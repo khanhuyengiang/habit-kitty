@@ -155,7 +155,10 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
 
 .food { width: 30px; height: 24px; vertical-align: -4px; margin-right: 6px; }
 
-.room .pet { touch-action: manipulation; cursor: pointer; }
+.room .pet { touch-action: manipulation; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; outline: none; }
+.ripple { position: absolute; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(255,255,255,.35); border: 2px solid rgba(255,255,255,.6); pointer-events: none; animation: ripple .5s ease-out forwards; }
+@keyframes ripple { from { transform: scale(.2); opacity: 1; } to { transform: scale(1.3); opacity: 0; } }
+.pencil { background: none; border: 0; padding: 0 4px; font: inherit; color: var(--muted, #8a7a6a); cursor: pointer; }
 .heart { position: absolute; left: 50%; top: -4%; width: 32px; margin-left: -16px; pointer-events: none; animation: heart 1.2s steps(8) forwards; }
 .heart svg { display: block; width: 100%; filter: drop-shadow(0 2px 0 rgba(255,255,255,.6)); }
 @keyframes heart { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; transform: translateY(-4px); }
@@ -220,6 +223,13 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
 .field textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line); background: var(--bg); font: 400 13px/1.3 var(--font-mono); min-height: 90px; }
 
 /* cozy room */
+.room, .room * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.room-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.clock-pop { position: fixed; right: 12px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 6; display: grid; justify-items: end; gap: 6px; }
+.clock-btn { width: 40px; height: 40px; border: 2px solid var(--ink); background: var(--surface); font-size: 18px; line-height: 1; opacity: .85; }
+.clock-menu { display: none; order: -1; width: min(300px, calc(100vw - 24px)); border: 2px solid var(--ink); }
+.clock-pop.open .clock-menu { display: grid; }
+@media (hover: hover) { .clock-pop:hover .clock-menu { display: grid; } }
 .room { position: relative; aspect-ratio: 80 / 112; border: 2px solid var(--ink); overflow: hidden; background: #e9d6c3; }
 .room svg.bg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .room .pet { position: absolute; width: 22%; filter: drop-shadow(0 3px 0 rgba(0,0,0,.18)); }
@@ -240,12 +250,12 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
 <div class="wrap">
   <header class="top" id="top"></header>
 
-  <main id="tab-room" class="tab"><div id="room"></div><p class="muted" id="room-note"></p></main>
+  <main id="tab-room" class="tab"><div class="room-head"><h2 id="room-title"></h2><button class="btn small" type="button" data-action="room-rename">Rename</button></div><div id="room"></div><p class="muted" id="room-note"></p></main>
 
   <main id="tab-mindful" class="tab">
-    <div class="seg" id="mindful-seg" role="tablist" aria-label="Tasks or habits">
+    <div class="seg" id="mindful-seg" role="tablist" aria-label="Treats or tasks">
+      <button type="button" role="tab" data-action="mindful-view" data-view="habit">Treats</button>
       <button type="button" role="tab" data-action="mindful-view" data-view="task">Tasks</button>
-      <button type="button" role="tab" data-action="mindful-view" data-view="habit">Habits</button>
     </div>
     <section class="panel">
       <h3 id="mindful-title"></h3>
@@ -274,7 +284,7 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
     <section class="update" id="log" hidden></section>
     <div class="seg" id="today-seg" role="tablist" aria-label="Where your cats are"></div>
     <section class="cats" id="cats" aria-label="Your cats"></section>
-    <button class="btn primary" type="button" data-action="adopt-open" style="padding:16px;font-size:18px">Adopt cat</button>
+    <button class="btn primary" type="button" data-action="adopt-open" style="padding:16px;font-size:18px">Adopt kitty</button>
     <p class="muted" style="text-align:center;font-size:13px">Press and hold a cat for more options.</p>
   </main>
 
@@ -302,18 +312,7 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
 
     <section class="panel">
       <h3>Kitties</h3>
-      <label class="check"><input type="checkbox" id="unlimited-cats"><span><b>Unlimited kitty</b><br><span class="muted">Normally you can keep 9 kitties. Turn this on to adopt more, but you will have to confirm three times for every extra kitty.</span></span></label>
-    </section>
-
-    <section class="panel">
-      <h3>Playtest clock</h3>
-      <p class="muted">Skip ahead in time to test what happens when days pass. <b id="clock-now"></b></p>
-      <p class="muted" id="clock-label"></p>
-      <div class="btns">
-        <button class="btn" type="button" data-action="skip" data-hours="3">+3 h</button>
-        <button class="btn" type="button" data-action="skip" data-hours="24">+1 day</button>
-        <button class="btn" type="button" data-action="real-time" id="real-time">Now</button>
-      </div>
+      <label class="check"><input type="checkbox" id="unlimited-cats"><span><b>Unlimited kitties</b><br><span class="muted">Normally you can keep 9 kitties. Turn this on to adopt more, but you will have to confirm three times for every extra kitty.</span></span></label>
     </section>
 
     <section class="panel">
@@ -323,9 +322,9 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
         <li>A day runs from 2am to 2am.</li>
         <li>Every missed day costs −15. After 3 missed days in a row a classic cat dies; a light-hearted one runs away.</li>
         <li>Going away? Leave a cat with the sitter for up to 7 days (−5 a day, once every 30 days). Bring it home in time or it stays there.</li>
-        <li>Below 0 affection, cats only trust you with one cat at a time. Mindful tasks earn it back.</li>
+        <li>Below 0 affection, cats only trust you with one cat at a time. Treats and tasks earn it back.</li>
         <li>Heatmap shows each cat's month (switch between combined and individual); the gold outline is today.</li>
-        <li>Mindful <b>tasks</b> are one-offs (up to 15 xp a day). Mindful <b>habits</b> repeat and keep their history (up to 10 xp a day). A daily habit can become a kitty and keeps its history in teal.</li>
+        <li><b>Tasks</b> are one-offs (up to 15 xp a day). <b>Treats</b> are small habits you might not do every day, like cleaning your desk after working from home; they repeat and keep their history (up to 10 xp a day). A daily treat can become a kitty and keeps its history in teal.</li>
         <li>You can keep up to 9 kitties.</li>
       </ul>
     </section>
@@ -339,11 +338,24 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
 
 <nav class="tabbar" aria-label="Tabs"><div class="tabbar-in" role="tablist">
   <button role="tab" data-action="tab" data-tab="room"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7M5 10v10h14V10M10 20v-6h4v6"/></svg><span>Room</span></button>
-  <button role="tab" data-action="tab" data-tab="mindful"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21c-5 0-8-3-8-8 5 0 8 3 8 8Zm0 0c5 0 8-3 8-8-5 0-8 3-8 8ZM12 13V4"/></svg><span>Mindful</span></button>
-  <button role="tab" data-action="tab" data-tab="today" class="mid"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l4 4M20 4l-4 4M5 9h14v8H5zM9 13h1M14 13h1"/></svg><span>Today</span></button>
+  <button role="tab" data-action="tab" data-tab="mindful"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12c3-5 9-6 13-2l5-3v10l-5-3c-4 4-10 3-13-2ZM7 11h.01"/></svg><span>Treats</span></button>
+  <button role="tab" data-action="tab" data-tab="today" class="mid"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4l3.5 3.5h7L19 4v9a7 7 0 0 1-14 0ZM9 12h.01M15 12h.01M11 15.5h2"/></svg><span>Today</span></button>
   <button role="tab" data-action="tab" data-tab="heat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg><span>Heatmap</span></button>
   <button role="tab" data-action="tab" data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M9 4v6M15 14v6"/></svg><span>Settings</span></button>
 </div></nav>
+<div class="clock-pop" id="clock-pop">
+  <button type="button" class="clock-btn" data-action="clock-toggle" aria-label="Playtest clock">⏱</button>
+  <div class="clock-menu panel">
+    <h3>Playtest clock</h3>
+    <p class="muted"><b id="clock-now"></b></p>
+    <p class="muted" id="clock-label"></p>
+    <div class="btns">
+      <button class="btn" type="button" data-action="skip" data-hours="3">+3 h</button>
+      <button class="btn" type="button" data-action="skip" data-hours="24">+1 day</button>
+      <button class="btn" type="button" data-action="real-time" id="real-time">Now</button>
+    </div>
+  </div>
+</div>
 <div id="modal" hidden></div>
 <div class="toast" id="toast" role="status" hidden></div>
 

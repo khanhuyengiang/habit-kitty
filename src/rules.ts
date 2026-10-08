@@ -13,6 +13,7 @@ export const CONFIG = {
   mindfulDefaultCooldownDays: 1,
   lowXpThreshold: 0,         // xp below this = cats distrust you
   lowXpMaxCats: 1,
+  departureXp: -30,          // affection drops to this when a kitty runs away, leaves or dies
   lightheartedReturns: 1,    // a runaway cat can come back this many times
 } as const;
 
@@ -212,7 +213,7 @@ export function settleAll(state: AppState, now: Date): { state: AppState; events
   const cats = state.cats.map((cat) => {
     const r = settleCat(cat, today);
     xp += r.xpDelta;
-    if (r.events.some((e) => e.type === 'died')) xp = 0;   // losing a cat resets affection to 0
+    if (r.events.some((e) => e.type === 'died' || e.type === 'ranAway' || e.type === 'leftForever')) xp = CONFIG.departureXp;   // losing a cat drops affection to -30
     events.push(...r.events);
     return r.cat;
   });
