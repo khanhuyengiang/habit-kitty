@@ -10,7 +10,7 @@ import { dateOf, firstDay, habitStreak, monthGrid, streak, weekRow, type DayKind
 
 // ===================== Save =====================
 interface LogLine { at: number; text: string }
-interface Save { v: 1; state: AppState; offsetHours: number; log: LogLine[]; savedAt: number; logHidden?: boolean; combineHeat?: boolean; unlimited?: boolean }
+interface Save { v: 1; state: AppState; offsetHours: number; log: LogLine[]; savedAt: number; logHidden?: boolean; combineHeat?: boolean; unlimited?: boolean; roomName?: string }
 
 const KEY = 'habit-kitty-save-v1';
 const fresh = (): Save => ({ v: 1, state: newState(), offsetHours: 0, log: [], savedAt: 0 });
@@ -111,11 +111,11 @@ function reasonText(r: Reason, cat?: Cat): string {
       return `${n} can visit the sitter once every ${CONFIG.sitterCooldownDays} days. ` +
         `${plural(cat ? sitterCooldownLeft(cat, today()) : 0, 'day')} to go.`;
     case 'low_affection_cat_limit':
-      return 'Your affection is below 0, so cats only trust you with one at a time. Feed your cat or do mindful tasks to earn it back.';
+      return 'Your affection is below 0, so cats only trust you with one at a time. Feed your cat or do treats and tasks to earn it back.';
     case 'task_on_cooldown': return 'You did this one recently. It comes back after its repeat time.';
     case 'task_already_done': return 'This task is already done. Press and hold it to delete it.';
     case 'not_daily_habit': return 'Only daily habits can become a kitty.';
-    case 'cat_limit': return `You can keep ${CONFIG.maxCats} kitties. Turn on Unlimited kitty in Settings if you really want more.`;
+    case 'cat_limit': return `You can keep ${CONFIG.maxCats} kitties. Turn on Unlimited kitties in Settings if you really want more.`;
     case 'cat_not_active': return `${n} isn't here anymore.`;
     case 'no_such_cat': case 'no_such_task': return 'That no longer exists.';
   }
@@ -400,7 +400,7 @@ function renderCats() {
     `<button type="button" role="tab" data-action="today-view" data-view="${v}" aria-selected="${v === todayView}">${labels[v]} <span class="num">${all.filter((c) => viewOf(c) === v).length}</span></button>`).join('');
   if (!all.length) {
     $('cats').innerHTML = `<div class="cat"><div class="cat-head">${sprite('open', { fur: '#e8a04c', pattern: 'plain' }, true)}
-      <div><p class="cat-name">No cats yet</p><p class="cat-habit">Tap Adopt cat to get your first one.</p></div></div></div>`;
+      <div><p class="cat-name">No cats yet</p><p class="cat-habit">Tap Adopt kitty to get your first one.</p></div></div></div>`;
     return;
   }
   const cats = all.filter((c) => viewOf(c) === todayView);
@@ -427,7 +427,7 @@ function renderCats() {
     return `<article class="cat${ended ? ' ended' : ''}">
       <div class="cat-head"${c.status === 'ranAway' || !ended ? ` data-hold="cat" data-id="${c.id}"` : ''}>${sprite(s.face, lookFor(c), s.faded)}
         <div><p class="cat-name">${esc(c.name)}<span class="mode">${c.mode === 'classic' ? 'classic' : 'light-hearted'}</span></p>
-          <p class="cat-habit">${esc(c.habit)}</p>
+          <p class="cat-habit">${esc(c.habit)}${c.status === 'alive' || c.status === 'sitter' ? ` <button class="pencil" type="button" data-action="rename-habit" data-id="${c.id}" aria-label="Rename habit">✎</button>` : ''}</p>
           <span class="chip ${s.chip}">${s.label}</span>${ended ? '' : hp}</div>
       </div>
       ${s.note ? `<p class="note">${esc(s.note)}</p>` : ''}
@@ -437,36 +437,42 @@ function renderCats() {
   }).join('');
 }
 
-function renderCombined(): string {
+function renderCombined(subjects: Subject[], key: string, title: string, keyHtml: string, note: string): string {
   const t = today();
-  const cats = heatCats();
-  const back = viewMonth.get('all') ?? 0;
+  const back = viewMonth.get(key) ?? 0;
   const d = dateOf(t);
   const shown = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - back, 1));
-  const grids = cats.map((c) => monthGrid(c, shown.getUTCFullYear(), shown.getUTCMonth(), t));
+  const grids = subjects.map((c) => monthGrid(c, shown.getUTCFullYear(), shown.getUTCMonth(), t));
   const g0 = grids[0];
-  const cols = Math.ceil(Math.sqrt(cats.length));
+  const cols = Math.ceil(Math.sqrt(subjects.length));
   const cells = [
     ...['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((x) => `<div class="dow">${x}</div>`),
     ...Array.from({ length: g0.lead }, () => '<div class="px blank"></div>'),
     ...g0.days.map((x, i) => `<div class="cell${x.day === t ? ' now' : ''}" style="grid-template-columns:repeat(${cols},1fr)" title="${fmtDay(x.day)}">
       ${grids.map((g) => `<i class="s ${g.days[i].kind}"></i>`).join('')}<span>${x.date}</span></div>`),
   ].join('');
-  const first = Math.min(...cats.map(firstDay));
+  const first = Math.min(...subjects.map(firstDay));
   const fm = dateOf(first);
   const atStart = shown.getUTCFullYear() * 12 + shown.getUTCMonth() <= fm.getUTCFullYear() * 12 + fm.getUTCMonth();
   return `<article class="cat"><div class="month">
     <div class="month-nav">
-      <button type="button" data-action="month" data-id="all" data-step="1" ${atStart ? 'disabled' : ''} aria-label="Previous month">‹</button>
+      <button type="button" data-action="month" data-id="${key}" data-step="1" ${atStart ? 'disabled' : ''} aria-label="Previous month">‹</button>
       <strong>${g0.title}</strong>
-      <button type="button" data-action="month" data-id="all" data-step="-1" ${back === 0 ? 'disabled' : ''} aria-label="Next month">›</button>
+      <button type="button" data-action="month" data-id="${key}" data-step="-1" ${back === 0 ? 'disabled' : ''} aria-label="Next month">›</button>
     </div>
-    <div class="grid" role="img" aria-label="All cats, ${g0.title}">${cells}</div>
-    <div class="slice-key" style="grid-template-columns:repeat(${cols},auto)">${cats.map((c, i) =>
-      `<span><b class="num">${i + 1}</b>${sprite(catStatus(c, t).face, lookFor(c), !isActive(c) && c.status !== 'dead')}${esc(c.name)}</span>`).join('')}</div>
-    <p class="stats">Each day is split into one slice per cat, in the order shown above.</p>
+    <div class="grid" role="img" aria-label="${title}, ${g0.title}">${cells}</div>
+    <div class="slice-key" style="grid-template-columns:repeat(${cols},auto)">${keyHtml}</div>
+    <p class="stats">${note}</p>
   </div></article>`;
 }
+
+const combinedCats = (cats: Cat[], t: number) => renderCombined(cats, 'all', 'All cats',
+  cats.map((c, i) => `<span><b class="num">${i + 1}</b>${sprite(catStatus(c, t).face, lookFor(c), !isActive(c) && c.status !== 'dead')}${esc(c.name)}</span>`).join(''),
+  'Each day is split into one slice per cat, in the order shown above.');
+
+const combinedHabits = (habits: MindfulTask[]) => renderCombined(habits.map(habitSubject), 'all-habits', 'All treats',
+  habits.map((h, i) => `<span><b class="num">${i + 1}</b>${esc(h.name)}</span>`).join(''),
+  'Each day is split into one slice per habit, in the order shown above.');
 
 const HEAT_LEGEND = `<div class="legend"><span><i class="fed"></i>fed</span><span><i class="habit"></i>done as a habit</span>
   <span><i class="missed"></i>missed</span><span><i class="today"></i>today (outlined)</span><span><i class="sitter"></i>with sitter</span><span><i></i>not tracked</span></div>`;
@@ -476,7 +482,7 @@ let heatFocus: string | null = null;   // set by 'View heatmap' in a cat's menu:
 function catCard(c: Cat, t: number): string {
   return `<article class="cat">
       <div class="cat-head">${sprite(catStatus(c, t).face, lookFor(c), !isActive(c) && c.status !== 'dead')}
-        <div><p class="cat-name">${esc(c.name)}</p><p class="cat-habit">${esc(c.habit)}</p></div></div>
+        <div><p class="cat-name">${esc(c.name)}</p><p class="cat-habit">${esc(c.habit)}${c.status === 'alive' || c.status === 'sitter' ? ` <button class="pencil" type="button" data-action="rename-habit" data-id="${c.id}" aria-label="Rename habit">✎</button>` : ''}</p></div></div>
       ${renderMonth(c, t)}
     </article>`;
 }
@@ -494,12 +500,12 @@ function renderHeat() {
   }
   heatFocus = null;
   const habits = save.state.tasks.filter((k) => k.kind === 'habit');
-  const habitCards = habits.length ? `<h2>Mindful habits</h2>` + habits.map((h) => `<article class="cat">
+  const habitCards = !habits.length ? '' : `<h2>Treats</h2>` + (combined ? combinedHabits(habits) : habits.map((h) => `<article class="cat">
       <div class="cat-head solo"><div><p class="cat-name">${esc(h.name)}</p><p class="cat-habit">${repeatText(h.cooldownDays)} · +${h.xp} xp</p></div></div>
-      ${renderMonth(habitSubject(h), t, h)}</article>`).join('') : '';
+      ${renderMonth(habitSubject(h), t, h)}</article>`).join(''));
   let body: string;
   if (!cats.length) body = '<p class="muted">No living cats to show.</p>';
-  else if (combined) body = renderCombined();
+  else if (combined) body = combinedCats(cats, t);
   else body = cats.map((c) => catCard(c, t)).join('');
   $('heat').innerHTML = body + habitCards + HEAT_LEGEND;
 }
@@ -577,7 +583,7 @@ function renderRoom() {
   const clock = now().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
   const away = save.state.cats.filter((c) => c.status === 'sitter').length;
   $('room-note').textContent = !pets.length
-    ? (away ? 'Everyone is with the pet sitter. The room is quiet.' : 'It is quiet in here. Adopt a cat and they will move in.')
+    ? (away ? 'Everyone is with the pet sitter. The room is quiet.' : 'It is quiet in here. Adopt a kitty and they will move in.')
     : `It's ${clock}. ${phase === 'night' ? 'Everyone is asleep.' : 'Your cats are making themselves at home.'}${away ? ` ${plural(away, 'cat')} with the sitter.` : ''}`;
 }
 
@@ -610,6 +616,13 @@ $('room').addEventListener('click', (ev) => {
   const id = pet.dataset.id ?? '';
   const double = lastTap.id === id && t - lastTap.at < 350;
   lastTap = double ? { id: '', at: 0 } : { id, at: t };
+  const r = pet.getBoundingClientRect();
+  const ring = document.createElement('i');
+  ring.className = 'ripple';
+  ring.style.left = `${ev.clientX - r.left}px`;
+  ring.style.top = `${ev.clientY - r.top}px`;
+  pet.appendChild(ring);
+  setTimeout(() => ring.remove(), 500);
   if (!double) return;
   const heart = document.createElement('i');
   heart.className = 'heart';
@@ -620,7 +633,7 @@ $('room').addEventListener('click', (ev) => {
 
 const repeatText = (d: number) => d === 1 ? 'daily' : d === 7 ? 'weekly' : d === 14 ? 'every 2 weeks' : d === 30 ? 'monthly' : `every ${d} days`;
 
-let mindfulView: TaskKind = 'task';
+let mindfulView: TaskKind = 'habit';
 const DEL = (id: string) => `<button class="btn small del" data-action="task-del" data-id="${id}" aria-label="Delete">✕</button>`;
 
 function renderTasks() {
@@ -630,13 +643,13 @@ function renderTasks() {
   const cap = isTask ? CONFIG.taskMaxXp : CONFIG.habitMaxXp;
   document.querySelectorAll<HTMLElement>('#mindful-seg [data-view]').forEach((b) =>
     b.setAttribute('aria-selected', String(b.dataset.view === kind)));
-  $('mindful-title').textContent = isTask ? 'Tasks' : 'Habits';
+  $('mindful-title').textContent = isTask ? 'Tasks' : 'Treats';
   $('mindful-desc').textContent = isTask
     ? `One-off jobs. Do it once, tick it off, earn up to ${cap} xp. Tap ✕ or press and hold to delete.`
-    : `Repeating routines that earn up to ${cap} xp a day. Track them before you commit to a kitty. Tap ✕ or press and hold to delete.`;
+    : `Small habits you might not want to do every day, like cleaning your desk after a work-from-home session. Earn up to ${cap} xp a day. Track them before you commit to a kitty. Tap ✕ or press and hold to delete.`;
   const e = save.state.mindfulEarned?.day === t ? save.state.mindfulEarned : undefined;
   $('mindful-cap').textContent = `Earned today: ${(isTask ? e?.task : e?.habit) ?? 0}/${cap} xp`;
-  $('form-title').textContent = isTask ? 'New task' : 'New habit';
+  $('form-title').textContent = isTask ? 'New task' : 'New treat';
   $('task-xp-label').textContent = `Reward (xp, max ${cap})`;
   ($('task-xp') as HTMLInputElement).max = String(cap);
   ($('repeat-wrap') as HTMLElement).hidden = isTask;
@@ -656,12 +669,15 @@ function renderTasks() {
     const left = k.lastDoneDay === null ? 0 : Math.max(0, k.cooldownDays - (t - k.lastDoneDay));
     const daily = k.cooldownDays === 1;
     return `<li class="habit" data-task="${k.id}" data-hold="task"><span>${esc(k.name)} <span class="muted">· +${k.xp} xp · ${repeatText(k.cooldownDays)}</span></span>
-      <span class="row-btns"><button class="btn small" data-action="task" data-id="${k.id}" ${left ? 'disabled' : ''}>${left ? `in ${plural(left, 'day')}` : 'Done'}</button>${DEL(k.id)}</span>
+      <span class="row-btns"><button class="btn small" data-action="task" data-id="${k.id}" ${left ? 'disabled' : ''}>${left ? `in ${plural(left, 'day')}` : 'Done'}</button><button class="btn small" data-action="rename-habit" data-id="${k.id}" aria-label="Rename treat">✎</button>${DEL(k.id)}</span>
       ${renderWeek(habitSubject(k), t)}
       <span class="muted habit-foot">${k.doneDays.length ? `Done ${plural(k.doneDays.length, 'time')}` : 'Not done yet'}${daily ? ` · streak ${habitStreak(k.doneDays, t)}` : ''}</span>
       ${daily ? `<button class="btn small" data-action="habit-kitty" data-id="${k.id}">Make it a kitty</button>` : ''}</li>`;
-  }).join('') : `<li class="muted">No ${isTask ? 'tasks' : 'habits'} yet. Add one below.</li>`;
+  }).join('') : `<li class="muted">No ${isTask ? 'tasks' : 'treats'} yet. Add one below.</li>`;
 }
+
+const roomTitle = () => save.roomName?.trim() || 'Cozy room';
+function renderRoomTitle() { $('room-title').textContent = roomTitle(); }
 
 function renderClock() {
   const n = now();
@@ -720,14 +736,14 @@ function startAdopt(habitId?: string) {
     if (!save.unlimited) {
       openModal(`<div class="panel"><h3>${next} habits is a lot</h3>
         <p>${next} habits is a lot for people to handle, and it will be very sad if a kitty goes hungry.</p>
-        <p>Consider returning one kitty to the shelter to make room for a new one, or use a mindful habit as a temporary try-out for a habit you're not sure about yet.</p>
+        <p>Consider returning one kitty to the shelter to make room for a new one, or use a treat as a temporary try-out for a habit you're not sure about yet.</p>
         <div class="btns"><button class="btn" data-action="modal-close">OK</button>
-        <button class="btn primary" data-action="goto-habits">Try a mindful habit</button></div></div>`);
+        <button class="btn primary" data-action="goto-habits">Try a treat</button></div></div>`);
       return;
     }
     runGate([
       { title: `Kitty #${next}? That's a lot`, yes: 'I still want to',
-        text: `${next} habits is a lot for people to handle, and it will be very sad if a kitty goes hungry. Consider returning a kitty to the shelter, or trying this one as a mindful habit first.` },
+        text: `${next} habits is a lot for people to handle, and it will be very sad if a kitty goes hungry. Consider returning a kitty to the shelter, or trying this one as a treat first.` },
       { title: 'Are you really sure?', yes: 'Yes, really',
         text: `Every kitty needs you every single day. Miss a day and you lose ${CONFIG.starvePenalty} affection for each hungry kitty, and a classic kitty can die. With ${next} kitties that adds up fast.` },
       { title: 'Last chance', yes: 'I promise',
@@ -750,7 +766,7 @@ function openAdopt(habitId?: string) {
   adoptFrom = habitId ?? null;
   const habit = habitId ? save.state.tasks.find((k) => k.id === habitId) : undefined;
   openModal(`<form class="panel" id="adopt" novalidate>
-    <h3>${habit ? 'Make a kitty' : 'Adopt a cat'}</h3>
+    <h3>${habit ? 'Make a kitty' : 'Adopt a kitty'}</h3>
     <div class="preview"><div id="adopt-preview">${sprite('happy', draftLook)}</div>
       <button class="btn" type="button" data-action="randomise">🎲 Randomise look</button></div>
     <p class="muted">${habit ? `Your history with this habit comes along. Days you did it show in teal; days before the kitty show as empty.`
@@ -768,7 +784,7 @@ function openAdopt(habitId?: string) {
 }
 
 function renderAll() {
-  renderTop(); renderLog(); renderCats(); renderHeat(); renderRoom(); renderTasks(); renderClock(); renderSaved();
+  renderTop(); renderLog(); renderCats(); renderHeat(); renderRoom(); renderRoomTitle(); renderTasks(); renderClock(); renderSaved();
 }
 
 // ===================== Events =====================
@@ -848,6 +864,22 @@ document.addEventListener('click', (ev) => {
       closeModal();
       break;
     }
+    case 'rename-habit': {
+      const cur = cat ? cat.habit : save.state.tasks.find((k) => k.id === id)?.name;
+      if (cur === undefined) break;
+      closeModal();
+      openModal(`<form class="panel" id="rename" data-id="${id}" novalidate><h3>Rename habit</h3>
+        ${cat ? `<p class="muted">${esc(cat.name)}'s name stays the same. Only the habit changes.</p>` : ''}
+        <label class="field">Habit name <input id="rename-input" maxlength="40" autocomplete="off" value="${esc(cur)}"></label>
+        <div class="btns"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`);
+      break;
+    }
+    case 'room-rename':
+      openModal(`<form class="panel" id="room-name" novalidate><h3>Name your room</h3>
+        <label class="field">Room name <input id="room-name-input" maxlength="24" autocomplete="off" placeholder="Cozy room" value="${esc(save.roomName ?? '')}"></label>
+        <div class="btns"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`);
+      break;
+    case 'clock-toggle': $('clock-pop').classList.toggle('open'); break;
     case 'modal-close': if (ev.target === btn) closeModal(); break;
     case 'delete-task-yes':
       save.state = removeMindfulTask(save.state, id);
@@ -927,7 +959,7 @@ function loadSave(raw: string) {
 $('unlimited-cats').addEventListener('change', (ev) => {
   save.unlimited = (ev.target as HTMLInputElement).checked;
   persist();
-  toast(save.unlimited ? 'Unlimited kitty on. You will be asked three times for every kitty past 9.' : `Back to a limit of ${CONFIG.maxCats} kitties.`);
+  toast(save.unlimited ? 'Unlimited kitties on. You will be asked three times for every kitty past 9.' : `Back to a limit of ${CONFIG.maxCats} kitties.`);
 });
 
 $('load-file').addEventListener('change', async (ev) => {
@@ -954,10 +986,23 @@ document.addEventListener('submit', (ev) => {
     closeModal();
     toast(adoptFrom ? `${name.trim()} is a kitty now, and remembers your history.` : `Welcome home, ${name.trim()}! Feed them today.`);
     adoptFrom = null;
+  } else if (form.id === 'rename') {
+    const id = form.dataset.id ?? '';
+    const name = ($('rename-input') as HTMLInputElement).value.trim();
+    if (!name) return;
+    save.state = {
+      ...save.state,
+      cats: save.state.cats.map((c) => (c.id === id ? { ...c, habit: name } : c)),
+      tasks: save.state.tasks.map((k) => (k.id === id ? { ...k, name } : k)),
+    };
+    persist(); closeModal(); renderAll(); toast('Habit renamed.');
+  } else if (form.id === 'room-name') {
+    save.roomName = ($('room-name-input') as HTMLInputElement).value.trim() || undefined;
+    persist(); closeModal(); renderRoomTitle(); toast('Room renamed.');
   } else if (form.id === 'task-form') {
     const input = $('task-name') as HTMLInputElement;
     const kind = mindfulView;
-    if (!input.value.trim()) { toast(`Name the ${kind} first.`); return; }
+    if (!input.value.trim()) { toast(`Name the ${kind === 'habit' ? 'treat' : 'task'} first.`); return; }
     const rep = ($('task-repeat') as HTMLSelectElement).value;
     const days = rep === 'custom' ? Number(($('task-days') as HTMLInputElement).value) : Number(rep);
     save.state = addMindfulTask(save.state, {
@@ -966,8 +1011,12 @@ document.addEventListener('submit', (ev) => {
     input.value = '';
     persist();
     renderAll();
-    toast(kind === 'task' ? 'Task added.' : 'Habit added.');
+    toast(kind === 'task' ? 'Task added.' : 'Treat added.');
   }
+});
+
+document.addEventListener('click', (ev) => {
+  if (!(ev.target as HTMLElement).closest('#clock-pop')) $('clock-pop').classList.remove('open');
 });
 
 $('task-repeat').addEventListener('change', () => renderTasks());
@@ -984,7 +1033,7 @@ function endHold() { clearTimeout(holdTimer); holdEl?.classList.remove('pressing
 function askDeleteTask(id: string) {
   const task = save.state.tasks.find((k) => k.id === id);
   if (!task) return;
-    openModal(`<div class="panel"><h3>Delete this ${task.kind}?</h3><p>${esc(task.name)}</p>${task.kind === 'habit' && task.doneDays.length ? '<p class="muted">Its history will be lost.</p>' : ''}
+    openModal(`<div class="panel"><h3>Delete this ${task.kind === 'habit' ? 'treat' : 'task'}?</h3><p>${esc(task.name)}</p>${task.kind === 'habit' && task.doneDays.length ? '<p class="muted">Its history will be lost.</p>' : ''}
       <div class="btns"><button class="btn" data-action="modal-close">Keep</button>
       <button class="btn primary" data-action="delete-task-yes" data-id="${id}">Delete</button></div></div>`);
 }
@@ -1001,6 +1050,7 @@ function fireHold(el: HTMLElement) {
       : away ? `<button class="btn primary" data-action="resume" data-id="${id}">Bring ${esc(cat.name)} home</button>` : '';
     openModal(`<div class="panel"><h3>${esc(cat.name)}</h3><p class="muted">${esc(cat.habit)}</p>
       <div style="display:grid;gap:8px">${sitterBtn}
+      <button class="btn" data-action="rename-habit" data-id="${id}">Rename habit</button>
       ${cat.status === 'ranAway' ? '' : `<button class="btn" data-action="cat-heat" data-id="${id}">View heatmap</button>`}
       <button class="btn" data-action="shelter-ask" data-id="${id}">Return to the shelter</button>
       <button class="btn" data-action="modal-close">Cancel</button></div></div>`);

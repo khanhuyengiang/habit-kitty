@@ -77,7 +77,7 @@ describe('starvation and death', () => {
     expect(hunger(s.cats[0], dayIndex(at(3)))).toBe('starving');
 
     const r = settleAll(s, at(4));
-    expect(r.state.xp).toBe(0);
+    expect(r.state.xp).toBe(-30);
     expect(r.state.cats[0].status).toBe('dead');
     expect(r.events.some((e) => e.type === 'died')).toBe(true);
     expect(graveyard(r.state)).toHaveLength(1);
@@ -86,7 +86,7 @@ describe('starvation and death', () => {
   it('caps the penalty at 3 misses even if the app was closed for ages', () => {
     const s = settleAll(ok(feedCat(setup(), 'c1', at(0))), at(40)).state;
     expect(s.cats[0].status).toBe('dead');
-    expect(s.xp).toBe(0);
+    expect(s.xp).toBe(-30);
   });
 
   it('feeding a hungry cat rescues it', () => {
@@ -111,23 +111,23 @@ describe('light-hearted mode', () => {
     expect(graveyard(r.state)).toHaveLength(0);
     expect(runaways(r.state)).toHaveLength(1);
     expect(r.events.some((e) => e.type === 'ranAway')).toBe(true);
-    expect(r.state.xp).toBe(-45); // same penalties as classic
+    expect(r.state.xp).toBe(-30); // dropped to -30 when they ran away
   });
 
   it('comes back once when you do the habit, then leaves for good', () => {
-    let s = settleAll(setup('lighthearted'), at(10)).state;   // ran away, xp -45
+    let s = settleAll(setup('lighthearted'), at(10)).state;   // ran away, xp -30
 
     const back = feedCat(s, 'c1', at(10));
     s = ok(back);
     expect(back.events.some((e) => e.type === 'returned')).toBe(true);
     expect(s.cats[0].status).toBe('alive');
     expect(s.cats[0].missed).toBe(0);
-    expect(s.xp).toBe(-40);
+    expect(s.xp).toBe(-25);
 
     s = settleAll(s, at(20)).state;                            // neglected again
     expect(s.cats[0].status).toBe('leftForever');
     expect(s.cats[0].runAwayCount).toBe(2);
-    expect(s.xp).toBe(-85);
+    expect(s.xp).toBe(-30);
 
     const r = feedCat(s, 'c1', at(20));
     expect(r.ok).toBe(false);
@@ -135,7 +135,7 @@ describe('light-hearted mode', () => {
   });
 
   it('a runaway cat still holds your one slot at low xp', () => {
-    const s = settleAll(setup('lighthearted'), at(10)).state;  // xp -45, cat away
+    const s = settleAll(setup('lighthearted'), at(10)).state;  // xp -30, cat away
     const r = adoptCat(s, { id: 'c2', name: 'Pixel', habit: 'Read' }, at(10));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toBe('low_affection_cat_limit');
@@ -328,11 +328,11 @@ describe('cat limit and shelter', () => {
 });
 
 describe('cat death', () => {
-  it('resets affection to 0', () => {
+  it('drops affection to -30', () => {
     let s = ok(adoptCat(newState(), { id: 'c1', name: 'Mochi', habit: 'Water' }, at(0)));
     s = { ...s, xp: 80 };
     s = settleAll(s, at(3)).state;
     expect(s.cats[0].status).toBe('dead');
-    expect(s.xp).toBe(0);
+    expect(s.xp).toBe(-30);
   });
 });
