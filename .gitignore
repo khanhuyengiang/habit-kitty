@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output (regenerate with `npm run build:web` / `npm run app:apk`)
+dist/
+app-www/
+
+# Android: generated or machine-specific
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+android/local.properties
+android/.idea/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Local state and tooling
+save.json
+.history/
+.vscode/
+.idea/
+*.log
+.DS_Store
