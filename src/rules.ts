@@ -7,9 +7,10 @@ export const CONFIG = {
   sitterPenaltyPerDay: 5,
   sitterMaxDays: 7,
   sitterCooldownDays: 30,    // 1 sitter trip per cat per rolling 30 days
-  mindfulMaxXp: 15,          // per task
-  mindfulDailyCap: 15,       // total xp mindful tasks can give per day
-  mindfulDefaultCooldownDays: 7,
+  maxCats: 9,                // active cats, unless the player opts into unlimited
+  taskMaxXp: 15,             // one-off tasks: reward and daily payout cap
+  habitMaxXp: 10,            // repeating habits: reward and daily payout cap
+  mindfulDefaultCooldownDays: 1,
   lowXpThreshold: 0,         // xp below this = cats distrust you
   lowXpMaxCats: 1,
   lightheartedReturns: 1,    // a runaway cat can come back this many times
@@ -41,6 +42,7 @@ export interface Cat {
   sitterTrips: SitterTrip[];       // oldest first; the last one is open while with the sitter
   runAwayCount: number;
   look?: CatLook;                  // chosen appearance; older saves derive one from the id
+  habitDays?: number[];            // days it was done as a mindful habit, before it became a cat
 }
 
 // Days start..end-1 were spent with the sitter; end is the day the cat came home
@@ -50,19 +52,26 @@ export interface SitterTrip {
   end: number | null;
 }
 
+export type TaskKind = 'task' | 'habit';
+
+// A 'task' is one-off (done once, then it stays ticked until deleted).
+// A 'habit' repeats every cooldownDays and keeps its history.
 export interface MindfulTask {
   id: string;
   name: string;
-  xp: number;                      // 1..15
-  cooldownDays: number;
+  kind: TaskKind;
+  xp: number;                      // tasks 1..15, habits 1..10
+  cooldownDays: number;            // habits only
   lastDoneDay: number | null;
+  doneDays: number[];              // every day it was done, ascending
+  createdDay: number;
 }
 
 export interface AppState {
   xp: number;                      // global affection score, may be negative
   cats: Cat[];
   tasks: MindfulTask[];
-  mindfulEarned?: { day: number; xp: number };   // mindful xp already paid out today
+  mindfulEarned?: { day: number; task: number; habit: number };   // mindful xp already paid out today
 }
 
 export type GameEvent =
@@ -77,7 +86,7 @@ export type Reason =
   | 'no_such_cat' | 'no_such_task' | 'invalid_input'
   | 'cat_not_active' | 'with_sitter' | 'already_with_sitter' | 'not_with_sitter'
   | 'already_fed_today' | 'sitter_cooldown'
-  | 'low_affection_cat_limit' | 'task_on_cooldown';
+  | 'low_affection_cat_limit' | 'task_on_cooldown' | 'cat_limit' | 'task_already_done' | 'not_daily_habit';
 
 // On failure the (settled) state is still returned: always persist result.state.
 export type ActionResult =
@@ -227,7 +236,7 @@ export const maxActiveCats = (xp: number) =>
 
 export function adoptCat(
   state: AppState,
-  input: { id: string; name: string; habit: string; mode?: CatMode; look?: CatLook },
+  input: { id: string; name: string; habit: string; mode?: CatMode; look?: CatLook; habitDays?: number[]; unlimited?: boolean },
   now: Date,
 ): ActionResult {
   const { s, events, today } = begin(state, now);
@@ -237,6 +246,7 @@ export function adoptCat(
     (c) => c.status === 'alive' || c.status === 'sitter' || c.status === 'ranAway',
   ).length;
   if (active >= maxActiveCats(s.xp)) return fail(s, events, 'low_affection_cat_limit');
+  if (active >= CONFIG.maxCats && !input.unlimited) return fail(s, events, 'cat_limit');
 
   const cat: Cat = {
     id: input.id, name: input.name.trim(), habit: input.habit.trim(),
@@ -245,6 +255,7 @@ export function adoptCat(
     sitterStartDay: null, lastSitterStartDay: null, endedDay: null, totalFeedings: 0,
     fedDays: [], sitterTrips: [], runAwayCount: 0,
     ...(input.look ? { look: input.look } : {}),
+    ...(input.habitDays?.length ? { habitDays: input.habitDays } : {}),
   };
   return done({ ...s, cats: [...s.cats, cat] }, events);
 }
@@ -326,14 +337,20 @@ export function resumeCat(state: AppState, catId: string, now: Date): ActionResu
 
 export function addMindfulTask(
   state: AppState,
-  input: { id: string; name: string; xp: number; cooldownDays?: number },
+  input: { id: string; name: string; xp: number; kind?: TaskKind; cooldownDays?: number },
+  now: Date = new Date(),
 ): AppState {
+  const kind = input.kind ?? 'habit';
+  const max = kind === 'task' ? CONFIG.taskMaxXp : CONFIG.habitMaxXp;
   const task: MindfulTask = {
     id: input.id,
     name: input.name.trim(),
-    xp: Math.min(CONFIG.mindfulMaxXp, Math.max(1, Math.round(input.xp))),
-    cooldownDays: Math.max(1, Math.round(input.cooldownDays ?? CONFIG.mindfulDefaultCooldownDays)),
+    kind,
+    xp: Math.min(max, Math.max(1, Math.round(input.xp))),
+    cooldownDays: kind === 'task' ? 0 : Math.max(1, Math.round(input.cooldownDays ?? CONFIG.mindfulDefaultCooldownDays)),
     lastDoneDay: null,
+    doneDays: [],
+    createdDay: dayIndex(now),
   };
   return { ...state, tasks: [...state.tasks, task] };
 }
@@ -345,21 +362,42 @@ export function doMindfulTask(state: AppState, taskId: string, now: Date): Actio
   const { s, events, today } = begin(state, now);
   const task = s.tasks.find((t) => t.id === taskId);
   if (!task) return fail(s, events, 'no_such_task');
-  if (task.lastDoneDay !== null && today - task.lastDoneDay < task.cooldownDays) {
+  if (task.kind === 'task') {
+    if (task.lastDoneDay !== null) return fail(s, events, 'task_already_done');
+  } else if (task.lastDoneDay !== null && today - task.lastDoneDay < task.cooldownDays) {
     return fail(s, events, 'task_on_cooldown');
   }
-  // Tasks can always be done, but only the first mindfulDailyCap xp each day pays out.
-  const earned = s.mindfulEarned?.day === today ? s.mindfulEarned.xp : 0;
-  const paid = Math.max(0, Math.min(task.xp, CONFIG.mindfulDailyCap - earned));
+  // Anything can be done, but only the first N xp of each kind pays out per day.
+  const cap = task.kind === 'task' ? CONFIG.taskMaxXp : CONFIG.habitMaxXp;
+  const e = s.mindfulEarned?.day === today ? s.mindfulEarned : undefined;
+  const earned = { task: e?.task ?? 0, habit: e?.habit ?? 0 };
+  const paid = Math.max(0, Math.min(task.xp, cap - earned[task.kind]));
+  earned[task.kind] += paid;
   return done(
     {
       ...s,
       xp: s.xp + paid,
-      mindfulEarned: { day: today, xp: earned + paid },
-      tasks: s.tasks.map((t) => (t.id === taskId ? { ...t, lastDoneDay: today } : t)),
+      mindfulEarned: { day: today, ...earned },
+      tasks: s.tasks.map((t) => (t.id === taskId
+        ? { ...t, lastDoneDay: today, doneDays: [...t.doneDays, today] } : t)),
     },
     events,
   );
+}
+
+// Turn a daily habit into a cat. The cat keeps the habit's history (as habitDays) and the habit is removed.
+export function habitToCat(
+  state: AppState,
+  taskId: string,
+  input: { id: string; name: string; mode?: CatMode; look?: CatLook; unlimited?: boolean },
+  now: Date,
+): ActionResult {
+  const task = state.tasks.find((t) => t.id === taskId);
+  if (!task) return fail(state, [], 'no_such_task');
+  if (task.kind !== 'habit' || task.cooldownDays !== 1) return fail(state, [], 'not_daily_habit');
+  const r = adoptCat(state, { ...input, habit: task.name, habitDays: task.doneDays }, now);
+  if (!r.ok) return r;
+  return done(removeMindfulTask(r.state, taskId), r.events);
 }
 
 // ===================== Selectors for the UI =====================

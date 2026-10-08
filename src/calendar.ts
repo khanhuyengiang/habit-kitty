@@ -5,15 +5,19 @@ import type { Cat } from './rules.ts';
 export const dateOf = (day: number) => new Date(day * 86_400_000);
 export const dayOf = (y: number, m: number, d: number) => Math.round(Date.UTC(y, m, d) / 86_400_000);
 
-export type DayKind = 'fed' | 'missed' | 'today' | 'sitter' | 'none';
+export type DayKind = 'fed' | 'missed' | 'today' | 'sitter' | 'habit' | 'none';
 
-function kindOf(cat: Cat, day: number, today: number, fed: Set<number>): DayKind {
+// Anything with a feeding history: a cat, or a mindful habit dressed up as one (noMiss: skipped days aren't failures).
+export type Trackable = Pick<Cat, 'fedDays' | 'adoptedDay' | 'sitterTrips' | 'endedDay'> & { habitDays?: number[]; noMiss?: boolean };
+
+function kindOf(cat: Trackable, day: number, today: number, fed: Set<number>, habit: Set<number>): DayKind {
   if (fed.has(day)) return 'fed';
+  if (habit.has(day)) return 'habit';   // done before it was a cat (or while it is just a habit)
   if (day < cat.adoptedDay || day > today) return 'none';
   if (cat.sitterTrips.some((t) => day >= t.start && day < (t.end ?? Infinity))) return 'sitter';
   if (cat.endedDay !== null && day >= cat.endedDay) return 'none';
   if (day === today) return 'today';
-  return 'missed';
+  return cat.noMiss ? 'none' : 'missed';
 }
 
 export interface MonthGrid {
@@ -24,14 +28,15 @@ export interface MonthGrid {
   tracked: number;                       // days you were expected to feed: fed + missed
 }
 
-export function monthGrid(cat: Cat, year: number, month: number, today: number): MonthGrid {
+export function monthGrid(cat: Trackable, year: number, month: number, today: number): MonthGrid {
   const fed = new Set(cat.fedDays);
+  const habit = new Set(cat.habitDays ?? []);
   const first = dayOf(year, month, 1);
   const last = dayOf(year, month + 1, 0);
-  const count: Record<DayKind, number> = { fed: 0, missed: 0, today: 0, sitter: 0, none: 0 };
+  const count: Record<DayKind, number> = { fed: 0, missed: 0, today: 0, sitter: 0, habit: 0, none: 0 };
   const days = [];
   for (let d = first; d <= last; d++) {
-    const kind = kindOf(cat, d, today, fed);
+    const kind = kindOf(cat, d, today, fed, habit);
     count[kind]++;
     days.push({ day: d, date: d - first + 1, kind });
   }
@@ -53,8 +58,21 @@ export function streak(cat: Cat, today: number): number {
 }
 
 // The Monday-first week containing `today`, one entry per day.
-export function weekRow(cat: Cat, today: number): { day: number; kind: DayKind }[] {
+export function weekRow(cat: Trackable, today: number): { day: number; kind: DayKind }[] {
   const fed = new Set(cat.fedDays);
+  const habit = new Set(cat.habitDays ?? []);
   const monday = today - ((dateOf(today).getUTCDay() + 6) % 7);
-  return Array.from({ length: 7 }, (_, i) => ({ day: monday + i, kind: kindOf(cat, monday + i, today, fed) }));
+  return Array.from({ length: 7 }, (_, i) => ({ day: monday + i, kind: kindOf(cat, monday + i, today, fed, habit) }));
 }
+
+// Days in a row (ending today or yesterday) that a repeating habit was done.
+export function habitStreak(doneDays: number[], today: number): number {
+  const done = new Set(doneDays);
+  let d = done.has(today) ? today : today - 1;
+  let n = 0;
+  while (done.has(d--)) n++;
+  return n;
+}
+
+// The first day with any history, for month navigation limits.
+export const firstDay = (c: Trackable) => Math.min(c.adoptedDay, ...(c.habitDays ?? []));

@@ -7,9 +7,9 @@ Runs as a single web page and as an offline Android app (via Capacitor).
 |:--:|:--:|:--:|:--:|
 | <img src="docs/screenshots/today.png" width="200"> | <img src="docs/screenshots/room.png" width="200"> | <img src="docs/screenshots/heatmap.png" width="200"> | <img src="docs/screenshots/heatmap-combined.png" width="200"> |
 
-| Mindful tasks | Settings | Press and hold a cat | Adopt a cat |
+| Memories | Mindful habits | Press and hold a cat | Adopt a cat |
 |:--:|:--:|:--:|:--:|
-| <img src="docs/screenshots/mindful.png" width="200"> | <img src="docs/screenshots/settings.png" width="200"> | <img src="docs/screenshots/cat-menu.png" width="200"> | <img src="docs/screenshots/adopt.png" width="200"> |
+| <img src="docs/screenshots/memories.png" width="200"> | <img src="docs/screenshots/habits.png" width="200"> | <img src="docs/screenshots/cat-menu.png" width="200"> | <img src="docs/screenshots/adopt.png" width="200"> |
 
 ## How it works
 
@@ -20,8 +20,12 @@ Runs as a single web page and as an offline Android app (via Capacitor).
   (−5 a day, once every 30 days). Bring it home in time or it stays there.
 - No longer want a habit? Press and hold the cat and **return it to the shelter**, with no penalty.
 - Below 0 affection, cats only trust you with one cat at a time.
-- **Mindful tasks** are small repeatable chores (daily, weekly, custom) that earn affection back.
-  They pay at most 15 xp a day in total; you can still do more, they just won't pay.
+- You can keep up to **9 kitties**. From the 6th the app nags you to be responsible, and the 10th is blocked.
+  **Settings → Unlimited kitty** lifts the limit, but every extra kitty needs three different "are you sure?" dialogs.
+- **Mindful tasks** are one-off jobs worth up to 15 xp. Do them once, tick them off.
+- **Mindful habits** repeat (daily, weekly, custom) and keep a history, worth up to 10 xp a day.
+  A daily habit can become a kitty: it keeps its history, shown in teal.
+- Tasks and habits can always be done, but each kind pays out at most its cap per day.
 - Every cat gets a different food each day (kibbles, wet food, fish, chicken, shrimp or meat).
   Each cat has its own look, which you can randomise when adopting.
 
@@ -29,10 +33,10 @@ Runs as a single web page and as an offline Android app (via Capacitor).
 
 1. **Room**: a cosy room that follows the clock. Awake cats wander and climb the cat tree, and sleep at night.
    Double-tap an awake cat for a heart. Cats with the sitter are away from home.
-2. **Mindful**: your repeatable tasks. Press and hold one to delete it.
-3. **Today**: your cats, this week as dots, and the update box.
-4. **Heatmap**: the month for each cat, or all cats on one calendar (turn on *Combine heatmap* in Settings).
-5. **Settings**: save and load, combined heatmap, playtest clock and how to use.
+2. **Mindful**: switch between one-off **Tasks** and repeating **Habits**. Press and hold an item to delete it.
+3. **Today**: your cats, sorted into **Home**, **Sitter** and **Memories** (cats that died, ran away or went to the shelter, each with a condensed all-time heatmap from adoption to departure). Press and hold a cat for the sitter, its heatmap or the shelter.
+4. **Heatmap**: a switch toggles between all kitties on one calendar (each day split into a slice per kitty) and one calendar per kitty. Habits are listed below. Dead and runaway cats are not shown.
+5. **Settings**: save and load, unlimited kitty, playtest clock and how to use.
 
 Progress is stored on the device. Use **Settings → Save & load** to back it up (on Android, *Save to file*
 opens the share sheet) or move it to another device.

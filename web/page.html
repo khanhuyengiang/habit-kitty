@@ -7,7 +7,7 @@
 :root {
   --bg: #f1f0f7; --surface: #ffffff; --ink: #221c2e; --muted: #6c6580; --line: #dcd8e8;
   --accent: #c2416b; --accent-ink: #ffffff; --accent-soft: #f7dfe7;
-  --fed: #3a9d5d; --missed: #d1495b; --today: #e9b44c; --sitter: #4a7fd0; --none: #e3e0ec;
+  --habit: #1f9e9a; --fed: #3a9d5d; --missed: #d1495b; --today: #e9b44c; --sitter: #4a7fd0; --none: #e3e0ec;
   --warn-bg: #fdf1d8; --warn-ink: #7a5309;
   --font-display: "Pixelify Sans", "Courier New", monospace;
   --font-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -16,13 +16,13 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #17141f; --surface: #221d2d; --ink: #efeaf7; --muted: #a59cba; --line: #352e45;
   --accent: #f06a95; --accent-ink: #1a1020; --accent-soft: #3d2133;
-  --fed: #4fbf78; --missed: #e0606f; --today: #f0c45e; --sitter: #6b9bea; --none: #2c2639;
+  --habit: #3cc7c0; --fed: #4fbf78; --missed: #e0606f; --today: #f0c45e; --sitter: #6b9bea; --none: #2c2639;
   --warn-bg: #3a2f17; --warn-ink: #f3d491; color-scheme: dark;
 } }
 :root[data-theme="dark"] {
   --bg: #17141f; --surface: #221d2d; --ink: #efeaf7; --muted: #a59cba; --line: #352e45;
   --accent: #f06a95; --accent-ink: #1a1020; --accent-soft: #3d2133;
-  --fed: #4fbf78; --missed: #e0606f; --today: #f0c45e; --sitter: #6b9bea; --none: #2c2639;
+  --habit: #3cc7c0; --fed: #4fbf78; --missed: #e0606f; --today: #f0c45e; --sitter: #6b9bea; --none: #2c2639;
   --warn-bg: #3a2f17; --warn-ink: #f3d491; color-scheme: dark;
 }
 
@@ -63,6 +63,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .cat-head { display: grid; grid-template-columns: 78px 1fr; gap: 14px; align-items: center; }
 .sprite { width: 78px; height: 84px; }
 .sprite.faded { opacity: .28; }
+.cat-head.solo { grid-template-columns: 1fr; }
 .cat-name { font: 700 22px/1.1 var(--font-display); overflow-wrap: anywhere; }
 .cat-habit { font-size: 15px; color: var(--muted); overflow-wrap: anywhere; }
 .chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; font-weight: 700; padding: 3px 8px; background: var(--bg); }
@@ -160,6 +161,37 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
 @keyframes heart { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; transform: translateY(-4px); }
   70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-40px); } }
 
+/* all-time heatmap (memories) */
+.life { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+.lm { flex: none; display: grid; gap: 4px; align-content: start; }
+.lm > span { font: 500 10px/1 var(--font-mono); color: var(--muted); white-space: nowrap; }
+.lg { display: grid; grid-template-rows: repeat(7, 14px); grid-auto-flow: column; grid-auto-columns: 14px; gap: 3px; }
+.lc { background: var(--none); }
+.lc.fed { background: var(--fed); } .lc.missed { background: var(--missed); } .lc.sitter { background: var(--sitter); } .lc.habit { background: var(--habit); }
+.lc.blank { background: transparent; }
+.focus-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; background: var(--accent-soft); border: 2px solid var(--ink); }
+
+/* switches */
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 2px solid var(--ink); background: var(--surface); }
+.seg button { border: 0; background: transparent; padding: 12px; font-weight: 800; color: var(--muted); }
+.seg button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+.switch { position: relative; display: grid; grid-template-columns: 1fr 1fr; height: 46px; padding: 0; border: 2px solid var(--ink); background: var(--surface); }
+.switch span { position: relative; z-index: 1; display: grid; place-items: center; font-weight: 800; color: var(--muted); transition: color .15s; }
+.switch .thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc(50% - 2px); background: var(--accent); }
+.switch[aria-checked="false"] .thumb { transform: translateX(100%); }
+.switch[aria-checked="true"] [data-side="combined"], .switch[aria-checked="false"] [data-side="individual"] { color: var(--accent-ink); }
+@media (prefers-reduced-motion: no-preference) { .switch .thumb { transition: transform .18s steps(4); } }
+.dot.habit { background: var(--habit); border-color: var(--habit); }
+.px.habit { background: var(--habit); } .px.habit span { color: #fff; opacity: .85; }
+.cell .s.habit { background: var(--habit); }
+.legend i.habit { background: var(--habit); }
+.tasks li.habit { flex-wrap: wrap; }
+.tasks li.habit .week { flex: 1 0 100%; }
+.tasks li .habit-foot { flex: 1 1 auto; font-size: 13px; }
+.row-btns { display: flex; gap: 6px; flex: none; }
+.btn.del { padding: 6px 10px; color: var(--missed); }
+.tasks .done { text-decoration: line-through; color: var(--muted); }
+
 /* combined heatmap */
 .cell { aspect-ratio: 1; display: grid; gap: 1px; background: var(--surface); position: relative; border: 1px solid var(--line); }
 .cell .s { background: var(--none); min-width: 0; min-height: 0; }
@@ -211,37 +243,45 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
   <main id="tab-room" class="tab"><div id="room"></div><p class="muted" id="room-note"></p></main>
 
   <main id="tab-mindful" class="tab">
-    <section class="panel" aria-labelledby="tasks-h">
-      <h3 id="tasks-h">Mindful tasks</h3>
-      <p class="muted">Small things that earn affection (1–15 xp) when it runs low. Press and hold a task to delete it. Tasks pay at most 15 xp a day in total; you can still do more, they just won't pay.</p>
+    <div class="seg" id="mindful-seg" role="tablist" aria-label="Tasks or habits">
+      <button type="button" role="tab" data-action="mindful-view" data-view="task">Tasks</button>
+      <button type="button" role="tab" data-action="mindful-view" data-view="habit">Habits</button>
+    </div>
+    <section class="panel">
+      <h3 id="mindful-title"></h3>
+      <p class="muted" id="mindful-desc"></p>
       <p class="num" id="mindful-cap"></p>
       <ul class="tasks" id="tasks"></ul>
     </section>
     <form class="panel" id="task-form" novalidate>
-      <h3>New task</h3>
-      <label class="field">Task <input id="task-name" maxlength="40" placeholder="Stretch for 5 minutes" autocomplete="off"></label>
+      <h3 id="form-title"></h3>
+      <label class="field">Name <input id="task-name" maxlength="40" autocomplete="off"></label>
       <div class="row">
-        <label class="field">Reward (xp, max 15) <input id="task-xp" type="number" inputmode="numeric" min="1" max="15" value="2"></label>
-        <label class="field">Repeat
+        <label class="field"><span id="task-xp-label"></span> <input id="task-xp" type="number" inputmode="numeric" min="1" max="15" value="2"></label>
+        <label class="field" id="repeat-wrap">Repeat
           <select id="task-repeat">
-            <option value="1">Every day</option><option value="2">Every 2 days</option><option value="7" selected>Every week</option>
+            <option value="1" selected>Every day</option><option value="2">Every 2 days</option><option value="7">Every week</option>
             <option value="14">Every 2 weeks</option><option value="30">Every month</option><option value="custom">Custom…</option>
           </select>
         </label>
       </div>
       <label class="field" id="task-days-wrap" hidden>Repeat every (days) <input id="task-days" type="number" inputmode="numeric" min="1" max="365" value="3"></label>
-      <button class="btn primary" type="submit">Add task</button>
+      <button class="btn primary" type="submit" id="task-submit">Add</button>
     </form>
   </main>
 
   <main id="tab-today" class="tab">
     <section class="update" id="log" hidden></section>
+    <div class="seg" id="today-seg" role="tablist" aria-label="Where your cats are"></div>
     <section class="cats" id="cats" aria-label="Your cats"></section>
     <button class="btn primary" type="button" data-action="adopt-open" style="padding:16px;font-size:18px">Adopt cat</button>
-    <p class="muted" style="text-align:center;font-size:13px">Press and hold a cat to return it to the shelter.</p>
+    <p class="muted" style="text-align:center;font-size:13px">Press and hold a cat for more options.</p>
   </main>
 
-  <main id="tab-heat" class="tab"><h2>Heatmap</h2><section class="cats" id="heat"></section></main>
+  <main id="tab-heat" class="tab">
+    <button type="button" class="switch" id="heat-switch" role="switch" aria-checked="true" aria-label="Heatmap view: combined or individual" data-action="heat-toggle">
+      <span data-side="combined">Combined</span><span data-side="individual">Individual</span><i class="thumb"></i>
+    </button><section class="cats" id="heat"></section></main>
 
   <main id="tab-settings" class="tab">
     <section class="panel">
@@ -261,8 +301,8 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
     </section>
 
     <section class="panel">
-      <h3>Heatmap</h3>
-      <label class="check"><input type="checkbox" id="combine-heat"><span><b>Combine heatmap</b><br><span class="muted">Show all cats on one calendar. Each day is split into a slice per cat.</span></span></label>
+      <h3>Kitties</h3>
+      <label class="check"><input type="checkbox" id="unlimited-cats"><span><b>Unlimited kitty</b><br><span class="muted">Normally you can keep 9 kitties. Turn this on to adopt more, but you will have to confirm three times for every extra kitty.</span></span></label>
     </section>
 
     <section class="panel">
@@ -284,7 +324,9 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
         <li>Every missed day costs −15. After 3 missed days in a row a classic cat dies; a light-hearted one runs away.</li>
         <li>Going away? Leave a cat with the sitter for up to 7 days (−5 a day, once every 30 days). Bring it home in time or it stays there.</li>
         <li>Below 0 affection, cats only trust you with one cat at a time. Mindful tasks earn it back.</li>
-        <li>Heatmap shows each cat's month; the gold outline is today.</li>
+        <li>Heatmap shows each cat's month (switch between combined and individual); the gold outline is today.</li>
+        <li>Mindful <b>tasks</b> are one-offs (up to 15 xp a day). Mindful <b>habits</b> repeat and keep their history (up to 10 xp a day). A daily habit can become a kitty and keeps its history in teal.</li>
+        <li>You can keep up to 9 kitties.</li>
       </ul>
     </section>
 

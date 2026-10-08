@@ -155,7 +155,7 @@ for await (const line of rl) {
       const xp = Number(args.at(-1));
       if (args.length < 2 || Number.isNaN(xp)) { console.log('usage: task <name> <xp 1-3>'); break; }
       const name = args.slice(0, -1).join(' ');
-      save.state = addMindfulTask(save.state, { id: crypto.randomUUID(), name, xp });
+      save.state = addMindfulTask(save.state, { id: crypto.randomUUID(), name, xp }, now());
       console.log(`Added task "${name}".`);
       break;
     }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   newState, adoptCat, feedCat, startSitter, resumeCat, settleAll,
-  addMindfulTask, doMindfulTask, removeMindfulTask, returnToShelter, dayIndex, levelFor, levelProgress,
+  addMindfulTask, doMindfulTask, removeMindfulTask, returnToShelter, habitToCat, dayIndex, levelFor, levelProgress,
   graveyard, runaways, hunger, type ActionResult, type AppState, type CatMode,
 } from './rules';
 
@@ -231,36 +231,90 @@ describe('low affection cat limit', () => {
   });
 });
 
-describe('mindful tasks', () => {
-  it('caps xp at 15 and enforces a per-task cooldown', () => {
-    let s = addMindfulTask(newState(), { id: 't1', name: 'Clean the toilet', xp: 40, cooldownDays: 7 });
-    expect(s.tasks[0].xp).toBe(15);
-    s = ok(doMindfulTask(s, 't1', at(0)));
-    expect(s.xp).toBe(15);
-    const early = doMindfulTask(s, 't1', at(3));
+describe('mindful habits', () => {
+  it('caps xp at 10, enforces the repeat time and tracks history', () => {
+    let s = addMindfulTask(newState(), { id: 'h1', name: 'Clean the toilet', xp: 40, kind: 'habit', cooldownDays: 7 }, at(0));
+    expect(s.tasks[0].xp).toBe(10);
+    s = ok(doMindfulTask(s, 'h1', at(0)));
+    expect(s.xp).toBe(10);
+    const early = doMindfulTask(s, 'h1', at(3));
     expect(early.ok).toBe(false);
     if (!early.ok) expect(early.reason).toBe('task_on_cooldown');
-    s = ok(doMindfulTask(s, 't1', at(7)));
-    expect(s.xp).toBe(30);
+    s = ok(doMindfulTask(s, 'h1', at(7)));
+    expect(s.xp).toBe(20);
+    expect(s.tasks[0].doneDays).toHaveLength(2);
   });
 
-  it('removes a task and allows a daily repeat', () => {
-    let s = addMindfulTask(newState(), { id: 't1', name: 'Stretch', xp: 2, cooldownDays: 1 });
-    s = ok(doMindfulTask(s, 't1', at(0)));
-    s = ok(doMindfulTask(s, 't1', at(1)));
+  it('pays at most 10 xp a day across habits but still lets them be done', () => {
+    let s = addMindfulTask(newState(), { id: 'a', name: 'A', xp: 8, cooldownDays: 1 }, at(0));
+    s = addMindfulTask(s, { id: 'b', name: 'B', xp: 8, cooldownDays: 1 }, at(0));
+    s = ok(doMindfulTask(s, 'a', at(0)));
+    s = ok(doMindfulTask(s, 'b', at(0)));
+    expect(s.xp).toBe(10);
+    s = ok(doMindfulTask(s, 'a', at(1)));
+    expect(s.xp).toBe(18);
+  });
+
+  it('turns a daily habit into a cat that keeps its history', () => {
+    let s = addMindfulTask(newState(), { id: 'h1', name: 'Drink water', xp: 2, cooldownDays: 1 }, at(0));
+    s = ok(doMindfulTask(s, 'h1', at(0)));
+    s = ok(doMindfulTask(s, 'h1', at(1)));
+    s = ok(habitToCat(s, 'h1', { id: 'c1', name: 'Mochi' }, at(2)));
+    expect(s.tasks).toHaveLength(0);
+    expect(s.cats[0].habit).toBe('Drink water');
+    expect(s.cats[0].habitDays).toEqual([dayIndex(at(0)), dayIndex(at(1))]);
+    expect(s.cats[0].adoptedDay).toBe(dayIndex(at(2)));
+  });
+
+  it('only lets daily habits become cats', () => {
+    const s = addMindfulTask(newState(), { id: 'h1', name: 'Call mum', xp: 2, cooldownDays: 7 }, at(0));
+    const r = habitToCat(s, 'h1', { id: 'c1', name: 'Mochi' }, at(0));
+    expect(r.ok).toBe(false);
+  });
+
+  it('removes a habit', () => {
+    const s = addMindfulTask(newState(), { id: 't1', name: 'Stretch', xp: 2, cooldownDays: 1 }, at(0));
     expect(removeMindfulTask(s, 't1').tasks).toHaveLength(0);
   });
 });
 
-describe('daily mindful cap and shelter', () => {
-  it('pays at most 15 xp a day but still lets tasks be done', () => {
-    let s = addMindfulTask(newState(), { id: 'a', name: 'A', xp: 10, cooldownDays: 1 });
-    s = addMindfulTask(s, { id: 'b', name: 'B', xp: 10, cooldownDays: 1 });
+describe('one-off mindful tasks', () => {
+  it('pay up to 15 xp once, then stay done', () => {
+    let s = addMindfulTask(newState(), { id: 't1', name: 'Book dentist', xp: 40, kind: 'task' }, at(0));
+    expect(s.tasks[0].xp).toBe(15);
+    s = ok(doMindfulTask(s, 't1', at(0)));
+    expect(s.xp).toBe(15);
+    const again = doMindfulTask(s, 't1', at(30));
+    expect(again.ok).toBe(false);
+    if (!again.ok) expect(again.reason).toBe('task_already_done');
+  });
+
+  it('have a daily cap of 15 separate from habits', () => {
+    let s = addMindfulTask(newState(), { id: 'a', name: 'A', xp: 12, kind: 'task' }, at(0));
+    s = addMindfulTask(s, { id: 'b', name: 'B', xp: 12, kind: 'task' }, at(0));
+    s = addMindfulTask(s, { id: 'h', name: 'H', xp: 6, kind: 'habit', cooldownDays: 1 }, at(0));
     s = ok(doMindfulTask(s, 'a', at(0)));
     s = ok(doMindfulTask(s, 'b', at(0)));
-    expect(s.xp).toBe(15);
-    s = ok(doMindfulTask(s, 'a', at(1)));
-    expect(s.xp).toBe(25);
+    s = ok(doMindfulTask(s, 'h', at(0)));
+    expect(s.xp).toBe(15 + 6);
+  });
+});
+
+describe('cat limit and shelter', () => {
+  const adopt = (s: AppState, i: number, unlimited = false) =>
+    adoptCat(s, { id: `c${i}`, name: `C${i}`, habit: 'x', unlimited }, at(0));
+  const nine = () => {
+    let s = newState();
+    for (let i = 0; i < 9; i++) s = ok(adopt(s, i));
+    return s;
+  };
+
+  it('stops at 9 cats unless unlimited', () => {
+    const s = nine();
+    const r = adopt(s, 9);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('cat_limit');
+    expect(ok(adopt(s, 9, true)).cats).toHaveLength(10);
   });
 
   it('returns a cat to the shelter without penalty', () => {
