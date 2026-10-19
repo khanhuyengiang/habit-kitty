@@ -31,6 +31,7 @@
   body.show-grid .art .sprite { mix-blend-mode: normal; }
   /* same animations as the app, so the tail swish and blink read correctly here too */
   .sprite.body .tail.b, .sprite.body .blink { visibility: hidden; }
+  .sprite.nap { image-rendering: pixelated; }
   @media (prefers-reduced-motion: no-preference) {
     .sprite.body .tail.a { animation: tail-a 1.6s steps(1) infinite; }
     .sprite.body .tail.b { animation: tail-b 1.6s steps(1) infinite; }
