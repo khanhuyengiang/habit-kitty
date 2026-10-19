@@ -1,0 +1,11 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- cat face, white on transparent as Android status bar icons require -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4,3 L8.5,7.5 L15.5,7.5 L20,3 L20,13 A8,8 0 0 1 4,13 Z M9,11 A1.2,1.2 0 1 0 9,13.4 A1.2,1.2 0 1 0 9,11 M15,11 A1.2,1.2 0 1 0 15,13.4 A1.2,1.2 0 1 0 15,11"
+        android:fillType="evenOdd" />
+</vector>

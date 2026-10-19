@@ -27,3 +27,6 @@ save.json
 .idea/
 *.log
 .DS_Store
+
+# Dev preview server output
+.preview/

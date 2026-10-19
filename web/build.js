@@ -12,6 +12,7 @@ async function bundle(isApp) {
     target: 'es2020',
     minify: true,
     write: false,
+    loader: { '.md': 'text' },
     define: { __APP__: String(isApp) },
   });
   return outputFiles[0].text.replace(/<\/script/gi, '<\\/script');

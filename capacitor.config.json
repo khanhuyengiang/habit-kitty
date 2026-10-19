@@ -1,5 +1,11 @@
 {
   "appId": "local.habitkitty.app",
   "appName": "Habit Kitty",
-  "webDir": "app-www"
+  "webDir": "app-www",
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_notify",
+      "iconColor": "#CC4A80"
+    }
+  }
 }

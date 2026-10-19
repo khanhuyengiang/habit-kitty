@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/room_img"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@string/widget_description"
+        android:scaleType="fitCenter" />
+
+    <TextView
+        android:id="@+id/room_hint"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:padding="12dp"
+        android:text="@string/widget_empty"
+        android:textColor="#3b2733"
+        android:background="#fde3ec" />
+</FrameLayout>

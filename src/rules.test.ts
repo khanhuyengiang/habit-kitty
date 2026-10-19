@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   newState, adoptCat, feedCat, startSitter, resumeCat, settleAll,
   addMindfulTask, doMindfulTask, removeMindfulTask, returnToShelter, habitToCat, dayIndex, levelFor, levelProgress,
-  graveyard, runaways, hunger, type ActionResult, type AppState, type CatMode,
+  graveyard, runaways, hunger, setTaskDay, genderOf, type ActionResult, type AppState, type CatMode,
 } from './rules';
 
 // day n at a given hour (all test dates are local time)
@@ -334,5 +334,49 @@ describe('cat death', () => {
     s = settleAll(s, at(3)).state;
     expect(s.cats[0].status).toBe('dead');
     expect(s.xp).toBe(-30);
+  });
+});
+
+describe('time travel', () => {
+  const habit = () => addMindfulTask(newState(), { id: 'h', name: 'Stretch', xp: 5, kind: 'habit', cooldownDays: 1 }, at(0));
+  const day = (n: number) => dayIndex(at(n));
+
+  it('marks and unmarks past and present days without touching xp', () => {
+    let s = ok(setTaskDay(habit(), 'h', day(5), true, at(10)));
+    s = ok(setTaskDay(s, 'h', day(10), true, at(10)));
+    s = ok(setTaskDay(s, 'h', day(5), true, at(10)));   // marking twice changes nothing
+    expect(s.tasks[0].doneDays).toEqual([day(5), day(10)]);
+    expect(s.tasks[0].lastDoneDay).toBe(day(10));
+    expect(s.xp).toBe(0);
+    s = ok(setTaskDay(s, 'h', day(10), false, at(10)));
+    expect(s.tasks[0].doneDays).toEqual([day(5)]);
+    expect(s.tasks[0].lastDoneDay).toBe(day(5));
+    s = ok(setTaskDay(s, 'h', day(5), false, at(10)));
+    expect(s.tasks[0].lastDoneDay).toBeNull();
+  });
+
+  it('refuses the future, and moves a one-off task instead of repeating it', () => {
+    const r = setTaskDay(habit(), 'h', day(11), true, at(10));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('future_day');
+    let s = addMindfulTask(newState(), { id: 't', name: 'Dentist', xp: 5, kind: 'task' }, at(0));
+    s = ok(setTaskDay(s, 't', day(3), true, at(10)));
+    s = ok(setTaskDay(s, 't', day(4), true, at(10)));
+    expect(s.tasks[0].doneDays).toEqual([day(4)]);
+  });
+
+  it('reaches back before the task was created', () => {
+    const s = ok(setTaskDay(habit(), 'h', day(-3), true, at(2)));
+    expect(s.tasks[0].createdDay).toBe(day(-3));
+  });
+});
+
+describe('gender', () => {
+  it('is stored at adoption, and older cats get a stable one', () => {
+    const s = ok(adoptCat(newState(), { id: 'x', name: 'X', habit: 'h', gender: 'boy' }, at(0)));
+    expect(s.cats[0].gender).toBe('boy');
+    expect(genderOf({ id: 'old-cat' })).toBe(genderOf({ id: 'old-cat' }));
+    const kinds = new Set(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((id) => genderOf({ id })));
+    expect(kinds.size).toBe(2);
   });
 });

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>pixel cats preview</title>
+<style>
+  :root { --bg: #fdf7ee; --surface: #fff; --line: #e4d9c8; --muted: #8a7f70; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1d1a21; --surface: #272230; --line: #3c3447; --muted: #a79cb5; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--muted); font: 14px system-ui, sans-serif; }
+  .bar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+         padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .bar strong { color: inherit; font-size: 15px; }
+  .bar label { display: flex; gap: 6px; align-items: center; }
+  .swatches { display: flex; gap: 4px; }
+  .sw { width: 20px; height: 20px; border: 1px solid var(--line); cursor: pointer; padding: 0; }
+  main { padding: 16px; display: grid; gap: 20px; }
+  .row h2 { margin: 0 0 8px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+  .cells { display: flex; flex-wrap: wrap; gap: 12px; }
+  .cell { margin: 0; display: grid; gap: 6px; justify-items: center;
+          background: var(--surface); border: 1px solid var(--line); padding: 8px; }
+  figcaption { font-size: 11px; }
+  .art { width: 96px; }
+  body.zoom .art { width: 200px; }
+  .sprite { width: 100%; height: auto; display: block; }
+  /* pixel grid overlay: one line per sprite pixel (sprite pixels are square, so cols sets both) */
+  body.show-grid .art { background-image:
+      repeating-linear-gradient(to right, #8886 0 1px, transparent 1px calc(100% / var(--cols))),
+      repeating-linear-gradient(to bottom, #8886 0 1px, transparent 1px calc(100% / var(--cols))); }
+  body.show-grid .art .sprite { mix-blend-mode: normal; }
+  /* same animations as the app, so the tail swish and blink read correctly here too */
+  .sprite.body .tail.b, .sprite.body .blink { visibility: hidden; }
+  @media (prefers-reduced-motion: no-preference) {
+    .sprite.body .tail.a { animation: tail-a 1.6s steps(1) infinite; }
+    .sprite.body .tail.b { animation: tail-b 1.6s steps(1) infinite; }
+    .sprite.body .blink { animation: blink 4.4s steps(1) infinite; }
+  }
+  @keyframes tail-a { 0%, 49.9% { visibility: visible; } 50%, 100% { visibility: hidden; } }
+  @keyframes tail-b { 0%, 49.9% { visibility: hidden; } 50%, 100% { visibility: visible; } }
+  @keyframes blink { 0%, 93% { visibility: hidden; } 93.1%, 100% { visibility: visible; } }
+</style>
+</head>
+<body><script src="preview.js"></script></body>
+</html>

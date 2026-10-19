@@ -22,8 +22,11 @@ export type CatMode = 'classic' | 'lighthearted';
 export type CatStatus =
   | 'alive' | 'sitter' | 'dead' | 'ranAway' | 'leftForever' | 'gone' | 'shelter';
 
-export type CatPattern = 'plain' | 'stripes' | 'patch' | 'mask';
-export interface CatLook { fur: string; pattern: CatPattern }
+export type CatPattern = 'plain' | 'stripes' | 'patch' | 'mask' | 'calico' | 'point';
+export type CatGender = 'girl' | 'boy';
+export type CatTrait = 'playful' | 'curious' | 'cuddly' | 'lazy' | 'shy' | 'grumpy';
+// Older saves only have fur and pattern; the personality is derived from the cat's id.
+export interface CatLook { fur: string; pattern: CatPattern; trait?: CatTrait }
 
 export interface Cat {
   id: string;
@@ -43,6 +46,7 @@ export interface Cat {
   sitterTrips: SitterTrip[];       // oldest first; the last one is open while with the sitter
   runAwayCount: number;
   look?: CatLook;                  // chosen appearance; older saves derive one from the id
+  gender?: CatGender;              // older saves derive it from the id (see genderOf)
   habitDays?: number[];            // days it was done as a mindful habit, before it became a cat
 }
 
@@ -63,6 +67,7 @@ export interface MindfulTask {
   kind: TaskKind;
   xp: number;                      // tasks 1..15, habits 1..10
   cooldownDays: number;            // habits only
+  weekdays?: number[];             // habits only: repeat on these weekdays (0 = Monday ... 6 = Sunday) instead of every cooldownDays
   lastDoneDay: number | null;
   doneDays: number[];              // every day it was done, ascending
   createdDay: number;
@@ -87,12 +92,17 @@ export type Reason =
   | 'no_such_cat' | 'no_such_task' | 'invalid_input'
   | 'cat_not_active' | 'with_sitter' | 'already_with_sitter' | 'not_with_sitter'
   | 'already_fed_today' | 'sitter_cooldown'
-  | 'low_affection_cat_limit' | 'task_on_cooldown' | 'cat_limit' | 'task_already_done' | 'not_daily_habit';
+  | 'future_day' | 'low_affection_cat_limit' | 'task_on_cooldown' | 'cat_limit' | 'task_already_done' | 'not_daily_habit';
 
 // On failure the (settled) state is still returned: always persist result.state.
 export type ActionResult =
   | { ok: true; state: AppState; events: GameEvent[] }
   | { ok: false; reason: Reason; state: AppState; events: GameEvent[] };
+
+const idHash = (id: string) => [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+// Cats adopted before genders existed get a stable one derived from their id.
+export const genderOf = (c: { id: string; gender?: CatGender }): CatGender =>
+  c.gender ?? ((idHash(c.id) >> 3) % 2 === 0 ? 'girl' : 'boy');
 
 export const newState = (): AppState => ({ xp: 0, cats: [], tasks: [] });
 
@@ -237,7 +247,7 @@ export const maxActiveCats = (xp: number) =>
 
 export function adoptCat(
   state: AppState,
-  input: { id: string; name: string; habit: string; mode?: CatMode; look?: CatLook; habitDays?: number[]; unlimited?: boolean },
+  input: { id: string; name: string; habit: string; mode?: CatMode; look?: CatLook; gender?: CatGender; habitDays?: number[]; unlimited?: boolean },
   now: Date,
 ): ActionResult {
   const { s, events, today } = begin(state, now);
@@ -255,6 +265,7 @@ export function adoptCat(
     adoptedDay: today, lastFedDay: null, missed: 0, settledDay: today,
     sitterStartDay: null, lastSitterStartDay: null, endedDay: null, totalFeedings: 0,
     fedDays: [], sitterTrips: [], runAwayCount: 0,
+    gender: input.gender ?? genderOf({ id: input.id }),
     ...(input.look ? { look: input.look } : {}),
     ...(input.habitDays?.length ? { habitDays: input.habitDays } : {}),
   };
@@ -338,10 +349,12 @@ export function resumeCat(state: AppState, catId: string, now: Date): ActionResu
 
 export function addMindfulTask(
   state: AppState,
-  input: { id: string; name: string; xp: number; kind?: TaskKind; cooldownDays?: number },
+  input: { id: string; name: string; xp: number; kind?: TaskKind; cooldownDays?: number; weekdays?: number[] },
   now: Date = new Date(),
 ): AppState {
   const kind = input.kind ?? 'habit';
+  const picked = [...new Set((input.weekdays ?? []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort();
+  const days = kind === 'habit' && picked.length > 0 && picked.length < 7 ? picked : undefined;   // all seven is just "every day"
   const max = kind === 'task' ? CONFIG.taskMaxXp : CONFIG.habitMaxXp;
   const task: MindfulTask = {
     id: input.id,
@@ -349,11 +362,30 @@ export function addMindfulTask(
     kind,
     xp: Math.min(max, Math.max(1, Math.round(input.xp))),
     cooldownDays: kind === 'task' ? 0 : Math.max(1, Math.round(input.cooldownDays ?? CONFIG.mindfulDefaultCooldownDays)),
+    ...(days ? { weekdays: days, cooldownDays: 7 } : {}),
     lastDoneDay: null,
     doneDays: [],
     createdDay: dayIndex(now),
   };
   return { ...state, tasks: [...state.tasks, task] };
+}
+
+// Monday = 0 ... Sunday = 6 (day 0 of the day index, 1 Jan 1970, was a Thursday).
+export const weekdayOf = (day: number) => (((day + 3) % 7) + 7) % 7;
+
+// Days until a habit can be done again: 0 means it is ready now. A weekday habit is ready once its most recent
+// scheduled weekday has not been done yet, so a missed Monday can still be done on Tuesday.
+export function daysUntilReady(task: MindfulTask, today: number): number {
+  if (task.lastDoneDay === null) return 0;
+  if (!task.weekdays?.length) return Math.max(0, task.cooldownDays - (today - task.lastDoneDay));
+  for (let k = 0; k < 7; k++) {
+    if (task.weekdays.includes(weekdayOf(today - k))) {
+      if (task.lastDoneDay < today - k) return 0;
+      break;
+    }
+  }
+  for (let k = 1; k <= 7; k++) if (task.weekdays.includes(weekdayOf(today + k))) return k;
+  return 7;
 }
 
 export const removeMindfulTask = (state: AppState, taskId: string): AppState =>
@@ -365,7 +397,7 @@ export function doMindfulTask(state: AppState, taskId: string, now: Date): Actio
   if (!task) return fail(s, events, 'no_such_task');
   if (task.kind === 'task') {
     if (task.lastDoneDay !== null) return fail(s, events, 'task_already_done');
-  } else if (task.lastDoneDay !== null && today - task.lastDoneDay < task.cooldownDays) {
+  } else if (daysUntilReady(task, today) > 0) {
     return fail(s, events, 'task_on_cooldown');
   }
   // Anything can be done, but only the first N xp of each kind pays out per day.
@@ -386,11 +418,34 @@ export function doMindfulTask(state: AppState, taskId: string, now: Date): Actio
   );
 }
 
+// Time travel: mark (or unmark) a task as done on any day up to today. This fixes the record, so it never
+// pays xp, and unmarking never takes any back. A one-off task has a single done day; marking another day moves it.
+export function setTaskDay(state: AppState, taskId: string, day: number, isDone: boolean, now: Date): ActionResult {
+  const { s, events, today } = begin(state, now);
+  const task = s.tasks.find((t) => t.id === taskId);
+  if (!task) return fail(s, events, 'no_such_task');
+  if (!Number.isInteger(day) || day > today) return fail(s, events, 'future_day');
+  const had = task.doneDays.includes(day);
+  const doneDays = !isDone
+    ? task.doneDays.filter((d) => d !== day)
+    : task.kind === 'task' ? [day] : had ? task.doneDays : [...task.doneDays, day].sort((a, b) => a - b);
+  return done(
+    {
+      ...s,
+      tasks: s.tasks.map((t) => (t.id === taskId ? {
+        ...t, doneDays, lastDoneDay: doneDays.length ? doneDays[doneDays.length - 1] : null,
+        createdDay: isDone ? Math.min(t.createdDay, day) : t.createdDay,
+      } : t)),
+    },
+    events,
+  );
+}
+
 // Turn a daily habit into a cat. The cat keeps the habit's history (as habitDays) and the habit is removed.
 export function habitToCat(
   state: AppState,
   taskId: string,
-  input: { id: string; name: string; mode?: CatMode; look?: CatLook; unlimited?: boolean },
+  input: { id: string; name: string; mode?: CatMode; look?: CatLook; gender?: CatGender; unlimited?: boolean },
   now: Date,
 ): ActionResult {
   const task = state.tasks.find((t) => t.id === taskId);

@@ -5,28 +5,33 @@
 <style>
 /* Layout: one phone-width column; cats are the page, each with its own pixel month grid. */
 :root {
-  --bg: #f1f0f7; --surface: #ffffff; --ink: #221c2e; --muted: #6c6580; --line: #dcd8e8;
-  --accent: #c2416b; --accent-ink: #ffffff; --accent-soft: #f7dfe7;
-  --habit: #1f9e9a; --fed: #3a9d5d; --missed: #d1495b; --today: #e9b44c; --sitter: #4a7fd0; --none: #e3e0ec;
-  --warn-bg: #fdf1d8; --warn-ink: #7a5309;
+  /* Soft pink pastel. Pink is the accent (buttons, selection, entries); cards stay near-white so it never floods. */
+  --bg: #fff4f7; --surface: #fffcfd; --ink: #3b2733; --muted: #84677a; --line: #f2d6e0;
+  --accent: #cc4a80; --accent-ink: #ffffff; --accent-soft: #fde3ec; --accent-pastel: #ffc6d9;
+  /* Heatmap: every state is a pastel, kept apart by hue AND lightness (mint is light, rose is deep). */
+  --habit: #7fcfd6; --fed: #8dd5ae; --missed: #e5687f; --today: #eeb04a; --sitter: #a7a2ec; --none: #f6e7ed;
+  --warn-bg: #fff0d6; --warn-ink: #7a4d09;
   --font-display: "Pixelify Sans", "Courier New", monospace;
   --font-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #17141f; --surface: #221d2d; --ink: #efeaf7; --muted: #a59cba; --line: #352e45;
-  --accent: #f06a95; --accent-ink: #1a1020; --accent-soft: #3d2133;
-  --habit: #3cc7c0; --fed: #4fbf78; --missed: #e0606f; --today: #f0c45e; --sitter: #6b9bea; --none: #2c2639;
-  --warn-bg: #3a2f17; --warn-ink: #f3d491; color-scheme: dark;
+  --bg: #1e1520; --surface: #2a1e2d; --ink: #f8e9f0; --muted: #c0a2b4; --line: #43304a;
+  --accent: #f27aa5; --accent-ink: #2a1020; --accent-soft: #4a2740; --accent-pastel: #e895b5;
+  --habit: #5fb8c2; --fed: #6cbf92; --missed: #e0647c; --today: #f0c15e; --sitter: #8d88dc; --none: #3a2a40;
+  --warn-bg: #3d2f19; --warn-ink: #f5d99b; color-scheme: dark;
 } }
 :root[data-theme="dark"] {
-  --bg: #17141f; --surface: #221d2d; --ink: #efeaf7; --muted: #a59cba; --line: #352e45;
-  --accent: #f06a95; --accent-ink: #1a1020; --accent-soft: #3d2133;
-  --habit: #3cc7c0; --fed: #4fbf78; --missed: #e0606f; --today: #f0c45e; --sitter: #6b9bea; --none: #2c2639;
-  --warn-bg: #3a2f17; --warn-ink: #f3d491; color-scheme: dark;
+  --bg: #1e1520; --surface: #2a1e2d; --ink: #f8e9f0; --muted: #c0a2b4; --line: #43304a;
+  --accent: #f27aa5; --accent-ink: #2a1020; --accent-soft: #4a2740; --accent-pastel: #e895b5;
+  --habit: #5fb8c2; --fed: #6cbf92; --missed: #e0647c; --today: #f0c15e; --sitter: #8d88dc; --none: #3a2a40;
+  --warn-bg: #3d2f19; --warn-ink: #f5d99b; color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
+/* no text selection or long-press callout anywhere except where you type (inputs, textareas) */
+body { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+input, textarea, [contenteditable] { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
 body { background: var(--bg); color: var(--ink); font: 400 16px/1.5 var(--font-body); }
 .wrap { max-width: 480px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 110px; display: grid; gap: 24px; }
 h1, h2, h3 { margin: 0; text-wrap: balance; }
@@ -43,6 +48,10 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .brand { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .brand h1 { font: 700 34px/1 var(--font-display); letter-spacing: .01em; }
 .brand h1 span { color: var(--accent); }
+.brand-r { display: flex; align-items: center; gap: 12px; }
+.gear { width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); }
+.gear svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.gear[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 .meter { display: grid; gap: 6px; }
 .meter-row { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
 .meter-row b { font-family: var(--font-mono); font-weight: 500; }
@@ -60,17 +69,27 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .cats { display: grid; gap: 16px; }
 .cat { background: var(--surface); border: 1px solid var(--line); padding: 16px; display: grid; gap: 14px; }
 .cat.ended { opacity: .72; }
-.cat-head { display: grid; grid-template-columns: 78px 1fr; gap: 14px; align-items: center; }
-.sprite { width: 78px; height: 84px; }
+.cat-head { --face: clamp(92px, 27vw, 116px); display: grid; grid-template-columns: var(--face) 1fr; gap: 14px; align-items: center; }
+.sprite { width: 92px; height: auto; }
+.cat-head > .sprite { width: var(--face); }
 .sprite.faded { opacity: .28; }
 .cat-head.solo { grid-template-columns: 1fr; }
+/* the sprite with its action button underneath */
+.cat-side { display: grid; gap: 8px; justify-items: center; align-content: center; }
+.cat-side .sprite { width: 100%; }
+.cat-side .sq { width: 100%; height: auto; padding: 7px 8px; grid-auto-flow: column; justify-content: center; gap: 6px; font-size: 13px; font-weight: 800; }
+.cat-side .sq .food { width: 24px; height: 19px; }
+.cat-side .sq b { font-size: 16px; line-height: 19px; }
+.sq { width: 62px; height: 62px; padding: 4px; flex: none; display: grid; place-items: center; align-content: center; gap: 2px; font-size: 11px; line-height: 1; }
+.sq .food { width: 30px; height: 24px; margin: 0; vertical-align: 0; }
+.sq b { font-size: 22px; line-height: 24px; }
 .cat-name { font: 700 22px/1.1 var(--font-display); overflow-wrap: anywhere; }
 .cat-habit { font-size: 15px; color: var(--muted); overflow-wrap: anywhere; }
 .chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; font-weight: 700; padding: 3px 8px; background: var(--bg); }
 .chip::before { content: ""; width: 8px; height: 8px; background: var(--chip, var(--muted)); }
 .chip.fed { --chip: var(--fed); } .chip.missed { --chip: var(--missed); } .chip.today { --chip: var(--today); }
 .chip.sitter { --chip: var(--sitter); } .chip.none { --chip: var(--muted); }
-.mode { font-size: 12px; color: var(--muted); margin-left: 6px; }
+.mode { display: block; font: 600 12px/1.3 var(--font-body, inherit); color: var(--muted); margin-top: 3px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn { border: 0; padding: 11px 16px; font-weight: 800; background: var(--bg); border: 1px solid var(--line); }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); flex: 1 1 auto; }
@@ -83,15 +102,23 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .month-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .month-nav strong { font: 500 15px/1 var(--font-display); }
 .month-nav button { border: 1px solid var(--line); background: transparent; width: 32px; height: 28px; font-family: var(--font-mono); }
-.grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .grid .dow { font: 500 11px/1 var(--font-mono); color: var(--muted); text-align: center; padding-bottom: 2px; }
-.px { aspect-ratio: 1; max-width: 100%; background: var(--none); position: relative; }
-.px.fed { background: var(--fed); } .px.missed { background: var(--missed); }
-.px.today { background: transparent; box-shadow: inset 0 0 0 3px var(--today); }
-.px.sitter { background: var(--sitter); } .px.blank { background: transparent; }
-.px span { position: absolute; left: 3px; top: 1px; font: 500 9px/1 var(--font-mono); color: var(--ink); opacity: .55; }
-.px.fed span, .px.missed span, .px.sitter span { color: #fff; opacity: .85; }
+/* one calendar look, shared by the heatmaps (.px, .cell) and the diary (.dc) */
+.px, .cell, .dc { aspect-ratio: 1; max-width: 100%; position: relative; border: 1px solid var(--line); background: var(--surface); }
+.px { background: var(--none); }
+.px.fed { background: var(--fed); border-color: var(--fed); } .px.missed { background: var(--missed); border-color: var(--missed); }
+.px.sitter { background: var(--sitter); border-color: var(--sitter); } .px.blank { background: transparent; border: 0; }
+.cell.now { outline: 3px solid var(--today); outline-offset: -3px; z-index: 1; }
+.px span, .cell span, .dc .dn { position: absolute; left: 3px; top: 2px; font: 500 10px/1 var(--font-mono); color: var(--ink); opacity: .75; }
 .stats { font-size: 14px; color: var(--muted); }
+.chips { border: 0; padding: 0; margin: 0; min-width: 0; }
+.chips > div { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.chips label { position: relative; display: inline-flex; }
+.chips input { position: absolute; inset: 0; opacity: 0; margin: 0; }
+.chips span { border: 1px solid var(--line); background: var(--surface); padding: 8px 10px; font-weight: 800; font-size: 14px; }
+.chips input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.chips input:focus-visible + span { outline: 3px solid var(--today); }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 12px; height: 12px; display: inline-block; background: var(--none); }
@@ -143,14 +170,20 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
   padding-bottom: env(safe-area-inset-bottom, 0px); z-index: 5; }
 .tabbar-in { max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; padding-inline: 6px; }
 .tabbar button { background: transparent; border: 0; padding: 8px 0 6px; display: grid; justify-items: center; gap: 2px; font-size: 11px; font-weight: 700; color: var(--muted); }
-.tabbar svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: square; }
+.tabbar svg { width: 24px; height: 24px; fill: currentColor; shape-rendering: crispEdges; }
 .tabbar button[aria-selected="true"] { color: var(--accent); }
+.tabbar button { min-width: 0; }
 .tabbar button.mid { margin-top: -14px; padding-top: 10px; background: var(--accent-soft); border: 2px solid var(--ink); border-bottom: 0; border-radius: 14px 14px 0 0; }
 .tabbar button.mid svg { width: 30px; height: 30px; }
 
 /* modal */
 .scrim { position: fixed; inset: 0; background: rgba(20, 14, 30, .55); display: grid; place-items: center; padding: 16px; z-index: 10; }
-.scrim .panel { width: min(440px, 100%); max-height: 90vh; overflow: auto; border: 2px solid var(--ink); }
+.scrim .panel { width: min(440px, 100%); max-height: 90vh; overflow: auto; border: 2px solid var(--ink); position: relative; }
+.x-close { position: absolute; top: 8px; right: 8px; z-index: 1; width: 30px; height: 30px; padding: 0; display: grid; place-items: center; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); font: 700 20px/1 var(--font-mono); }
+.panel > .cat-head { padding-right: 36px; }
+.catlog { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.catlog li { padding: 8px 10px; background: var(--bg); }
+.catlog .num { color: var(--muted); margin-right: 6px; }
 .btns { display: flex; gap: 8px; } .btns .btn { flex: 1; }
 
 .food { width: 30px; height: 24px; vertical-align: -4px; margin-right: 6px; }
@@ -185,7 +218,7 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
 .switch[aria-checked="true"] [data-side="combined"], .switch[aria-checked="false"] [data-side="individual"] { color: var(--accent-ink); }
 @media (prefers-reduced-motion: no-preference) { .switch .thumb { transition: transform .18s steps(4); } }
 .dot.habit { background: var(--habit); border-color: var(--habit); }
-.px.habit { background: var(--habit); } .px.habit span { color: #fff; opacity: .85; }
+.px.habit { background: var(--habit); border-color: var(--habit); }
 .cell .s.habit { background: var(--habit); }
 .legend i.habit { background: var(--habit); }
 .tasks li.habit { flex-wrap: wrap; }
@@ -196,14 +229,13 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
 .tasks .done { text-decoration: line-through; color: var(--muted); }
 
 /* combined heatmap */
-.cell { aspect-ratio: 1; display: grid; gap: 1px; background: var(--surface); position: relative; border: 1px solid var(--line); }
+.cell { display: grid; gap: 1px; }
 .cell .s { background: var(--none); min-width: 0; min-height: 0; }
 .cell .s.fed { background: var(--fed); } .cell .s.missed { background: var(--missed); } .cell .s.sitter { background: var(--sitter); }
-.cell span { position: absolute; left: 2px; top: 0; font: 500 9px/1.2 var(--font-mono); color: var(--ink); text-shadow: 0 0 2px var(--surface), 0 0 2px var(--surface); }
-.cell.now { box-shadow: 0 0 0 3px var(--today); z-index: 1; }
-.slice-key { display: grid; gap: 6px 14px; font-size: 13px; justify-content: start; }
-.slice-key span { display: inline-flex; align-items: center; gap: 6px; }
-.slice-key .sprite { width: 22px; height: 24px; }
+.cell span { text-shadow: 0 0 2px var(--surface), 0 0 2px var(--surface); }
+.slice-key { display: grid; gap: 6px 14px; font-size: 13px; justify-content: start; min-width: 0; }
+.slice-key span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.slice-key .sprite { width: 34px; height: auto; flex: none; }
 .check { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; }
 .check input { width: 22px; height: 22px; margin-top: 2px; accent-color: var(--accent); flex: none; }
 
@@ -211,7 +243,7 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
 [data-hold] { touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .cat-head.pressing { background: var(--accent-soft); outline: 6px solid var(--accent-soft); }
 .preview { display: flex; align-items: center; gap: 14px; }
-.preview .sprite { width: 78px; height: 84px; }
+.preview .sprite { width: 120px; height: auto; }
 .preview .btn { flex: 1; }
 .room .pet { transition: left 2.6s steps(13), top 2.6s steps(13); }
 .room.night .pet { transition: none; }
@@ -230,37 +262,135 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
 .clock-menu { display: none; order: -1; width: min(300px, calc(100vw - 24px)); border: 2px solid var(--ink); }
 .clock-pop.open .clock-menu { display: grid; }
 @media (hover: hover) { .clock-pop:hover .clock-menu { display: grid; } }
-.room { position: relative; aspect-ratio: 80 / 112; border: 2px solid var(--ink); overflow: hidden; background: #e9d6c3; }
+.room { position: relative; isolation: isolate; aspect-ratio: 80 / 112; border: 2px solid var(--ink); overflow: hidden; background: #f1dccd; }
 .room svg.bg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.room .pet { position: absolute; width: 22%; filter: drop-shadow(0 3px 0 rgba(0,0,0,.18)); }
+.room .pet { position: absolute; width: 24%; filter: drop-shadow(0 3px 0 rgba(0,0,0,.18)); }
 .room .pet .sprite { width: 100%; height: auto; }
 .room .pet em { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); font: 700 11px/1 var(--font-display); white-space: nowrap; color: #4a3a2d; font-style: normal; }
 @media (prefers-reduced-motion: no-preference) { .room .pet { animation: bob 2.4s steps(2) infinite; } .room .pet.b { animation-delay: 1.2s; } }
 @keyframes bob { 50% { transform: translateY(-3px); } }
+/* full-body kitties: the tail swishes, eyes blink, and they hop while walking to a new spot */
+.sprite.body .tail.b, .sprite.body .blink { visibility: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+  .sprite.body .tail.a { animation: tail-a 1.6s steps(1) infinite; animation-delay: var(--d); }
+  .sprite.body .tail.b { animation: tail-b 1.6s steps(1) infinite; animation-delay: var(--d); }
+  .sprite.body .blink { animation: blink 4.4s steps(1) infinite; animation-delay: var(--d); }
+  .room .pet.walking .sprite.body { animation: hop .32s steps(2) infinite; }
+  .room.night .pet .sprite.body { animation: breathe 3s steps(2) infinite; }
+}
+@keyframes tail-a { 0%, 49.9% { visibility: visible; } 50%, 100% { visibility: hidden; } }
+@keyframes tail-b { 0%, 49.9% { visibility: hidden; } 50%, 100% { visibility: visible; } }
+@keyframes blink { 0%, 93% { visibility: hidden; } 93.1%, 100% { visibility: visible; } }
+@keyframes hop { 50% { transform: translateY(-5px); } }
+@keyframes breathe { 50% { transform: translateY(1px) scaleY(.97); } }
 
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); z-index: 20;
   max-width: min(440px, calc(100% - 32px)); background: var(--surface); color: var(--ink); border: 2px solid var(--ink);
   padding: 10px 14px; font-size: 15px; box-shadow: 4px 4px 0 var(--ink); }
 @media (prefers-reduced-motion: no-preference) { .toast { animation: pop .18s steps(3); } }
 @keyframes pop { from { transform: translate(-50%, 8px); } }
-.px.now { box-shadow: inset 0 0 0 3px var(--today); }
+.px.now, .dc.now { box-shadow: inset 0 0 0 3px var(--today); }
+
+/* diary */
+.dcal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.dcal .dow { font: 500 11px/1 var(--font-mono); color: var(--muted); text-align: center; padding-bottom: 2px; }
+.dc { padding: 0; color: var(--ink); display: grid; place-items: center; }
+.dc.blank { border: 0; background: transparent; }
+.dc:disabled { opacity: .4; cursor: default; }
+.dc .mood { width: 88%; height: auto; margin-top: 6px; }
+.dc.has { background: var(--accent-pastel); border-color: var(--accent-pastel); }
+.dc.has .dn { opacity: .85; font-weight: 500; }
+.dlegend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); }
+.dlegend span { display: inline-flex; align-items: center; gap: 6px; }
+.dlegend i { width: 12px; height: 12px; background: var(--surface); border: 1px solid var(--line); }
+.dlegend i.has { background: var(--accent-pastel); border-color: var(--accent-pastel); }
+.dlegend i.now { box-shadow: inset 0 0 0 2px var(--today); }
+.dlegend .mood { width: 20px; height: auto; }
+.moods { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.moods button { display: grid; justify-items: center; gap: 2px; padding: 6px 2px; font-size: 11px; font-weight: 700; border: 1px solid var(--line); background: var(--bg); color: var(--muted); }
+.moods button .mood { width: 44px; height: auto; }
+.moods button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); box-shadow: inset 0 0 0 1px var(--accent); }
+.diary-text { min-height: 160px; font: 400 16px/1.4 var(--font-body) !important; resize: vertical; }
+.diary-photo img { display: block; width: 100%; max-height: 260px; object-fit: cover; border: 1px solid var(--line); margin-bottom: 8px; }
+.look-pick { display: grid; gap: 4px; }
+.party { position: fixed; inset: 0; pointer-events: none; z-index: 30; overflow: hidden; }
+.party .popper { position: absolute; left: 50%; bottom: 20%; width: 72px; margin-left: -36px; transform: rotate(-18deg); transform-origin: 50% 100%; }
+.party .popper svg { width: 100%; height: auto; display: block; }
+.party i { position: absolute; left: 50%; bottom: calc(20% + 64px); width: 8px; height: 8px; background: var(--c); opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .party .popper { animation: pop-shake .5s steps(4) 1; }
+  .party i { animation: burst 1.9s steps(14) forwards; animation-delay: var(--w); }
+}
+@keyframes pop-shake { 30% { transform: rotate(-18deg) translateY(4px) scale(1.12, .9); } 60% { transform: rotate(-18deg) scale(.95, 1.1); } }
+@keyframes burst {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0); }
+  55% { opacity: 1; transform: translate(var(--x), var(--y)) rotate(var(--r)); }
+  100% { opacity: 0; transform: translate(calc(var(--x) * 1.15), calc(var(--y) + 190px)) rotate(calc(var(--r) * 2)); }
+}
+.fold { padding: 0; display: block; }
+.fold > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; padding: 16px; font: 700 20px/1.1 var(--font-display); }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: "+"; font-family: var(--font-mono); color: var(--muted); }
+.fold[open] > summary::after { content: "–"; }
+.fold-body { display: grid; gap: 12px; padding: 0 16px 16px; }
+.clock-pop[hidden] { display: none; }
+.alarms { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.alarms li { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.alarms .nm { overflow-wrap: anywhere; font-weight: 700; }
+.alarms .when { display: flex; align-items: center; gap: 6px; flex: none; }
+.reminder-status { font-size: 14px; color: var(--muted); }
+.reminder-status.bad { color: var(--warn-ink); background: var(--warn-bg); padding: 8px 10px; }
+
+/* thought bubbles over a cat's head */
+.room .pet .thought { position: absolute; left: 50%; bottom: 96%; transform: translateX(-50%); display: flex; align-items: center; gap: 3px;
+  padding: 3px 7px; background: #fff; border: 2px solid #3b2733; border-radius: 14px; pointer-events: none; animation: thought 5s steps(10) forwards; }
+.room .pet .thought::before, .room .pet .thought::after { content: ""; position: absolute; background: #fff; border: 2px solid #3b2733; border-radius: 50%; }
+.room .pet .thought::before { width: 6px; height: 6px; left: 50%; bottom: -10px; }
+.room .pet .thought::after { width: 3px; height: 3px; left: 50%; bottom: -15px; margin-left: 3px; }
+.room .pet .thought .sprite { width: 26px; height: auto; }
+.room .pet .thought .sprite.faded { opacity: .6; }
+.room .pet .thought b { font: 700 13px/1 var(--font-display); color: var(--accent); }
+@keyframes thought { 0% { opacity: 0; transform: translate(-50%, 6px); } 10%, 85% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -4px); } }
 .legend i.now { background: var(--fed); box-shadow: inset 0 0 0 2px var(--today); }
+
+.room-btns { display: flex; gap: 6px; align-items: center; }
+.btn.icon { padding: 6px 8px; display: grid; place-items: center; }
+.pixart { width: 20px; height: 20px; display: block; }
+.pixart.dim { opacity: .3; filter: grayscale(1); }
+.travel-note { background: var(--accent-pastel); padding: 8px 10px; font-size: 14px; }
+.btn.travel { padding: 6px 8px; }
+.dc .tick { position: absolute; right: 4px; bottom: 2px; font: 800 14px/1 var(--font-body, inherit); color: var(--accent); }
+.x-close ~ h3 { padding-right: 36px; }
+.ach-group { margin: 6px 0 0; font: 700 14px/1 var(--font-display); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.ach { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ach li { display: flex; gap: 10px; align-items: center; padding: 8px 10px; background: var(--bg); }
+.ach li.got { background: var(--accent-pastel); }
+.ach-icon .pixart { width: 28px; height: 28px; }
+.ach-bar { display: block; height: 6px; margin-top: 6px; background: var(--line); }
+.ach-bar i { display: block; height: 100%; background: var(--accent); }
+.change h4 { margin: 0 0 4px; font: 700 18px/1.2 var(--font-display); }
+.change summary { cursor: pointer; font: 700 18px/1.2 var(--font-display); padding: 4px 0; }
+.change summary .muted { font: 400 14px/1 var(--font-body, inherit); }
+.change + .change { margin-top: 14px; }
+.change-title { margin: 8px 0 2px; font-weight: 800; font-size: 14px; }
+.change ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 15px; }
 </style>
 
 <div class="wrap">
   <header class="top" id="top"></header>
 
-  <main id="tab-room" class="tab"><div class="room-head"><h2 id="room-title"></h2><button class="btn small" type="button" data-action="room-rename">Rename</button></div><div id="room"></div><p class="muted" id="room-note"></p></main>
+  <main id="tab-room" class="tab"><div class="room-head"><h2 id="room-title"></h2><span class="room-btns"><button class="btn small icon" id="room-book" type="button" data-action="book" aria-label="Kitty diary: everyone's day"></button><button class="btn small icon" id="room-trophy" type="button" data-action="trophies" aria-label="Achievements"></button><button class="btn small" type="button" data-action="room-rename">Rename</button></span></div><div id="room"></div><p class="muted" id="room-note"></p></main>
 
   <main id="tab-mindful" class="tab">
-    <div class="seg" id="mindful-seg" role="tablist" aria-label="Treats or tasks">
+    <div class="seg" id="mindful-seg" role="tablist" aria-label="Treats or kibbles">
       <button type="button" role="tab" data-action="mindful-view" data-view="habit">Treats</button>
-      <button type="button" role="tab" data-action="mindful-view" data-view="task">Tasks</button>
+      <button type="button" role="tab" data-action="mindful-view" data-view="task">Kibbles</button>
     </div>
     <section class="panel">
       <h3 id="mindful-title"></h3>
       <p class="muted" id="mindful-desc"></p>
       <p class="num" id="mindful-cap"></p>
+      <p class="travel-note" id="mindful-travel" hidden>⏪ Time travel is on. Use the ⏪ button on a row to mark or unmark it on any day.</p>
       <ul class="tasks" id="tasks"></ul>
     </section>
     <form class="panel" id="task-form" novalidate>
@@ -271,11 +401,16 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
         <label class="field" id="repeat-wrap">Repeat
           <select id="task-repeat">
             <option value="1" selected>Every day</option><option value="2">Every 2 days</option><option value="7">Every week</option>
-            <option value="14">Every 2 weeks</option><option value="30">Every month</option><option value="custom">Custom…</option>
+            <option value="14">Every 2 weeks</option><option value="30">Every month</option>
+            <option value="weekdays">On certain weekdays…</option><option value="custom">Every N days…</option>
           </select>
         </label>
       </div>
       <label class="field" id="task-days-wrap" hidden>Repeat every (days) <input id="task-days" type="number" inputmode="numeric" min="1" max="365" value="3"></label>
+      <fieldset class="field chips" id="task-weekdays-wrap" hidden><legend>Repeat on</legend>
+        <div><label><input type="checkbox" name="weekday" value="0"><span>Mon</span></label><label><input type="checkbox" name="weekday" value="1"><span>Tue</span></label><label><input type="checkbox" name="weekday" value="2"><span>Wed</span></label><label><input type="checkbox" name="weekday" value="3"><span>Thu</span></label><label><input type="checkbox" name="weekday" value="4"><span>Fri</span></label><label><input type="checkbox" name="weekday" value="5"><span>Sat</span></label><label><input type="checkbox" name="weekday" value="6"><span>Sun</span></label></div>
+        <p class="muted">Once on each day you pick. A day you missed can still be done the day after.</p>
+      </fieldset>
       <button class="btn primary" type="submit" id="task-submit">Add</button>
     </form>
   </main>
@@ -289,59 +424,91 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
   </main>
 
   <main id="tab-heat" class="tab">
-    <button type="button" class="switch" id="heat-switch" role="switch" aria-checked="true" aria-label="Heatmap view: combined or individual" data-action="heat-toggle">
-      <span data-side="combined">Combined</span><span data-side="individual">Individual</span><i class="thumb"></i>
-    </button><section class="cats" id="heat"></section></main>
+    <section class="cats" id="heat"></section></main>
+
+  <main id="tab-diary" class="tab">
+    <article class="cat"><div class="month">
+    <div class="month-nav">
+      <button type="button" data-action="diary-month" data-step="-1" aria-label="Previous month">‹</button>
+      <strong id="diary-title"></strong>
+      <button type="button" id="diary-next" data-action="diary-month" data-step="1" aria-label="Next month">›</button>
+    </div>
+    <div class="dcal" id="diary-cal" role="group" aria-label="Diary calendar"></div>
+    <p class="stats" id="diary-stats"></p>
+    <div class="dlegend" id="diary-legend"></div>
+    <button class="btn small" type="button" data-action="diary-today" style="justify-self:start">Jump to today</button>
+    </div></article>
+  </main>
 
   <main id="tab-settings" class="tab">
-    <section class="panel">
-      <h3>Save &amp; load</h3>
-      <p class="muted">Save your progress to a file or text, and load it again on any device.</p>
+    <details class="panel fold"><summary>Feeding reminders</summary><div class="fold-body">
+      <label class="check"><input type="checkbox" id="reminder-on"><span><b>Daily reminder</b><br><span class="muted">Once a day, a kitty that still needs feeding asks for you. If everyone is fed, you get some good news instead.</span></span></label>
+      <label class="field">Time <input type="time" id="reminder-time" value="18:00"></label>
+      <label class="field">Last-call alerts
+        <select id="last-call">
+          <option value="off">Off</option>
+          <option value="gentle">Gentle: 3 hours before the day ends</option>
+          <option value="insistent">Insistent: 3 hours, 1 hour and 15 minutes before</option>
+        </select>
+      </label>
+      <p class="muted">The day ends at 02:00. These only go out for kitties that haven't been fed yet.</p>
+      <div class="field"><span>Feeding alarm for each kitty</span><ul class="alarms" id="cat-alarms"></ul></div>
+      <p class="reminder-status" id="reminder-status" role="status"></p>
+    </div></details>
+
+    <details class="panel fold"><summary>Backup</summary><div class="fold-body">
+      <p class="muted">One <b>.kitty</b> file holds your kitties, every diary page and your photos (scaled down so the file stays small). Keep it somewhere safe, like Drive or an email to yourself.</p>
       <div class="btns">
-        <button class="btn" type="button" data-action="save-file">Save to file</button>
-        <button class="btn" type="button" data-action="save-copy">Copy</button>
+        <button class="btn primary" type="button" data-action="save-file">Back up…</button>
+        <button class="btn" type="button" data-action="load-file">Restore…</button>
       </div>
-      <label class="field">Save text (paste here to load) <textarea id="save-text" spellcheck="false" placeholder="Paste a saved game here"></textarea></label>
-      <div class="btns">
-        <button class="btn primary" type="button" data-action="load-text">Load from text</button>
-        <button class="btn" type="button" data-action="load-file">Load file…</button>
-      </div>
-      <input type="file" id="load-file" accept=".json,application/json,text/plain" hidden>
+      <input type="file" id="load-file" accept=".kitty,.zip,.json,application/zip,application/octet-stream,application/json,text/plain" hidden>
+      <details class="more"><summary>Game only, as text</summary>
+        <p class="muted">Copies just the kitties and settings, without diary or photos.</p>
+        <label class="field">Save text <textarea id="save-text" spellcheck="false" placeholder="Paste a saved game here"></textarea></label>
+        <div class="btns">
+          <button class="btn" type="button" data-action="save-copy">Copy</button>
+          <button class="btn" type="button" data-action="load-text">Load from text</button>
+        </div>
+      </details>
       <p class="form-error" id="save-error" hidden></p>
-    </section>
+    </div></details>
 
-    <section class="panel">
-      <h3>Kitties</h3>
+    <details class="panel fold"><summary>Game options</summary><div class="fold-body">
+      <label class="check"><input type="checkbox" id="allow-rename"><span><b>Allow renaming kitties</b><br><span class="muted">Adds a Rename button to the long-press menu. Off by default, so a kitty keeps the name you gave it.</span></span></label>
+      <label class="check"><input type="checkbox" id="show-clock"><span><b>Playtest clock</b><br><span class="muted">Shows a small clock button for skipping ahead in time, to try out how days and streaks play out.</span></span></label>
+      <label class="check"><input type="checkbox" id="time-travel"><span><b>Time travel</b><br><span class="muted">Adds a ⏪ button to every treat and kibble, so you can mark or unmark it as done on any past day (or today). It only fixes your record: no xp is paid or taken away.</span></span></label>
       <label class="check"><input type="checkbox" id="unlimited-cats"><span><b>Unlimited kitties</b><br><span class="muted">Normally you can keep 9 kitties. Turn this on to adopt more, but you will have to confirm three times for every extra kitty.</span></span></label>
-    </section>
+    </div></details>
 
-    <section class="panel">
-      <h3>How to use</h3>
+    <details class="panel fold"><summary>Change log</summary><div class="fold-body" id="changelog"></div></details>
+
+    <details class="panel fold"><summary>How to use</summary><div class="fold-body">
       <ul class="rules-list">
         <li>Each cat stands for one habit. Do the habit, then feed the cat once a day: +5 affection.</li>
         <li>A day runs from 2am to 2am.</li>
         <li>Every missed day costs −15. After 3 missed days in a row a classic cat dies; a light-hearted one runs away.</li>
         <li>Going away? Leave a cat with the sitter for up to 7 days (−5 a day, once every 30 days). Bring it home in time or it stays there.</li>
-        <li>Below 0 affection, cats only trust you with one cat at a time. Treats and tasks earn it back.</li>
+        <li>Below 0 affection, cats only trust you with one cat at a time. Treats and kibbles earn it back.</li>
         <li>Heatmap shows each cat's month (switch between combined and individual); the gold outline is today.</li>
-        <li><b>Tasks</b> are one-offs (up to 15 xp a day). <b>Treats</b> are small habits you might not do every day, like cleaning your desk after working from home; they repeat and keep their history (up to 10 xp a day). A daily treat can become a kitty and keeps its history in teal.</li>
+        <li><b>Kibbles</b> are one-offs (up to 15 xp a day). <b>Treats</b> are small habits you might not do every day, like cleaning your desk after working from home; they repeat and keep their history (up to 10 xp a day). A daily treat can become a kitty and keeps its history in teal.</li>
         <li>You can keep up to 9 kitties.</li>
       </ul>
-    </section>
+    </div></details>
 
     <footer class="foot">
-      <span><span id="saved">Saved on this device</span> · <span id="version">v0.2</span></span>
+      <span><span id="saved">Saved on this device</span> · <span id="version"></span></span>
       <span class="confirm" id="reset-area"><button class="linkish" type="button" data-action="reset-ask">Start over</button></span>
     </footer>
   </main>
 </div>
 
 <nav class="tabbar" aria-label="Tabs"><div class="tabbar-in" role="tablist">
-  <button role="tab" data-action="tab" data-tab="room"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7M5 10v10h14V10M10 20v-6h4v6"/></svg><span>Room</span></button>
-  <button role="tab" data-action="tab" data-tab="mindful"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12c3-5 9-6 13-2l5-3v10l-5-3c-4 4-10 3-13-2ZM7 11h.01"/></svg><span>Treats</span></button>
-  <button role="tab" data-action="tab" data-tab="today" class="mid"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4l3.5 3.5h7L19 4v9a7 7 0 0 1-14 0ZM9 12h.01M15 12h.01M11 15.5h2"/></svg><span>Today</span></button>
-  <button role="tab" data-action="tab" data-tab="heat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg><span>Heatmap</span></button>
-  <button role="tab" data-action="tab" data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M9 4v6M15 14v6"/></svg><span>Settings</span></button>
+  <button role="tab" data-action="tab" data-tab="room"><svg viewBox="0 0 11 10" aria-hidden="true"><path d="M5 0h1v1h-1zM4 1h3v1h-3zM3 2h5v1h-5zM2 3h7v1h-7zM1 4h9v1h-9zM0 5h11v1h-11zM1 6h2v1h-2zM5 6h1v1h-1zM8 6h2v1h-2zM1 7h2v1h-2zM8 7h2v1h-2zM1 8h3v1h-3zM7 8h3v1h-3zM1 9h4v1h-4zM6 9h4v1h-4z"/></svg><span>Room</span></button>
+  <button role="tab" data-action="tab" data-tab="mindful"><svg viewBox="0 0 12 6" aria-hidden="true"><path d="M3 0h4v1h-4zM1 1h7v1h-7zM11 1h1v1h-1zM0 2h2v1h-2zM3 2h8v1h-8zM0 3h11v1h-11zM1 4h7v1h-7zM11 4h1v1h-1zM3 5h4v1h-4z"/></svg><span>Treats</span></button>
+  <button role="tab" data-action="tab" data-tab="today" class="mid"><svg viewBox="0 0 23 15" aria-hidden="true"><path d="M6 0h2v1h-2zM15 0h2v1h-2zM5 1h4v1h-4zM14 1h4v1h-4zM5 2h5v1h-5zM13 2h5v1h-5zM4 3h15v1h-15zM4 4h15v1h-15zM3 5h17v1h-17zM3 6h17v1h-17zM2 7h19v1h-19zM1 8h21v1h-21zM2 9h19v1h-19zM1 10h21v1h-21zM2 11h19v1h-19zM3 12h17v1h-17zM4 13h15v1h-15zM6 14h11v1h-11z"/></svg><span>Today</span></button>
+  <button role="tab" data-action="tab" data-tab="heat"><svg viewBox="0 0 11 11" aria-hidden="true"><path d="M1 0h3v1h-3zM7 0h3v1h-3zM0 1h5v1h-5zM6 1h5v1h-5zM0 2h5v1h-5zM6 2h5v1h-5zM0 3h5v1h-5zM6 3h5v1h-5zM1 4h3v1h-3zM7 4h3v1h-3zM1 6h3v1h-3zM7 6h3v1h-3zM0 7h5v1h-5zM6 7h5v1h-5zM0 8h5v1h-5zM6 8h5v1h-5zM0 9h5v1h-5zM6 9h5v1h-5zM1 10h3v1h-3zM7 10h3v1h-3z"/></svg><span>Heatmap</span></button>
+  <button role="tab" data-action="tab" data-tab="diary"><svg viewBox="0 0 11 8" aria-hidden="true"><path d="M1 0h9v1h-9zM0 1h11v1h-11zM0 2h3v1h-3zM5 2h1v1h-1zM8 2h3v1h-3zM0 3h3v1h-3zM8 3h3v1h-3zM0 4h4v1h-4zM7 4h4v1h-4zM0 5h5v1h-5zM6 5h5v1h-5zM0 6h11v1h-11zM1 7h9v1h-9z"/></svg><span>Diary</span></button>
 </div></nav>
 <div class="clock-pop" id="clock-pop">
   <button type="button" class="clock-btn" data-action="clock-toggle" aria-label="Playtest clock">⏱</button>
@@ -350,6 +517,7 @@ details.rules ul { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px;
     <p class="muted"><b id="clock-now"></b></p>
     <p class="muted" id="clock-label"></p>
     <div class="btns">
+      <button class="btn" type="button" data-action="skip" data-hours="-24">−1 day</button>
       <button class="btn" type="button" data-action="skip" data-hours="3">+3 h</button>
       <button class="btn" type="button" data-action="skip" data-hours="24">+1 day</button>
       <button class="btn" type="button" data-action="real-time" id="real-time">Now</button>
