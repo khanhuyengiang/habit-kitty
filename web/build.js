@@ -27,15 +27,7 @@ mkdirSync('dist', { recursive: true });
 writeFileSync('dist/habit-kitty.html', site);
 
 // ---- Android app ----
-const FONTS = [
-  ['Pixelify Sans', 500, 'pixelify-sans/files/pixelify-sans-latin-500-normal.woff2'],
-  ['Pixelify Sans', 700, 'pixelify-sans/files/pixelify-sans-latin-700-normal.woff2'],
-  ['Nunito', 400, 'nunito/files/nunito-latin-400-normal.woff2'],
-  ['Nunito', 600, 'nunito/files/nunito-latin-600-normal.woff2'],
-  ['Nunito', 800, 'nunito/files/nunito-latin-800-normal.woff2'],
-  ['DM Mono', 400, 'dm-mono/files/dm-mono-latin-400-normal.woff2'],
-  ['DM Mono', 500, 'dm-mono/files/dm-mono-latin-500-normal.woff2'],
-];
+const FONTS = [['Jersey 15', 400, 'jersey-15/files/jersey-15-latin-400-normal.woff2']];
 rmSync('app-www', { recursive: true, force: true });
 mkdirSync('app-www/fonts', { recursive: true });
 const faces = FONTS.map(([family, weight, src]) => {

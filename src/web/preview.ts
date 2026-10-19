@@ -1,6 +1,6 @@
 // Sprite sheet for `npm run preview`: every face x pattern, so shape edits in src/pixelcat.ts
 // can be seen side by side. Dev only — never bundled into the app.
-import { FURS, PATTERNS, TRAITS, WIDTH, bodySvg, faceSvg, popperSvg, type Face } from '../pixelcat.ts';
+import { FURS, NAP_W, PATTERNS, TRAITS, WIDTH, bodySvg, faceSvg, miniSvg, napSvg, popperSvg, MINI_W, type Face } from '../pixelcat.ts';
 import type { CatLook } from '../rules.ts';
 
 const FACES: Face[] = ['open', 'happy', 'sleepy', 'sad', 'starving', 'dead'];
@@ -22,6 +22,8 @@ function render() {
     out += `<section class="row"><h2>${p}</h2><div class="cells">`;
     out += FACES.map((f) => cell(f, faceSvg(f, look(fur, p)), WIDTH)).join('');
     out += FACES.map((f) => cell(`${f} (sitting)`, bodySvg(f, look(fur, p), 0), WIDTH + 1)).join('');
+    out += cell('napping', napSvg(look(fur, p)), NAP_W);
+    out += FACES.map((f) => cell(`${f} (mini)`, miniSvg(f, look(fur, p)), MINI_W)).join('');
     out += '</div></section>';
   }
   out += `<section class="row"><h2>popper</h2><div class="cells">${cell('popper', popperSvg(), 13)}</div></section>`;
