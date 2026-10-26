@@ -1,5 +1,5 @@
 // Daily feeding reminders: decides what each upcoming reminder says. Pure, no platform code.
-import { CONFIG, dayIndex, type AppState, type Cat } from './rules.ts';
+import { dayIndex, dayStartHour, type AppState, type Cat } from './rules.ts';
 import type { Face } from './pixelcat.ts';
 
 export type LastCall = 'off' | 'gentle' | 'insistent';
@@ -27,7 +27,7 @@ export interface PlannedReminder {
 export const REMINDER_DAYS = 14;      // how far ahead reminders are scheduled; every app open tops this up
 export const defaultReminder = (): ReminderSettings => ({ enabled: false, hour: 18, minute: 0 });
 
-// Minutes before the day ends (CONFIG.resetHour) at which a last-call alert goes out.
+// Minutes before the day ends (dayStartHour) at which a last-call alert goes out.
 export const LAST_CALL_MINUTES: Record<LastCall, number[]> = { off: [], gentle: [180], insistent: [180, 60, 15] };
 
 export const anyReminder = (r: ReminderSettings) => r.enabled || (r.lastCall ?? 'off') !== 'off' || Object.keys(r.catAlarms ?? {}).length > 0;
@@ -79,7 +79,9 @@ export function planReminders(
   const future = (at: Date) => at.getTime() > now.getTime();
 
   let prev: string | undefined;
-  for (let i = 0; i <= days; i++) {
+  // From yesterday: before the day starts (say 1am, with a 2am start) the game day that began yesterday is still running
+  // and its last calls are still ahead. Anything else dated yesterday is in the past and skipped.
+  for (let i = -1; i <= days; i++) {
     const date = (h: number, m: number, plus = 0) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + i + plus, h, m, 0, 0);
 
     if (settings.enabled) {
@@ -115,12 +117,13 @@ export function planReminders(
       raw.push({ at, title: 'Habit Kitty', body: `Time to feed ${c.name}! Do "${c.habit}" first.`, catId: c.id, face: faceFor(missedBy(c, dayIndex(at), today)) });
     }
 
-    // The game day that starts on today's date + i ends at resetHour the next morning.
+    // The game day that starts on today's date + i ends when the next one starts, the next morning.
     const lastCall = LAST_CALL_MINUTES[settings.lastCall ?? 'off'];
     if (lastCall.length) {
-      const fireDay = dayIndex(date(12, 0));
+      const start = dayStartHour();
+      const fireDay = dayIndex(date(start, 0));
       const unfed = unfedOn(fireDay);
-      const end = date(CONFIG.resetHour, 0, 1);
+      const end = date(start, 0, 1);
       for (const minutes of lastCall) {
         const at = new Date(end.getTime() - minutes * 60_000);
         if (unfed.length && future(at)) {

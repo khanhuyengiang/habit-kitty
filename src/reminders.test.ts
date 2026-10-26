@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { adoptCat, dayIndex, feedCat, newState, type AppState } from './rules.ts';
+import { afterEach, describe, expect, it } from 'vitest';
+import { adoptCat, dayIndex, feedCat, newState, setDayStart, type AppState } from './rules.ts';
 import { HAPPY_BODY, planReminders, type ReminderSettings } from './reminders.ts';
 
 const at = (h: number, m = 0, d = 10) => new Date(2026, 9, d, h, m);
@@ -99,6 +99,12 @@ describe('last call', () => {
     const { plan } = planReminders(withCats('A', 'B', 'C', 'D'), settings('insistent'), at(9), 0);
     expect(plan[0].body).toBe('A, B and 2 more are still waiting to be fed. The day ends in 3 hours.');
     expect(plan[2].body).toContain('Last call');
+  });
+  afterEach(() => setDayStart(undefined));
+  it('follows a later day start, still warning before the current day ends in the small hours', () => {
+    setDayStart(6);
+    const { plan } = planReminders(withCats('Mochi'), settings('insistent'), at(3, 0, 11), 0);
+    expect(plan.map((p) => [p.at.getDate(), p.at.getHours(), p.at.getMinutes()])).toEqual([[11, 5, 0], [11, 5, 45], [12, 3, 0], [12, 5, 0], [12, 5, 45]]);
   });
 });
 

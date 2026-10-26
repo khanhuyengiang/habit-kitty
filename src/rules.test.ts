@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import {
   newState, adoptCat, feedCat, startSitter, resumeCat, settleAll,
-  addMindfulTask, doMindfulTask, removeMindfulTask, returnToShelter, habitToCat, dayIndex, levelFor, levelProgress,
+  addMindfulTask, doMindfulTask, removeMindfulTask, returnToShelter, habitToCat, dayIndex, setDayStart, levelFor, levelProgress,
   graveyard, runaways, hunger, setTaskDay, genderOf, type ActionResult, type AppState, type CatMode,
 } from './rules';
 
@@ -19,6 +19,20 @@ describe('day boundary', () => {
     const evening = new Date(2026, 0, 5, 23, 0);
     expect(dayIndex(new Date(2026, 0, 6, 1, 59))).toBe(dayIndex(evening));
     expect(dayIndex(new Date(2026, 0, 6, 2, 0))).toBe(dayIndex(evening) + 1);
+  });
+
+  afterEach(() => setDayStart(undefined));
+  it('follows the day start the player picked', () => {
+    const evening = new Date(2026, 0, 5, 23, 0);
+    setDayStart(5);
+    expect(dayIndex(new Date(2026, 0, 6, 4, 59))).toBe(dayIndex(evening));
+    expect(dayIndex(new Date(2026, 0, 6, 5, 0))).toBe(dayIndex(evening) + 1);
+    setDayStart(0);
+    expect(dayIndex(new Date(2026, 0, 6, 0, 0))).toBe(dayIndex(evening) + 1);
+  });
+  it('falls back to 2am for a day start out of range', () => {
+    setDayStart(13);
+    expect(dayIndex(new Date(2026, 0, 6, 1, 59))).toBe(dayIndex(new Date(2026, 0, 5, 23, 0)));
   });
 });
 

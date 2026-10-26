@@ -7,6 +7,7 @@
     "app:sync": "node web/build.js && cap sync android",
     "app:apk": "npm run app:sync && cd android && JAVA_HOME=${JAVA_HOME:-$HOME/android-studio-rabbit1-linux/android-studio/jbr} ./gradlew clean assembleDebug && cp app/build/outputs/apk/debug/app-debug.apk ../dist/HabitKitty.apk",
     "preview": "node web/preview.js",
+    "editor": "node web/editor.js",
     "icons": "node scripts/notify-icons.ts"
   },
   "devDependencies": {
@@ -23,5 +24,5 @@
     "@capacitor/share": "^8.0.3",
     "fflate": "^0.8.3"
   },
-  "version": "3.0.0"
+  "version": "0.3.0"
 }

@@ -1,14 +1,14 @@
 import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { FACE_HALF, PATTERNS, SIT_HALF, WIDTH, bodySvg, faceSvg, lookOf, randomLook, notifyIconName, NOTIFY_FACES, FURS, type Face } from './pixelcat.ts';
+import { FACE_HALF, HALF_W, PATTERNS, SIT_HALF, WIDTH, bodySvg, faceSvg, lookOf, randomLook, notifyIconName, NOTIFY_FACES, FURS, type Face } from './pixelcat.ts';
 
 const FACES: Face[] = ['open', 'happy', 'sleepy', 'sad', 'starving', 'dead'];
 const look = { fur: '#ffb98a', pattern: 'plain' as const };
 
 describe('pixel cats', () => {
   it('has templates that are 14 columns wide on every row', () => {
-    for (const row of [...FACE_HALF, ...SIT_HALF]) expect(row).toHaveLength(14);
-    expect(WIDTH).toBe(27);
+    for (const row of [...FACE_HALF, ...SIT_HALF]) expect(row).toHaveLength(HALF_W);
+    expect(WIDTH).toBe(2 * HALF_W - 1);
   });
   it('draws every face and pattern, for both the face and the sitting cat', () => {
     for (const f of FACES) { expect(faceSvg(f, look)).toContain('<rect'); expect(bodySvg(f, look)).toContain('<rect'); }

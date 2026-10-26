@@ -1,8 +1,13 @@
 // Bundles src/web/app.ts (with the shared rules) into the page, in two flavours:
 //   dist/habit-kitty.html  page body only, for publishing as a Claude artifact (it adds the skeleton)
-//   app-www/index.html     full offline document with bundled fonts, for the Android app (Capacitor)
+//   app-www/index.html     full offline document with bundled fonts and sounds, for the Android app (Capacitor)
+// The sounds (sounds/*.mp3) are files next to the app's page, and inlined as data URLs into the single-file website.
 import { build } from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
+
+const SOUNDS = { bgm: 'Strawberry-Walk.mp3', meow: 'Meow.mp3', purr: 'Purr.mp3' };
+const soundUrls = (isApp) => Object.fromEntries(Object.entries(SOUNDS).map(([k, f]) =>
+  [k, isApp ? `sounds/${f}` : `data:audio/mpeg;base64,${readFileSync(`sounds/${f}`).toString('base64')}`]));
 
 async function bundle(isApp) {
   const { outputFiles } = await build({
@@ -13,7 +18,7 @@ async function bundle(isApp) {
     minify: true,
     write: false,
     loader: { '.md': 'text' },
-    define: { __APP__: String(isApp) },
+    define: { __APP__: String(isApp), __SOUNDS__: JSON.stringify(soundUrls(isApp)) },
   });
   return outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 }
@@ -30,6 +35,8 @@ writeFileSync('dist/habit-kitty.html', site);
 const FONTS = [['Jersey 15', 400, 'jersey-15/files/jersey-15-latin-400-normal.woff2']];
 rmSync('app-www', { recursive: true, force: true });
 mkdirSync('app-www/fonts', { recursive: true });
+mkdirSync('app-www/sounds', { recursive: true });
+for (const f of Object.values(SOUNDS)) copyFileSync(`sounds/${f}`, `app-www/sounds/${f}`);
 const faces = FONTS.map(([family, weight, src]) => {
   const file = src.split('/').pop();
   copyFileSync(`node_modules/@fontsource/${src}`, `app-www/fonts/${file}`);

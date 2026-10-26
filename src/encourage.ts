@@ -1,4 +1,5 @@
 // What a kitty says (well, what the app says for it) when it has been fed. Pure: pass `rand` for a fixed roll.
+import { lookOf } from './pixelcat.ts';
 import { genderOf, CONFIG, type Cat } from './rules.ts';
 
 export const STREAK_MILESTONES = [3, 7, 14, 30, 50, 100];
@@ -36,7 +37,7 @@ const milestone = (cat: Cat, streak: number): string | null => {
 export function fedMessage(cat: Cat, food: string, streak: number, rand: () => number = Math.random): string {
   const p = pronoun(cat);
   const special = milestone(cat, streak);
-  const trait = cat.look?.trait && rand() < 0.4 ? BY_TRAIT[cat.look.trait] : undefined;
+  const trait = rand() < 0.4 ? BY_TRAIT[lookOf(cat).trait ?? 'curious'] : undefined;
   const line = special ?? (trait ?? GENERIC[Math.min(GENERIC.length - 1, Math.floor(rand() * GENERIC.length))])(cat.name, p);
-  return `${cat.name} ate ${food}. +${CONFIG.xpPerFeeding} xp. ${line}`;
+  return `${cat.name} ate ${food}. +${CONFIG.xpPerFeeding} XP. ${line}`;
 }

@@ -71,9 +71,9 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 /* ---------- pictures: always columns x --px ---------- */
 .pxs { display: block; flex: none; width: calc(var(--w) * var(--px)); height: calc(var(--h) * var(--px)); }
 .pxs.ico { fill: currentColor; }
-.sprite { display: block; width: calc(23 * var(--px)); height: auto; }
-.sprite.mini { width: calc(13 * var(--px)); }
-.sprite.body { width: calc(28 * var(--px)); }
+.sprite { display: block; width: calc(var(--w, 23) * var(--px)); height: auto; }
+.sprite.mini { width: calc(var(--w, 13) * var(--px)); }
+.sprite.body { width: calc(var(--w, 28) * var(--px)); }
 .sprite.nap { width: calc(var(--w) * var(--px)); }
 .sprite.faded { opacity: .28; }
 
@@ -93,6 +93,11 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .gear { width: calc(14 * var(--px)); height: calc(14 * var(--px)); display: grid; place-items: center; padding: 0; background: var(--surface); color: var(--ink);
   box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--bevel); }
 .gear[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); }
+@keyframes sweep { 0%, 100% { background: var(--none); } 40% { background: var(--accent); } }
+.bar.busy i { animation: sweep 1s steps(2, end) infinite; }
+.bar.busy i:nth-child(2) { animation-delay: .1s; } .bar.busy i:nth-child(3) { animation-delay: .2s; } .bar.busy i:nth-child(4) { animation-delay: .3s; }
+.bar.busy i:nth-child(5) { animation-delay: .4s; } .bar.busy i:nth-child(6) { animation-delay: .5s; } .bar.busy i:nth-child(7) { animation-delay: .6s; } .bar.busy i:nth-child(8) { animation-delay: .7s; }
+.loading { display: grid; gap: var(--s2); margin-bottom: var(--s2); }
 .meter { display: grid; gap: var(--s2); }
 .meter-row { display: flex; justify-content: space-between; gap: var(--s4); font-size: 18px; }
 .meter-row b { font-weight: 700; }
@@ -118,7 +123,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .cats { display: grid; gap: var(--s5); }
 .cat { padding: var(--s5); display: grid; gap: var(--s4); }
 .cat.ended { opacity: .72; }
-.cat-head { display: grid; grid-template-columns: calc(28 * var(--px)) 1fr; gap: var(--s4); align-items: center; }
+.cat-head { display: grid; grid-template-columns: calc(var(--face-w, 23) * var(--px) + var(--s5)) 1fr; gap: var(--s4); align-items: center; }
 .cat-head.solo { grid-template-columns: 1fr; }
 .cat-side { display: grid; gap: var(--s2); justify-items: center; align-content: center; }
 .cat-side .sq { width: 100%; padding: var(--s2) var(--s1); }
@@ -149,9 +154,14 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .month { display: grid; gap: var(--s3); }
 .month-nav { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
 .month-nav strong { font: 700 20px/1 var(--font); }
-.month-nav button, #diary-next { border: var(--px) solid var(--edge); clip-path: var(--notch); background: var(--surface2); color: var(--ink);
+/* the arrows; an id here would outrank :disabled below and leave a disabled arrow looking pressable */
+.month-nav button:not(.month-title) { border: var(--px) solid var(--edge); clip-path: var(--notch); background: var(--surface2); color: var(--ink);
   width: calc(11 * var(--px)); height: calc(9 * var(--px)); display: grid; place-items: center; padding: 0; box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--line); }
-.month-nav button:disabled { background: var(--none); color: var(--muted); border-color: var(--line); box-shadow: none; }
+.month-nav button:disabled { background: var(--none); color: var(--muted); border-color: var(--line); box-shadow: none; cursor: default; }
+/* the month title opens the month and year picker */
+.month-title { font: 700 20px/1 var(--font); background: none; border: 0; padding: var(--s1) var(--s2); color: var(--ink);
+  text-decoration: underline; text-decoration-thickness: var(--px); text-underline-offset: var(--s1); text-decoration-color: var(--line); }
+.month-title:hover { background: var(--surface2); }
 .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--px); }
 .grid .dow { font: 600 15px/1 var(--font); color: var(--muted); text-align: center; padding-bottom: var(--s1); }
 /* one calendar look, shared by the heatmaps (.px, .cell) and the diary (.dc) */
@@ -321,7 +331,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 @media (hover: hover) { .clock-pop:hover .clock-menu { display: grid; } }
 .room { box-sizing: content-box; position: relative; isolation: isolate; width: calc(108 * var(--px)); height: calc(150 * var(--px)); margin-inline: auto; overflow: hidden; background: var(--bg3); }
 .room svg.bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.room .pet { position: absolute; width: calc(28 * var(--px)); }
+.room .pet { position: absolute; }
 .room .pet.napping { width: auto; }
 .room .pet em { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); font: 700 15px/1 var(--font); white-space: nowrap; color: #4a3a78; font-style: normal;
   paint-order: stroke fill; -webkit-text-stroke: 4px #fffafd; }
@@ -426,6 +436,32 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .change + .change { margin-top: var(--s4); }
 .change-title { margin: var(--s2) 0 var(--px); font-weight: 700; font-size: 18px; }
 .change ul { margin: 0; padding-left: var(--s6); display: grid; gap: var(--s1); font-size: 18px; list-style: square; }
+
+/* volume sliders: a pixel track that fills with pink, and a square key for a thumb */
+.vol { display: grid; grid-template-columns: 1fr auto; gap: var(--s1) var(--s3); align-items: center; font-size: 18px; font-weight: 600; }
+.vol span { grid-column: 1 / -1; }
+.vol output { min-width: 4ch; text-align: right; color: var(--muted); }
+.vol input { appearance: none; -webkit-appearance: none; width: 100%; height: calc(9 * var(--px)); margin: 0; background: transparent; cursor: pointer; }
+.vol input::-webkit-slider-runnable-track { height: calc(4 * var(--px)); border: var(--px) solid var(--edge); background: linear-gradient(var(--accent), var(--accent)) 0 0 / var(--fill, 0%) 100% no-repeat, var(--none); }
+.vol input::-moz-range-track { height: calc(2 * var(--px)); border: var(--px) solid var(--edge); background: var(--none); }
+.vol input::-moz-range-progress { height: calc(2 * var(--px)); background: var(--accent); }
+.vol input::-webkit-slider-thumb { -webkit-appearance: none; width: calc(6 * var(--px)); height: calc(9 * var(--px)); margin-top: calc(-3.5 * var(--px)); border: var(--px) solid var(--edge); border-radius: 0;
+  background: var(--surface); box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--line); }
+.vol input::-moz-range-thumb { width: calc(4 * var(--px)); height: calc(7 * var(--px)); border: var(--px) solid var(--edge); border-radius: 0; background: var(--surface); box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--line); }
+.fold-body a { color: var(--accent-text); text-decoration-thickness: var(--px); text-underline-offset: var(--px); overflow-wrap: anywhere; }
+
+/* a small dialog over the page or over another dialog (the month picker, the diary's Clear check) */
+.scrim.layer { z-index: 15; }
+.picker-head { display: flex; align-items: center; gap: var(--s3); min-height: calc(11 * var(--px)); padding-right: calc(12 * var(--px)); }
+.picker-head strong { font: 700 25px/1.1 var(--font); }
+.picker-head .btn { display: inline-flex; align-items: center; gap: var(--s2); }
+.pick-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s2); }
+.pick { border: var(--px) solid var(--line); clip-path: var(--notch); background: var(--surface2); color: var(--ink); padding: var(--s3) 0 var(--s4); font-weight: 700;
+  box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--line); }
+.pick.now { box-shadow: inset 0 0 0 var(--px) var(--today), inset 0 calc(-2 * var(--px)) 0 var(--line); }
+.pick[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--accent-shade); }
+.pick:active:not(:disabled) { transform: translateY(var(--s1)); box-shadow: none; }
+.pick:disabled { background: var(--none); color: var(--muted); border-color: var(--line); box-shadow: none; opacity: .55; cursor: default; }
 </style>
 
 <div class="wrap">
@@ -482,7 +518,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
     <article class="cat"><div class="month">
     <div class="month-nav">
       <button type="button" data-action="diary-month" data-step="-1" aria-label="Previous month" data-icon="prev"></button>
-      <strong id="diary-title"></strong>
+      <button type="button" class="month-title" id="diary-title" data-action="picker-open" data-key="diary" aria-haspopup="dialog"></button>
       <button type="button" id="diary-next" data-action="diary-month" data-step="1" aria-label="Next month" data-icon="next"></button>
     </div>
     <div class="dcal" id="diary-cal" role="group" aria-label="Diary calendar"></div>
@@ -503,9 +539,26 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
           <option value="insistent">Insistent: 3 hours, 1 hour and 15 minutes before</option>
         </select>
       </label>
-      <p class="muted">The day ends at 02:00. These only go out for kitties that haven't been fed yet.</p>
+      <p class="muted"><span id="day-end-note">The day ends at 02:00.</span> These only go out for kitties that haven't been fed yet.</p>
       <div class="field"><span>Feeding alarm for each kitty</span><ul class="alarms" id="cat-alarms"></ul></div>
       <p class="reminder-status" id="reminder-status" role="status"></p>
+    </div></details>
+
+    <details class="panel fold"><summary>Sound</summary><div class="fold-body">
+      <label class="vol"><span>Music</span><input type="range" id="vol-bgm" min="0" max="100" step="5"><output id="vol-bgm-out" class="num" for="vol-bgm"></output></label>
+      <label class="vol"><span>Meows</span><input type="range" id="vol-meow" min="0" max="100" step="5"><output id="vol-meow-out" class="num" for="vol-meow"></output></label>
+      <label class="vol"><span>Purrs</span><input type="range" id="vol-purr" min="0" max="100" step="5"><output id="vol-purr-out" class="num" for="vol-purr"></output></label>
+      <p class="muted">Kitties in the cozy room meow now and then, and may purr or meow when you pet them. Slide a sound all the way down to turn it off.</p>
+      <p class="muted">Music: Strawberry Walk 【BGM： IchinoseSound】 <a href="https://www.youtube.com/@IchinoseSound" target="_blank" rel="noopener">youtube.com/@IchinoseSound</a></p>
+    </div></details>
+
+    <details class="panel fold"><summary>Your day</summary><div class="fold-body">
+      <p class="muted">Choose when your day starts and ends. Feeding, treats, kibbles, streaks and diary pages all count toward the day you are in, so a night owl can let the day run past midnight.</p>
+      <div class="row">
+        <label class="field">Starts at <select id="day-start"></select></label>
+        <label class="field">Ends at <select id="day-end"></select></label>
+      </div>
+      <p class="muted" id="day-span"></p>
     </div></details>
 
     <details class="panel fold"><summary>Backup</summary><div class="fold-body">
@@ -529,7 +582,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
     <details class="panel fold"><summary>Game options</summary><div class="fold-body">
       <label class="check"><input type="checkbox" id="allow-rename"><span><b>Allow renaming kitties</b><br><span class="muted">Adds a Rename button to the long-press menu. Off by default, so a kitty keeps the name you gave it.</span></span></label>
       <label class="check"><input type="checkbox" id="show-clock"><span><b>Playtest clock</b><br><span class="muted">Shows a small clock button for skipping ahead in time, to try out how days and streaks play out.</span></span></label>
-      <label class="check"><input type="checkbox" id="time-travel"><span><b>Time travel</b><br><span class="muted">Adds a rewind button to every treat and kibble, so you can mark or unmark it as done on any past day (or today). It only fixes your record: no xp is paid or taken away.</span></span></label>
+      <label class="check"><input type="checkbox" id="time-travel"><span><b>Time travel</b><br><span class="muted">Adds a rewind button to every treat and kibble, so you can mark or unmark it as done on any past day (or today). It only fixes your record: no XP is paid or taken away.</span></span></label>
       <label class="check"><input type="checkbox" id="unlimited-cats"><span><b>Unlimited kitties</b><br><span class="muted">Normally you can keep 9 kitties. Turn this on to adopt more, but you will have to confirm three times for every extra kitty.</span></span></label>
     </div></details>
 
@@ -538,12 +591,12 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
     <details class="panel fold"><summary>How to use</summary><div class="fold-body">
       <ul class="rules-list">
         <li>Each cat stands for one habit. Do the habit, then feed the cat once a day: +5 affection.</li>
-        <li>A day runs from 2am to 2am.</li>
+        <li id="day-rule">A day runs from 2am to 2am.</li>
         <li>Every missed day costs −15. After 3 missed days in a row a classic cat dies; a light-hearted one runs away.</li>
         <li>Going away? Leave a cat with the sitter for up to 7 days (−5 a day, once every 30 days). Bring it home in time or it stays there.</li>
         <li>Below 0 affection, cats only trust you with one cat at a time. Treats and kibbles earn it back.</li>
         <li>Heatmap shows each cat's month (switch between combined and individual); the gold outline is today.</li>
-        <li><b>Kibbles</b> are one-offs (up to 15 xp a day). <b>Treats</b> are small habits you might not do every day, like cleaning your desk after working from home; they repeat and keep their history (up to 10 xp a day). A daily treat can become a kitty and keeps its history in teal.</li>
+        <li><b>Kibbles</b> are one-offs (up to 15 XP a day). <b>Treats</b> are small habits you might not do every day, like cleaning your desk after working from home; they repeat and keep their history (up to 10 XP a day). A daily treat can become a kitty and keeps its history in teal.</li>
         <li>You can keep up to 9 kitties.</li>
       </ul>
     </div></details>

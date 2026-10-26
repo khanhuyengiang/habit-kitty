@@ -45,6 +45,8 @@ export const ICONS: Record<string, string[]> = {
   prev: ['..o', '.o.', 'o..', '.o.', '..o'],
   next: ['o..', '.o.', '..o', '.o.', 'o..'],
   gear: ['....o....', '.o.ooo.o.', '..ooooo..', '.ooo.ooo.', 'ooo...ooo', '.ooo.ooo.', '..ooooo..', '.o.ooo.o.', '....o....'],
+  sun: ['....o....', '.o..o..o.', '..ooooo..', '..ooooo.o', 'ooooooooo', 'o.ooooo..', '..ooooo..', '.o..o..o.', '....o....'],
+  moon: ['...ooo...', '..oo.....', '.oo......', '.oo......', '.oo......', '.oo...o..', '..oo..o..', '...oooo..', '.........'],
   clock: ['..ooooo..', '.o.....o.', 'o...o...o', 'o...o...o', 'o...ooo.o', 'o.......o', 'o.......o', '.o.....o.', '..ooooo..'],
   // tab bar
   room: ['.....o.....', '....ooo....', '...ooooo...', '..ooooooo..', '.ooooooooo.', 'ooooooooooo', '.ooooooooo.', '.ooo...ooo.', '.ooo...ooo.', '.ooo...ooo.'],

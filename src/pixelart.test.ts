@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BOOK_ART, FOODS, ICONS, MARKS, PAL, ROOM_H, ROOM_W, TROPHY_ART, artSvg, iconSvg, roomSvg } from './pixelart.ts';
-import { FURS, MINI_W, PATTERNS, bodySvg, faceSvg, miniSvg, popperSvg } from './pixelcat.ts';
+import { BODY_H, BODY_W, FACE_W, FURS, MINI_W, PATTERNS, bodySvg, faceSvg, miniSvg, popperSvg } from './pixelcat.ts';
 
 const arts: Record<string, string[]> = { book: BOOK_ART, trophy: TROPHY_ART, ...Object.fromEntries(Object.entries(FOODS)), ...MARKS };
 
@@ -23,9 +23,9 @@ describe('one pixel grid', () => {
     expect(iconSvg('x')).toContain('--w:5;--h:5');
   });
 
-  it('keeps the cats on whole pixels: face 23 wide, body 28 wide, mini 11 wide', () => {
-    expect(faceSvg('open', { fur: FURS[0], pattern: 'plain' })).toContain('viewBox="2 0 23 15"');
-    expect(bodySvg('open', { fur: FURS[0], pattern: 'plain' })).toContain('viewBox="0 0 28 26"');
+  it('sizes each cat from its own art', () => {
+    expect(faceSvg('open', { fur: FURS[0], pattern: 'plain' })).toContain(`viewBox="2 0 ${FACE_W} 15"`);
+    expect(bodySvg('open', { fur: FURS[0], pattern: 'plain' })).toContain(`viewBox="0 0 ${BODY_W} ${BODY_H}"`);
     PATTERNS.forEach((pattern) => expect(miniSvg('happy', { fur: FURS[0], pattern })).toContain(`viewBox="0 0 ${MINI_W} 10"`));
     expect(popperSvg()).toContain('viewBox="0 0 13 10"');
   });

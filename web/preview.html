@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>pixel cats preview</title>
 <style>
-  :root { --bg: #fdf7ee; --surface: #fff; --line: #e4d9c8; --muted: #8a7f70; }
+  :root { --px: 3px; --bg: #fdf7ee; --surface: #fff; --line: #e4d9c8; --muted: #8a7f70; }
   @media (prefers-color-scheme: dark) { :root { --bg: #1d1a21; --surface: #272230; --line: #3c3447; --muted: #a79cb5; } }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--muted); font: 14px system-ui, sans-serif; }
@@ -21,13 +21,15 @@
   .cell { margin: 0; display: grid; gap: 6px; justify-items: center;
           background: var(--surface); border: 1px solid var(--line); padding: 8px; }
   figcaption { font-size: 11px; }
-  .art { width: 96px; }
-  body.zoom .art { width: 200px; }
+  /* one pixel size for every sprite: width = its columns x --px, so sizes compare true to how they look in the app */
+  .art { width: calc(var(--cols) * var(--px)); }
   .sprite { width: 100%; height: auto; display: block; }
+  .compare { display: flex; align-items: flex-end; gap: 24px; flex-wrap: wrap; padding: 12px; background: var(--surface); border: 1px solid var(--line); }
+  .compare figure { margin: 0; display: grid; gap: 6px; justify-items: center; }
   /* pixel grid overlay: one line per sprite pixel (sprite pixels are square, so cols sets both) */
   body.show-grid .art { background-image:
-      repeating-linear-gradient(to right, #8886 0 1px, transparent 1px calc(100% / var(--cols))),
-      repeating-linear-gradient(to bottom, #8886 0 1px, transparent 1px calc(100% / var(--cols))); }
+      repeating-linear-gradient(to right, #8886 0 1px, transparent 1px var(--px)),
+      repeating-linear-gradient(to bottom, #8886 0 1px, transparent 1px var(--px)); }
   body.show-grid .art .sprite { mix-blend-mode: normal; }
   /* same animations as the app, so the tail swish and blink read correctly here too */
   .sprite.body .tail.b, .sprite.body .blink { visibility: hidden; }

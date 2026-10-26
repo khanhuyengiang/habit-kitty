@@ -2,11 +2,13 @@
 // Bundles src/web/preview.ts in watch mode and serves it; esbuild pushes a change
 // event on every rebuild and the page reloads itself (see the end of preview.ts).
 import { context } from 'esbuild';
-import { copyFileSync, mkdirSync } from 'node:fs';
+import { copyFileSync, mkdirSync, watch } from 'node:fs';
 
 const OUT = '.preview';
 mkdirSync(OUT, { recursive: true });
-copyFileSync('web/preview.html', `${OUT}/index.html`);
+const copyHtml = () => copyFileSync('web/preview.html', `${OUT}/index.html`);
+copyHtml();
+watch('web/preview.html', () => { try { copyHtml(); } catch { /* mid-save */ } });   // CSS edits in the page show up too (reload the tab)
 
 const ctx = await context({
   entryPoints: ['src/web/preview.ts'],

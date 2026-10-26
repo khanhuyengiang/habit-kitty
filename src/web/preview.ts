@@ -1,6 +1,6 @@
 // Sprite sheet for `npm run preview`: every face x pattern, so shape edits in src/pixelcat.ts
 // can be seen side by side. Dev only — never bundled into the app.
-import { FURS, NAP_W, PATTERNS, TRAITS, WIDTH, bodySvg, faceSvg, miniSvg, napSvg, popperSvg, MINI_W, type Face } from '../pixelcat.ts';
+import { FACE_X, FURS, NAP_W, PATTERNS, TRAITS, WIDTH, BODY_W, bodySvg, faceSvg, miniSvg, napSvg, popperSvg, MINI_W, type Face } from '../pixelcat.ts';
 import type { CatLook } from '../rules.ts';
 
 const FACES: Face[] = ['open', 'happy', 'sleepy', 'sad', 'starving', 'dead'];
@@ -17,11 +17,15 @@ function cell(label: string, svg: string, cols: number) {
 function render() {
   const fur = (document.querySelector<HTMLInputElement>('#fur')!).value;
   const grid = document.querySelector('#sheet')!;
-  let out = '';
+  const lk = look(fur, 'plain');
+  let out = `<section class="row"><h2>size comparison (same pixel size as the app)</h2><div class="compare">`
+    + [['sitting', bodySvg('open', lk, 0), BODY_W], ['napping', napSvg(lk), NAP_W], ['face', faceSvg('open', lk), WIDTH - 2 * FACE_X], ['mini', miniSvg('open', lk), MINI_W]]
+      .map(([label, svg, cols]) => `<figure><div class="art" style="--cols:${cols}">${svg}</div><figcaption>${label} ${cols} px wide</figcaption></figure>`).join('')
+    + '</div></section>';
   for (const p of PATTERNS) {
     out += `<section class="row"><h2>${p}</h2><div class="cells">`;
-    out += FACES.map((f) => cell(f, faceSvg(f, look(fur, p)), WIDTH)).join('');
-    out += FACES.map((f) => cell(`${f} (sitting)`, bodySvg(f, look(fur, p), 0), WIDTH + 1)).join('');
+    out += FACES.map((f) => cell(f, faceSvg(f, look(fur, p)), WIDTH - 2 * FACE_X)).join('');
+    out += FACES.map((f) => cell(`${f} (sitting)`, bodySvg(f, look(fur, p), 0), BODY_W)).join('');
     out += cell('napping', napSvg(look(fur, p)), NAP_W);
     out += FACES.map((f) => cell(`${f} (mini)`, miniSvg(f, look(fur, p)), MINI_W)).join('');
     out += '</div></section>';
@@ -35,7 +39,7 @@ document.body.append(el(`<header class="bar">
   <label>fur <input id="fur" type="color" value="${DEFAULT_FUR}"></label>
   <span class="swatches">${FURS.map((f) => `<button class="sw" data-fur="${f}" style="background:${f}" title="${f}"></button>`).join('')}</span>
   <label><input id="grid" type="checkbox"> pixel grid</label>
-  <label><input id="big" type="checkbox"> zoom</label>
+  <label>pixel size <input id="px" type="range" min="2" max="10" value="3"> <span id="pxv">3</span>px</label>
 </header>`));
 document.body.append(el('<main id="sheet"></main>'));
 
@@ -46,9 +50,13 @@ document.querySelector('.swatches')!.addEventListener('click', (e) => {
   (document.querySelector<HTMLInputElement>('#fur')!).value = fur;
   render();
 });
-for (const [id, cls] of [['grid', 'show-grid'], ['big', 'zoom']] as const)
-  document.querySelector(`#${id}`)!.addEventListener('change', (e) =>
-    document.body.classList.toggle(cls, (e.target as HTMLInputElement).checked));
+document.querySelector('#grid')!.addEventListener('change', (e) =>
+  document.body.classList.toggle('show-grid', (e.target as HTMLInputElement).checked));
+document.querySelector('#px')!.addEventListener('input', (e) => {
+  const v = (e.target as HTMLInputElement).value;
+  document.documentElement.style.setProperty('--px', `${v}px`);
+  document.querySelector('#pxv')!.textContent = v;
+});
 
 render();
 
