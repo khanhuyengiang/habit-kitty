@@ -1,7 +1,7 @@
 // Phone playtest build of Habit Kitty. Bundled into one HTML page by `npm run build:web`.
 import {
   CONFIG, newState, adoptCat, feedCat, startSitter, resumeCat, settleAll, addMindfulTask,
-  doMindfulTask, setTaskDay, genderOf, daysUntilReady, removeMindfulTask, returnToShelter, habitToCat, dayIndex, nextReset, levelProgress, hunger, sitterCooldownLeft,
+  doMindfulTask, setTaskDay, genderOf, daysUntilReady, removeMindfulTask, returnToShelter, habitToCat, dayIndex, dayStartHour, setDayStart, nextReset, levelProgress, hunger, sitterCooldownLeft,
   type ActionResult, type AppState, type Cat, type CatMode, type CatGender, type CatLook, type CatTrait, type GameEvent, type MindfulTask, type Reason, type TaskKind,
 } from '../rules.ts';
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -20,7 +20,8 @@ import {
   PHOTO_MAX_BYTES, PHOTO_MAX_SIDE, dayFromName, diaryPath, entryFromMarkdown, entryToMarkdown, isZip, packBackup, photoPath, unpackBackup,
   type Backup, type DiaryEntry, type Mood,
 } from '../store.ts';
-import { CONFETTI_COLORS, TRAITS, notifyIconName, TRAIT_TEXT, bodySvg, faceSvg, lookOf, popperSvg, randomLook, type Face } from '../pixelcat.ts';
+import { CONFETTI_COLORS, TRAITS, notifyIconName, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../pixelcat.ts';
+import { BOOK_ART, FOODS, MARKS, ROOM_H, ROOM_W, TROPHY_ART, artSvg, heartSvg, iconSvg, markSvg, roomSvg } from '../pixelart.ts';
 import { dateOf, dayOf, firstDay, habitStreak, monthGrid, streak, weekRow, type DayKind, type Trackable } from '../calendar.ts';
 
 // ===================== Save =====================
@@ -33,6 +34,8 @@ interface Save {
   timeTravel?: boolean;                // lets treats and kibbles be marked done on past days
   achieved?: Record<string, number>;   // achievement id -> day it was unlocked
   seenVersion?: string;                // last app version whose change log was shown
+  sound?: Partial<Record<SoundKind, number>>;   // volume per sound, 0..100 (see SOUND_DEFAULTS)
+  dayStart?: number;                   // hour the day starts (and the one before ends), 0..CONFIG.dayStartMax; CONFIG.resetHour when unset
 }
 
 const KEY = 'habit-kitty-save-v1';
@@ -47,6 +50,7 @@ function readLocal(): Save | null {
 
 // Older saves: every mindful item was a repeating habit with no history.
 function normalize(sv: Save): Save {
+  setDayStart(sv.dayStart);   // every day index from here on, this one included, follows the save's day start
   const day = dayIndex(new Date(Date.now() + (Number(sv.offsetHours) || 0) * 3_600_000));
   const tasks = (sv.state.tasks ?? []).map((k) => {
     const kind: TaskKind = k.kind ?? 'habit';
@@ -114,6 +118,8 @@ const catName = (id: string) => save.state.cats.find((c) => c.id === id)?.name ?
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const fmtDay = (day: number) =>
   dateOf(day).toLocaleDateString('en', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+const hourText = (h: number) => `${String(h).padStart(2, '0')}:00`;
+const dayRuleText = (h = dayStartHour()) => (h === 0 ? 'A day runs from midnight to midnight.' : `A day runs from ${hourText(h)} to ${hourText(h)} the next day.`);
 
 function eventText(e: GameEvent): string {
   const n = catName(e.catId);
@@ -131,7 +137,7 @@ function reasonText(r: Reason, cat?: Cat): string {
   const n = cat?.name ?? 'This cat';
   switch (r) {
     case 'invalid_input': return 'Give your cat a name and a habit.';
-    case 'already_fed_today': return `${n} is already fed today. The next day starts at 2am.`;
+    case 'already_fed_today': return `${n} is already fed today. The next day starts at ${hourText(dayStartHour())}.`;
     case 'with_sitter': return `${n} is with the sitter. Bring them home first.`;
     case 'already_with_sitter': return `${n} is already with the sitter.`;
     case 'not_with_sitter': return `${n} isn't with the sitter.`;
@@ -194,47 +200,19 @@ const lookFor = lookOf;
 const hash = (id: string) => [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
 
 // Pixel heart for petting.
-const HEART_ART = ['.oo..oo.', 'orroorro', 'orwrrrro', 'orrrrrro', '.orrrro.', '..orro..', '...oo...'];
-const HEART = `<svg viewBox="0 0 8 7" shape-rendering="crispEdges" aria-hidden="true">${HEART_ART.map((row, y) => [...row].map((ch, x) =>
-  ch === '.' ? '' : `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${ch === 'o' ? '#5a1f3a' : ch === 'w' ? '#ffd1dd' : '#ec4b78'}"/>`).join('')).join('')}</svg>`;
+const HEART = heartSvg();
+
+document.documentElement.style.setProperty('--face-w', String(FACE_W));   // the cat card's picture column follows the art
+
+// Static buttons in the page template name their icon with data-icon; draw them on the same pixel grid.
+document.querySelectorAll<HTMLElement>('[data-icon]').forEach((el) => el.insertAdjacentHTML('afterbegin', el.dataset.icon === 'cat' ? miniSvg('happy', { fur: '#ffb3cf', pattern: 'plain' }) : iconSvg(el.dataset.icon ?? 'x')));
 
 // ===================== Food =====================
-const FOOD_PAL: Record<string, string> = {
-  o: '#2a2433', b: '#a8714a', B: '#7a4f2e', u: '#6fb2ef', r: '#e0606f', w: '#fbf8f2', g: '#8fb4d4',
-  s: '#c9d9e6', e: '#ee8a4c', c: '#e9b872', C: '#f6d9a0', m: '#c4524a', M: '#e08a7a', p: '#f2a7b8', y: '#f0c45e',
-};
-const FOODS: Record<string, { label: string; art: string[] }> = {
-  kibbles: { label: 'kibbles', art: [
-    '..........', '...b..b...', '..bBbbBb..', '.bbBbbbBb.', 'oooooooooo', 'ouuuuuuuuo', '.ouuuuuuo.', '..oooooo..'] },
-  'wet food': { label: 'wet food', art: [
-    '..........', '.oooooooo.', '.owwwwwwo.', '.orrrrrro.', '.orwppwro.', '.orrrrrro.', '.oooooooo.', '..........'] },
-  fish: { label: 'fish', art: [
-    '..........', '....oooo.o', '..ooggggoo', '.oggoggggo', 'oggggggggo', '.ogsssggoo', '..oogggoo.', '....oooo.o'] },
-  chicken: { label: 'chicken', art: [
-    '..oooo....', '.occCco...', '.oCccCco..', '.occCcco..', '..ooccoo..', '....oowo..', '.....owwo.', '......oo..'] },
-  shrimp: { label: 'shrimp', art: [
-    '...oooo...', '..oeeeeo..', '.oeeoeeeo.', '.oeeo.oeo.', '..oo.oeeo.', '....oeeeo.', '...oeeeo..', '..oeeoo...'] },
-  meat: { label: 'meat', art: [
-    '..........', '..oooooo..', '.ommmmmmo.', 'omMMmmmwmo', 'ommmMmmmmo', '.ommmmmmo.', '..oooooo..', '..........'] },
-};
 const FOOD_KEYS = Object.keys(FOODS);
-// A little pixel picture from rows of palette letters (the room's book and trophy buttons, achievements).
-function pixelArt(art: string[], cls = ''): string {
-  const rects = art.flatMap((row, y) => [...row].map((ch, x) => (FOOD_PAL[ch] ? `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${FOOD_PAL[ch]}"/>` : '')));
-  return `<svg class="pixart ${cls}" viewBox="0 0 ${art[0].length} ${art.length}" aria-hidden="true" shape-rendering="crispEdges">${rects.join('')}</svg>`;
-}
-const BOOK_ART = ['.ooooooo.', 'orrrrrrro', 'orrwwwrro', 'orrrrrrro', 'orrwwwrro', 'orrrrrrro', 'orrrrrrro', 'owwwwwwwo', '.ooooooo.'];
-const TROPHY_ART = ['ooooooooo', 'oyyyyyyyo', 'oyywwyyyo', 'oyyyyyyyo', '.oyyyyyo.', '..oyyyo..', '...oyo...', '..ooooo..', '.oyyyyyo.', 'ooooooooo'];
+const pixelArt = (art: string[], cls = '') => artSvg(art, `pixart ${cls}`);
 // A different treat for every cat, every day (stable within the day).
 const foodFor = (c: Cat, day: number) => FOOD_KEYS[hash(`${c.id}:${day}`) % FOOD_KEYS.length];
-function foodIcon(kind: string): string {
-  const art = FOODS[kind].art;
-  let r = '';
-  art.forEach((row, y) => [...row].forEach((ch, x) => {
-    if (FOOD_PAL[ch]) r += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${FOOD_PAL[ch]}"/>`;
-  }));
-  return `<svg class="food" viewBox="0 0 10 8" aria-hidden="true" shape-rendering="crispEdges">${r}</svg>`;
-}
+const foodIcon = (kind: string) => artSvg(FOODS[kind], 'food');
 
 // ===================== Rendering =====================
 const viewMonth = new Map<string, number>();   // cat id -> months back from current
@@ -257,6 +235,17 @@ function celebrate(level: number) {
   setTimeout(() => party.remove(), 2800);
 }
 
+// ---- dark mode: follows the device until the toggle is used, then remembers the choice on this device ----
+const systemDark = () => window.matchMedia('(prefers-color-scheme: dark)').matches;
+const isDark = () => document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : systemDark();
+try { const t = localStorage.getItem('hk-theme'); if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t; } catch { /* storage blocked: follow the device */ }
+function toggleTheme() {
+  const next = isDark() ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('hk-theme', next); } catch { /* not remembered */ }
+  renderTop();
+}
+
 function renderTop() {
   const { level, xpIntoLevel, xpForNextLevel } = levelProgress(save.state.xp);
   if (lastLevel !== null && level > lastLevel) celebrate(level);
@@ -266,11 +255,12 @@ function renderTop() {
   $('top').innerHTML = `
     <div class="brand"><h1>Habit <span>Kitty</span></h1>
       <div class="brand-r"><span class="muted">Level <b class="num">${level}</b></span>
-        <button class="gear" type="button" data-action="settings-toggle" aria-label="Settings" aria-pressed="${tab === 'settings'}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></div></div>
+        <button class="gear" type="button" data-action="theme-toggle" aria-label="${isDark() ? 'Switch to light mode' : 'Switch to dark mode'}">${iconSvg(isDark() ? 'sun' : 'moon')}</button>
+        <button class="gear" type="button" data-action="settings-toggle" aria-label="Settings" aria-pressed="${tab === 'settings'}">${iconSvg('gear')}</button></div></div>
     <div class="meter">
-      <div class="meter-row"><span>Affection <b>${save.state.xp}</b> xp</span>
+      <div class="meter-row"><span>Affection <b>${save.state.xp}</b> XP</span>
         <span class="muted num">${xpIntoLevel}/${xpForNextLevel} to level ${level + 1}</span></div>
-      <div class="bar" role="img" aria-label="${xpIntoLevel} of ${xpForNextLevel} xp to the next level">${bar}</div>
+      <div class="bar" role="img" aria-label="${xpIntoLevel} of ${xpForNextLevel} XP to the next level">${bar}</div>
     </div>
     ${save.state.xp < CONFIG.lowXpThreshold
       ? '<p class="distrust">Your affection is below 0. Until it recovers, you can only keep one cat.</p>' : ''}`;
@@ -279,9 +269,9 @@ function renderTop() {
 function renderLog() {
   const el = $('log');
   el.hidden = !save.log.length || !!save.logHidden;
-  el.innerHTML = `<button class="x" type="button" data-action="log-close" aria-label="Close update">✕</button>
-    <h2>Update · what happened</h2><ul style="list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px;font-size:15px">${save.log.map((l) =>
-    `<li><time class="muted num" style="font-size:12px;margin-right:8px">${new Date(l.at).toLocaleDateString('en', { day: 'numeric', month: 'short' })}</time>${esc(l.text)}</li>`).join('')}</ul>`;
+  el.innerHTML = `<button class="x" type="button" data-action="log-close" aria-label="Close update">${iconSvg('x')}</button>
+    <h2>Update · what happened</h2><ul style="list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px;font-size:18px">${save.log.map((l) =>
+    `<li><time class="muted num" style="font-size:15px;margin-right:8px">${new Date(l.at).toLocaleDateString('en', { day: 'numeric', month: 'short' })}</time>${esc(l.text)}</li>`).join('')}</ul>`;
 }
 
 function catStatus(c: Cat, t: number): { face: Face; faded: boolean; chip: DayKind; label: string; note?: string } {
@@ -337,9 +327,9 @@ function renderMonth(c: Subject, t: number, habit?: MindfulTask): string {
   const atStart = shown.getUTCFullYear() * 12 + shown.getUTCMonth() <= firstMonth.getUTCFullYear() * 12 + firstMonth.getUTCMonth();
   return `<div class="month">
     <div class="month-nav">
-      <button type="button" data-action="month" data-id="${c.id}" data-step="1" ${atStart ? 'disabled' : ''} aria-label="Previous month">‹</button>
-      <strong>${g.title}</strong>
-      <button type="button" data-action="month" data-id="${c.id}" data-step="-1" ${back === 0 ? 'disabled' : ''} aria-label="Next month">›</button>
+      <button type="button" data-action="month" data-id="${c.id}" data-step="1" ${atStart ? 'disabled' : ''} aria-label="Previous month">${iconSvg('prev')}</button>
+      ${monthTitle(c.id, shown.getUTCFullYear(), shown.getUTCMonth(), g.title, firstMonth.getUTCFullYear() * 12 + firstMonth.getUTCMonth())}
+      <button type="button" data-action="month" data-id="${c.id}" data-step="-1" ${back === 0 ? 'disabled' : ''} aria-label="Next month">${iconSvg('next')}</button>
     </div>
     <div class="grid" role="img" aria-label="${esc(c.name)}, ${g.title}: ${habit ? `done ${g.count.habit} days` : `fed ${g.count.fed} of ${g.tracked} days`}">${cells}</div>
     <p class="stats">${stats}</p>
@@ -397,17 +387,17 @@ function catHead(c: Cat, t: number, holdable: boolean): string {
   let button = '';
   if (c.status === 'alive') {
     const fed = c.lastFedDay === t;
-    button = `<button class="btn primary sq" data-action="feed" data-id="${c.id}" ${fed ? 'disabled' : ''} aria-label="${fed ? `${esc(c.name)} is fed today` : `Feed ${esc(c.name)}`}">${fed ? '<b>✓</b>' : foodIcon(foodFor(c, t))}<span>${fed ? 'Fed' : 'Feed'}</span></button>`;
+    button = `<button class="btn primary sq" data-action="feed" data-id="${c.id}" ${fed ? 'disabled' : ''} aria-label="${fed ? `${esc(c.name)} is fed today` : `Feed ${esc(c.name)}`}">${fed ? `<b>${iconSvg('check')}</b>` : foodIcon(foodFor(c, t))}</button>`;
   } else if (c.status === 'sitter') {
-    button = `<button class="btn primary sq" data-action="resume" data-id="${c.id}" aria-label="Bring ${esc(c.name)} home"><b>⌂</b><span>Home</span></button>`;
+    button = `<button class="btn primary sq" data-action="resume" data-id="${c.id}" aria-label="Bring ${esc(c.name)} home"><b>${iconSvg('home')}</b></button>`;
   } else if (c.status === 'ranAway') {
-    button = `<button class="btn primary sq" data-action="feed" data-id="${c.id}" aria-label="Call ${esc(c.name)} back">${foodIcon(foodFor(c, t))}<span>Call</span></button>`;
+    button = `<button class="btn primary sq" data-action="feed" data-id="${c.id}" aria-label="Call ${esc(c.name)} back">${foodIcon(foodFor(c, t))}</button>`;
   }
   const left = c.status === 'alive' ? 3 - c.missed : 0;
   const hp = `<div class="hp${left === 1 ? ' low' : ''}" role="img" aria-label="health ${left} of 3">${[0, 1, 2].map((i) => `<i class="${i < left ? 'on' : ''}"></i>`).join('')}</div>`;
   return `<div class="cat-head"${holdable ? ` data-hold="cat" data-id="${c.id}"` : ''}><div class="cat-side">${sprite(s.face, lookFor(c), s.faded)}${button}</div>
     <div><p class="cat-name">${esc(c.name)}<span class="mode">${c.mode === 'classic' ? 'classic' : 'light-hearted'} · ${genderOf(c)} · ${lookFor(c).trait}</span></p>
-      <p class="cat-habit">${esc(c.habit)}${c.status === 'alive' || c.status === 'sitter' ? ` <button class="pencil" type="button" data-action="rename-habit" data-id="${c.id}" aria-label="Rename habit">✎</button>` : ''}</p>
+      <p class="cat-habit">${esc(c.habit)}</p>
       <span class="chip ${s.chip}">${s.label}</span>${ended ? '' : hp}</div>
 </div>`;
 }
@@ -462,9 +452,9 @@ function renderCombined(subjects: Subject[], key: string, title: string, keyHtml
   const atStart = shown.getUTCFullYear() * 12 + shown.getUTCMonth() <= fm.getUTCFullYear() * 12 + fm.getUTCMonth();
   return `<article class="cat"><div class="month">
     <div class="month-nav">
-      <button type="button" data-action="month" data-id="${key}" data-step="1" ${atStart ? 'disabled' : ''} aria-label="Previous month">‹</button>
-      <strong>${g0.title}</strong>
-      <button type="button" data-action="month" data-id="${key}" data-step="-1" ${back === 0 ? 'disabled' : ''} aria-label="Next month">›</button>
+      <button type="button" data-action="month" data-id="${key}" data-step="1" ${atStart ? 'disabled' : ''} aria-label="Previous month">${iconSvg('prev')}</button>
+      ${monthTitle(key, shown.getUTCFullYear(), shown.getUTCMonth(), g0.title, fm.getUTCFullYear() * 12 + fm.getUTCMonth())}
+      <button type="button" data-action="month" data-id="${key}" data-step="-1" ${back === 0 ? 'disabled' : ''} aria-label="Next month">${iconSvg('next')}</button>
     </div>
     <div class="grid" role="img" aria-label="${title}, ${g0.title}">${cells}</div>
     <div class="slice-key" style="grid-template-columns:repeat(${cols},auto)">${keyHtml}</div>
@@ -473,7 +463,7 @@ function renderCombined(subjects: Subject[], key: string, title: string, keyHtml
 }
 
 const combinedCats = (cats: Cat[], t: number) => renderCombined(cats, 'all', 'All cats',
-  cats.map((c, i) => `<span><b class="num">${i + 1}</b>${sprite(catStatus(c, t).face, lookFor(c), !isActive(c) && c.status !== 'dead')}${esc(c.name)}</span>`).join(''),
+  cats.map((c, i) => `<span><b class="num">${i + 1}</b>${miniSvg(catStatus(c, t).face, lookFor(c), !isActive(c) && c.status !== 'dead')}${esc(c.name)}</span>`).join(''),
   'Each day is split into one slice per cat, in the order shown above.');
 
 const combinedHabits = (habits: MindfulTask[]) => renderCombined(habits.map(habitSubject), 'all-habits', 'All treats',
@@ -488,55 +478,35 @@ function renderHeat() {
   const habits = save.state.tasks.filter((k) => k.kind === 'habit');
   const habitCards = habits.length ? `<h2>Treats</h2>${combinedHabits(habits)}` : '';
   const body = cats.length ? combinedCats(cats, today()) : '<p class="muted">No living cats to show.</p>';
-  $('heat').innerHTML = body + habitCards + HEAT_LEGEND + '<p class="muted" style="text-align:center;font-size:13px">Press and hold a kitty to see just its heatmap.</p>';
+  $('heat').innerHTML = body + habitCards + HEAT_LEGEND + '<p class="muted" style="text-align:center;font-size:15px">Press and hold a kitty to see just its heatmap.</p>';
 }
 
 // ---- cozy room: lives in real time (sky follows the clock, cats wander, sleep at night) ----
-// Positions are [x, feet-y] in room units (80 x 112); a cat is 17.6 units wide and ~19 tall.
-const ROOM_W = 80, ROOM_H = 112, PET_W = 19.2, PET_H = 17;
+// Positions are [x, feet-y] in room pixels (108 x 150); a cat is 28 pixels wide and BODY_H tall, the same pixels as the room.
+const PET_W = BODY_W, PET_H = BODY_H;
 const SPOTS: [number, number][] = [
-  [3, 84], [27, 104], [46, 98], [12, 100], [58, 105], [30, 88],   // cushion, rug, floor
-  [59, 44], [53, 62], [61, 84],                                  // cat tree: top, middle, base
+  [3, 113], [36, 139], [62, 131], [16, 134], [78, 142], [40, 118],   // cushion, rug, floor
+  [77, 58], [71, 84], [78, 112],                                    // cat tree: top, middle, base
 ];
-const NIGHT_SPOTS: [number, number][] = [[3, 84], [27, 104], [61, 84], [46, 98], [12, 100], [58, 105], [59, 44], [53, 62], [30, 88]];
+const NIGHT_SPOTS: [number, number][] = [[3, 113], [36, 139], [78, 112], [62, 131], [16, 134], [78, 142], [77, 58], [71, 84], [40, 118]];
 const roomPos = new Map<string, number>(); // cat id -> index into SPOTS
 let roomSig = '';
 const skyPhase = (): 'day' | 'dusk' | 'night' => {
   const h = now().getHours();
   return h >= 8 && h < 17 ? 'day' : (h >= 6 && h < 8) || (h >= 17 && h < 20) ? 'dusk' : 'night';
 };
-const petStyle = ([x, y]: [number, number]) =>
-  `left:${(x / ROOM_W) * 100}%;top:${((y - PET_H) / ROOM_H) * 100}%;z-index:${Math.round(y)}`;
+// Cats go to bed at 10pm and get up at 6am, even though the sky starts to darken at 8pm.
+const asleepNow = () => { const h = now().getHours(); return h >= 22 || h < 6; };
+// A napping cat is wider than a sitting one, so it is centred on its spot and kept inside the room.
+const napLeft = (x: number) => Math.max(0, Math.min(ROOM_W - NAP_W, x + (PET_W - NAP_W) / 2));
+const petStyle = ([x, y]: [number, number], nap = false) =>
+  `left:calc(${nap ? napLeft(x) : x} * var(--px));top:calc(${y - (nap ? NAP_H : PET_H)} * var(--px));z-index:${Math.round(y)}`;
 
-function roomBg(phase: 'day' | 'dusk' | 'night'): string {
-  const sky = { day: '#bfe4f5', dusk: '#f2a77b', night: '#1d2748' }[phase];
-  const wall = { day: '#f3e3d0', dusk: '#ecd0b4', night: '#c9b3a6' }[phase];
-  const sun = phase === 'day' ? '<rect x="35" y="14" width="5" height="5" fill="#f7d54a"/>'
-    : phase === 'dusk' ? '<rect x="26" y="26" width="6" height="5" fill="#f7d54a"/>'
-    : '<rect x="34" y="14" width="5" height="5" fill="#f4f1e0"/><rect x="36" y="14" width="3" height="3" fill="#1d2748"/><rect x="24" y="16" width="1" height="1" fill="#fff"/><rect x="28" y="26" width="1" height="1" fill="#fff"/><rect x="40" y="28" width="1" height="1" fill="#fff"/>';
-  return `<svg class="bg" viewBox="0 0 ${ROOM_W} ${ROOM_H}" shape-rendering="crispEdges" aria-hidden="true">
-    <rect width="80" height="112" fill="${wall}"/><rect width="80" height="6" fill="#e6cfb6"/>
-    <rect y="68" width="80" height="44" fill="#b98a5e"/><rect y="68" width="80" height="2" fill="#8d6641"/>
-    <g fill="#8d6641" opacity=".35"><rect y="76" width="80" height=".6"/><rect y="84" width="80" height=".6"/><rect y="92" width="80" height=".6"/><rect y="100" width="80" height=".6"/><rect y="108" width="80" height=".6"/></g>
-    <rect x="18" y="10" width="28" height="26" fill="#6e4b32"/><rect x="20" y="12" width="24" height="22" fill="${sky}"/>${sun}
-    <rect x="31" y="12" width="2" height="22" fill="#6e4b32"/><rect x="20" y="22" width="24" height="2" fill="#6e4b32"/>
-    <rect x="16" y="36" width="32" height="2" fill="#6e4b32"/>
-    <rect x="54" y="14" width="14" height="10" fill="#6e4b32"/><rect x="55" y="15" width="12" height="8" fill="#f2a7b8"/><rect x="57" y="17" width="4" height="4" fill="#fbf8f2"/>
-    <rect x="6" y="52" width="9" height="9" fill="#a8714a"/><rect x="8" y="42" width="5" height="10" fill="#3a9d5d"/><rect x="5" y="46" width="4" height="6" fill="#4fbf78"/><rect x="12" y="45" width="4" height="7" fill="#4fbf78"/>
-    <rect x="6" y="61" width="9" height="7" fill="#a8714a"/>
-    <ellipse cx="38" cy="95" rx="30" ry="9" fill="#e48aa8"/><ellipse cx="38" cy="95" rx="23" ry="6" fill="#f5b8cc"/>
-    <rect x="2" y="84" width="24" height="9" fill="#b08fc4"/><rect x="2" y="81" width="24" height="4" fill="#cdb2dc"/>
-    <g><!-- cat tree -->
-      <rect x="64" y="46" width="5" height="38" fill="#d9b98a"/><g fill="#b8955f"><rect x="64" y="52" width="5" height="1"/><rect x="64" y="58" width="5" height="1"/><rect x="64" y="64" width="5" height="1"/><rect x="64" y="70" width="5" height="1"/><rect x="64" y="76" width="5" height="1"/></g>
-      <rect x="56" y="44" width="23" height="4" fill="#8a63a8"/><rect x="56" y="48" width="23" height="1" fill="#5d3f78"/>
-      <rect x="52" y="62" width="22" height="4" fill="#8a63a8"/><rect x="52" y="66" width="22" height="1" fill="#5d3f78"/>
-      <rect x="58" y="82" width="22" height="22" fill="#c9a06a"/><rect x="58" y="82" width="22" height="3" fill="#8a63a8"/>
-      <rect x="63" y="90" width="12" height="14" fill="#5d4330"/><rect x="65" y="88" width="8" height="2" fill="#5d4330"/><rect x="60" y="101" width="3" height="3" fill="#e0606f"/>
-      <rect x="74" y="49" width="1" height="8" fill="#e0606f"/><rect x="73" y="57" width="3" height="3" fill="#f0c45e"/>
-    </g>
-    ${phase === 'night' ? '<rect width="80" height="112" fill="#1d2748" opacity=".38"/><rect x="5" y="26" width="3" height="3" fill="#ffe9a0"/><circle cx="6.5" cy="27.5" r="9" fill="#ffe9a0" opacity=".16"/>' : ''}
-  </svg>`;
-}
+// Naps: at night every kitty sleeps curled up; by day they doze off now and then (a lazy cat far more than a playful one).
+const napUntil = new Map<string, number>();   // cat id -> when a daytime nap ends
+const isNapping = (id: string, phase: 'day' | 'dusk' | 'night', asleep = phase === 'night') => asleep || (napUntil.get(id) ?? 0) > Date.now();
+
+const roomBg = roomSvg;
 
 // Cats that are away (sitter, ran away) aren't home, so they aren't in the room.
 const homeCats = () => sortedCats().filter((c) => c.status === 'alive').slice(0, SPOTS.length);
@@ -545,9 +515,11 @@ function renderRoom() {
   const t = today();
   const phase = skyPhase();
   const pets = homeCats();
-  const faceOf = (c: Cat): Face => (phase === 'night' ? 'sleepy' : catStatus(c, t).face);
+  const asleep = asleepNow();
+  const faceOf = (c: Cat): Face => (asleep ? 'sleepy' : catStatus(c, t).face);
   const lookKey = (c: Cat) => Object.values(lookFor(c)).join('');
-  const sig = phase + '|' + pets.map((c) => `${c.id}:${faceOf(c)}:${lookKey(c)}:${c.name}`).join('|');
+  const sig = phase + (asleep ? 'z' : '') + '|' + pets.map((c) => `${c.id}:${faceOf(c)}:${lookKey(c)}:${c.name}`).join('|');
+  renderRoomNote();
   if (sig === roomSig) return;
   roomSig = sig;
   const taken = new Set<number>();
@@ -559,15 +531,21 @@ function renderRoom() {
     return k;
   };
   $('room').innerHTML = `<div class="room ${phase}">${roomBg(phase)}${pets.map((c, i) => {
-    const pos = phase === 'night' ? NIGHT_SPOTS[i] : SPOTS[spotIdx(c, i)];
-    return `<div class="pet" data-id="${c.id}" data-hold="cat" style="${petStyle(pos)}">${bodySvg(faceOf(c), lookFor(c), hash(c.id))}${phase === 'night' ? '<b class="zz">z z</b>' : ''}<em>${esc(c.name)}</em></div>`;
+    const pos = asleep ? NIGHT_SPOTS[i] : SPOTS[spotIdx(c, i)];
+    const nap = isNapping(c.id, phase, asleep);
+    return `<div class="pet${nap ? ' napping' : ''}" data-id="${c.id}" data-fx="${pos[0]}" data-fy="${pos[1]}" data-nap="${nap ? 1 : ''}" data-hold="cat" style="${petStyle(pos, nap)}">${nap ? napSvg(lookFor(c)) : bodySvg(faceOf(c), lookFor(c), hash(c.id))}${nap ? '<b class="zz">z z</b>' : ''}<em>${esc(c.name)}</em></div>`;
   }).join('')}</div>`;
+}
+
+// The note under the room shows the time, so it is redrawn every few seconds, not only when the room itself changes.
+function renderRoomNote() {
   const clock = now().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
   const away = save.state.cats.filter((c) => c.status === 'sitter').length;
-  $('room-note').textContent = !pets.length
+  $('room-note').textContent = !homeCats().length
     ? (away ? 'Everyone is with the pet sitter. The room is quiet.' : 'It is quiet in here. Adopt a kitty and they will move in.')
-    : `It's ${clock}. ${phase === 'night' ? 'Everyone is asleep.' : 'Your cats are making themselves at home.'}${away ? ` ${plural(away, 'cat')} with the sitter.` : ''}`;
+    : `It's ${clock}. ${asleepNow() ? 'Everyone is asleep.' : 'Your cats are making themselves at home.'}${away ? ` ${plural(away, 'cat')} with the sitter.` : ''}`;
 }
+setInterval(() => { if (tab === 'room') { renderRoom(); renderRoomNote(); } }, 5000);
 
 // How often each personality gets up and goes somewhere (rolled every WANDER_MS).
 const MOVE_CHANCE: Record<CatTrait, number> = { playful: 0.4, curious: 0.28, cuddly: 0.18, grumpy: 0.12, shy: 0.1, lazy: 0.04 };
@@ -576,19 +554,50 @@ const traitOf = (id: string): CatTrait => {
   return c ? (lookFor(c).trait ?? 'curious') : 'curious';
 };
 
+// Swap a cat in the room between the sitting sprite and the curled-up napping one, keeping its feet where they were.
+function setNap(el: HTMLElement, on: boolean) {
+  const c = save.state.cats.find((k) => k.id === el.dataset.id);
+  const old = el.querySelector('svg.sprite');
+  if (!c || !old) return;
+  const tpl = document.createElement('template');
+  tpl.innerHTML = on ? napSvg(lookFor(c)) : bodySvg(catStatus(c, today()).face, lookFor(c), hash(c.id));
+  old.replaceWith(tpl.content.firstElementChild as Element);
+  el.dataset.nap = on ? '1' : '';
+  el.classList.toggle('napping', on);
+  el.querySelector('.zz')?.remove();
+  if (on) el.insertAdjacentHTML('afterbegin', '<b class="zz">z z</b>');
+  el.style.top = `calc(${Number(el.dataset.fy) - (on ? NAP_H : PET_H)} * var(--px))`;
+  const fx = Number(el.dataset.fx);
+  el.style.left = `calc(${on ? napLeft(fx) : fx} * var(--px))`;
+}
+
+const NAP_CHANCE: Record<CatTrait, number> = { lazy: 0.12, grumpy: 0.05, cuddly: 0.05, shy: 0.04, curious: 0.02, playful: 0.012 };
+
 function wander() {
-  if (tab !== 'room' || skyPhase() === 'night') return;
+  if (tab !== 'room' || asleepNow()) return;
   const els = [...document.querySelectorAll<HTMLElement>('#room .pet')];
   const taken = new Set(els.map((el) => roomPos.get(el.dataset.id ?? '')));
   els.forEach((el) => {
     const id = el.dataset.id ?? '';
-    if (Math.random() > MOVE_CHANCE[traitOf(id)] || el.classList.contains('thinking')) return;
+    if (el.dataset.nap === '1') {   // asleep: wake up when the nap is over
+      if ((napUntil.get(id) ?? 0) <= Date.now()) { napUntil.delete(id); setNap(el, false); }
+      return;
+    }
+    if (el.classList.contains('thinking') || el.classList.contains('zooming')) return;
+    if (Math.random() < NAP_CHANCE[traitOf(id)]) {
+      napUntil.set(id, Date.now() + (30 + Math.random() * 60) * 1000);
+      setNap(el, true);
+      return;
+    }
+    if (Math.random() > MOVE_CHANCE[traitOf(id)]) return;
     const from = roomPos.get(id) ?? 0;
     const free = SPOTS.map((_, i) => i).filter((i) => !taken.has(i));
     if (!free.length) return;
     const to = free[Math.floor(Math.random() * free.length)];
     taken.delete(from); taken.add(to);
     roomPos.set(id, to);
+    el.dataset.fx = String(SPOTS[to][0]);
+    el.dataset.fy = String(SPOTS[to][1]);
     el.setAttribute('style', petStyle(SPOTS[to]));
     el.classList.add('walking');
     setTimeout(() => el.classList.remove('walking'), 2600);
@@ -598,10 +607,34 @@ function wander() {
 const WANDER_MS = 8000;
 setInterval(wander, WANDER_MS);
 
+// Zoomies: at dusk and in the night a cat wakes with a burst of energy, races round the room, then curls up again.
+const ZOOM_CHANCE: Record<CatTrait, number> = { playful: 0.9, curious: 0.5, cuddly: 0.3, grumpy: 0.25, shy: 0.15, lazy: 0.1 };
+let zooming = false;
+function zoomies() {
+  const phase = skyPhase();
+  if (phase === 'day' || tab !== 'room' || document.hidden || zooming || Math.random() > 0.4) return;
+  const els = [...document.querySelectorAll<HTMLElement>('#room .pet')].filter((el) => !el.classList.contains('thinking'));
+  const el = els[Math.floor(Math.random() * els.length)];
+  if (!el || Math.random() > ZOOM_CHANCE[traitOf(el.dataset.id ?? '')]) return;
+  zooming = true;
+  const home = el.getAttribute('style') ?? '', homeFx = el.dataset.fx ?? '0', homeFy = el.dataset.fy ?? '0', wasNap = el.dataset.nap === '1';
+  el.classList.add('zooming', 'walking');
+  if (wasNap) setNap(el, false);
+  const route = [...SPOTS].sort(() => Math.random() - 0.5).slice(0, 5);
+  route.forEach(([x, y], i) => setTimeout(() => { el.dataset.fx = String(x); el.dataset.fy = String(y); el.setAttribute('style', petStyle([x, y])); }, 150 + i * 420));
+  setTimeout(() => { el.dataset.fx = homeFx; el.dataset.fy = homeFy; el.setAttribute('style', home); }, 150 + route.length * 420);
+  setTimeout(() => {
+    el.classList.remove('zooming', 'walking');
+    if (wasNap) setNap(el, true);
+    zooming = false;
+  }, 150 + route.length * 420 + 700);
+}
+setInterval(zoomies, 7000);
+
 // ---- home-screen widget (Android): the room as three pictures, one per time of day ----
 // The native widget (RoomWidgetProvider) picks the file that matches the clock. Cats sit where they are in the room now.
 const RoomWidget = registerPlugin<{ refresh(): Promise<void>; pendingTab(): Promise<{ tab: string }> }>('RoomWidget');
-const WIDGET_Y = 10, WIDGET_PX = 6;   // crop off the empty ceiling; 6 pixels per room unit
+const WIDGET_Y = 6, WIDGET_PX = 6;   // crop off the empty ceiling; 6 pixels per room unit
 
 // One thought bubble per hour, so the picture holds still between pushes (the room itself rolls them live).
 function widgetThought(phase: 'day' | 'dusk' | 'night') {
@@ -616,23 +649,25 @@ function roomPicture(phase: 'day' | 'dusk' | 'night'): string {
   const thought = widgetThought(phase);
   const cats = homeCats().map((c, i) => {
     const [x, y] = phase === 'night' ? NIGHT_SPOTS[i] : SPOTS[roomPos.get(c.id) ?? i];
-    const body = bodySvg(phase === 'night' ? 'sleepy' : catStatus(c, t).face, lookFor(c), hash(c.id))
+    const nap = isNapping(c.id, phase);
+    const body = (nap ? napSvg(lookFor(c)) : bodySvg(catStatus(c, t).face, lookFor(c), hash(c.id)))
       .replace('<g class="tail b">', '<g display="none">').replace('<g class="blink">', '<g display="none">')   // no CSS here: show tail frame A only
-      .replace('<svg ', `<svg x="${x}" y="${y - PET_H}" width="${PET_W}" height="${PET_H}" `);
-    const name = `<text x="${x + PET_W / 2}" y="${y + 4}" font-size="4" font-weight="700" font-family="monospace" text-anchor="middle" fill="#4a3a2d">${esc(c.name)}</text>`;
+      .replace('<svg ', `<svg x="${nap ? napLeft(x) : x}" y="${y - (nap ? NAP_H : PET_H)}" width="${nap ? NAP_W : PET_W}" height="${nap ? NAP_H : PET_H}" `);
+    const name = `<text x="${x + PET_W / 2}" y="${y + 7}" font-size="7" font-family="Jersey 15, monospace" text-anchor="middle" fill="#5a4380">${esc(c.name)}</text>`;
     const about = thought?.thinker === c.id ? save.state.cats.find((k) => k.id === thought.subject) : undefined;
     let bubble = '';
     if (about && thought) {
       const v = THOUGHT_FACE[thought.kind];
-      const bx = x + PET_W / 2 - 9, by = y - PET_H - 11;
-      bubble = `<g><rect x="${bx}" y="${by}" width="18" height="9" rx="3" fill="#fff" stroke="#3b2733" stroke-width=".8"/>
-        <circle cx="${bx + 9}" cy="${by + 11}" r="1.4" fill="#fff" stroke="#3b2733" stroke-width=".6"/><circle cx="${bx + 11}" cy="${by + 13.5}" r=".8" fill="#fff" stroke="#3b2733" stroke-width=".5"/>
-        ${sprite(v.face, lookFor(about), v.faded).replace('<svg ', `<svg x="${bx + 1.5}" y="${by + 1.5}" width="9" height="6" `)}
-        <text x="${bx + 14}" y="${by + 6.2}" font-size="5" font-weight="700" font-family="monospace" text-anchor="middle" fill="#cc4a80">${v.mark}</text></g>`;
+      const bw = 26, bh = 14, bx = x + PET_W / 2 - bw / 2, by = y - PET_H - bh - 4;
+      const edge = '#5a4380', R = (rx: number, ry: number, w: number, h: number, f: string) => `<rect x="${rx}" y="${ry}" width="${w}" height="${h}" fill="${f}"/>`;
+      const mark = markSvg(v.mark).replace('<svg ', `<svg x="${bx + 17}" y="${by + 3}" width="${MARKS[v.mark][0].length}" height="${MARKS[v.mark].length}" `);
+      bubble = `<g>${R(bx + 1, by, bw - 2, bh, edge)}${R(bx, by + 1, bw, bh - 2, edge)}${R(bx + 1, by + 1, bw - 2, bh - 2, '#fffafc')}
+        ${R(bx + bw / 2 - 1, by + bh, 3, 1, edge)}${R(bx + bw / 2, by + bh + 1, 2, 1, edge)}
+        ${miniSvg(v.face, lookFor(about), v.faded).replace('<svg ', `<svg x="${bx + 2}" y="${by + 2}" width="13" height="10" `)}${mark}</g>`;
     }
     return { y, body: body + name + bubble };
   }).sort((a, b) => a.y - b.y).map((c) => c.body).join('');
-  const bg = roomBg(phase).replace('<svg class="bg"', `<svg x="0" y="0" width="${ROOM_W}" height="${ROOM_H}"`);
+  const bg = roomBg(phase, 'bg').replace('<svg class="bg"', `<svg x="0" y="0" width="${ROOM_W}" height="${ROOM_H}"`);
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 ${WIDGET_Y} ${ROOM_W} ${ROOM_H - WIDGET_Y}" shape-rendering="crispEdges">${bg}${cats}</svg>`;
 }
 
@@ -682,27 +717,27 @@ const THINK_EVERY_MS = 4000, THINK_GAP_MS = 20_000, THINK_REST_MS = 90_000, THIN
 let lastThought = 0;
 const thoughtAt = new Map<string, number>();
 const THOUGHT_FACE: Record<ThoughtKind, { face: Face; faded: boolean; mark: string }> = {
-  away:     { face: 'open',  faded: false, mark: '…' },
-  returned: { face: 'happy', faded: false, mark: '♥' },
-  passed:   { face: 'open',  faded: true,  mark: '♡' },
-  ranAway:  { face: 'open',  faded: true,  mark: '?' },
+  away:     { face: 'open',  faded: false, mark: 'dots' },
+  returned: { face: 'happy', faded: false, mark: 'heart' },
+  passed:   { face: 'open',  faded: true,  mark: 'heart-outline' },
+  ranAway:  { face: 'open',  faded: true,  mark: 'question' },
 };
 
 function think() {
-  if (tab !== 'room' || document.hidden || skyPhase() === 'night' || document.querySelector('#room .thought')) return;
+  if (tab !== 'room' || document.hidden || asleepNow() || document.querySelector('#room .thought')) return;
   const t = Date.now();
   if (t - lastThought < THINK_GAP_MS) return;
   const pick = pickThought(save.state.cats, today(), save.returned ?? {}, (id) => t - (thoughtAt.get(id) ?? 0) > THINK_REST_MS);
   const el = pick && document.querySelector<HTMLElement>(`#room .pet[data-id="${pick.thinker}"]`);
   const about = pick && save.state.cats.find((c) => c.id === pick.subject);
-  if (!pick || !el || !about) return;
+  if (!pick || !el || !about || el.dataset.nap === '1') return;
   lastThought = t;
   thoughtAt.set(pick.thinker, t);
   const v = THOUGHT_FACE[pick.kind];
   const bubble = document.createElement('div');
   bubble.className = 'thought';
   bubble.setAttribute('aria-hidden', 'true');
-  bubble.innerHTML = sprite(v.face, lookFor(about), v.faded) + `<b>${v.mark}</b>`;
+  bubble.innerHTML = miniSvg(v.face, lookFor(about), v.faded) + markSvg(v.mark);
   el.classList.add('thinking');
   el.style.zIndex = '300';
   el.appendChild(bubble);
@@ -710,11 +745,71 @@ function think() {
 }
 setInterval(think, THINK_EVERY_MS);
 
+// ===================== Sound =====================
+// Strawberry Walk loops in the background, kitties in the room meow now and then, and a petted kitty may purr or meow.
+// Browsers only play sound after the first tap or key press, so the music starts then. It pauses while the app is hidden.
+declare const __SOUNDS__: Record<SoundKind, string>;   // file paths in the app, data URLs on the website (web/build.js)
+type SoundKind = 'bgm' | 'meow' | 'purr';
+const SOUND_DEFAULTS: Record<SoundKind, number> = { bgm: 40, meow: 70, purr: 70 };
+const PET_MEOW = 0.1, PET_PURR = 0.4;                  // chances when petted: a meow, else a purr, else quiet
+const MEOW_EVERY_MS = 15_000, MEOW_CHANCE = 0.12;      // a random meow about every two minutes in the room
+const volumeOf = (k: SoundKind) => Math.min(100, Math.max(0, save.sound?.[k] ?? SOUND_DEFAULTS[k]));
+let soundOk = false;
+let music: HTMLAudioElement | null = null;
+let purring: HTMLAudioElement | null = null;
+
+function syncMusic() {
+  const v = volumeOf('bgm') / 100;
+  if (!soundOk || !v || document.hidden) { music?.pause(); return; }
+  if (!music) { music = new Audio(__SOUNDS__.bgm); music.loop = true; }
+  music.volume = v;
+  if (music.paused) music.play().catch(() => { /* not allowed yet: the next tap tries again */ });
+}
+
+function playSound(k: 'meow' | 'purr') {
+  const v = volumeOf(k) / 100;
+  if (!soundOk || !v || document.hidden) return;
+  if (k === 'purr' && purring && !purring.ended) return;   // one purr at a time, however fast the petting
+  const a = new Audio(__SOUNDS__[k]);
+  a.volume = v;
+  if (k === 'purr') purring = a;
+  a.play().catch(() => {});
+}
+
+const allowSound = () => { soundOk = true; if (music?.paused !== false) syncMusic(); };
+document.addEventListener('click', allowSound, true);
+document.addEventListener('keydown', allowSound, true);
+document.addEventListener('visibilitychange', syncMusic);
+
+setInterval(() => {
+  if (tab !== 'room' || asleepNow() || Math.random() > MEOW_CHANCE) return;
+  if ([...document.querySelectorAll<HTMLElement>('#room .pet')].some((el) => el.dataset.nap !== '1')) playSound('meow');
+}, MEOW_EVERY_MS);
+
+function renderSound() {
+  for (const k of ['bgm', 'meow', 'purr'] as const) {
+    const v = volumeOf(k), input = $<HTMLInputElement>(`vol-${k}`);
+    input.value = String(v);
+    input.style.setProperty('--fill', `${v}%`);
+    $(`vol-${k}-out`).textContent = v ? `${v}%` : 'Off';
+  }
+}
+for (const k of ['bgm', 'meow', 'purr'] as const) {
+  const input = $<HTMLInputElement>(`vol-${k}`);
+  input.addEventListener('input', () => {
+    save.sound = { ...save.sound, [k]: Number(input.value) };
+    renderSound();
+    if (k === 'bgm') syncMusic();
+  });
+  input.addEventListener('change', () => { persist(); if (k !== 'bgm') playSound(k); });   // let go of a slider: hear how loud it is
+}
+
 // Double-tap an awake cat to make a heart float up from it.
 let lastTap = { id: '', at: 0 };
 $('room').addEventListener('click', (ev) => {
   const pet = (ev.target as HTMLElement).closest<HTMLElement>('.pet');
-  if (!pet || skyPhase() === 'night') return;
+  if (!pet || asleepNow()) return;
+  if (pet.dataset.nap === '1') { napUntil.delete(pet.dataset.id ?? ''); setNap(pet, false); return; }   // a tap wakes a napping cat
   const t = Date.now();
   const id = pet.dataset.id ?? '';
   const double = lastTap.id === id && t - lastTap.at < 350;
@@ -732,6 +827,9 @@ $('room').addEventListener('click', (ev) => {
   heart.innerHTML = HEART;
   pet.appendChild(heart);
   setTimeout(() => heart.remove(), 1300);
+  const roll = Math.random();
+  if (roll < PET_MEOW) playSound('meow');
+  else if (roll < PET_MEOW + PET_PURR) playSound('purr');
 });
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -739,8 +837,8 @@ const scheduleText = (k: MindfulTask) => k.weekdays?.length ? `on ${k.weekdays.m
 const repeatText = (d: number) => d === 1 ? 'daily' : d === 7 ? 'weekly' : d === 14 ? 'every 2 weeks' : d === 30 ? 'monthly' : `every ${d} days`;
 
 let mindfulView: TaskKind = 'habit';
-const TRAVEL = (id: string) => save.timeTravel ? `<button class="btn small travel" data-action="travel" data-id="${id}" aria-label="Time travel: edit the days this was done">⏪</button>` : '';
-const DEL = (id: string) => `<button class="btn small del" data-action="task-del" data-id="${id}" aria-label="Delete">✕</button>`;
+const TRAVEL = (id: string) => save.timeTravel ? `<button class="btn small travel" data-action="travel" data-id="${id}" aria-label="Time travel: edit the days this was done">${iconSvg('rewind')}</button>` : '';
+const DEL = (id: string) => `<button class="btn small del" data-action="task-del" data-id="${id}" aria-label="Delete">${iconSvg('x')}</button>`;
 
 function renderTasks() {
   const t = today();
@@ -751,13 +849,13 @@ function renderTasks() {
     b.setAttribute('aria-selected', String(b.dataset.view === kind)));
   $('mindful-title').textContent = isTask ? 'Kibbles' : 'Treats';
   $('mindful-desc').textContent = isTask
-    ? `One-off jobs. Do it once, tick it off, earn up to ${cap} xp. Tap ✕ or press and hold to delete.`
-    : `Small habits you might not want to do every day, like cleaning your desk after a work-from-home session. Earn up to ${cap} xp a day. Track them before you commit to a kitty. Tap ✕ or press and hold to delete.`;
+    ? `One-off jobs. Do it once, tick it off, earn up to ${cap} XP. Tap the X or press and hold to delete.`
+    : `Small habits you might not want to do every day, like cleaning your desk after a work-from-home session. Earn up to ${cap} XP a day. Track them before you commit to a kitty. Tap the X or press and hold to delete.`;
   const e = save.state.mindfulEarned?.day === t ? save.state.mindfulEarned : undefined;
   $('mindful-travel').hidden = !save.timeTravel;
-  $('mindful-cap').textContent = `Earned today: ${(isTask ? e?.task : e?.habit) ?? 0}/${cap} xp`;
+  $('mindful-cap').textContent = `Earned today: ${(isTask ? e?.task : e?.habit) ?? 0}/${cap} XP`;
   $('form-title').textContent = isTask ? 'New kibble' : 'New treat';
-  $('task-xp-label').textContent = `Reward (xp, max ${cap})`;
+  $('task-xp-label').textContent = `Reward (XP, max ${cap})`;
   ($('task-xp') as HTMLInputElement).max = String(cap);
   ($('repeat-wrap') as HTMLElement).hidden = isTask;
   ($('task-days-wrap') as HTMLElement).hidden = isTask || ($('task-repeat') as HTMLSelectElement).value !== 'custom';
@@ -771,13 +869,13 @@ function renderTasks() {
   $('tasks').innerHTML = list.length ? list.map((k) => {
     if (isTask) {
       const done = k.lastDoneDay !== null;
-      return `<li data-task="${k.id}" data-hold="task"><span class="${done ? 'done' : ''}">${esc(k.name)} <span class="muted">· +${k.xp} xp</span></span>
-        <span class="row-btns"><button class="btn small" data-action="task" data-id="${k.id}" ${done ? 'disabled' : ''}>${done ? '✓ Done' : 'Done'}</button>${TRAVEL(k.id)}${DEL(k.id)}</span></li>`;
+      return `<li data-task="${k.id}" data-hold="task"><span class="${done ? 'done' : ''}">${esc(k.name)} <span class="muted">· +${k.xp} XP</span></span>
+        <span class="row-btns"><button class="btn small" data-action="task" data-id="${k.id}" ${done ? 'disabled' : ''}>${done ? `${iconSvg('check')} Done` : 'Done'}</button>${TRAVEL(k.id)}${DEL(k.id)}</span></li>`;
     }
     const left = daysUntilReady(k, t);
     const daily = k.cooldownDays === 1;
-    return `<li class="habit" data-task="${k.id}" data-hold="task"><span>${esc(k.name)} <span class="muted">· +${k.xp} xp · ${scheduleText(k)}</span></span>
-      <span class="row-btns"><button class="btn small" data-action="task" data-id="${k.id}" ${left ? 'disabled' : ''}>${left ? `in ${plural(left, 'day')}` : 'Done'}</button><button class="btn small" data-action="rename-habit" data-id="${k.id}" aria-label="Rename treat">✎</button>${TRAVEL(k.id)}${DEL(k.id)}</span>
+    return `<li class="habit" data-task="${k.id}" data-hold="task"><span>${esc(k.name)} <span class="muted">· +${k.xp} XP · ${scheduleText(k)}</span></span>
+      <span class="row-btns"><button class="btn small" data-action="task" data-id="${k.id}" ${left ? 'disabled' : ''}>${left ? `in ${plural(left, 'day')}` : 'Done'}</button><button class="btn small" data-action="rename-habit" data-id="${k.id}" aria-label="Rename treat">Edit</button>${TRAVEL(k.id)}${DEL(k.id)}</span>
       ${renderWeek(habitSubject(k), t)}
       <span class="muted habit-foot">${k.doneDays.length ? `Done ${plural(k.doneDays.length, 'time')}` : 'Not done yet'}${daily ? ` · streak ${habitStreak(k.doneDays, t)}` : ''}</span>
       ${daily ? `<button class="btn small" data-action="habit-kitty" data-id="${k.id}">Make it a kitty</button>` : ''}</li>`;
@@ -801,11 +899,43 @@ function renderClock() {
   ($('real-time') as HTMLButtonElement).disabled = !ahead;
 }
 
+// ---- your day: one boundary, shown as a start and an end (a day is always 24 hours) ----
+function renderDaySetting() {
+  const h = dayStartHour();
+  const hours = Array.from({ length: CONFIG.dayStartMax + 1 }, (_, i) => i);
+  for (const [id, label] of [['day-start', hourText], ['day-end', (i: number) => `${hourText(i)} next day`]] as const) {
+    const sel = $<HTMLSelectElement>(id);
+    if (!sel.options.length) sel.innerHTML = hours.map((i) => `<option value="${i}">${label(i)}</option>`).join('');   // built once, so a re-render can't close an open list
+    sel.value = String(h);
+  }
+  $('day-span').textContent = `${dayRuleText(h)} Moving one end moves the other.`;
+  $('day-end-note').textContent = `The day ends at ${hourText(h)}.`;
+  $('day-rule').textContent = dayRuleText(h);
+}
+
+// Refused when it would put you in a different day right now: going back would let you redo a day, going forward
+// would end today early. Both settings agree on the day from the later hour on.
+function setDayBoundary(h: number) {
+  const old = dayStartHour(), before = today();
+  setDayStart(h);
+  if (today() !== before) {
+    setDayStart(old);
+    renderDaySetting();
+    toast(`That would move you into a different day right now. Try again after ${hourText(Math.max(old, h))}.`);
+    return;
+  }
+  save.dayStart = dayStartHour();
+  persist(); renderAll();
+  toast(dayRuleText());
+}
+
 function renderSaved() {
   ($('unlimited-cats') as HTMLInputElement).checked = !!save.unlimited;
   ($('allow-rename') as HTMLInputElement).checked = !!save.allowRename;
   ($('show-clock') as HTMLInputElement).checked = !!save.showClock;
   ($('time-travel') as HTMLInputElement).checked = !!save.timeTravel;
+  renderDaySetting();
+  renderSound();
   $('version').textContent = `v${VERSION}`;
   $('clock-pop').hidden = !save.showClock;
   if (!save.showClock) $('clock-pop').classList.remove('open');
@@ -823,7 +953,7 @@ const MOODS: Record<Mood, { label: string; face: Face; fur: string }> = {
   stressed: { label: 'Stressed', face: 'starving', fur: '#c3a9ee' },
 };
 const MOOD_KEYS = Object.keys(MOODS) as Mood[];
-const moodSprite = (m: Mood) => sprite(MOODS[m].face, { fur: MOODS[m].fur, pattern: 'plain' }).replace('class="sprite', 'class="sprite mood');
+const moodSprite = (m: Mood) => miniSvg(MOODS[m].face, { fur: MOODS[m].fur, pattern: 'plain' }).replace('class="sprite', 'class="sprite mood');
 const hasPage = (e?: DiaryEntry) => !!e && (!!e.text.trim() || !!e.photo);   // a written page or a photo turns the day pink
 
 // ---- Diary files: one Markdown file per day and one small JPEG per day, in the app's private storage ----
@@ -930,22 +1060,29 @@ async function loadDiary() {
 }
 
 // Scale down and re-encode as JPEG until it fits under PHOTO_MAX_BYTES.
+// The full-size photo is decoded and drawn only once; every retry re-encodes from the small copy.
 async function compressPhoto(file: Blob): Promise<Blob> {
   const img = await createImageBitmap(file);
-  let side = PHOTO_MAX_SIDE, quality = 0.7;
-  for (let i = 0; ; i++) {
-    const k = Math.min(1, side / Math.max(img.width, img.height));
+  const draw = (src: CanvasImageSource, w: number, h: number) => {
     const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(img.width * k));
-    canvas.height = Math.max(1, Math.round(img.height * k));
+    canvas.width = Math.max(1, Math.round(w));
+    canvas.height = Math.max(1, Math.round(h));
     const g = canvas.getContext('2d') as CanvasRenderingContext2D;
     g.fillStyle = '#fff';
     g.fillRect(0, 0, canvas.width, canvas.height);
-    g.drawImage(img, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', quality));
+    g.drawImage(src, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  };
+  const k0 = Math.min(1, PHOTO_MAX_SIDE / Math.max(img.width, img.height));
+  let canvas = draw(img, img.width * k0, img.height * k0);
+  img.close();
+  const encode = (c: HTMLCanvasElement, q: number) => new Promise<Blob | null>((r) => c.toBlob(r, 'image/jpeg', q));
+  let quality = 0.7;
+  for (let i = 0; ; i++) {
+    const blob = await encode(canvas, quality);
     if (!blob) throw new Error('encode failed');
-    if (blob.size <= PHOTO_MAX_BYTES || i >= 14 || side < 200) { img.close(); return blob; }
-    if (quality > 0.45) quality -= 0.1; else side = Math.round(side * 0.85);
+    if (blob.size <= PHOTO_MAX_BYTES || i >= 14 || Math.max(canvas.width, canvas.height) < 200) return blob;
+    if (quality > 0.45) quality -= 0.1; else canvas = draw(canvas, canvas.width * 0.85, canvas.height * 0.85);
   }
 }
 
@@ -1033,7 +1170,10 @@ function renderDiary() {
       aria-label="${fmtDay(d)}: ${what}"><span class="dn">${d - first + 1}</span>${e?.mood ? moodSprite(e.mood) : ''}</button>`);
   }
   $('diary-cal').innerHTML = cells.join('');
-  $('diary-title').textContent = title;
+  const head = $('diary-title');
+  head.textContent = title;
+  head.dataset.y = String(y); head.dataset.m = String(m);
+  head.setAttribute('aria-label', `${title}. Pick a month`);
   ($('diary-next') as HTMLButtonElement).disabled = atNow;
   $('diary-stats').innerHTML = pages ? `<b class="num">${pages}</b> ${pages === 1 ? 'page' : 'pages'} written this month` : 'No pages this month yet. Tap a day to write one.';
   $('diary-legend').innerHTML = `<span><i class="has"></i>has an entry</span><span><i class="now"></i>today</span>` +
@@ -1051,7 +1191,13 @@ function drawDraftPhoto() {
     : '<p class="muted">No photo attached.</p>';
   box.parentElement?.querySelector<HTMLElement>('[data-action="diary-photo-add"]')?.replaceChildren(diaryDraft.photoUrl ? 'Change photo' : 'Add photo');
 }
+// A pixel bar that sweeps back and forth while a photo is being converted or loaded.
+function showPhotoBusy(text: string) {
+  $('diary-photo').innerHTML = `<div class="loading" role="status"><p class="muted">${text}</p><div class="bar busy"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>`;
+  document.querySelectorAll<HTMLButtonElement>('#diary-form [data-action="diary-photo-add"], #diary-form button[type="submit"]').forEach((b) => (b.disabled = true));
+}
 function setDraftPhoto(b: Blob | null) {
+  document.querySelectorAll<HTMLButtonElement>('#diary-form [data-action="diary-photo-add"], #diary-form button[type="submit"]').forEach((x) => (x.disabled = false));
   if (!diaryDraft) return;
   if (diaryDraft.photoUrl) URL.revokeObjectURL(diaryDraft.photoUrl);
   diaryDraft.photo = b;
@@ -1065,7 +1211,7 @@ function markMood() {
 function openDiary(day: number) {
   const e = save.diary?.[day];
   diaryDraft = { day, mood: e?.mood, photo: null, photoUrl: '' };
-  openModal(`<form class="panel" id="diary-form" novalidate>
+  openModal(`<form class="panel" id="diary-form" novalidate><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
     <h3>${esc(dateOf(day).toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }))}</h3>
     <div class="field"><span>How are you feeling?</span>
       <div class="moods" id="diary-moods">${MOOD_KEYS.map((k) =>
@@ -1079,7 +1225,8 @@ function openDiary(day: number) {
   </form>`);
   markMood();
   drawDraftPhoto();
-  if (e?.photo) diaryDraft.loaded = getPhoto(day).then((b) => { if (b && diaryDraft?.day === day && !diaryDraft.photo) setDraftPhoto(b); });
+  if (e?.photo) showPhotoBusy('Loading photo…');
+  if (e?.photo) diaryDraft.loaded = getPhoto(day).then((b) => { if (diaryDraft?.day === day && !diaryDraft.photo) setDraftPhoto(b || null); });
 }
 
 async function saveDiary() {
@@ -1194,7 +1341,7 @@ function renderReminder() {
   $('cat-alarms').innerHTML = home.length ? home.map((c) => {
     const a = r.catAlarms?.[c.id];
     return `<li><span class="nm">${esc(c.name)}</span><span class="when"><input type="time" data-cat-alarm="${c.id}" value="${a ? hhmm(a) : ''}" aria-label="Feeding alarm for ${esc(c.name)}">
-      <button class="btn small" type="button" data-action="cat-alarm-clear" data-id="${c.id}" ${a ? '' : 'disabled'} aria-label="Remove alarm for ${esc(c.name)}">✕</button></span></li>`;
+      <button class="btn small" type="button" data-action="cat-alarm-clear" data-id="${c.id}" ${a ? '' : 'disabled'} aria-label="Remove alarm for ${esc(c.name)}">${iconSvg('x')}</button></span></li>`;
   }).join('') : '<li class="muted">No kitties at home.</li>';
   const { perm, next, error } = reminderInfo;
   const el = $('reminder-status');
@@ -1252,6 +1399,7 @@ function showTab(name: string) {
 }
 
 function closeModal() {
+  closeLayer(false);
   if (diaryDraft?.photoUrl) URL.revokeObjectURL(diaryDraft.photoUrl);
   diaryDraft = null; gate = null; menuCat = null;
   $('modal').hidden = true; $('modal').innerHTML = '';
@@ -1261,6 +1409,79 @@ function openModal(html: string) {
   m.innerHTML = `<div class="scrim" data-action="modal-close">${html}</div>`;
   m.hidden = false;
   m.querySelector<HTMLElement>('input')?.focus();
+}
+
+// A small dialog over the page or over the open dialog, which keeps its state underneath. Focus goes to the
+// selected choice (or the one marked data-focus) and back to whatever opened it.
+let layerFrom: HTMLElement | null = null;
+const LAYER_FOCUS = ['[aria-pressed="true"]:not(:disabled)', '.pick.now:not(:disabled)', '[data-focus]', '.pick:not(:disabled)', 'button:not(:disabled)'];
+function openLayer(html: string, label: string, from?: HTMLElement) {
+  const old = document.getElementById('layer');
+  if (!old) layerFrom = from ?? (document.activeElement as HTMLElement | null);
+  old?.remove();
+  const el = document.createElement('div');
+  el.id = 'layer';
+  el.className = 'scrim layer';
+  el.dataset.action = 'layer-close';
+  el.innerHTML = `<div class="panel" role="dialog" aria-modal="true" aria-label="${esc(label)}">${html}</div>`;
+  document.body.appendChild(el);
+  for (const q of LAYER_FOCUS) { const b = el.querySelector<HTMLElement>(q); if (b) { b.focus(); break; } }
+}
+function closeLayer(refocus = true) {
+  const el = document.getElementById('layer');
+  if (!el) return;
+  el.remove();
+  picker = null;
+  if (refocus && layerFrom?.isConnected) layerFrom.focus();
+  layerFrom = null;
+}
+
+// ---- month and year picker: tap a calendar's title (the diary, the heatmaps) to jump to any month up to now ----
+interface Picker { key: string; y: number; m: number; year: number; first: number }   // year: the one being shown; first: earliest month allowed, as y * 12 + m
+let picker: Picker | null = null;
+const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => new Date(Date.UTC(2000, i, 1)).toLocaleString('en', { month: 'short', timeZone: 'UTC' }));
+const nowMonth = () => { const d = dateOf(today()); return d.getUTCFullYear() * 12 + d.getUTCMonth(); };
+const PICKER_YEARS = 12;   // the current year, the ten before it and next year (greyed), 4 x 3
+
+const monthTitle = (key: string, y: number, m: number, title: string, first: number) =>
+  `<button type="button" class="month-title" data-action="picker-open" data-key="${key}" data-y="${y}" data-m="${m}" data-first="${first}" aria-haspopup="dialog" aria-label="${title}. Pick a month">${title}</button>`;
+
+function openPicker(btn: HTMLElement) {
+  const y = Number(btn.dataset.y), m = Number(btn.dataset.m), first = Number(btn.dataset.first);
+  picker = { key: btn.dataset.key ?? '', y, m, year: y, first: Number.isFinite(first) ? first : -Infinity };
+  drawPicker('month', btn);
+}
+
+function drawPicker(view: 'month' | 'year', from?: HTMLElement) {
+  const p = picker;
+  if (!p) return;
+  const cur = nowMonth(), curY = Math.floor(cur / 12);
+  const close = `<button class="x-close" type="button" data-action="layer-close" aria-label="Close">${iconSvg('x')}</button>`;
+  const cell = (cls: string, data: string, label: string, on: boolean, off: boolean, aria = label) =>
+    `<button type="button" class="pick${cls}" ${data} aria-pressed="${on}" aria-label="${aria}" ${off ? 'disabled' : ''}>${label}</button>`;
+  const html = view === 'month'
+    ? `${close}<div class="picker-head"><button class="btn small" type="button" data-action="picker-years" aria-label="Back to years">${iconSvg('prev')}Back</button><strong>${p.year}</strong></div>
+      <div class="pick-grid">${MONTH_NAMES.map((name, i) => {
+        const ym = p.year * 12 + i;
+        return cell(ym === cur ? ' now' : '', `data-action="picker-month" data-m="${i}"`, name, ym === p.y * 12 + p.m, ym > cur || ym < p.first, `${name} ${p.year}`);
+      }).join('')}</div>`
+    : `${close}<div class="picker-head"><strong>Pick a year</strong></div>
+      <div class="pick-grid">${Array.from({ length: PICKER_YEARS }, (_, i) => curY - PICKER_YEARS + 2 + i).map((y) =>
+        cell(y === curY ? ' now' : '', `data-action="picker-year" data-y="${y}"`, String(y), y === p.y, y > curY || (y + 1) * 12 <= p.first)).join('')}</div>`;
+  openLayer(html, view === 'month' ? `Pick a month in ${p.year}` : 'Pick a year', from);
+}
+
+function pickMonth(m: number) {
+  const p = picker;
+  if (!p || p.year * 12 + m > nowMonth() || p.year * 12 + m < p.first) return;
+  closeLayer(false);
+  if (p.key === 'diary') { diaryYM = { y: p.year, m }; renderDiary(); }
+  else {
+    viewMonth.set(p.key, Math.max(0, nowMonth() - (p.year * 12 + m)));
+    renderHeat();
+    if (menuCat === p.key) openCatMenu(p.key);
+  }
+  document.querySelector<HTMLElement>(`[data-action="picker-open"][data-key="${CSS.escape(p.key)}"]`)?.focus();   // the title was redrawn
 }
 
 // ---- adopting: friendly nagging, a cap of 9, and a triple-confirm for unlimited mode ----
@@ -1327,7 +1548,7 @@ function openAdopt(habitId?: string) {
   openModal(`<form class="panel" id="adopt" novalidate>
     <h3>${habit ? 'Make a kitty' : 'Adopt a kitty'}</h3>
     <div class="preview"><div id="adopt-preview">${sprite('happy', draftLook)}</div>
-      <button class="btn" type="button" data-action="randomise">🎲 Randomise look</button></div>
+      <button class="btn" type="button" data-action="randomise">${iconSvg('dice')} Randomise look</button></div>
     <div class="look-pick" id="adopt-look">${lookPickers()}</div>
     <p class="muted">${habit ? `Your history with this habit comes along. Days you did it show in teal; days before the kitty show as empty.`
       : 'Each cat stands for one habit. Do the habit, feed the cat.'}</p>
@@ -1361,7 +1582,7 @@ function openTrophies() {
   const list = achievements(save.state, diaryPageCount(), today());
   const unlocked = list.filter((a) => a.unlocked).length;
   const groups = [...new Set(list.map((a) => a.group))];
-  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">×</button>
+  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
     <h3>Achievements</h3><p class="muted"><b class="num">${unlocked}</b> of ${list.length} unlocked</p>
     ${groups.map((g) => `<h4 class="ach-group">${g}</h4><ul class="ach">${list.filter((a) => a.group === g).map((a) =>
       `<li class="${a.unlocked ? 'got' : ''}"><span class="ach-icon">${a.unlocked ? pixelArt(TROPHY_ART) : pixelArt(TROPHY_ART, 'dim')}</span>
@@ -1377,12 +1598,12 @@ function openBook(day: number = today()) {
   const day0 = Math.max(first, Math.min(day, t));
   const clockNow = now().getHours() * 60 + now().getMinutes();
   const lines = allCatsDiary(home.filter((c) => c.adoptedDay <= day0), day0).filter((l) => day0 < t || l.minute <= clockNow);
-  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">×</button>
+  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
     <h3>Kitty diary</h3>
     <div class="month-nav">
-      <button type="button" data-action="book-day" data-day="${day0 - 1}" ${day0 <= first ? 'disabled' : ''} aria-label="Previous day">‹</button>
+      <button type="button" data-action="book-day" data-day="${day0 - 1}" ${day0 <= first ? 'disabled' : ''} aria-label="Previous day">${iconSvg('prev')}</button>
       <strong>${day0 === t ? 'Today · ' : ''}${fmtDay(day0)}</strong>
-      <button type="button" data-action="book-day" data-day="${day0 + 1}" ${day0 >= t ? 'disabled' : ''} aria-label="Next day">›</button>
+      <button type="button" data-action="book-day" data-day="${day0 + 1}" ${day0 >= t ? 'disabled' : ''} aria-label="Next day">${iconSvg('next')}</button>
     </div>
     ${lines.length ? `<ul class="catlog">${lines.map((l) => `<li><span class="num">${clock(l.minute)}</span> ${esc(l.text)}</li>`).join('')}</ul>`
       : `<p class="muted">${home.length ? 'Nothing happened yet.' : 'Nobody is home, so nothing to write about.'}</p>`}</div>`);
@@ -1405,16 +1626,16 @@ function openTravel(id: string, back = travelBack) {
     ...Array.from({ length: last - first + 1 }, (_, i) => {
       const day = first + i, on = doneSet.has(day);
       return `<button type="button" class="dc${on ? ' has' : ''}${day === t ? ' now' : ''}" data-action="travel-day" data-id="${id}" data-day="${day}" ${day > t ? 'disabled' : ''}
-        aria-pressed="${on}" aria-label="${fmtDay(day)}: ${on ? 'done' : 'not done'}"><span class="dn">${i + 1}</span>${on ? '<b class="tick">✓</b>' : ''}</button>`;
+        aria-pressed="${on}" aria-label="${fmtDay(day)}: ${on ? 'done' : 'not done'}"><span class="dn">${i + 1}</span>${on ? `<b class="tick">${iconSvg('tick')}</b>` : ''}</button>`;
     }),
   ].join('');
-  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">×</button>
+  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
     <h3>Time travel</h3><p><b>${esc(task.name)}</b></p>
-    <p class="muted">Tap a day to mark it done or not done. This only fixes your record: no xp is paid or taken away.${task.kind === 'task' ? ' A kibble is done once, so tapping another day moves it.' : ''}</p>
+    <p class="muted">Tap a day to mark it done or not done. This only fixes your record: no XP is paid or taken away.${task.kind === 'task' ? ' A kibble is done once, so tapping another day moves it.' : ''}</p>
     <div class="month-nav">
-      <button type="button" data-action="travel-month" data-id="${id}" data-step="1" aria-label="Previous month">‹</button>
+      <button type="button" data-action="travel-month" data-id="${id}" data-step="1" aria-label="Previous month">${iconSvg('prev')}</button>
       <strong>${dateOf(first).toLocaleString('en', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</strong>
-      <button type="button" data-action="travel-month" data-id="${id}" data-step="-1" ${back === 0 ? 'disabled' : ''} aria-label="Next month">›</button>
+      <button type="button" data-action="travel-month" data-id="${id}" data-step="-1" ${back === 0 ? 'disabled' : ''} aria-label="Next month">${iconSvg('next')}</button>
     </div>
     <div class="dcal" role="group" aria-label="Days">${cells}</div>
     <div class="btns"><button class="btn primary" type="button" data-action="modal-close">Done</button></div></div>`);
@@ -1466,7 +1687,7 @@ document.addEventListener('click', (ev) => {
     case 'feed':
       act((s, at) => feedCat(s, id, at), () => {
         const fed = save.state.cats.find((c) => c.id === id) as Cat;
-        return cat?.status === 'ranAway' ? `${fed.name} came back! Welcome home.` : fedMessage(fed, FOODS[foodFor(fed, today())].label, streak(fed, today()));
+        return cat?.status === 'ranAway' ? `${fed.name} came back! Welcome home.` : fedMessage(fed, foodFor(fed, today()), streak(fed, today()));
       }, cat);
       if (menuCat === id) openCatMenu(id);   // keep the open menu in step (fed, or called back)
       break;
@@ -1484,23 +1705,30 @@ document.addEventListener('click', (ev) => {
       const before = earned();
       act((s, at) => doMindfulTask(s, id, at), () => {
         const paid = earned() - before;
-        return paid >= task.xp ? `Nice. +${paid} xp`
-          : paid > 0 ? `+${paid} xp. That's today's ${cap} xp limit for ${kind}s.`
-          : `Done! You've already earned today's ${cap} xp from ${kind}s, so no extra xp.`;
+        return paid >= task.xp ? `Nice. +${paid} XP`
+          : paid > 0 ? `+${paid} XP. That's today's ${cap} XP limit for ${kind}s.`
+          : `Done! You've already earned today's ${cap} XP from ${kind}s, so no extra XP.`;
       });
       break;
     }
     case 'tab':
       showTab(btn.dataset.tab ?? 'today');
       break;
+    case 'theme-toggle': toggleTheme(); break;
     case 'settings-toggle': showTab(tab === 'settings' ? tabBeforeSettings : 'settings'); break;
     case 'diary-month': {
       const d = diaryMonth(), n = new Date(Date.UTC(d.y, d.m + Number(btn.dataset.step), 1));
+      if (n.getUTCFullYear() * 12 + n.getUTCMonth() > nowMonth()) break;   // never into a month that hasn't happened
       diaryYM = { y: n.getUTCFullYear(), m: n.getUTCMonth() };
       renderDiary();
       break;
     }
     case 'diary-today': diaryYM = null; renderDiary(); break;
+    case 'picker-open': openPicker(btn); break;
+    case 'picker-years': drawPicker('year'); break;
+    case 'picker-year': if (picker) { picker.year = Number(btn.dataset.y); drawPicker('month'); } break;
+    case 'picker-month': pickMonth(Number(btn.dataset.m)); break;
+    case 'layer-close': if (ev.target === btn || btn.tagName === 'BUTTON') closeLayer(); break;
     case 'diary-open': openDiary(Number(btn.dataset.day)); break;
     case 'diary-mood':
       if (diaryDraft) { diaryDraft.mood = diaryDraft.mood === btn.dataset.mood ? undefined : (btn.dataset.mood as Mood); markMood(); }
@@ -1508,6 +1736,12 @@ document.addEventListener('click', (ev) => {
     case 'diary-photo-add': $('diary-file').click(); break;
     case 'diary-photo-remove': setDraftPhoto(null); break;
     case 'diary-clear':
+      openLayer(`<h3>Clear this page?</h3>
+        <p>This empties the text, mood and photo on this diary page. Nothing is deleted until you press Save, so closing the page without saving keeps it as it was.</p>
+        <div class="btns"><button class="btn" type="button" data-action="layer-close" data-focus>Cancel</button><button class="btn primary" type="button" data-action="diary-clear-yes">Clear</button></div>`, 'Clear this page?', btn);
+      break;
+    case 'diary-clear-yes':
+      closeLayer();
       ($('diary-text') as HTMLTextAreaElement).value = '';
       if (diaryDraft) { diaryDraft.mood = undefined; markMood(); setDraftPhoto(null); }
       break;
@@ -1635,6 +1869,7 @@ document.addEventListener('click', (ev) => {
       break;
     case 'reset-yes':
       save = fresh();
+      setDayStart(save.dayStart);
       lastLevel = null;
       diaryReady = true;
       clearDiaryFiles();
@@ -1681,7 +1916,7 @@ $('show-clock').addEventListener('change', (ev) => {
 $('time-travel').addEventListener('change', (ev) => {
   save.timeTravel = (ev.target as HTMLInputElement).checked;
   persist(); renderTasks();
-  toast(save.timeTravel ? 'Time travel on. Every treat and kibble now has a ⏪ button.' : 'Time travel off.');
+  toast(save.timeTravel ? 'Time travel on. Every treat and kibble now has a rewind button.' : 'Time travel off.');
 });
 $('unlimited-cats').addEventListener('change', (ev) => {
   save.unlimited = (ev.target as HTMLInputElement).checked;
@@ -1689,6 +1924,7 @@ $('unlimited-cats').addEventListener('change', (ev) => {
   toast(save.unlimited ? 'Unlimited kitties on. You will be asked three times for every kitty past 9.' : `Back to a limit of ${CONFIG.maxCats} kitties.`);
 });
 
+for (const id of ['day-start', 'day-end']) $(id).addEventListener('change', (ev) => setDayBoundary(Number((ev.target as HTMLSelectElement).value)));
 $('reminder-on').addEventListener('change', (ev) => setReminderEnabled((ev.target as HTMLInputElement).checked));
 $('last-call').addEventListener('change', async (ev) => {
   const v = (ev.target as HTMLSelectElement).value as LastCall;
@@ -1734,8 +1970,10 @@ document.addEventListener('change', async (ev) => {
   const err = $('diary-error');
   try {
     err.hidden = true;
+    showPhotoBusy('Shrinking photo…');
+    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));   // let the bar paint before the heavy work
     setDraftPhoto(await compressPhoto(f));
-  } catch { err.textContent = "Couldn't read that photo. Try a different one."; err.hidden = false; }
+  } catch { setDraftPhoto(diaryDraft?.photo ?? null); err.textContent = "Couldn't read that photo. Try a different one."; err.hidden = false; }
 });
 
 $('load-file').addEventListener('change', async (ev) => {
@@ -1813,6 +2051,28 @@ document.addEventListener('click', (ev) => {
 
 $('task-repeat').addEventListener('change', () => renderTasks());
 
+// Keys in a small dialog: Escape closes it, Tab stays inside it, arrows move around the month and year grids.
+const GRID_STEP: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -4, ArrowDown: 4 };
+document.addEventListener('keydown', (ev) => {
+  const layer = document.getElementById('layer');
+  if (!layer) return;
+  if (ev.key === 'Escape') { ev.preventDefault(); closeLayer(); return; }
+  const at = document.activeElement as HTMLButtonElement;
+  if (ev.key === 'Tab') {
+    const all = [...layer.querySelectorAll<HTMLElement>('button:not(:disabled)')];
+    const i = all.indexOf(at);
+    const to = ev.shiftKey ? (i <= 0 ? all[all.length - 1] : null) : (i === -1 || i === all.length - 1 ? all[0] : null);
+    if (to) { ev.preventDefault(); to.focus(); }
+    return;
+  }
+  const grid = at?.closest('.pick-grid');
+  if (!GRID_STEP[ev.key] || !grid) return;
+  ev.preventDefault();
+  const cells = [...grid.querySelectorAll<HTMLButtonElement>('button')];
+  const next = cells[cells.indexOf(at) + GRID_STEP[ev.key]];
+  if (next && !next.disabled) next.focus();
+});
+
 // Press and hold a task or a cat. Android also fires `contextmenu` on a long press (and then cancels
 // the pointer), so that counts as the hold too; whichever comes first wins.
 const HOLD_MS = 500;
@@ -1868,7 +2128,7 @@ function openCatMenu(id: string, tab?: MenuTab) {
       <button class="btn" data-action="rename-habit" data-id="${id}">Rename habit</button>
       ${save.allowRename ? `<button class="btn" data-action="rename-cat" data-id="${id}">Rename ${esc(cat.name)}</button>` : ''}
       <button class="btn" data-action="shelter-ask" data-id="${id}">Return to the shelter</button></div>`;
-  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">×</button>
+  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
     ${catHead(cat, today(), false)}
     <div class="seg" role="tablist">${(Object.keys(MENU_TABS) as MenuTab[]).map((v) =>
       `<button type="button" role="tab" data-action="menu-tab" data-view="${v}" data-id="${id}" aria-selected="${v === menuTab}">${MENU_TABS[v]}</button>`).join('')}</div>

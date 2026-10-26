@@ -72,7 +72,7 @@ function status() {
 
   const today = dayIndex(now());
   const { level, xpIntoLevel, xpForNextLevel } = levelProgress(save.state.xp);
-  console.log(`\n📅 ${now().toLocaleString()}   ❤️  xp ${save.state.xp}  (level ${level}, ${xpIntoLevel}/${xpForNextLevel})`);
+  console.log(`\n📅 ${now().toLocaleString()}   ❤️  XP ${save.state.xp}  (level ${level}, ${xpIntoLevel}/${xpForNextLevel})`);
   if (!save.state.cats.length) console.log('No cats yet. Try: adopt Mochi Meditate');
   for (const c of save.state.cats) {
     const extra =
@@ -82,7 +82,7 @@ function status() {
     const cd = sitterCooldownLeft(c, today);
     console.log(`  🐱 ${c.name} [${c.habit}, ${c.mode}]  ${c.status} ${extra}${cd ? `  (sitter cooldown ${cd}d)` : ''}`);
   }
-  for (const t of save.state.tasks) console.log(`  🧘 ${t.name} (+${t.xp} xp, every ${t.cooldownDays}d)`);
+  for (const t of save.state.tasks) console.log(`  🧘 ${t.name} (+${t.xp} XP, every ${t.cooldownDays}d)`);
   console.log();
 }
 
@@ -122,7 +122,7 @@ const HELP = `commands:
   adopt <name> <habit> [light]   adopt a cat (add "light" for light-hearted mode)
   feed <name>                    you did the habit today
   sitter <name> / resume <name>  send to / bring back from the pet sitter
-  task <name> <xp 1-3>           add a mindful task;   do <name>   to complete it
+  task <name> <XP 1-3>           add a mindful task;   do <name>   to complete it
   skip [days]                    fast-forward time (default 1 day; "skip 3h" for hours)
   heatmap [name] [YYYY-MM]       feeding calendar (default: all cats, this month)
   status, help, reset, quit`;
@@ -153,7 +153,7 @@ for await (const line of rl) {
     case 'resume': report(resumeCat(save.state, catId, now()), `🏠 ${args[0]} is back home.`); break;
     case 'task': {
       const xp = Number(args.at(-1));
-      if (args.length < 2 || Number.isNaN(xp)) { console.log('usage: task <name> <xp 1-3>'); break; }
+      if (args.length < 2 || Number.isNaN(xp)) { console.log('usage: task <name> <XP 1-3>'); break; }
       const name = args.slice(0, -1).join(' ');
       save.state = addMindfulTask(save.state, { id: crypto.randomUUID(), name, xp }, now());
       console.log(`Added task "${name}".`);

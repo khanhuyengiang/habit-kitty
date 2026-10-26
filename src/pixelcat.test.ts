@@ -1,14 +1,14 @@
 import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { FACE_HALF, PATTERNS, SIT_HALF, WIDTH, bodySvg, faceSvg, lookOf, randomLook, notifyIconName, NOTIFY_FACES, FURS, type Face } from './pixelcat.ts';
+import { FACE_HALF, HALF_W, PATTERNS, SIT_HALF, WIDTH, bodySvg, faceSvg, lookOf, randomLook, notifyIconName, NOTIFY_FACES, FURS, type Face } from './pixelcat.ts';
 
 const FACES: Face[] = ['open', 'happy', 'sleepy', 'sad', 'starving', 'dead'];
-const look = { fur: '#fbb16e', pattern: 'plain' as const };
+const look = { fur: '#ffb98a', pattern: 'plain' as const };
 
 describe('pixel cats', () => {
   it('has templates that are 14 columns wide on every row', () => {
-    for (const row of [...FACE_HALF, ...SIT_HALF]) expect(row).toHaveLength(14);
-    expect(WIDTH).toBe(27);
+    for (const row of [...FACE_HALF, ...SIT_HALF]) expect(row).toHaveLength(HALF_W);
+    expect(WIDTH).toBe(2 * HALF_W - 1);
   });
   it('draws every face and pattern, for both the face and the sitting cat', () => {
     for (const f of FACES) { expect(faceSvg(f, look)).toContain('<rect'); expect(bodySvg(f, look)).toContain('<rect'); }
@@ -23,9 +23,9 @@ describe('pixel cats', () => {
     expect(bodySvg('open', look)).toContain('tail a');
   });
   it('colours calico patches differently on each side', () => {
-    const svg = faceSvg('open', { fur: '#fbf6ee', pattern: 'calico' });
-    expect(svg).toContain('#54301f');
-    expect(svg).toContain('#f09e3a');
+    const svg = faceSvg('open', { fur: '#fffafc', pattern: 'calico' });
+    expect(svg).toContain('#6b4a45');
+    expect(svg).toContain('#ffb06a');
   });
   it('derives a stable personality for cats saved before looks existed', () => {
     expect(lookOf({ id: 'mochi' })).toEqual(lookOf({ id: 'mochi' }));
@@ -35,8 +35,8 @@ describe('pixel cats', () => {
   it('gives calico and point cats a base coat that suits the pattern', () => {
     for (let i = 0; i < 60; i++) {
       const l = randomLook();
-      if (l.pattern === 'calico') expect(l.fur).toBe('#fbf6ee');
-      if (l.pattern === 'point') expect(l.fur).toBe('#f6e8d4');
+      if (l.pattern === 'calico') expect(l.fur).toBe('#fffafc');
+      if (l.pattern === 'point') expect(l.fur).toBe('#f8eadb');
     }
   });
 });

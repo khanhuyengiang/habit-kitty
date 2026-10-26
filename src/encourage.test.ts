@@ -9,10 +9,10 @@ const cat = (over: Partial<Cat> = {}): Cat => {
 };
 
 describe('fedMessage', () => {
-  it('always names the food and the xp, with some encouragement', () => {
+  it('always names the food and the XP, with some encouragement', () => {
     for (const roll of [0, 0.3, 0.99]) {
       const m = fedMessage(cat(), 'fish', 1, () => roll);
-      expect(m).toContain('Mochi ate fish. +5 xp.');
+      expect(m).toContain('Mochi ate fish. +5 XP.');
       expect(m.length).toBeGreaterThan(30);
     }
   });

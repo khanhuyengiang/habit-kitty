@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kitty pixel editor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jersey+15&display=swap">
+<style>
+  :root { --ink: #4a3a78; --edge: #8f78d0; --line: #d9ccf7; --surface: #fffafd; --soft: #f3eeff; --pink: #ff8fb8; --pink-edge: #d9608f; }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: var(--ink); font: 20px/1.3 "Jersey 15", ui-monospace, monospace; background: #e8f2fd; }
+  header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 16px; background: var(--surface); border-bottom: 3px solid var(--edge); }
+  header h1 { margin: 0; font-size: 28px; font-weight: 400; }
+  main { display: grid; grid-template-columns: 210px minmax(0, 1fr) 360px; gap: 14px; padding: 14px; align-items: start; }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+  .box { background: var(--surface); border: 3px solid var(--edge); padding: 10px; display: grid; gap: 8px; }
+  .box h2 { margin: 0; font-size: 20px; font-weight: 400; letter-spacing: .08em; text-transform: uppercase; color: #7a69a8; }
+  button, select, input, textarea { font: inherit; color: inherit; }
+  button { background: var(--soft); border: 3px solid var(--edge); padding: 2px 10px; cursor: pointer; box-shadow: inset 0 -4px 0 var(--line); }
+  button:active { transform: translateY(2px); }
+  button.on { background: var(--pink); border-color: var(--pink-edge); box-shadow: inset 0 -4px 0 #f26fa3; }
+  input[type=number] { width: 70px; border: 3px solid var(--line); background: var(--soft); padding: 0 6px; }
+  select, input[type=text] { border: 3px solid var(--line); background: var(--soft); padding: 0 6px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .slots { display: grid; gap: 4px; }
+  .slot { display: grid; grid-template-columns: 28px 26px 1fr; gap: 6px; align-items: center; text-align: left; padding: 2px 6px; box-shadow: none; }
+  .slot b { font-weight: 400; font-size: 22px; text-align: center; }
+  .slot i { width: 26px; height: 26px; border: 3px solid var(--ink); display: block; }
+  .slot small { font-size: 16px; color: #7a69a8; }
+  .slot.on small { color: var(--ink); }
+  #stage { overflow: auto; max-height: calc(100vh - 110px); background: repeating-conic-gradient(#fff 0 25%, #eef0fb 0 50%) 0 0 / 16px 16px; border: 3px solid var(--edge); padding: 0; }
+  canvas { display: block; image-rendering: pixelated; touch-action: none; cursor: crosshair; }
+  #code { width: 100%; height: 360px; font: 14px/1.25 ui-monospace, monospace; border: 3px solid var(--line); background: var(--soft); padding: 6px; white-space: pre; resize: vertical; }
+  #prev, #prevFace { background: #ffe3ef; border: 3px solid var(--line); image-rendering: pixelated; max-width: 100%; }
+  label { display: inline-flex; gap: 4px; align-items: center; }
+  .hint { font-size: 16px; color: #7a69a8; }
+  #status { font-size: 16px; color: #3a9d7d; min-height: 1.3em; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kitty pixel editor</h1>
+  <label>part <select id="part"><option value="sit">sitting cat + face</option><option value="tailA">tail frame A</option><option value="tailB">tail frame B</option><option value="nap">napping cat</option><option value="mini">mini face</option></select></label>
+  <label>coat <select id="coat"></select></label>
+  <span class="row">size <input id="w" type="number" min="1" max="128" value="43"> x <input id="h" type="number" min="1" max="128" value="28"> <button id="resize">Resize</button></span>
+  <span class="row">zoom <input id="zoom" type="range" min="6" max="32" value="16"></span>
+  <label><input id="gridOn" type="checkbox" checked> grid</label>
+  <label><input id="mirror" type="checkbox"> mirror</label>
+  <span class="row"><button id="undo">Undo</button><button id="redo">Redo</button><button id="flip">Flip</button><button id="clear">Clear</button></span>
+  <span class="row">move <button data-move="-1,0">←</button><button data-move="1,0">→</button><button data-move="0,-1">↑</button><button data-move="0,1">↓</button></span>
+</header>
+
+<main>
+  <section class="box">
+    <h2>Tool</h2>
+    <div class="row" id="tools">
+      <button data-tool="pencil" class="on">Pencil</button><button data-tool="erase">Erase</button>
+      <button data-tool="fill">Fill</button><button data-tool="pick">Pick</button>
+      <button data-tool="select" title="drag a box; drag inside it to move it">Select</button><button data-tool="move" title="drag to move the selection, or the whole layer if nothing is selected">Move</button>
+    </div>
+    <p class="hint">Keys: B pencil, E erase, G fill, I pick, S select, M move, 1-9 slots, ctrl+Z undo. Right-click erases. With a selection: arrows nudge it, Delete clears it, ctrl+C / ctrl+V copy and paste, Esc deselects.</p>
+    <h2>Colours (slots)</h2>
+    <div class="slots" id="slots"></div>
+    <h2>Fur colour (preview)</h2>
+    <div class="row"><input id="fur" type="color" value="#ffb98a" title="fur colour used for plain, stripes, point"></div>
+    <p class="hint" id="coatHelp"></p>
+  </section>
+
+  <section id="stage"><canvas id="cv"></canvas></section>
+
+  <section class="box">
+    <h2>Preview (as in the app)</h2>
+    <div class="row" style="align-items:flex-end"><canvas id="prev"></canvas><canvas id="prevFace"></canvas></div>
+    <p class="hint" id="prevNote"></p>
+    <h2>Code</h2>
+    <div class="row"><input id="name" type="text" value="NAP" size="18" readonly>
+      <button id="copy">Copy</button><button id="load">Load from box</button>
+      <button id="fetchSrc" title="needs npm run editor">Reload from file</button><button id="saveSrc" title="needs npm run editor">Save to file</button></div>
+    <textarea id="code" spellcheck="false"></textarea>
+    <div id="status"></div>
+  </section>
+</main>
+
+<script>
+// Slots are the letters the game's colour tables understand (see src/pixelcat.ts and src/coats.ts).
+// Colours come from the chosen coat, worked out here the same way coatOf() does in the game.
+const SLOTS = [
+  ['o', 'outline'], ['f', 'main colour'], ['s', 'shade'], ['a', 'accent a'], ['b', 'accent b'],
+  ['W', 'white / paws / muzzle'], ['S', 'S (nap: coat shade)'], ['T', 'tail light (nap)'], ['D', 'tail dark (nap)'],
+  ['p', 'ear pink'], ['F', 'F (mini fur)'], ['m', 'mouth'], ['e', 'eye'], ['n', 'nose'], ['c', 'blush'],
+];
+const PATTERNS = ['stripes', 'mask', 'patch', 'calico', 'point', 'plain'];
+const PARTS = { sit: { art: 'SIT_HALF', coat: 'sit' }, tailA: { art: 'TAIL_A' }, tailB: { art: 'TAIL_B' }, nap: { art: 'NAP', coat: 'nap' }, mini: { art: 'MINI', coat: 'mini' } };
+const DIMS = { sit: [14, 26], tailA: [28, 26], tailB: [28, 26], nap: [43, 28], mini: [13, 9] };
+const WHITE = '#fffafc';
+const $ = (id) => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d'), prev = $('prev'), pctx = prev.getContext('2d');
+let part = 'nap', coat = 'base', baseRows = null, ghost = null, W = 43, H = 28, grid = blank(W, H), cur = 'o', tool = 'pencil',
+  undoS = [], redoS = [], drawing = false, last = null, btn = 0,
+  sel = null, floating = null, drag = null, clip = null;   // selection {x,y,w,h}; floating = lifted pixels being moved
+
+function blank(w, h) { return Array.from({ length: h }, () => Array(w).fill('.')); }
+const clone = (g) => g.map((r) => r.slice());
+const shade = (hex, f) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * f).toString(16).padStart(2, '0')).join('');
+const overlayMode = () => coat !== 'base';
+// the sitting cat's base art is stored as its left half and mirrored; coat layers cover the whole mirrored cat
+const mirrored = () => part === 'sit' && !overlayMode();
+const isTail = () => part === 'tailA' || part === 'tailB';
+const HEAD_ROWS = 14, FACE_X = 2;
+
+function colours() {
+  const fur = $('fur').value, pat = overlayMode() ? coat : 'plain';
+  const c = { plain: { f: fur, s: fur, W: fur, a: shade(fur, .8), b: shade(fur, .8) },
+    stripes: { f: fur, s: shade(fur, .74), W: WHITE, a: shade(fur, .8), b: shade(fur, .8) },
+    mask: { f: fur, s: fur, W: WHITE, a: shade(fur, .8), b: shade(fur, .8) },
+    patch: { f: WHITE, s: WHITE, W: WHITE, a: fur, b: shade(fur, .8) },
+    calico: { f: WHITE, s: WHITE, W: WHITE, a: '#6b4a45', b: '#ffb06a' },
+    point: { f: fur, s: fur, W: '#fff8f0', a: '#8a6a5a', b: '#8a6a5a' } }[pat];
+  const m = { o: '#3d2c63', m: '#3d2c63', p: '#ffb3c6', c: '#ffa6c0', n: '#f77fa0', e: '#2a1f4a', t: '#8fd0fa', h: '#ffd36e', ...c, F: c.f };
+  if (part === 'nap') { m.S = c.s; m.s = shade(c.f, .9); m.T = pat === 'calico' ? '#a58a80' : shade(c.f, .88); m.D = pat === 'calico' ? c.a : shade(c.f, .72); }
+  else { m.S = c.s; m.T = m.D = c.f; }
+  return m;
+}
+function coatHelp() {
+  $('coatHelp').textContent = isTail() ? 'Tails have no coat layers: they take the cat\'s fur colour.' :
+    overlayMode() ? `Painting the ${coat} layer: a letter recolours the fur underneath, a gap (erase) leaves the base alone. Plain and mask normally need no layer.` : 'Editing the base art (shown in plain fur). Pick a coat to paint its patches.';
+}
+
+// ---- the sprite as drawn: base art with the coat layer on top ----
+function baseFull() {   // the base art as a full grid (the sitting cat is mirrored from its left half)
+  const rows = baseRows ?? [];
+  const w = Math.max(1, ...rows.map((r) => r.length));
+  const g = rows.map((r) => [...r.padEnd(w, '.')]);
+  return part === 'sit' ? g.map((r) => [...r, ...r.slice(0, -1).reverse()]) : g;
+}
+function withFloat() {   // the grid with any lifted pixels dropped in place (for drawing only)
+  if (!floating) return grid;
+  const g = clone(grid);
+  floating.forEach((row, dy) => row.forEach((ch, dx) => { const x = sel.x + dx, y = sel.y + dy; if (ch !== '.' && inGrid(x, y)) g[y][x] = ch; }));
+  return g;
+}
+function composite() {
+  const layer = withFloat();
+  if (!overlayMode()) {
+    return mirrored() ? layer.map((r) => [...r, ...r.slice(0, -1).reverse()]) : layer;
+  }
+  const g = baseFull(), over = part === 'nap' ? 'fsWT' : part === 'mini' ? 'F' : 'fsW';
+  layer.forEach((row, y) => row.forEach((ch, x) => { const cur = g[y]?.[x]; if (ch !== '.' && cur && over.includes(cur)) g[y][x] = ch; }));
+  return g;
+}
+function slotsPanel() {
+  const col = colours();
+  $('slots').innerHTML = '';
+  SLOTS.forEach(([k, name], i) => {
+    const b = document.createElement('button');
+    b.className = 'slot' + (cur === k ? ' on' : '');
+    b.innerHTML = `<b>${k}</b><i style="background:${col[k] ?? '#ccc'}"></i><small>${i < 9 ? i + 1 + ' ' : ''}${name}</small>`;
+    b.onclick = () => { cur = k; if (tool === 'erase' || tool === 'pick') setTool('pencil'); slotsPanel(); };
+    $('slots').append(b);
+  });
+}
+function setTool(t) { tool = t; document.querySelectorAll('#tools button').forEach((b) => b.classList.toggle('on', b.dataset.tool === t)); }
+document.querySelectorAll('#tools button').forEach((b) => (b.onclick = () => setTool(b.dataset.tool)));
+
+// ---- drawing ----
+function paintCells(c, k, cells, col) {
+  cells.forEach((row, y) => row.forEach((ch, x) => { if (col[ch]) { c.fillStyle = col[ch]; c.fillRect(x * k, y * k, k, k); } }));
+}
+function paintGhost(c, k, col) {   // under a tail: the sitting cat, faintly
+  c.globalAlpha = 0.3;
+  ghost.forEach((row, y) => [...row].forEach((ch, x) => {
+    if (!col[ch]) return; c.fillStyle = col[ch];
+    c.fillRect(x * k, y * k, k, k); c.fillRect((2 * ghost[0].length - 2 - x) * k, y * k, k, k);
+  }));
+  c.globalAlpha = 1;
+}
+function render() {
+  const z = +$('zoom').value, col = colours(), cells = composite();
+  const DW = cells[0]?.length ?? W;
+  cv.width = DW * z; cv.height = cells.length * z;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (isTail() && ghost) paintGhost(ctx, z, col);
+  paintCells(ctx, z, cells, col);
+  if (overlayMode()) {   // outline the cells the layer paints, so you can tell layer from base
+    ctx.strokeStyle = 'rgba(255,143,184,.9)'; ctx.lineWidth = 1;
+    grid.forEach((row, y) => row.forEach((ch, x) => { if (ch !== '.') ctx.strokeRect(x * z + .5, y * z + .5, z - 1, z - 1); }));
+  }
+  if ($('gridOn').checked) {
+    ctx.strokeStyle = 'rgba(74,58,120,.22)'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let x = 0; x <= DW; x++) { ctx.moveTo(x * z + .5, 0); ctx.lineTo(x * z + .5, cv.height); }
+    for (let y = 0; y <= cells.length; y++) { ctx.moveTo(0, y * z + .5); ctx.lineTo(cv.width, y * z + .5); }
+    ctx.stroke();
+  }
+  if (sel) {   // the selection box
+    ctx.strokeStyle = '#ff5c9a'; ctx.lineWidth = 2; ctx.setLineDash([5, 3]);
+    ctx.strokeRect(sel.x * z + 1, sel.y * z + 1, sel.w * z - 2, sel.h * z - 2);
+    if (mirrored()) ctx.strokeRect((DW - sel.x - sel.w) * z + 1, sel.y * z + 1, sel.w * z - 2, sel.h * z - 2);
+    ctx.setLineDash([]);
+  }
+  if (part === 'sit') {   // the centre line and where the round face ends
+    ctx.strokeStyle = '#ff8fb8'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath();
+    ctx.moveTo((DW - 1) / 2 * z + z / 2, 0); ctx.lineTo((DW - 1) / 2 * z + z / 2, cv.height);
+    ctx.moveTo(0, HEAD_ROWS * z); ctx.lineTo(cv.width, HEAD_ROWS * z); ctx.stroke(); ctx.setLineDash([]);
+  }
+  const k = 3; prev.width = DW * k; prev.height = cells.length * k; pctx.clearRect(0, 0, prev.width, prev.height);
+  if (isTail() && ghost) paintGhost(pctx, k, col);
+  paintCells(pctx, k, cells, col);
+  const pf = $('prevFace'); pf.style.display = part === 'sit' ? '' : 'none';
+  if (part === 'sit') {   // the round face: the head rows plus a chin row, minus two empty columns each side
+    const fw = DW - 2 * FACE_X, fc = pf.getContext('2d'), faceCells = cells.slice(0, HEAD_ROWS).map((r) => r.slice(FACE_X, DW - FACE_X));
+    faceCells.push(faceCells[0].map((_, x) => (x >= 6 && x < fw - 6 ? 'o' : '.')));
+    pf.width = fw * k; pf.height = faceCells.length * k; fc.clearRect(0, 0, pf.width, pf.height);
+    paintCells(fc, k, faceCells, col);
+  }
+  $('prevNote').textContent = isTail() ? 'The faint cat underneath is the sitting cat, for alignment. Frames A and B swap to make the swish.'
+    : part === 'sit' ? 'Left: the sitting cat (tail not shown). Right: the round face (the head rows).'
+    : part === 'mini' ? 'The app repeats row 3 once, to make the face one row taller.' : '';
+  $('code').value = toCode(); $('w').value = grid[0].length; $('h').value = grid.length;
+  coatHelp();
+}
+const artName = () => PARTS[part].art;
+const label = () => (overlayMode() ? `COAT_${PARTS[part].coat.toUpperCase()}.${coat}` : artName());
+function toCode() {
+  $('name').value = label();
+  const rows = grid.map((r) => r.join(''));
+  return overlayMode() ? `  ${coat}: [\n${rows.map((r) => `    '${r}',`).join('\n')}\n  ],\n`
+    : `export const ${artName()} = [\n${rows.map((r) => `  '${r}',`).join('\n')}\n];\n`;
+}
+function fromCode(text) {
+  const rows = [...text.matchAll(/'([^'\n]*)'|"([^"\n]*)"/g)].map((m) => m[1] ?? m[2]);
+  if (!rows.length) throw new Error('no rows found');
+  const w = Math.max(...rows.map((r) => r.length));
+  grid = rows.map((r) => [...r.padEnd(w, '.')]);
+}
+// ---- selection and move ----
+const inSel = (x, y) => sel && x >= sel.x && y >= sel.y && x < sel.x + sel.w && y < sel.y + sel.h;
+function commitFloat() {   // drop lifted pixels back onto the grid (empty pixels leave what is underneath alone)
+  if (!floating) return;
+  floating.forEach((row, dy) => row.forEach((ch, dx) => {
+    const x = sel.x + dx, y = sel.y + dy;
+    if (ch !== '.' && inGrid(x, y)) grid[y][x] = ch;
+  }));
+  floating = null;
+}
+function lift() {   // pick the selected pixels up, leaving a gap
+  if (floating || !sel) return;
+  push();
+  floating = [];
+  for (let dy = 0; dy < sel.h; dy++) {
+    floating.push([]);
+    for (let dx = 0; dx < sel.w; dx++) {
+      const x = sel.x + dx, y = sel.y + dy;
+      floating[dy].push(inGrid(x, y) ? grid[y][x] : '.');
+      if (inGrid(x, y)) grid[y][x] = '.';
+    }
+  }
+}
+function nudge(dx, dy) { lift(); sel = { ...sel, x: sel.x + dx, y: sel.y + dy }; render(); }
+function clearSel() { if (!sel) return; if (!floating) { push(); for (let y = sel.y; y < sel.y + sel.h; y++) for (let x = sel.x; x < sel.x + sel.w; x++) if (inGrid(x, y)) grid[y][x] = '.'; } floating = null; sel = null; render(); }
+function copySel() {
+  if (!sel) return;
+  const src = floating ?? Array.from({ length: sel.h }, (_, dy) => Array.from({ length: sel.w }, (_, dx) => (inGrid(sel.x + dx, sel.y + dy) ? grid[sel.y + dy][sel.x + dx] : '.')));
+  clip = src.map((r) => r.slice());
+}
+function pasteClip() {
+  if (!clip) return;
+  commitFloat(); push(); floating = clip.map((r) => r.slice()); sel = { x: 0, y: 0, w: clip[0].length, h: clip.length }; render();
+}
+function push() {
+  commitFloat(); undoS.push(clone(grid)); if (undoS.length > 200) undoS.shift(); redoS = []; }
+function setCell(x, y, ch) {
+  const put = (xx) => { if (xx >= 0 && xx < grid[0].length && y >= 0 && y < grid.length) grid[y][xx] = ch; };
+  put(x); if ($('mirror').checked) put(grid[0].length - 1 - x);
+}
+function line(a, b, ch) {
+  let [x0, y0] = a; const [x1, y1] = b, dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx + dy;
+  for (;;) { setCell(x0, y0, ch); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } }
+}
+function fill(x, y, ch) {
+  const from = grid[y][x]; if (from === ch) return;
+  const st = [[x, y]];
+  while (st.length) {
+    const [cx, cy] = st.pop();
+    if (cx < 0 || cy < 0 || cx >= grid[0].length || cy >= grid.length || grid[cy][cx] !== from) continue;
+    grid[cy][cx] = ch; st.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+  }
+}
+const cellAt = (e) => {
+  const r = cv.getBoundingClientRect(), z = +$('zoom').value; let x = Math.floor((e.clientX - r.left) / z);
+  const w = grid[0].length;
+  if (mirrored() && x >= w) x = 2 * w - 2 - x;   // clicks on the mirrored half edit the same pixel
+  return [x, Math.floor((e.clientY - r.top) / z)];
+};
+const inGrid = (x, y) => x >= 0 && y >= 0 && x < grid[0].length && y < grid.length;
+cv.addEventListener('contextmenu', (e) => e.preventDefault());
+cv.addEventListener('pointerdown', (e) => {
+  const [x, y] = cellAt(e);
+  if (e.button === 0 && (tool === 'select' || tool === 'move')) {
+    if (tool === 'move' && !sel) sel = { x: 0, y: 0, w: grid[0].length, h: grid.length };   // nothing selected: move the whole layer
+    try { cv.setPointerCapture(e.pointerId); } catch { /* synthetic events */ }
+    if (sel && inSel(x, y)) { lift(); drag = { mode: 'move', start: [x, y], orig: { x: sel.x, y: sel.y } }; }
+    else if (tool === 'select') { commitFloat(); sel = { x, y, w: 1, h: 1 }; drag = { mode: 'select', anchor: [x, y], moved: false }; }
+    render(); return;
+  }
+  if (!inGrid(x, y)) return;
+  commitFloat(); sel = null;
+  btn = e.button; try { cv.setPointerCapture(e.pointerId); } catch { /* synthetic events */ }
+  const t = btn === 2 ? 'erase' : tool;
+  if (t === 'pick') { const ch = grid[y][x]; if (ch !== '.') { cur = ch; slotsPanel(); } setTool('pencil'); return; }
+  push();
+  if (t === 'fill') { fill(x, y, cur); render(); return; }
+  drawing = true; last = [x, y]; setCell(x, y, t === 'erase' ? '.' : cur); render();
+});
+cv.addEventListener('pointermove', (e) => {
+  if (drag) {
+    const [x, y] = cellAt(e);
+    if (drag.mode === 'move') sel = { ...sel, x: drag.orig.x + x - drag.start[0], y: drag.orig.y + y - drag.start[1] };
+    else {
+      const cx = Math.max(0, Math.min(grid[0].length - 1, x)), cy = Math.max(0, Math.min(grid.length - 1, y));
+      const x0 = Math.min(cx, drag.anchor[0]), y0 = Math.min(cy, drag.anchor[1]);
+      sel = { x: x0, y: y0, w: Math.abs(cx - drag.anchor[0]) + 1, h: Math.abs(cy - drag.anchor[1]) + 1 };
+      drag.moved = drag.moved || sel.w > 1 || sel.h > 1;
+    }
+    render(); return;
+  }
+  if (!drawing) return; const [x, y] = cellAt(e);
+  if (x === last[0] && y === last[1]) return;
+  line(last, [x, y], (btn === 2 || tool === 'erase') ? '.' : cur); last = [x, y]; render();
+});
+cv.addEventListener('pointerup', () => {
+  drawing = false;
+  if (drag?.mode === 'select' && !drag.moved) sel = null;   // a plain click deselects
+  if (drag?.mode === 'move') { commitFloat(); sel = tool === 'move' && sel.w === grid[0].length && sel.h === grid.length ? null : sel; }
+  drag = null; render();
+});
+
+// ---- toolbar ----
+function undo() { commitFloat(); sel = null; if (!undoS.length) return; redoS.push(clone(grid)); grid = undoS.pop(); render(); }
+function redo() { commitFloat(); sel = null; if (!redoS.length) return; undoS.push(clone(grid)); grid = redoS.pop(); render(); }
+$('undo').onclick = undo; $('redo').onclick = redo;
+$('flip').onclick = () => { push(); grid = grid.map((r) => r.reverse()); render(); };
+$('clear').onclick = () => { push(); grid = blank(grid[0].length, grid.length); render(); };
+$('resize').onclick = () => {
+  const w = Math.max(1, Math.min(128, +$('w').value || grid[0].length)), h = Math.max(1, Math.min(128, +$('h').value || grid.length));
+  push(); grid = Array.from({ length: h }, (_, y) => Array.from({ length: w }, (_, x) => grid[y]?.[x] ?? '.')); render();
+};
+document.querySelectorAll('[data-move]').forEach((b) => (b.onclick = () => {
+  const [dx, dy] = b.dataset.move.split(',').map(Number); push();
+  const w = grid[0].length, h = grid.length, g = blank(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const nx = x + dx, ny = y + dy; if (nx >= 0 && ny >= 0 && nx < w && ny < h) g[ny][nx] = grid[y][x]; }
+  grid = g; render();
+}));
+['zoom', 'gridOn', 'fur'].forEach((id) => $(id).addEventListener('input', () => { render(); slotsPanel(); }));
+const say = (t, bad) => { $('status').style.color = bad ? '#c23f7c' : '#3a9d7d'; $('status').textContent = t; };
+$('copy').onclick = async () => { try { await navigator.clipboard.writeText(toCode()); say('Copied.'); } catch { $('code').select(); say('Press ctrl+C to copy.', true); } };
+$('load').onclick = () => { try { push(); fromCode($('code').value); render(); say('Loaded.'); } catch (e) { undoS.pop(); say(String(e.message), true); } };
+
+// ---- files (needs `npm run editor`) ----
+const rowsFrom = (text) => [...text.matchAll(/'([^']*)'/g)].map((m) => m[1]);
+async function fetchRows(url) { const r = await fetch(url); if (!r.ok) return null; const t = await r.text(); return t.startsWith('{') ? JSON.parse(t).rows : rowsFrom(t); }
+async function loadPart(announce = true) {
+  undoS = []; redoS = []; ghost = null; baseRows = null; sel = null; floating = null; drag = null;
+  const hasCoat = !isTail(); if (!hasCoat) coat = 'base';
+  $('coat').value = coat; $('coat').disabled = !hasCoat;
+  const base = await fetchRows('/api/art?name=' + artName()).catch(() => null);
+  baseRows = base;
+  if (!overlayMode()) {
+    grid = base ? base.map((r) => [...r]) : blank(...DIMS[part]);
+    if (!base) say(`${artName()}: blank grid (start with npm run editor to load the current art).`, true);
+  } else {
+    const rows = await fetchRows(`/api/coat?part=${PARTS[part].coat}&pattern=${coat}`).catch(() => null);
+    const full = baseFull();
+    const w = full[0]?.length ?? DIMS[part][0], h = full.length || DIMS[part][1];
+    grid = rows ? rows.map((r) => [...r.padEnd(w, '.')]) : blank(w, h);
+    while (grid.length < h) grid.push(Array(w).fill('.'));
+  }
+  if (isTail()) {
+    const g = await fetchRows('/api/art?name=SIT_HALF').catch(() => null); ghost = g;
+    while (ghost && grid.length < ghost.length) grid.push(Array(grid[0].length).fill('.'));
+  }
+  if (announce && (base || overlayMode())) say(`Loaded ${label()}.`);
+  render(); slotsPanel();
+}
+$('fetchSrc').onclick = () => loadPart();
+$('saveSrc').onclick = async () => {
+  try {
+    const url = overlayMode() ? `/api/coat?part=${PARTS[part].coat}&pattern=${coat}` : `/api/art?name=${artName()}`;
+    const r = await fetch(url, { method: 'POST', body: JSON.stringify({ rows: grid.map((x) => x.join('')) }) });
+    if (!r.ok) throw new Error(await r.text());
+    say(`Saved ${label()} (the preview reloads).`);
+  } catch (e) { say(String(e.message || 'start the editor with npm run editor'), true); }
+};
+$('part').onchange = () => { part = $('part').value; loadPart(); };
+$('coat').onchange = () => { coat = $('coat').value; loadPart(); };
+addEventListener('keydown', (e) => {
+  if (['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement.tagName)) return;
+  const k = e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (sel && e.key.startsWith('Arrow')) { e.preventDefault(); nudge({ ArrowLeft: -1, ArrowRight: 1 }[e.key] ?? 0, { ArrowUp: -1, ArrowDown: 1 }[e.key] ?? 0); return; }
+  if (sel && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); clearSel(); return; }
+  if (e.key === 'Escape') { commitFloat(); sel = null; render(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'c') { copySel(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'v') { e.preventDefault(); pasteClip(); return; }
+  if (k === 's') setTool('select'); else if (k === 'm') setTool('move');
+  else if (k === 'b') setTool('pencil'); else if (k === 'e') setTool('erase'); else if (k === 'g') setTool('fill'); else if (k === 'i') setTool('pick');
+  else if (/^[1-9]$/.test(k)) { cur = SLOTS[+k - 1][0]; setTool('pencil'); slotsPanel(); }
+});
+
+$('coat').innerHTML = '<option value="base">base art (no coat)</option>' + PATTERNS.map((p) => `<option value="${p}">${p}</option>`).join('');
+// deep links: ?part=sit&coat=calico (also the old ?target=SIT_HALF)
+const qs = new URLSearchParams(location.search);
+part = qs.get('part') || { SIT_HALF: 'sit', NAP: 'nap', MINI: 'mini' }[qs.get('target')] || 'nap';
+if (!PARTS[part]) part = 'nap';
+coat = PATTERNS.includes(qs.get('coat')) ? qs.get('coat') : 'base';
+$('part').value = part;
+loadPart();
+</script>
+</body>
+</html>

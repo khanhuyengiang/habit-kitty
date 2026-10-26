@@ -1,6 +1,7 @@
 // ===================== Config =====================
 export const CONFIG = {
-  resetHour: 2,              // a "day" runs 2am -> 2am
+  resetHour: 2,              // a "day" runs 2am -> 2am, unless the player moves it (setDayStart)
+  dayStartMax: 12,           // the latest hour a day may start
   xpPerFeeding: 5,
   starvePenalty: 15,         // per missed day
   deathAfterMissedDays: 3,
@@ -107,8 +108,16 @@ export const genderOf = (c: { id: string; gender?: CatGender }): CatGender =>
 export const newState = (): AppState => ({ xp: 0, cats: [], tasks: [] });
 
 // ===================== Time =====================
+// The hour (local time) a day starts, which is also the hour the one before it ends. A setting, so it lives here
+// rather than in CONFIG: every dayIndex() below follows it.
+let dayStart: number = CONFIG.resetHour;
+export const dayStartHour = () => dayStart;
+export function setDayStart(hour: number | undefined) {
+  dayStart = Number.isInteger(hour) && (hour as number) >= 0 && (hour as number) <= CONFIG.dayStartMax ? (hour as number) : CONFIG.resetHour;
+}
+
 // Integer day number, with the day rolling over at resetHour (local time).
-export function dayIndex(now: Date, resetHour: number = CONFIG.resetHour): number {
+export function dayIndex(now: Date, resetHour: number = dayStart): number {
   const d = new Date(
     now.getFullYear(),
     now.getMonth(),
@@ -118,7 +127,7 @@ export function dayIndex(now: Date, resetHour: number = CONFIG.resetHour): numbe
 }
 
 // Next reset moment (handy for scheduling a notification).
-export function nextReset(now: Date, resetHour: number = CONFIG.resetHour): Date {
+export function nextReset(now: Date, resetHour: number = dayStart): Date {
   const d = new Date(now);
   d.setHours(resetHour, 0, 0, 0);
   if (d.getTime() <= now.getTime()) d.setDate(d.getDate() + 1);
@@ -154,7 +163,7 @@ function settleAlive(cat: Cat, today: number): Settled {
   const events: GameEvent[] = [];
   let xpDelta = 0;
 
-  // boundary b = the 2am rollover into day b, which completes day b-1
+  // boundary b = the rollover (2am by default) into day b, which completes day b-1
   for (let b = cat.settledDay + 1; b <= today; b++) {
     const completed = b - 1;
     if (c.lastFedDay !== null && c.lastFedDay >= completed) continue; // was fed
