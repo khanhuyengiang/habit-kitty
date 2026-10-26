@@ -273,6 +273,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .focus-bar { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); background: var(--accent-soft); }
 
 /* switches */
+.seg[hidden] { display: none; }
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--surface); }
 .seg button { border: 0; background: transparent; padding: var(--s4); font-weight: 700; color: var(--muted); }
 .seg button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
@@ -323,7 +324,11 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 
 /* cozy room: 108 x 150 pixels, the same pixels as the cats in it */
 .room, .room * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-.room-head { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); }
+.room-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); }
+.room-foot p { margin: 0; }
+/* the diary book and the trophy sit on the shelf in the room; these buttons are their click areas */
+.room .prop { position: absolute; z-index: 200; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.room .prop:hover, .room .prop:focus-visible { box-shadow: 0 0 0 var(--px) var(--today); }
 .clock-pop { position: fixed; right: var(--s4); bottom: calc(26 * var(--px) + env(safe-area-inset-bottom, 0px)); z-index: 6; display: grid; justify-items: end; gap: var(--s2); }
 .clock-btn { width: calc(13 * var(--px)); height: calc(13 * var(--px)); display: grid; place-items: center; padding: 0; background: var(--surface); color: var(--ink); box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--bevel); }
 .clock-menu { display: none; order: -1; width: min(calc(100 * var(--px)), calc(100vw - 24px)); }
@@ -332,6 +337,9 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .room { box-sizing: content-box; position: relative; isolation: isolate; width: calc(108 * var(--px)); height: calc(150 * var(--px)); margin-inline: auto; overflow: hidden; background: var(--bg3); }
 .room svg.bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .room .pet { position: absolute; }
+#room-seg { margin: var(--s3) 0; }
+#outdoor { display: block; }
+#outdoor[hidden] { display: none; }
 .room .pet.napping { width: auto; }
 .room .pet em { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); font: 700 15px/1 var(--font); white-space: nowrap; color: #4a3a78; font-style: normal;
   paint-order: stroke fill; -webkit-text-stroke: 4px #fffafd; }
@@ -419,7 +427,6 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 @keyframes thought { 0% { opacity: 0; transform: translate(-50%, var(--s2)); } 10%, 85% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, calc(-1 * var(--s1))); } }
 .legend i.now { background: var(--fed); box-shadow: inset 0 0 0 var(--px) var(--today); }
 
-.room-btns { display: flex; gap: var(--s2); align-items: center; }
 .pixart.dim { opacity: .3; filter: grayscale(1); }
 .travel-note { background: var(--accent-pastel); border-color: var(--accent-edge); padding: var(--s2) var(--s3); font-size: 18px; }
 .dc .tick { position: absolute; right: var(--s1); bottom: var(--s1); color: var(--accent-text); display: grid; }
@@ -467,23 +474,26 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 <div class="wrap">
   <header class="top" id="top"></header>
 
-  <main id="tab-room" class="tab"><div class="room-head"><h2 id="room-title"></h2><span class="room-btns"><button class="btn small icon" id="room-book" type="button" data-action="book" aria-label="Kitty diary: everyone's day"></button><button class="btn small icon" id="room-trophy" type="button" data-action="trophies" aria-label="Achievements"></button><button class="btn small" type="button" data-action="room-rename">Rename</button></span></div><div id="room"></div><p class="muted" id="room-note"></p></main>
+  <main id="tab-room" class="tab"><div class="seg" id="room-seg" role="tablist" aria-label="Room"><button type="button" role="tab" id="room-tab-indoor" data-action="room-view" data-view="indoor">Bunker</button><button type="button" role="tab" data-action="room-view" data-view="outdoor">Nancy park</button></div><div id="room"></div><div id="outdoor" hidden></div><div class="room-foot"><p class="muted" id="room-note"></p><button class="btn small" id="room-rename" type="button" data-action="room-rename">Rename</button></div></main>
 
   <main id="tab-mindful" class="tab">
-    <div class="seg" id="mindful-seg" role="tablist" aria-label="Treats or kibbles">
-      <button type="button" role="tab" data-action="mindful-view" data-view="habit">Treats</button>
-      <button type="button" role="tab" data-action="mindful-view" data-view="task">Kibbles</button>
+    <div class="seg" id="mindful-seg" role="tablist" aria-label="Stray kitties or treats">
+      <button type="button" role="tab" data-action="mindful-view" data-view="habit">Stray kitties</button>
+      <button type="button" role="tab" data-action="mindful-view" data-view="task">Treats</button>
     </div>
-    <section class="panel">
+    <section class="cats" id="strays" aria-label="Your stray kitties"></section>
+    <section class="panel" id="tasks-panel">
       <h3 id="mindful-title"></h3>
       <p class="muted" id="mindful-desc"></p>
       <p class="num" id="mindful-cap"></p>
       <p class="travel-note" id="mindful-travel" hidden>Time travel is on. Use the rewind button on a row to mark or unmark it on any day.</p>
       <ul class="tasks" id="tasks"></ul>
     </section>
+    <p class="muted" id="strays-note" style="text-align:center;font-size:13px"></p>
     <form class="panel" id="task-form" novalidate>
       <h3 id="form-title"></h3>
-      <label class="field">Name <input id="task-name" maxlength="40" autocomplete="off"></label>
+      <label class="field" id="nick-wrap">Kitty's name <input id="task-nick" maxlength="24" autocomplete="off" placeholder="Leave empty for a surprise"></label>
+      <label class="field"><span id="task-name-label">Name</span> <input id="task-name" maxlength="40" autocomplete="off"></label>
       <div class="row">
         <label class="field"><span id="task-xp-label"></span> <input id="task-xp" type="number" inputmode="numeric" min="1" max="15" value="2"></label>
         <label class="field" id="repeat-wrap">Repeat
@@ -548,12 +558,12 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
       <label class="vol"><span>Music</span><input type="range" id="vol-bgm" min="0" max="100" step="5"><output id="vol-bgm-out" class="num" for="vol-bgm"></output></label>
       <label class="vol"><span>Meows</span><input type="range" id="vol-meow" min="0" max="100" step="5"><output id="vol-meow-out" class="num" for="vol-meow"></output></label>
       <label class="vol"><span>Purrs</span><input type="range" id="vol-purr" min="0" max="100" step="5"><output id="vol-purr-out" class="num" for="vol-purr"></output></label>
-      <p class="muted">Kitties in the cozy room meow now and then, and may purr or meow when you pet them. Slide a sound all the way down to turn it off.</p>
+      <p class="muted">Kitties in the Bunker (and strays in Nancy park) meow now and then, and may purr or meow when you pet them. Slide a sound all the way down to turn it off.</p>
       <p class="muted">Music: Strawberry Walk 【BGM： IchinoseSound】 <a href="https://www.youtube.com/@IchinoseSound" target="_blank" rel="noopener">youtube.com/@IchinoseSound</a></p>
     </div></details>
 
     <details class="panel fold"><summary>Your day</summary><div class="fold-body">
-      <p class="muted">Choose when your day starts and ends. Feeding, treats, kibbles, streaks and diary pages all count toward the day you are in, so a night owl can let the day run past midnight.</p>
+      <p class="muted">Choose when your day starts and ends. Feeding, stray kitties, treats, streaks and diary pages all count toward the day you are in, so a night owl can let the day run past midnight.</p>
       <div class="row">
         <label class="field">Starts at <select id="day-start"></select></label>
         <label class="field">Ends at <select id="day-end"></select></label>
@@ -582,7 +592,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
     <details class="panel fold"><summary>Game options</summary><div class="fold-body">
       <label class="check"><input type="checkbox" id="allow-rename"><span><b>Allow renaming kitties</b><br><span class="muted">Adds a Rename button to the long-press menu. Off by default, so a kitty keeps the name you gave it.</span></span></label>
       <label class="check"><input type="checkbox" id="show-clock"><span><b>Playtest clock</b><br><span class="muted">Shows a small clock button for skipping ahead in time, to try out how days and streaks play out.</span></span></label>
-      <label class="check"><input type="checkbox" id="time-travel"><span><b>Time travel</b><br><span class="muted">Adds a rewind button to every treat and kibble, so you can mark or unmark it as done on any past day (or today). It only fixes your record: no XP is paid or taken away.</span></span></label>
+      <label class="check"><input type="checkbox" id="time-travel"><span><b>Time travel</b><br><span class="muted">Adds a rewind button to every stray kitty and treat, so you can mark or unmark it as done on any past day (or today). It only fixes your record: no XP is paid or taken away.</span></span></label>
       <label class="check"><input type="checkbox" id="unlimited-cats"><span><b>Unlimited kitties</b><br><span class="muted">Normally you can keep 9 kitties. Turn this on to adopt more, but you will have to confirm three times for every extra kitty.</span></span></label>
     </div></details>
 
@@ -594,9 +604,10 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
         <li id="day-rule">A day runs from 2am to 2am.</li>
         <li>Every missed day costs −15. After 3 missed days in a row a classic cat dies; a light-hearted one runs away.</li>
         <li>Going away? Leave a cat with the sitter for up to 7 days (−5 a day, once every 30 days). Bring it home in time or it stays there.</li>
-        <li>Below 0 affection, cats only trust you with one cat at a time. Treats and kibbles earn it back.</li>
+        <li>Below 0 affection, cats only trust you with one cat at a time. Feeding strays and doing treats earn it back.</li>
         <li>Heatmap shows each cat's month (switch between combined and individual); the gold outline is today.</li>
-        <li><b>Kibbles</b> are one-offs (up to 15 XP a day). <b>Treats</b> are small habits you might not do every day, like cleaning your desk after working from home; they repeat and keep their history (up to 10 XP a day). A daily treat can become a kitty and keeps its history in teal.</li>
+        <li><b>Treats</b> are one-offs (up to 15 XP a day). <b>Stray kitties</b> are small habits you might not do every day, like cleaning your desk after working from home; they repeat and keep their history (up to 10 XP a day), and nothing bad happens if you skip a day. Feed a stray by doing its habit. A daily stray can be adopted as a kitty and keeps its history in teal. A kitty you release to the stray colony becomes a stray again.</li>
+        <li>The Room tab has two places: the Bunker for your kitties and Nancy park, where strays turn up now and then (each has a 30% chance every 6 hours).</li>
         <li>You can keep up to 9 kitties.</li>
       </ul>
     </div></details>
@@ -610,7 +621,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 
 <nav class="tabbar" aria-label="Tabs"><div class="tabbar-in" role="tablist">
   <button role="tab" data-action="tab" data-tab="room"><i data-icon="room"></i><span>Room</span></button>
-  <button role="tab" data-action="tab" data-tab="mindful"><i data-icon="treats"></i><span>Treats</span></button>
+  <button role="tab" data-action="tab" data-tab="mindful"><i data-icon="treats"></i><span>Strays</span></button>
   <button role="tab" data-action="tab" data-tab="today" class="mid"><i data-icon="cat"></i><span>Today</span></button>
   <button role="tab" data-action="tab" data-tab="heat"><i data-icon="heat"></i><span>Heatmap</span></button>
   <button role="tab" data-action="tab" data-tab="diary"><i data-icon="diary"></i><span>Diary</span></button>

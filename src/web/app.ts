@@ -1,7 +1,7 @@
 // Phone playtest build of Habit Kitty. Bundled into one HTML page by `npm run build:web`.
 import {
   CONFIG, newState, adoptCat, feedCat, startSitter, resumeCat, settleAll, addMindfulTask,
-  doMindfulTask, setTaskDay, genderOf, daysUntilReady, removeMindfulTask, returnToShelter, habitToCat, dayIndex, dayStartHour, setDayStart, nextReset, levelProgress, hunger, sitterCooldownLeft,
+  doMindfulTask, setTaskDay, genderOf, daysUntilReady, removeMindfulTask, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, dayIndex, dayStartHour, setDayStart, nextReset, levelProgress, hunger, sitterCooldownLeft,
   type ActionResult, type AppState, type Cat, type CatMode, type CatGender, type CatLook, type CatTrait, type GameEvent, type MindfulTask, type Reason, type TaskKind,
 } from '../rules.ts';
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -21,7 +21,7 @@ import {
   type Backup, type DiaryEntry, type Mood,
 } from '../store.ts';
 import { CONFETTI_COLORS, TRAITS, notifyIconName, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../pixelcat.ts';
-import { BOOK_ART, FOODS, MARKS, ROOM_H, ROOM_W, TROPHY_ART, artSvg, heartSvg, iconSvg, markSvg, roomSvg } from '../pixelart.ts';
+import { BOOK_ART, FOODS, MARKS, ROOM_H, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, heartSvg, iconSvg, markSvg, outdoorSvg, roomSvg } from '../pixelart.ts';
 import { dateOf, dayOf, firstDay, habitStreak, monthGrid, streak, weekRow, type DayKind, type Trackable } from '../calendar.ts';
 
 // ===================== Save =====================
@@ -31,7 +31,7 @@ interface Save {
   diary?: Record<string, DiaryEntry>;   // in memory only: each page lives in its own file (see "Diary files")
   reminder?: ReminderSettings;
   returned?: Record<string, number>;   // cat id -> day it last came home (feeds the "welcome back" thoughts)
-  timeTravel?: boolean;                // lets treats and kibbles be marked done on past days
+  timeTravel?: boolean;                // lets stray kitties and treats be marked done on past days
   achieved?: Record<string, number>;   // achievement id -> day it was unlocked
   seenVersion?: string;                // last app version whose change log was shown
   sound?: Partial<Record<SoundKind, number>>;   // volume per sound, 0..100 (see SOUND_DEFAULTS)
@@ -145,10 +145,10 @@ function reasonText(r: Reason, cat?: Cat): string {
       return `${n} can visit the sitter once every ${CONFIG.sitterCooldownDays} days. ` +
         `${plural(cat ? sitterCooldownLeft(cat, today()) : 0, 'day')} to go.`;
     case 'low_affection_cat_limit':
-      return 'Your affection is below 0, so cats only trust you with one at a time. Feed your cat or do treats and kibbles to earn it back.';
+      return 'Your affection is below 0, so cats only trust you with one at a time. Feed your cat, feed a stray or do treats to earn it back.';
     case 'future_day': return "That day hasn't happened yet.";
     case 'task_on_cooldown': return 'You did this one recently. It comes back after its repeat time.';
-    case 'task_already_done': return 'This kibble is already done. Press and hold it to delete it.';
+    case 'task_already_done': return 'This treat is already done. Press and hold it to delete it.';
     case 'not_daily_habit': return 'Only daily habits can become a kitty.';
     case 'cat_limit': return `You can keep ${CONFIG.maxCats} kitties. Turn on Unlimited kitties in Settings if you really want more.`;
     case 'cat_not_active': return `${n} isn't here anymore.`;
@@ -406,7 +406,10 @@ function renderCats() {
   const t = today();
   const all = sortedCats();
   const seg = $('today-seg');
-  seg.hidden = !all.length;
+  // Sitter and Memories only matter once a cat is away or gone; until then there is just Home.
+  const awayCats = all.some((c) => viewOf(c) !== 'home');
+  if (!awayCats) todayView = 'home';
+  seg.hidden = !awayCats;
   const labels: Record<TodayView, string> = { home: 'Home', sitter: 'Sitter', memories: 'Memories' };
   seg.innerHTML = (Object.keys(labels) as TodayView[]).map((v) =>
     `<button type="button" role="tab" data-action="today-view" data-view="${v}" aria-selected="${v === todayView}">${labels[v]} <span class="num">${all.filter((c) => viewOf(c) === v).length}</span></button>`).join('');
@@ -466,7 +469,7 @@ const combinedCats = (cats: Cat[], t: number) => renderCombined(cats, 'all', 'Al
   cats.map((c, i) => `<span><b class="num">${i + 1}</b>${miniSvg(catStatus(c, t).face, lookFor(c), !isActive(c) && c.status !== 'dead')}${esc(c.name)}</span>`).join(''),
   'Each day is split into one slice per cat, in the order shown above.');
 
-const combinedHabits = (habits: MindfulTask[]) => renderCombined(habits.map(habitSubject), 'all-habits', 'All treats',
+const combinedHabits = (habits: MindfulTask[]) => renderCombined(habits.map(habitSubject), 'all-habits', 'All stray kitties',
   habits.map((h, i) => `<span><b class="num">${i + 1}</b>${esc(h.name)}</span>`).join(''),
   'Each day is split into one slice per habit, in the order shown above.');
 
@@ -476,7 +479,7 @@ const HEAT_LEGEND = `<div class="legend"><span><i class="fed"></i>fed</span><spa
 function renderHeat() {
   const cats = heatCats();
   const habits = save.state.tasks.filter((k) => k.kind === 'habit');
-  const habitCards = habits.length ? `<h2>Treats</h2>${combinedHabits(habits)}` : '';
+  const habitCards = habits.length ? `<h2>Stray kitties</h2>${combinedHabits(habits)}` : '';
   const body = cats.length ? combinedCats(cats, today()) : '<p class="muted">No living cats to show.</p>';
   $('heat').innerHTML = body + habitCards + HEAT_LEGEND + '<p class="muted" style="text-align:center;font-size:15px">Press and hold a kitty to see just its heatmap.</p>';
 }
@@ -507,11 +510,28 @@ const napUntil = new Map<string, number>();   // cat id -> when a daytime nap en
 const isNapping = (id: string, phase: 'day' | 'dusk' | 'night', asleep = phase === 'night') => asleep || (napUntil.get(id) ?? 0) > Date.now();
 
 const roomBg = roomSvg;
+// The diary book and the trophy on the wall shelf (drawn in roomSvg); these are their click areas, in room pixels.
+const prop = (action: string, label: string, [x, y, w, h]: [number, number, number, number]) =>
+  `<button class="prop" type="button" data-action="${action}" aria-label="${label}" style="left:calc(${x} * var(--px));top:calc(${y} * var(--px));width:calc(${w} * var(--px));height:calc(${h} * var(--px))"></button>`;
+const PROPS = prop('book', "Kitty diary: everyone's day", SHELF_BOOK) + prop('trophies', 'Achievements', SHELF_TROPHY);
 
 // Cats that are away (sitter, ran away) aren't home, so they aren't in the room.
 const homeCats = () => sortedCats().filter((c) => c.status === 'alive').slice(0, SPOTS.length);
 
+// The room tab has two rooms: the cozy room (kitties) and the outdoors (strays, who only turn up now and then).
+type RoomView = 'indoor' | 'outdoor';
+let roomView: RoomView = 'indoor';
+
 function renderRoom() {
+  document.querySelectorAll<HTMLElement>('#room-seg [data-view]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.view === roomView)));
+  $('room').hidden = roomView !== 'indoor';
+  $('outdoor').hidden = roomView !== 'outdoor';
+  $('room-rename').hidden = roomView !== 'indoor';
+  renderRoomTitle();
+  if (roomView === 'outdoor') renderOutdoor(); else renderIndoor();
+}
+
+function renderIndoor() {
   const t = today();
   const phase = skyPhase();
   const pets = homeCats();
@@ -530,7 +550,7 @@ function renderRoom() {
     roomPos.set(c.id, k);
     return k;
   };
-  $('room').innerHTML = `<div class="room ${phase}">${roomBg(phase)}${pets.map((c, i) => {
+  $('room').innerHTML = `<div class="room ${phase}">${roomBg(phase)}${PROPS}${pets.map((c, i) => {
     const pos = asleep ? NIGHT_SPOTS[i] : SPOTS[spotIdx(c, i)];
     const nap = isNapping(c.id, phase, asleep);
     return `<div class="pet${nap ? ' napping' : ''}" data-id="${c.id}" data-fx="${pos[0]}" data-fy="${pos[1]}" data-nap="${nap ? 1 : ''}" data-hold="cat" style="${petStyle(pos, nap)}">${nap ? napSvg(lookFor(c)) : bodySvg(faceOf(c), lookFor(c), hash(c.id))}${nap ? '<b class="zz">z z</b>' : ''}<em>${esc(c.name)}</em></div>`;
@@ -540,11 +560,48 @@ function renderRoom() {
 // The note under the room shows the time, so it is redrawn every few seconds, not only when the room itself changes.
 function renderRoomNote() {
   const clock = now().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
+  if (roomView === 'outdoor') {
+    const n = visibleStrays().length, all = save.state.tasks.filter((k) => k.kind === 'habit').length;
+    $('room-note').textContent = !all ? 'No strays live here yet. Add a stray kitty, or release a kitty to the stray colony.'
+      : !n ? `It's ${clock}. No strays around right now. They drop by now and then.`
+      : `It's ${clock}. ${plural(n, 'stray')} dropped by. Press and hold one to feed it.`;
+    return;
+  }
   const away = save.state.cats.filter((c) => c.status === 'sitter').length;
   $('room-note').textContent = !homeCats().length
     ? (away ? 'Everyone is with the pet sitter. The room is quiet.' : 'It is quiet in here. Adopt a kitty and they will move in.')
     : `It's ${clock}. ${asleepNow() ? 'Everyone is asleep.' : 'Your cats are making themselves at home.'}${away ? ` ${plural(away, 'cat')} with the sitter.` : ''}`;
 }
+
+// ---- outdoors: strays are habits, so there is nothing to save. Each one turns up with a 30% chance every 6 hours. ----
+const OUT_SPOTS: [number, number][] = [[2, 112], [39, 110], [76, 112], [2, 146], [39, 142], [76, 146]];
+const strayLook = (k: MindfulTask) => lookFor({ id: k.id, look: k.former?.look });
+const strayName = strayNameOf;   // a nickname, a released kitty's name, or a stable one from its id
+const strayDoneToday = (k: MindfulTask, t: number) => k.lastDoneDay === t;
+const visibleStrays = () => {
+  const w = strayWindow(now());
+  return save.state.tasks.filter((k) => k.kind === 'habit' && strayVisible(k.id, w)).slice(0, OUT_SPOTS.length);
+};
+const shortName = (s: string, n = 14) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+let outdoorSig = '';
+
+function renderOutdoor() {
+  const t = today();
+  const phase = skyPhase();
+  const asleep = asleepNow();
+  const strays = visibleStrays();
+  const faceOf = (k: MindfulTask): Face => (asleep ? 'sleepy' : strayDoneToday(k, t) ? 'happy' : 'open');
+  const sig = phase + (asleep ? 'z' : '') + '|' + strays.map((k) => `${k.id}:${faceOf(k)}:${strayName(k)}`).join('|');
+  renderRoomNote();
+  if (sig === outdoorSig) return;
+  outdoorSig = sig;
+  $('outdoor').innerHTML = `<div class="room outdoor ${phase}">${outdoorSvg(phase)}${strays.map((k, i) => {
+    const pos = OUT_SPOTS[i];
+    const look = strayLook(k);
+    return `<div class="pet${asleep ? ' napping' : ''}" data-id="${k.id}" data-fx="${pos[0]}" data-fy="${pos[1]}" data-nap="${asleep ? 1 : ''}" data-hold="stray" style="${petStyle(pos, asleep)}">${asleep ? napSvg(look) : bodySvg(faceOf(k), look, hash(k.id))}${asleep ? '<b class="zz">z z</b>' : ''}<em>${esc(shortName(strayName(k)))}</em></div>`;
+  }).join('')}</div>`;
+}
+
 setInterval(() => { if (tab === 'room') { renderRoom(); renderRoomNote(); } }, 5000);
 
 // How often each personality gets up and goes somewhere (rolled every WANDER_MS).
@@ -806,7 +863,7 @@ for (const k of ['bgm', 'meow', 'purr'] as const) {
 
 // Double-tap an awake cat to make a heart float up from it.
 let lastTap = { id: '', at: 0 };
-$('room').addEventListener('click', (ev) => {
+for (const roomEl of [$('room'), $('outdoor')]) roomEl.addEventListener('click', (ev) => {
   const pet = (ev.target as HTMLElement).closest<HTMLElement>('.pet');
   if (!pet || asleepNow()) return;
   if (pet.dataset.nap === '1') { napUntil.delete(pet.dataset.id ?? ''); setNap(pet, false); return; }   // a tap wakes a napping cat
@@ -847,23 +904,41 @@ function renderTasks() {
   const cap = isTask ? CONFIG.taskMaxXp : CONFIG.habitMaxXp;
   document.querySelectorAll<HTMLElement>('#mindful-seg [data-view]').forEach((b) =>
     b.setAttribute('aria-selected', String(b.dataset.view === kind)));
-  $('mindful-title').textContent = isTask ? 'Kibbles' : 'Treats';
+  $('mindful-title').textContent = isTask ? 'Treats' : 'Stray kitties';
   $('mindful-desc').textContent = isTask
     ? `One-off jobs. Do it once, tick it off, earn up to ${cap} XP. Tap the X or press and hold to delete.`
-    : `Small habits you might not want to do every day, like cleaning your desk after a work-from-home session. Earn up to ${cap} XP a day. Track them before you commit to a kitty. Tap the X or press and hold to delete.`;
+    : `Small habits you might not want to do every day, like cleaning your desk after a work-from-home session. Earn up to ${cap} XP a day. Feed them by doing them. Nothing bad happens if you skip a day. Adopt one as a kitty when you are ready to commit. Tap the X or press and hold to delete.`;
   const e = save.state.mindfulEarned?.day === t ? save.state.mindfulEarned : undefined;
   $('mindful-travel').hidden = !save.timeTravel;
   $('mindful-cap').textContent = `Earned today: ${(isTask ? e?.task : e?.habit) ?? 0}/${cap} XP`;
-  $('form-title').textContent = isTask ? 'New kibble' : 'New treat';
+  $('form-title').textContent = isTask ? 'New treat' : 'New stray kitty';
   $('task-xp-label').textContent = `Reward (XP, max ${cap})`;
   ($('task-xp') as HTMLInputElement).max = String(cap);
   ($('repeat-wrap') as HTMLElement).hidden = isTask;
   ($('task-days-wrap') as HTMLElement).hidden = isTask || ($('task-repeat') as HTMLSelectElement).value !== 'custom';
   ($('task-weekdays-wrap') as HTMLElement).hidden = isTask || ($('task-repeat') as HTMLSelectElement).value !== 'weekdays';
   ($('task-form').querySelector('.row') as HTMLElement).style.gridTemplateColumns = isTask ? '1fr' : '';
-  $('task-submit').textContent = isTask ? 'Add kibble' : 'Add habit';
+  $('task-submit').textContent = isTask ? 'Add treat' : 'Add stray';
+  ($('nick-wrap') as HTMLElement).hidden = isTask;
+  $('task-name-label').textContent = isTask ? 'Name' : 'Habit';
   ($('task-name') as HTMLInputElement).placeholder = isTask ? 'Book a dentist appointment' : 'Stretch for 5 minutes';
 
+  // Stray kitties look like the Today tab: one card per stray. Treats stay a plain list.
+  $('tasks-panel').hidden = !isTask;
+  $('strays').hidden = isTask;
+  $('strays-note').hidden = isTask;
+  if (!isTask) {
+    const strays = save.state.tasks.filter((k) => k.kind === 'habit');
+    $('strays').innerHTML = strays.length ? strays.map((k) => `<article class="cat">
+      ${strayHead(k, t, true)}
+      ${renderWeek(habitSubject(k), t)}
+      <p class="muted habit-foot">${k.doneDays.length ? `Fed ${plural(k.doneDays.length, 'time')}` : 'Not fed yet'}${k.cooldownDays === 1 && !k.weekdays?.length ? ` · streak ${habitStreak(k.doneDays, t)}` : ''}${save.timeTravel ? ` ${TRAVEL(k.id)}` : ''}</p>
+    </article>`).join('')
+      : `<div class="cat"><div class="cat-head">${sprite('open', { fur: '#e8a04c', pattern: 'plain' }, true)}
+      <div><p class="cat-name">No stray kitties yet</p><p class="cat-habit">Add one below. Strays are habits with no penalty.</p></div></div></div>`;
+    $('strays-note').textContent = `Earned today: ${e?.habit ?? 0}/${cap} XP · Press and hold a stray for more options.${save.timeTravel ? ' Time travel is on: use the rewind button on a card.' : ''}`;
+    return;
+  }
   const list = save.state.tasks.filter((k) => k.kind === kind);
   if (isTask) list.sort((a, b) => Number(a.lastDoneDay !== null) - Number(b.lastDoneDay !== null));
   $('tasks').innerHTML = list.length ? list.map((k) => {
@@ -874,19 +949,17 @@ function renderTasks() {
     }
     const left = daysUntilReady(k, t);
     const daily = k.cooldownDays === 1;
-    return `<li class="habit" data-task="${k.id}" data-hold="task"><span>${esc(k.name)} <span class="muted">· +${k.xp} XP · ${scheduleText(k)}</span></span>
-      <span class="row-btns"><button class="btn small" data-action="task" data-id="${k.id}" ${left ? 'disabled' : ''}>${left ? `in ${plural(left, 'day')}` : 'Done'}</button><button class="btn small" data-action="rename-habit" data-id="${k.id}" aria-label="Rename treat">Edit</button>${TRAVEL(k.id)}${DEL(k.id)}</span>
+    return `<li class="habit" data-task="${k.id}" data-hold="stray"><span>${esc(k.name)} <span class="muted">· +${k.xp} XP · ${scheduleText(k)}</span></span>
+      <span class="row-btns"><button class="btn small" data-action="task" data-id="${k.id}" ${left ? 'disabled' : ''}>${left ? `in ${plural(left, 'day')}` : 'Feed'}</button><button class="btn small" data-action="rename-habit" data-id="${k.id}" aria-label="Rename stray kitty">Edit</button>${TRAVEL(k.id)}${DEL(k.id)}</span>
       ${renderWeek(habitSubject(k), t)}
       <span class="muted habit-foot">${k.doneDays.length ? `Done ${plural(k.doneDays.length, 'time')}` : 'Not done yet'}${daily ? ` · streak ${habitStreak(k.doneDays, t)}` : ''}</span>
-      ${daily ? `<button class="btn small" data-action="habit-kitty" data-id="${k.id}">Make it a kitty</button>` : ''}</li>`;
-  }).join('') : `<li class="muted">No ${isTask ? 'kibbles' : 'treats'} yet. Add one below.</li>`;
+      ${daily ? `<button class="btn small" data-action="habit-kitty" data-id="${k.id}">Adopt the kitty</button>` : ''}</li>`;
+  }).join('') : `<li class="muted">No ${isTask ? 'treats' : 'stray kitties'} yet. Add one below.</li>`;
 }
 
-const roomTitle = () => save.roomName?.trim() || 'Cozy room';
+// The first tab carries the room's name ("Bunker" unless renamed).
 function renderRoomTitle() {
-  $('room-title').textContent = roomTitle();
-  $('room-book').innerHTML = pixelArt(BOOK_ART);
-  $('room-trophy').innerHTML = pixelArt(TROPHY_ART);
+  $('room-tab-indoor').textContent = save.roomName?.trim() || 'Bunker';
 }
 
 function renderClock() {
@@ -1401,7 +1474,7 @@ function showTab(name: string) {
 function closeModal() {
   closeLayer(false);
   if (diaryDraft?.photoUrl) URL.revokeObjectURL(diaryDraft.photoUrl);
-  diaryDraft = null; gate = null; menuCat = null;
+  diaryDraft = null; gate = null; menuCat = null; menuStray = null;
   $('modal').hidden = true; $('modal').innerHTML = '';
 }
 function openModal(html: string) {
@@ -1506,14 +1579,14 @@ function startAdopt(habitId?: string) {
     if (!save.unlimited) {
       openModal(`<div class="panel"><h3>${next} habits is a lot</h3>
         <p>${next} habits is a lot for people to handle, and it will be very sad if a kitty goes hungry.</p>
-        <p>Consider returning one kitty to the shelter to make room for a new one, or use a treat as a temporary try-out for a habit you're not sure about yet.</p>
+        <p>Consider returning one kitty to the shelter to make room for a new one, or let a stray kitty be a temporary try-out for a habit you're not sure about yet.</p>
         <div class="btns"><button class="btn" data-action="modal-close">OK</button>
-        <button class="btn primary" data-action="goto-habits">Try a treat</button></div></div>`);
+        <button class="btn primary" data-action="goto-habits">Try a stray</button></div></div>`);
       return;
     }
     runGate([
       { title: `Kitty #${next}? That's a lot`, yes: 'I still want to',
-        text: `${next} habits is a lot for people to handle, and it will be very sad if a kitty goes hungry. Consider returning a kitty to the shelter, or trying this one as a treat first.` },
+        text: `${next} habits is a lot for people to handle, and it will be very sad if a kitty goes hungry. Consider returning a kitty to the shelter, or trying this one as a stray first.` },
       { title: 'Are you really sure?', yes: 'Yes, really',
         text: `Every kitty needs you every single day. Miss a day and you lose ${CONFIG.starvePenalty} affection for each hungry kitty, and a classic kitty can die. With ${next} kitties that adds up fast.` },
       { title: 'Last chance', yes: 'I promise',
@@ -1541,26 +1614,27 @@ const lookPickers = () =>
 const redrawLook = () => { $('adopt-preview').innerHTML = sprite('happy', draftLook); $('adopt-look').innerHTML = lookPickers(); };
 let adoptFrom: string | null = null;   // mindful habit being turned into a cat
 function openAdopt(habitId?: string) {
-  draftLook = randomLook();
-  draftGender = Math.random() < 0.5 ? 'girl' : 'boy';
   adoptFrom = habitId ?? null;
   const habit = habitId ? save.state.tasks.find((k) => k.id === habitId) : undefined;
+  const former = habit?.former;   // a released kitty comes back as itself
+  draftLook = former?.look ? { ...former.look } : randomLook();
+  draftGender = former?.gender ?? (Math.random() < 0.5 ? 'girl' : 'boy');
   openModal(`<form class="panel" id="adopt" novalidate>
-    <h3>${habit ? 'Make a kitty' : 'Adopt a kitty'}</h3>
+    <h3>${habit ? 'Adopt the kitty' : 'Adopt a kitty'}</h3>
     <div class="preview"><div id="adopt-preview">${sprite('happy', draftLook)}</div>
       <button class="btn" type="button" data-action="randomise">${iconSvg('dice')} Randomise look</button></div>
     <div class="look-pick" id="adopt-look">${lookPickers()}</div>
     <p class="muted">${habit ? `Your history with this habit comes along. Days you did it show in teal; days before the kitty show as empty.`
       : 'Each cat stands for one habit. Do the habit, feed the cat.'}</p>
-    <label class="field">Cat's name <input id="adopt-name" maxlength="24" placeholder="Mochi" autocomplete="off"></label>
+    <label class="field">Cat's name <input id="adopt-name" maxlength="24" placeholder="Mochi" autocomplete="off" value="${habit ? esc(strayName(habit)) : ''}"></label>
     <label class="field">Daily habit <input id="adopt-habit" maxlength="40" placeholder="Drink a glass of water" autocomplete="off" value="${habit ? esc(habit.name) : ''}" ${habit ? 'readonly' : ''}></label>
     <fieldset class="modes">
       <legend>If you neglect it for 3 days</legend>
-      <label><input type="radio" name="mode" value="classic" checked><b>Classic</b>the cat dies</label>
-      <label><input type="radio" name="mode" value="lighthearted"><b>Light-hearted</b>it runs away, and comes back once</label>
+      <label><input type="radio" name="mode" value="classic" ${former?.mode === 'lighthearted' ? '' : 'checked'}><b>Classic</b>the cat dies</label>
+      <label><input type="radio" name="mode" value="lighthearted" ${former?.mode === 'lighthearted' ? 'checked' : ''}><b>Light-hearted</b>it runs away, and comes back once</label>
     </fieldset>
     <p class="form-error" id="adopt-error" hidden></p>
-    <div class="btns"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">${habit ? 'Make kitty' : 'Adopt'}</button></div>
+    <div class="btns"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Adopt</button></div>
   </form>`);
 }
 
@@ -1609,7 +1683,7 @@ function openBook(day: number = today()) {
       : `<p class="muted">${home.length ? 'Nothing happened yet.' : 'Nobody is home, so nothing to write about.'}</p>`}</div>`);
 }
 
-// ---- time travel: mark or unmark a treat or kibble on any day up to today ----
+// ---- time travel: mark or unmark a stray kitty or treat on any day up to today ----
 let travelBack = 0;   // months back from the current one
 function openTravel(id: string, back = travelBack) {
   const task = save.state.tasks.find((k) => k.id === id);
@@ -1631,7 +1705,7 @@ function openTravel(id: string, back = travelBack) {
   ].join('');
   openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
     <h3>Time travel</h3><p><b>${esc(task.name)}</b></p>
-    <p class="muted">Tap a day to mark it done or not done. This only fixes your record: no XP is paid or taken away.${task.kind === 'task' ? ' A kibble is done once, so tapping another day moves it.' : ''}</p>
+    <p class="muted">Tap a day to mark it done or not done. This only fixes your record: no XP is paid or taken away.${task.kind === 'task' ? ' A treat is done once, so tapping another day moves it.' : ''}</p>
     <div class="month-nav">
       <button type="button" data-action="travel-month" data-id="${id}" data-step="1" aria-label="Previous month">${iconSvg('prev')}</button>
       <strong>${dateOf(first).toLocaleString('en', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</strong>
@@ -1706,9 +1780,10 @@ document.addEventListener('click', (ev) => {
       act((s, at) => doMindfulTask(s, id, at), () => {
         const paid = earned() - before;
         return paid >= task.xp ? `Nice. +${paid} XP`
-          : paid > 0 ? `+${paid} XP. That's today's ${cap} XP limit for ${kind}s.`
-          : `Done! You've already earned today's ${cap} XP from ${kind}s, so no extra XP.`;
+          : paid > 0 ? `+${paid} XP. That's today's ${cap} XP limit for ${kind === 'task' ? 'treats' : 'strays'}.`
+          : `Done! You've already earned today's ${cap} XP from ${kind === 'task' ? 'treats' : 'strays'}, so no extra XP.`;
       });
+      if (menuStray === id) openStrayMenu(id);   // keep the open menu in step (fed)
       break;
     }
     case 'tab':
@@ -1747,6 +1822,7 @@ document.addEventListener('click', (ev) => {
       break;
     case 'log-close': save.logHidden = true; persist(); renderLog(); break;
     case 'adopt-open': startAdopt(); break;
+    case 'room-view': roomView = btn.dataset.view === 'outdoor' ? 'outdoor' : 'indoor'; renderRoom(); break;
     case 'habit-kitty': startAdopt(id); break;
     case 'task-del': askDeleteTask(id); break;
     case 'gate-yes': {
@@ -1760,6 +1836,20 @@ document.addEventListener('click', (ev) => {
     }
     case 'goto-habits': closeModal(); mindfulView = 'habit'; renderTasks(); showTab('mindful'); break;
     case 'menu-tab': openCatMenu(id, btn.dataset.view as MenuTab); break;
+    case 'stray-tab': openStrayMenu(id, btn.dataset.view as StrayTab); break;
+    case 'release-ask':
+      if (!cat) break;
+      openModal(`<div class="panel"><h3>Release ${esc(cat.name)} to the stray colony?</h3>
+        <p>${esc(cat.name)} becomes a stray kitty: no penalty, and your history together comes along. Strays can't starve, so a missed day costs nothing. You can adopt ${esc(cat.name)} again any time.</p>
+        <div class="btns"><button class="btn" data-action="modal-close">Keep ${esc(cat.name)}</button>
+        <button class="btn primary" data-action="release-yes" data-id="${id}">Release</button></div></div>`);
+      break;
+    case 'release-yes': {
+      const name = cat?.name ?? 'Your cat';
+      closeModal();
+      act((s, at) => releaseToColony(s, id, uid(), at), `${name} joined the stray colony. Find them in Nancy park, or adopt them again.`, cat);
+      break;
+    }
     case 'mindful-view': mindfulView = btn.dataset.view === 'habit' ? 'habit' : 'task'; renderTasks(); break;
     case 'today-view': todayView = (btn.dataset.view as TodayView) ?? 'home'; renderCats(); break;
     case 'randomise':
@@ -1794,6 +1884,15 @@ document.addEventListener('click', (ev) => {
         <div class="btns"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`);
       break;
     }
+    case 'rename-stray': {
+      const k = save.state.tasks.find((x) => x.id === id);
+      if (!k) break;
+      closeModal();
+      openModal(`<form class="panel" id="rename-stray" data-id="${id}" novalidate><h3>Rename stray kitty</h3>
+        <label class="field">Name <input id="rename-stray-input" maxlength="24" autocomplete="off" value="${esc(strayName(k))}"></label>
+        <div class="btns"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`);
+      break;
+    }
     case 'rename-habit': {
       const cur = cat ? cat.habit : save.state.tasks.find((k) => k.id === id)?.name;
       if (cur === undefined) break;
@@ -1806,7 +1905,7 @@ document.addEventListener('click', (ev) => {
     }
     case 'room-rename':
       openModal(`<form class="panel" id="room-name" novalidate><h3>Name your room</h3>
-        <label class="field">Room name <input id="room-name-input" maxlength="24" autocomplete="off" placeholder="Cozy room" value="${esc(save.roomName ?? '')}"></label>
+        <label class="field">Room name <input id="room-name-input" maxlength="24" autocomplete="off" placeholder="Bunker" value="${esc(save.roomName ?? '')}"></label>
         <div class="btns"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`);
       break;
     case 'book': openBook(); break;
@@ -1822,10 +1921,12 @@ document.addEventListener('click', (ev) => {
     }
     case 'clock-toggle': $('clock-pop').classList.toggle('open'); break;
     case 'modal-close': if (ev.target === btn) closeModal(); break;
-    case 'delete-task-yes':
+    case 'delete-task-yes': {
+      const removed = save.state.tasks.find((k) => k.id === id);
       save.state = removeMindfulTask(save.state, id);
-      persist(); closeModal(); renderTasks(); toast('Kibble deleted.');
+      persist(); closeModal(); renderTasks(); toast(`${removed?.kind === 'habit' ? 'Stray kitty' : 'Treat'} deleted.`);
       break;
+    }
     case 'cat-alarm-clear': {
       const alarms = { ...reminderSettings().catAlarms };
       delete alarms[id];
@@ -1916,7 +2017,7 @@ $('show-clock').addEventListener('change', (ev) => {
 $('time-travel').addEventListener('change', (ev) => {
   save.timeTravel = (ev.target as HTMLInputElement).checked;
   persist(); renderTasks();
-  toast(save.timeTravel ? 'Time travel on. Every treat and kibble now has a rewind button.' : 'Time travel off.');
+  toast(save.timeTravel ? 'Time travel on. Every stray kitty and treat now has a rewind button.' : 'Time travel off.');
 });
 $('unlimited-cats').addEventListener('change', (ev) => {
   save.unlimited = (ev.target as HTMLInputElement).checked;
@@ -2004,7 +2105,7 @@ document.addEventListener('submit', (ev) => {
     renderAll();
     if (!r.ok) { const err = $('adopt-error'); err.textContent = reasonText(r.reason); err.hidden = false; return; }
     closeModal();
-    toast(adoptFrom ? `${name.trim()} is a kitty now, and remembers your history.` : `Welcome home, ${name.trim()}! Feed them today.`);
+    toast(adoptFrom ? `${name.trim()} is adopted, and remembers your history.` : `Welcome home, ${name.trim()}! Feed them today.`);
     adoptFrom = null;
   } else if (form.id === 'rename-cat') {
     const id = form.dataset.id ?? '';
@@ -2012,6 +2113,12 @@ document.addEventListener('submit', (ev) => {
     if (!name || !save.allowRename) return;
     save.state = { ...save.state, cats: save.state.cats.map((c) => (c.id === id ? { ...c, name } : c)) };
     persist(); closeModal(); renderAll(); toast('Kitty renamed.');
+  } else if (form.id === 'rename-stray') {
+    const id = form.dataset.id ?? '';
+    const nickname = ($('rename-stray-input') as HTMLInputElement).value.trim();
+    if (!nickname) return;
+    save.state = { ...save.state, tasks: save.state.tasks.map((k) => (k.id === id ? { ...k, nickname } : k)) };
+    persist(); closeModal(); renderAll(); toast('Stray kitty renamed.');
   } else if (form.id === 'rename') {
     const id = form.dataset.id ?? '';
     const name = ($('rename-input') as HTMLInputElement).value.trim();
@@ -2028,20 +2135,21 @@ document.addEventListener('submit', (ev) => {
   } else if (form.id === 'task-form') {
     const input = $('task-name') as HTMLInputElement;
     const kind = mindfulView;
-    if (!input.value.trim()) { toast(`Name the ${kind === 'habit' ? 'treat' : 'kibble'} first.`); return; }
+    if (!input.value.trim()) { toast(`Name the ${kind === 'habit' ? 'stray kitty' : 'treat'} first.`); return; }
     const rep = ($('task-repeat') as HTMLSelectElement).value;
     const weekdays = rep === 'weekdays'
       ? [...form.querySelectorAll<HTMLInputElement>('input[name="weekday"]:checked')].map((c) => Number(c.value)) : [];
     if (rep === 'weekdays' && !weekdays.length) { toast('Pick at least one weekday.'); return; }
     const days = rep === 'custom' ? Number(($('task-days') as HTMLInputElement).value) : Number(rep);
     save.state = addMindfulTask(save.state, {
-      id: uid(), name: input.value, kind, xp: Number(($('task-xp') as HTMLInputElement).value) || 1, cooldownDays: days || 1, weekdays,
+      id: uid(), name: input.value, kind, nickname: ($('task-nick') as HTMLInputElement).value, xp: Number(($('task-xp') as HTMLInputElement).value) || 1, cooldownDays: days || 1, weekdays,
     }, now());
     input.value = '';
+    ($('task-nick') as HTMLInputElement).value = '';
     form.querySelectorAll<HTMLInputElement>('input[name="weekday"]').forEach((c) => { c.checked = false; });
     persist();
     renderAll();
-    toast(kind === 'task' ? 'Kibble added.' : 'Treat added.');
+    toast(kind === 'task' ? 'Treat added.' : 'Stray kitty added.');
   }
 });
 
@@ -2085,7 +2193,7 @@ function endHold() { clearTimeout(holdTimer); holdEl?.classList.remove('pressing
 function askDeleteTask(id: string) {
   const task = save.state.tasks.find((k) => k.id === id);
   if (!task) return;
-    openModal(`<div class="panel"><h3>Delete this ${task.kind === 'habit' ? 'treat' : 'kibble'}?</h3><p>${esc(task.name)}</p>${task.kind === 'habit' && task.doneDays.length ? '<p class="muted">Its history will be lost.</p>' : ''}
+    openModal(`<div class="panel"><h3>Delete this ${task.kind === 'habit' ? 'stray kitty' : 'treat'}?</h3><p>${esc(task.name)}</p>${task.kind === 'habit' && task.doneDays.length ? '<p class="muted">Its history will be lost.</p>' : ''}
       <div class="btns"><button class="btn" data-action="modal-close">Keep</button>
       <button class="btn primary" data-action="delete-task-yes" data-id="${id}">Delete</button></div></div>`);
 }
@@ -2094,6 +2202,7 @@ function fireHold(el: HTMLElement) {
   endHold();
   const id = el.dataset.id ?? el.dataset.task ?? '';
   if (el.dataset.hold === 'cat') openCatMenu(id, 'diary');
+  else if (el.dataset.hold === 'stray') openStrayMenu(id);
   else askDeleteTask(id);
 }
 
@@ -2127,11 +2236,53 @@ function openCatMenu(id: string, tab?: MenuTab) {
     : `<div style="display:grid;gap:8px">${sitterBtn}
       <button class="btn" data-action="rename-habit" data-id="${id}">Rename habit</button>
       ${save.allowRename ? `<button class="btn" data-action="rename-cat" data-id="${id}">Rename ${esc(cat.name)}</button>` : ''}
+      ${cat.status === 'alive' ? `<button class="btn" data-action="release-ask" data-id="${id}">Release to the stray colony</button>` : ''}
       <button class="btn" data-action="shelter-ask" data-id="${id}">Return to the shelter</button></div>`;
   openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
     ${catHead(cat, today(), false)}
     <div class="seg" role="tablist">${(Object.keys(MENU_TABS) as MenuTab[]).map((v) =>
       `<button type="button" role="tab" data-action="menu-tab" data-view="${v}" data-id="${id}" aria-selected="${v === menuTab}">${MENU_TABS[v]}</button>`).join('')}</div>
+    ${pane}</div>`);
+}
+
+// Long press on a stray (in the stray list or outdoors): the same layout as the kitty menu, with Heatmap and Options tabs.
+// A stray is a habit, so feeding one is doing the habit; nothing bad happens if you skip a day.
+type StrayTab = 'heat' | 'options';
+let menuStray: string | null = null;
+let strayTab: StrayTab = 'heat';
+const STRAY_TABS: Record<StrayTab, string> = { heat: 'Heatmap', options: 'Options' };
+
+function strayHead(k: MindfulTask, t: number, holdable = false): string {
+  const left = daysUntilReady(k, t);
+  const fed = strayDoneToday(k, t);
+  const look = strayLook(k);
+  const face: Face = fed ? 'happy' : 'open';
+  const label = fed ? 'Fed today' : left ? `Next in ${plural(left, 'day')}` : 'Waiting for a meal';
+  const button = `<button class="btn primary sq" data-action="task" data-id="${k.id}" ${left ? 'disabled' : ''} aria-label="${left ? `${esc(k.name)} is fed for now` : `Feed ${esc(k.name)}`}">${left ? `<b>${iconSvg('check')}</b>` : foodIcon(FOOD_KEYS[hash(`${k.id}:${t}`) % FOOD_KEYS.length])}</button>`;
+  return `<div class="cat-head"${holdable ? ` data-hold="stray" data-id="${k.id}"` : ''}><div class="cat-side">${sprite(face, look)}${button}</div>
+    <div><p class="cat-name">${esc(strayName(k))}<span class="mode">stray · ${look.trait}</span></p>
+      <p class="cat-habit">${esc(k.name)} · ${scheduleText(k)} · +${k.xp} XP</p>
+      <span class="chip ${fed ? 'fed' : left ? 'none' : 'today'}">${label}</span></div>
+</div>`;
+}
+
+function openStrayMenu(id: string, tab?: StrayTab) {
+  const k = save.state.tasks.find((x) => x.id === id && x.kind === 'habit');
+  if (!k) return;
+  if (tab) strayTab = tab;
+  menuStray = id;
+  const pane = strayTab === 'heat'
+    ? renderMonth(habitSubject(k), today(), k) + HEAT_LEGEND
+    : `<div style="display:grid;gap:8px">
+      ${k.cooldownDays === 1 && !k.weekdays?.length ? `<button class="btn primary" data-action="habit-kitty" data-id="${id}">Adopt the kitty</button>` : '<p class="muted">Only daily strays can be adopted.</p>'}
+      <button class="btn" data-action="rename-stray" data-id="${id}">Rename ${esc(strayName(k))}</button>
+      <button class="btn" data-action="rename-habit" data-id="${id}">Rename habit</button>
+      ${save.timeTravel ? `<button class="btn" data-action="travel" data-id="${id}">Time travel</button>` : ''}
+      <button class="btn" data-action="task-del" data-id="${id}">Delete stray kitty</button></div>`;
+  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
+    ${strayHead(k, today())}
+    <div class="seg" role="tablist">${(Object.keys(STRAY_TABS) as StrayTab[]).map((v) =>
+      `<button type="button" role="tab" data-action="stray-tab" data-view="${v}" data-id="${id}" aria-selected="${v === strayTab}">${STRAY_TABS[v]}</button>`).join('')}</div>
     ${pane}</div>`);
 }
 

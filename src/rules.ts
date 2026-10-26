@@ -16,6 +16,8 @@ export const CONFIG = {
   lowXpMaxCats: 1,
   departureXp: -30,          // affection drops to this when a kitty runs away, leaves or dies
   lightheartedReturns: 1,    // a runaway cat can come back this many times
+  strayAppearChance: 0.3,    // each stray shows up outdoors with this chance...
+  strayWindowHours: 6,       // ...once every this many hours
 } as const;
 
 // ===================== Types =====================
@@ -72,7 +74,12 @@ export interface MindfulTask {
   lastDoneDay: number | null;
   doneDays: number[];              // every day it was done, ascending
   createdDay: number;
+  nickname?: string;               // habits only: the stray kitty's name (see strayNameOf)
+  former?: StrayFormer;            // a kitty released to the stray colony: remembered so adopting it again brings it back
 }
+
+// What a released kitty looked like, so the stray it became can be adopted as the same cat.
+export interface StrayFormer { name: string; mode: CatMode; look?: CatLook; gender?: CatGender }
 
 export interface AppState {
   xp: number;                      // global affection score, may be negative
@@ -358,7 +365,7 @@ export function resumeCat(state: AppState, catId: string, now: Date): ActionResu
 
 export function addMindfulTask(
   state: AppState,
-  input: { id: string; name: string; xp: number; kind?: TaskKind; cooldownDays?: number; weekdays?: number[] },
+  input: { id: string; name: string; xp: number; kind?: TaskKind; cooldownDays?: number; weekdays?: number[]; nickname?: string },
   now: Date = new Date(),
 ): AppState {
   const kind = input.kind ?? 'habit';
@@ -372,6 +379,7 @@ export function addMindfulTask(
     xp: Math.min(max, Math.max(1, Math.round(input.xp))),
     cooldownDays: kind === 'task' ? 0 : Math.max(1, Math.round(input.cooldownDays ?? CONFIG.mindfulDefaultCooldownDays)),
     ...(days ? { weekdays: days, cooldownDays: 7 } : {}),
+    ...(kind === 'habit' && input.nickname?.trim() ? { nickname: input.nickname.trim().slice(0, 24) } : {}),
     lastDoneDay: null,
     doneDays: [],
     createdDay: dayIndex(now),
@@ -463,6 +471,43 @@ export function habitToCat(
   const r = adoptCat(state, { ...input, habit: task.name, habitDays: task.doneDays }, now);
   if (!r.ok) return r;
   return done(removeMindfulTask(r.state, taskId), r.events);
+}
+
+// Release a kitty to the stray colony: it becomes a daily stray (a habit) that keeps its history and can be adopted again.
+// Unlike returning it to the shelter, nothing is lost and there is no penalty.
+export function releaseToColony(state: AppState, catId: string, newId: string, now: Date): ActionResult {
+  const { s, events, today } = begin(state, now);
+  const cat = s.cats.find((c) => c.id === catId);
+  if (!cat) return fail(s, events, 'no_such_cat');
+  if (cat.status !== 'alive') return fail(s, events, 'cat_not_active');
+  const doneDays = [...new Set([...(cat.habitDays ?? []), ...cat.fedDays])].sort((a, b) => a - b);
+  const stray: MindfulTask = {
+    id: newId, name: cat.habit, kind: 'habit', xp: CONFIG.xpPerFeeding, cooldownDays: 1,
+    lastDoneDay: doneDays.length ? doneDays[doneDays.length - 1] : null,
+    doneDays,
+    createdDay: Math.min(cat.adoptedDay, doneDays[0] ?? today),
+    nickname: cat.name,
+    former: { name: cat.name, mode: cat.mode, gender: genderOf(cat), ...(cat.look ? { look: cat.look } : {}) },
+  };
+  return done({ ...s, cats: s.cats.filter((c) => c.id !== catId), tasks: [...s.tasks, stray] }, events);
+}
+
+// Every stray kitty has a name like a kitty does. One the player did not choose gets a stable name from its id.
+export const STRAY_NAMES = ['Biscuit', 'Pebble', 'Mochi', 'Tofu', 'Pickle', 'Nugget', 'Waffle', 'Clover', 'Sesame', 'Noodle', 'Maple', 'Bean',
+  'Pudding', 'Olive', 'Peach', 'Cocoa', 'Button', 'Sprout', 'Muffin', 'Fig', 'Toast', 'Poppy', 'Ziggy', 'Dumpling'];
+export const strayNameOf = (t: { id: string; nickname?: string; former?: { name: string } }): string =>
+  t.nickname?.trim() || t.former?.name || STRAY_NAMES[idHash(t.id) % STRAY_NAMES.length];
+
+// Outdoors, each stray turns up with a fixed chance once per window of a few hours. The roll depends only on the stray
+// and the window, so it holds still between reloads and nothing has to be saved.
+export const strayWindow = (now: Date) =>
+  Math.floor((now.getTime() - now.getTimezoneOffset() * 60_000) / (CONFIG.strayWindowHours * 3_600_000));
+export function strayVisible(id: string, window: number): boolean {
+  let h = (idHash(id) ^ Math.imul(window, 0x9e3779b1)) | 0;
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  h ^= h >>> 16;
+  return (h >>> 0) / 2 ** 32 < CONFIG.strayAppearChance;
 }
 
 // ===================== Selectors for the UI =====================

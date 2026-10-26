@@ -61,7 +61,7 @@ export function achievements(s: AppState, diaryPages: number, today: number): Ac
       `${plural(w, 'week')} with ${k === 1 ? 'a kitty' : `${k} kitties`}`,
       `Look after ${k === 1 ? 'a kitty' : `${k} kitties at once`} for ${plural(w, 'week')}.`, longestRun(s.cats, k, today), w * 7)),
     ...STREAKS.map((n) => make(`streak-${n}`, 'Streaks', `${n}-day streak`, `Feed one kitty ${n} days in a row.`, streak, n)),
-    ...TREATS_DONE.map((n) => make(`mindful-${n}`, 'Mindful', `${n} treats and kibbles`, `Tick off ${n} treats or kibbles.`, tasksDone, n)),
+    ...TREATS_DONE.map((n) => make(`mindful-${n}`, 'Mindful', `${n} strays and treats`, `Feed ${n} strays or tick off ${n} treats.`, tasksDone, n)),
     ...LEVELS.map((n) => make(`level-${n}`, 'Mindful', `Level ${n}`, `Reach level ${n}.`, level, n)),
     ...DIARY_PAGES.map((n) => make(`diary-${n}`, 'Diary', n === 1 ? 'Dear diary' : `${n} diary pages`, `Write ${plural(n, 'diary page')}.`, diaryPages, n)),
   ];

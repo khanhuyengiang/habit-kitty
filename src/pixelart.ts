@@ -118,6 +118,60 @@ function pbox(x: number, y: number, w: number, h: number, fill: string, edge: st
     + R(x + 1, y + 1, w - 2, h - 2, fill);
 }
 
+const OUT: Record<Phase, { sky: string; cloud: string; hill: string; hill2: string; grass: string; grass2: string; path: string; path2: string; fence: string; fence2: string; leaf: string; leaf2: string; trunk: string; ink: string }> = {
+  day:   { sky: '#bfe6fb', cloud: '#ffffff', hill: '#b6e8c8', hill2: '#a2dcb9', grass: '#c9f0d0', grass2: '#b6e6c0', path: '#eadff8', path2: '#d9c9f0', fence: '#fff1dc', fence2: '#ecd0a8', leaf: '#8fdcb4', leaf2: '#6cc79a', trunk: '#d9a982', ink: '#6b4f9e' },
+  dusk:  { sky: '#ffc9a8', cloud: '#ffe6ef', hill: '#a8d4b4', hill2: '#96c4a6', grass: '#b8e0c0', grass2: '#a6d2b0', path: '#d9c9e8', path2: '#c8b6dc', fence: '#f2dcc6', fence2: '#d8b896', leaf: '#7cc8a2', leaf2: '#5eb08a', trunk: '#c29478', ink: '#6b4f9e' },
+  night: { sky: '#2c2a5a', cloud: '#4a4784', hill: '#4f8a82', hill2: '#437a74', grass: '#6fa890', grass2: '#609a84', path: '#9a8cc0', path2: '#8a7cb2', fence: '#b6a2b0', fence2: '#9a8498', leaf: '#4f9a82', leaf2: '#3e8470', trunk: '#8a6a76', ink: '#4d3a78' },
+};
+
+// The outdoors: a garden with a fence, a tree, a path, a cardboard box and a bowl. Same size and pixel grid as the room.
+export function outdoorSvg(phase: Phase, cls = 'bg'): string {
+  const c = OUT[phase], night = phase === 'night', o = c.ink;
+  const pink = night ? '#c58fb8' : '#ff9ec3', gold = night ? '#c9b46a' : '#ffd36e', lav = night ? '#8a76c4' : '#b9a3f0';
+  let s = '';
+  s += R(0, 0, 108, 150, c.sky);
+  if (phase === 'day') {
+    s += R(78, 12, 10, 10, '#ffd36e') + R(76, 14, 14, 6, '#ffd36e') + R(80, 10, 6, 14, '#ffd36e');
+    s += blob(24, 22, 10, 3, c.cloud) + blob(30, 19, 6, 3, c.cloud) + blob(60, 40, 12, 3, c.cloud) + blob(66, 37, 6, 3, c.cloud);
+  } else if (phase === 'dusk') {
+    s += R(74, 54, 16, 10, '#ffd36e') + R(72, 56, 20, 6, '#ffd36e') + R(76, 52, 12, 14, '#ffd36e');
+    s += blob(26, 24, 12, 3, c.cloud) + blob(32, 21, 6, 3, c.cloud) + blob(70, 36, 10, 2, c.cloud);
+  } else {
+    s += R(78, 12, 10, 10, '#f4f1e0') + R(83, 12, 5, 5, c.sky) + R(81, 15, 3, 3, '#f4f1e0');
+    for (const [x, y] of [[10, 10], [24, 26], [44, 14], [58, 34], [96, 40], [36, 46], [70, 28], [14, 52], [100, 20]]) s += R(x, y, 1, 1, '#ffffff');
+    s += R(52, 22, 1, 3, '#ffffff') + R(51, 23, 3, 1, '#ffffff');
+  }
+  // rolling hills
+  s += blob(20, 74, 38, 14, c.hill) + blob(90, 70, 34, 12, c.hill2);
+  // grass, with a tuft pattern
+  s += R(0, 82, 108, 68, c.grass);
+  for (let y = 90, i = 0; y < 150; y += 10, i++) for (let x = (i % 2) * 7 + 3; x < 108; x += 14) s += R(x, y, 1, 2, c.grass2) + R(x + 2, y + 1, 1, 2, c.grass2);
+  // fence
+  s += R(0, 70, 108, 3, c.fence2) + R(0, 78, 108, 3, c.fence2);
+  for (let x = 1; x < 108; x += 9) s += R(x, 65, 6, 17, c.fence) + R(x + 1, 64, 4, 1, c.fence) + R(x + 2, 63, 2, 1, c.fence) + R(x + 5, 65, 1, 17, c.fence2) + R(x, 81, 6, 1, o);
+  s += R(0, 82, 108, 1, o);
+  // tree, left
+  s += R(11, 40, 6, 46, c.trunk) + R(11, 40, 1, 46, o) + R(16, 40, 1, 46, o) + R(8, 84, 12, 2, c.trunk);
+  s += blob(14, 30, 16, 12, c.leaf) + blob(8, 38, 9, 6, c.leaf2) + blob(22, 36, 8, 6, c.leaf2) + blob(14, 22, 8, 5, c.leaf);
+  s += R(10, 26, 2, 2, pink) + R(20, 32, 2, 2, pink) + R(6, 36, 2, 2, pink);
+  // path: stepped paving across the middle of the garden
+  s += blob(54, 124, 50, 11, c.path) + blob(54, 124, 42, 8, c.path2) + blob(54, 124, 34, 5, c.path);
+  for (let x = 24; x < 86; x += 12) s += R(x, 119, 1, 11, c.path2);
+  // cardboard box (a shelter), right
+  s += pbox(76, 94, 28, 20, night ? '#b89a86' : '#f0c9a0', o) + R(77, 95, 26, 3, night ? '#a48870' : '#e0b088') + R(84, 104, 12, 10, night ? '#4d3a60' : '#6b4f9e') + R(86, 102, 8, 2, night ? '#4d3a60' : '#6b4f9e');
+  // food bowl
+  s += R(46, 142, 14, 1, o) + pbox(45, 143, 16, 6, pink, o) + R(47, 142, 12, 1, night ? '#d9cfe6' : '#fffafc');
+  // flowers
+  for (const [x, y, col] of [[4, 100, pink], [30, 96, gold], [64, 104, lav], [100, 130, pink], [8, 140, gold], [92, 144, lav], [70, 92, pink], [30, 146, pink]] as [number, number, string][])
+    s += R(x, y + 2, 1, 3, c.leaf2) + R(x - 1, y, 3, 1, col) + R(x, y - 1, 1, 3, col) + R(x, y, 1, 1, '#fffafc');
+  if (night) for (const [x, y] of [[40, 66], [92, 58]]) s += R(x, y, 2, 2, '#ffe9a0');   // fireflies
+  return `<svg class="${cls}" viewBox="0 0 ${ROOM_W} ${ROOM_H}" shape-rendering="crispEdges" aria-hidden="true">${s}</svg>`;
+}
+
+// The wall shelf holds the diary book and the trophy: [x, y, w, h] in room pixels, also used as their click areas.
+export const SHELF_BOOK: [number, number, number, number] = [2, 40, 9, 9];
+export const SHELF_TROPHY: [number, number, number, number] = [13, 39, 9, 10];
+
 export function roomSvg(phase: Phase, cls = 'bg'): string {
   const c = SKY[phase];
   const night = phase === 'night';
@@ -184,6 +238,11 @@ export function roomSvg(phase: Phase, cls = 'bg'): string {
   // a ball of yarn and a bone on the floor
   s += blob(70, 145, 4, 3, blue) + R(66, 145, 8, 1, night ? '#5f86b8' : '#6bbbea') + R(69, 143, 1, 5, night ? '#5f86b8' : '#6bbbea');
   s += R(18, 144, 12, 1, wood) + R(17, 143, 2, 3, wood) + R(29, 143, 2, 3, wood) + R(18, 146, 12, 1, woodD);
+
+  // wall shelf, left: the diary book and the trophy
+  s += R(0, 50, 22, 3, wood) + R(0, 50, 22, 1, o) + R(0, 53, 22, 1, o) + R(0, 52, 22, 1, woodD) + R(3, 54, 2, 3, woodD) + R(17, 54, 2, 3, woodD);
+  for (const [[x, y], art] of [[SHELF_BOOK, BOOK_ART], [SHELF_TROPHY, TROPHY_ART]] as const)
+    art.forEach((row, j) => [...row].forEach((ch, i) => { if (PAL[ch]) s += R(x + i, y + j, 1, 1, PAL[ch]); }));
 
   if (night) s += R(5, 30, 4, 4, c.glow) + R(3, 28, 8, 1, c.glow) + R(3, 35, 8, 1, c.glow);   // a night-light by the plant
   return `<svg class="${cls}" viewBox="0 0 ${ROOM_W} ${ROOM_H}" shape-rendering="crispEdges" aria-hidden="true">${s}</svg>`;

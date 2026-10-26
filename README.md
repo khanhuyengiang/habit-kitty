@@ -19,18 +19,19 @@ single web page and as an offline Android app (via Capacitor).
 - Below 0 affection, cats only trust you with one cat at a time.
 - You can keep up to **9 kitties**. From the 6th the app nags you to be responsible, and the 10th is blocked.
   **Settings → Unlimited kitty** lifts the limit, but every extra kitty needs three different "are you sure?" dialogs.
-- **Kibbles** are one-off jobs worth up to 15 XP. Do them once, tick them off.
-- **Treats** (mindful habits) repeat (daily, weekly, custom) and keep a history, worth up to 10 XP a day.
-  A daily treat can become a kitty: it keeps its history, shown in teal.
-- Kibbles and habits can always be done, but each kind pays out at most its cap per day.
+- **Treats** are one-off jobs worth up to 15 XP. Do them once, tick them off.
+- **Stray kitties** (mindful habits) repeat (daily, weekly, custom) and keep a history, worth up to 10 XP a day. You feed a stray by doing its habit,
+  and nothing bad happens when you skip a day. A daily stray can be **adopted** as a kitty: it keeps its history, shown in teal.
+- Changed your mind? Press and hold a kitty, then **Release to the stray colony**: it becomes a daily stray again, with no penalty, and can be adopted back as the same kitty.
+- Treats and strays can always be done, but each kind pays out at most its cap per day.
 - Everything is drawn on one pixel grid, so kitties, icons, food and the room share a single pixel size.
-- Every cat gets a different food each day (kibbles, wet food, fish, chicken, shrimp or meat).
+- Every cat gets a different food each day (dry food, wet food, fish, chicken, shrimp or meat).
   Each cat has its own look, which you can randomise when adopting.
 
 - Every kitty is a girl or a boy (chosen when you adopt). Feeding earns a warm message, with special ones for first meals, streaks and milestones.
-- **Achievements** (trophy in the Room): meals served, weeks of raising kitties, streaks, treats done, levels, diary pages.
+- **Achievements** (trophy in the Room): meals served, weeks of raising kitties, streaks, strays fed and treats done, levels, diary pages.
 - **Kitty diary** (book in the Room): what all your kitties got up to, day by day. Press and hold one kitty for its own.
-- **Time travel** (Settings → Game options): mark or unmark treats and kibbles as done on any past day. Edits the record only, no XP.
+- **Time travel** (Settings → Game options): mark or unmark stray kitties and treats as done on any past day. Edits the record only, no XP.
 - Reminders mention the habit, and on Android the notification icon is the kitty's face in its mood and fur colour
   (`npm run icons` redraws them after changing the pixel cats).
 - **Sound** (Settings → Sound): background music, kitties meowing in the room, and purrs or meows when you pet one. Each has its own volume.
@@ -40,11 +41,12 @@ single web page and as an offline Android app (via Capacitor).
 
 1. **Room**: a cosy room that follows the clock. Awake cats wander and climb the cat tree, and sleep at night.
    Double-tap an awake cat for a heart. Cats with the sitter are away from home.
-2. **Treats**: switch between repeating **Treats** (habits) and one-off **Kibbles**. Press and hold an item to delete it.
+   Switch to **Nancy park** to meet your strays: each stray turns up with a 30% chance every 6 hours. Press and hold one for its menu.
+2. **Strays**: switch between repeating **Stray kitties** (habits) and one-off **Treats**. Press and hold a stray for its menu (heatmap, adopt, rename, delete), or a treat to delete it.
 3. **Today**: your cats, sorted into **Home**, **Sitter** and **Memories** (cats that died, ran away or went to the shelter, each with a condensed all-time heatmap from adoption to departure). Press and hold a cat for the sitter, its heatmap or the shelter.
-4. **Heatmap**: a switch toggles between all kitties on one calendar (each day split into a slice per kitty) and one calendar per kitty. Treats are listed below. Dead and runaway cats are not shown.
+4. **Heatmap**: a switch toggles between all kitties on one calendar (each day split into a slice per kitty) and one calendar per kitty. Stray kitties are listed below. Dead and runaway cats are not shown.
 5. **Diary**: a monthly calendar. Tap a day to write a page, pick a mood (a little pixel cat) and attach a photo from your gallery.
-   Days with a page turn pink and the mood shows inside the day. Photos are shrunk to roughly 100-200 KB and kept on the device (not in saved text).
+   Days with a page turn pink and the mood shows inside the day. Photos are shrunk to at most 60 KB (900 px on the long side) and kept on the device (not in saved text).
 
 **Settings** is the gear icon at the top right, next to the light/dark switch. It holds feeding reminders, your day start, sound, save and load, unlimited kitty, and how to use.
 
@@ -81,7 +83,8 @@ npm run editor          # pixel editor for the cat art and coat patterns
 
 ### Android app
 
-Requires Android Studio (for the SDK and its bundled JDK).
+Requires Android Studio (for the SDK and its bundled JDK). `npm run app:apk` uses `$JAVA_HOME` if it is set, and otherwise
+falls back to a JDK path on the author's machine, so set `JAVA_HOME` to your JDK (for example Android Studio's `jbr` folder) first.
 
 ```sh
 npm run app:sync        # build the page and copy it into the Android project
@@ -97,13 +100,19 @@ You can also open the `android/` folder in Android Studio and press Run after `n
 |---|---|
 | `src/rules.ts` | Game rules: feeding, starvation, sitter, shelter, mindful tasks, levels. Pure functions, no UI. |
 | `src/calendar.ts` | Week and month data for the dots and heatmaps. |
+| `src/store.ts` | Save format: game, diary pages and photos, and packing them into a `.kitty` backup. |
+| `src/achievements.ts` | Achievements, worked out from the save. |
+| `src/catdiary.ts` | Each cat's own diary of little happenings (pure, seeded). |
 | `src/reminders.ts` | What each daily reminder says and when (pure, tested). |
 | `src/thoughts.ts` | Who a cat thinks about, and how often (pure, tested). |
+| `src/pixelart.ts` | The shared pixel grid, pastel palette, icons, food and room art (pure, returns SVG). |
 | `src/pixelcat.ts`, `src/coats.ts` | The pixel cats and the per-coat pattern layers (edit them with `npm run editor`). |
 | `src/web/app.ts` | The UI: tabs, pixel sprites, room, dialogs, save and load. |
 | `web/page.html` | Page markup and styles. |
 | `web/build.js` | Bundles the page, font and sounds for the web and for the Android app. |
 | `web/editor.js`, `web/pixel-editor.html` | The pixel editor for the cat art. |
+| `web/preview.js`, `src/web/preview.ts` | Live sprite sheet for `npm run preview` (dev only). |
+| `scripts/notify-icons.ts` | Draws the Android notification icons (`npm run icons`). |
 | `sounds/` | Background music, meow and purr. |
 | `src/play.ts` | Terminal playground for the rules. |
 | `android/` | Capacitor Android project. |
