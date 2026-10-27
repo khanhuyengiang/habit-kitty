@@ -8,12 +8,15 @@ Newest first. The app bundles this file: it shows the latest entry once after an
 - **Release to the stray colony.** Press and hold a kitty, open Options and release it: it becomes a daily stray kitty with its whole history, no penalty, and can be adopted again as the same kitty.
 - **Outdoors.** The Room tab now has a second room, a garden where your strays hang out. Each stray turns up with a 30% chance every 6 hours, so you will not always see everyone.
 - **Stray menu.** Press and hold a stray (in the list or outdoors) for a card with a feed button, a heatmap, and options to adopt, rename, time travel or delete.
+- **Stray names.** Give a new stray kitty a name when you add it. Strays you don't name get one of their own, and a released kitty keeps its name.
 
 ### Changed
 - **A tidier Room tab.** The top of the room is gone: the tabs now read **Bunker | Nancy park**, and the diary and achievements are real objects on the shelf in the Bunker (a book and a trophy). Tap the book for the kitty diary, the trophy for achievements. Rename lives under the room.
 - **Today** only shows Home / Sitter / Memories once a cat is actually away or gone.
 - **Treats are now Stray kitties, and Kibbles are now Treats.** The behaviour is the same: stray kitties are repeating habits, treats are one-off jobs. Your saves are untouched.
+- The Stray kitties list now shows one card per stray, with its week and streak, like the Today tab.
 - "Make it a kitty" is now **Adopt the kitty**, and the button to do a stray's habit says **Feed**.
+- The Mindful achievements now count strays fed as well as treats done.
 
 ## 0.3.0 - 2026-10-19
 
