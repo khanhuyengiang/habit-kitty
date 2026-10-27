@@ -1,7 +1,7 @@
 // Phone playtest build of Habit Kitty. Bundled into one HTML page by `npm run build:web`.
 import {
   CONFIG, newState, adoptCat, feedCat, startSitter, resumeCat, settleAll, addMindfulTask,
-  doMindfulTask, setTaskDay, genderOf, daysUntilReady, removeMindfulTask, returnToShelter, habitToCat, dayIndex, dayStartHour, setDayStart, nextReset, levelProgress, hunger, sitterCooldownLeft,
+  doMindfulTask, setTaskDay, genderOf, daysUntilReady, removeMindfulTask, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, idHash, dayIndex, dayStartHour, setDayStart, nextReset, levelProgress, hunger, sitterCooldownLeft,
   type ActionResult, type AppState, type Cat, type CatMode, type CatGender, type CatLook, type CatTrait, type GameEvent, type MindfulTask, type Reason, type TaskKind,
 } from '../rules.ts';
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -21,20 +21,21 @@ import {
   type Backup, type DiaryEntry, type Mood,
 } from '../store.ts';
 import { CONFETTI_COLORS, TRAITS, notifyIconName, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../pixelcat.ts';
-import { BOOK_ART, FOODS, MARKS, ROOM_H, ROOM_W, TROPHY_ART, artSvg, heartSvg, iconSvg, markSvg, roomSvg } from '../pixelart.ts';
+import { BOOK_ART, FOODS, MARKS, ROOM_H, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, heartSvg, iconSvg, markSvg, outdoorSvg, roomSvg } from '../pixelart.ts';
 import { dateOf, dayOf, firstDay, habitStreak, monthGrid, streak, weekRow, type DayKind, type Trackable } from '../calendar.ts';
 
 // ===================== Save =====================
 interface LogLine { at: number; text: string }
 interface Save {
-  v: 1; state: AppState; offsetHours: number; log: LogLine[]; savedAt: number; logHidden?: boolean; unlimited?: boolean; roomName?: string; allowRename?: boolean; showClock?: boolean;
+  v: 1; state: AppState; offsetHours: number; log: LogLine[]; savedAt: number; logHidden?: boolean; unlimited?: boolean; roomName?: string; outdoorName?: string; allowRename?: boolean; showClock?: boolean;
   diary?: Record<string, DiaryEntry>;   // in memory only: each page lives in its own file (see "Diary files")
   reminder?: ReminderSettings;
   returned?: Record<string, number>;   // cat id -> day it last came home (feeds the "welcome back" thoughts)
-  timeTravel?: boolean;                // lets treats and kibbles be marked done on past days
+  timeTravel?: boolean;                // lets stray kitties and treats be marked done on past days
   achieved?: Record<string, number>;   // achievement id -> day it was unlocked
   seenVersion?: string;                // last app version whose change log was shown
   sound?: Partial<Record<SoundKind, number>>;   // volume per sound, 0..100 (see SOUND_DEFAULTS)
+  strayLeft?: Record<string, number>;  // stray id -> garden window it wandered off in after being fed
   dayStart?: number;                   // hour the day starts (and the one before ends), 0..CONFIG.dayStartMax; CONFIG.resetHour when unset
 }
 
@@ -145,10 +146,10 @@ function reasonText(r: Reason, cat?: Cat): string {
       return `${n} can visit the sitter once every ${CONFIG.sitterCooldownDays} days. ` +
         `${plural(cat ? sitterCooldownLeft(cat, today()) : 0, 'day')} to go.`;
     case 'low_affection_cat_limit':
-      return 'Your affection is below 0, so cats only trust you with one at a time. Feed your cat or do treats and kibbles to earn it back.';
+      return 'Your affection is below 0, so cats only trust you with one at a time. Feed your cat, feed a stray or do treats to earn it back.';
     case 'future_day': return "That day hasn't happened yet.";
     case 'task_on_cooldown': return 'You did this one recently. It comes back after its repeat time.';
-    case 'task_already_done': return 'This kibble is already done. Press and hold it to delete it.';
+    case 'task_already_done': return 'This treat is already done. Press and hold it to delete it.';
     case 'not_daily_habit': return 'Only daily habits can become a kitty.';
     case 'cat_limit': return `You can keep ${CONFIG.maxCats} kitties. Turn on Unlimited kitties in Settings if you really want more.`;
     case 'cat_not_active': return `${n} isn't here anymore.`;
@@ -197,7 +198,7 @@ function settle() {
 // ===================== Pixel cats =====================
 const sprite = faceSvg;
 const lookFor = lookOf;
-const hash = (id: string) => [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+const hash = idHash;
 
 // Pixel heart for petting.
 const HEART = heartSvg();
@@ -303,6 +304,15 @@ type Subject = Trackable & { id: string; name: string };
 const habitSubject = (h: MindfulTask): Subject =>
   ({ id: h.id, name: h.name, fedDays: [], adoptedDay: h.createdDay, sitterTrips: [], endedDay: null, habitDays: h.doneDays, noMiss: true });
 
+// Previous / title / next for a heatmap month; `shown` and `first` are the first days of the month on show and of the earliest one.
+function monthNav(key: string, shown: Date, title: string, first: Date, atStart: boolean, back: number): string {
+  return `<div class="month-nav">
+      <button type="button" data-action="month" data-id="${key}" data-step="1" ${atStart ? 'disabled' : ''} aria-label="Previous month">${iconSvg('prev')}</button>
+      ${monthTitle(key, shown.getUTCFullYear(), shown.getUTCMonth(), title, first.getUTCFullYear() * 12 + first.getUTCMonth())}
+      <button type="button" data-action="month" data-id="${key}" data-step="-1" ${back === 0 ? 'disabled' : ''} aria-label="Next month">${iconSvg('next')}</button>
+    </div>`;
+}
+
 function renderMonth(c: Subject, t: number, habit?: MindfulTask): string {
   const back = viewMonth.get(c.id) ?? 0;
   const d = dateOf(t);
@@ -326,11 +336,7 @@ function renderMonth(c: Subject, t: number, habit?: MindfulTask): string {
   const firstMonth = dateOf(firstDay(c));
   const atStart = shown.getUTCFullYear() * 12 + shown.getUTCMonth() <= firstMonth.getUTCFullYear() * 12 + firstMonth.getUTCMonth();
   return `<div class="month">
-    <div class="month-nav">
-      <button type="button" data-action="month" data-id="${c.id}" data-step="1" ${atStart ? 'disabled' : ''} aria-label="Previous month">${iconSvg('prev')}</button>
-      ${monthTitle(c.id, shown.getUTCFullYear(), shown.getUTCMonth(), g.title, firstMonth.getUTCFullYear() * 12 + firstMonth.getUTCMonth())}
-      <button type="button" data-action="month" data-id="${c.id}" data-step="-1" ${back === 0 ? 'disabled' : ''} aria-label="Next month">${iconSvg('next')}</button>
-    </div>
+    ${monthNav(c.id, shown, g.title, firstMonth, atStart, back)}
     <div class="grid" role="img" aria-label="${esc(c.name)}, ${g.title}: ${habit ? `done ${g.count.habit} days` : `fed ${g.count.fed} of ${g.tracked} days`}">${cells}</div>
     <p class="stats">${stats}</p>
   </div>`;
@@ -406,7 +412,10 @@ function renderCats() {
   const t = today();
   const all = sortedCats();
   const seg = $('today-seg');
-  seg.hidden = !all.length;
+  // Sitter and Memories only matter once a cat is away or gone; until then there is just Home.
+  const awayCats = all.some((c) => viewOf(c) !== 'home');
+  if (!awayCats) todayView = 'home';
+  seg.hidden = !awayCats;
   const labels: Record<TodayView, string> = { home: 'Home', sitter: 'Sitter', memories: 'Memories' };
   seg.innerHTML = (Object.keys(labels) as TodayView[]).map((v) =>
     `<button type="button" role="tab" data-action="today-view" data-view="${v}" aria-selected="${v === todayView}">${labels[v]} <span class="num">${all.filter((c) => viewOf(c) === v).length}</span></button>`).join('');
@@ -451,11 +460,7 @@ function renderCombined(subjects: Subject[], key: string, title: string, keyHtml
   const fm = dateOf(first);
   const atStart = shown.getUTCFullYear() * 12 + shown.getUTCMonth() <= fm.getUTCFullYear() * 12 + fm.getUTCMonth();
   return `<article class="cat"><div class="month">
-    <div class="month-nav">
-      <button type="button" data-action="month" data-id="${key}" data-step="1" ${atStart ? 'disabled' : ''} aria-label="Previous month">${iconSvg('prev')}</button>
-      ${monthTitle(key, shown.getUTCFullYear(), shown.getUTCMonth(), g0.title, fm.getUTCFullYear() * 12 + fm.getUTCMonth())}
-      <button type="button" data-action="month" data-id="${key}" data-step="-1" ${back === 0 ? 'disabled' : ''} aria-label="Next month">${iconSvg('next')}</button>
-    </div>
+    ${monthNav(key, shown, g0.title, fm, atStart, back)}
     <div class="grid" role="img" aria-label="${title}, ${g0.title}">${cells}</div>
     <div class="slice-key" style="grid-template-columns:repeat(${cols},auto)">${keyHtml}</div>
     <p class="stats">${note}</p>
@@ -466,7 +471,7 @@ const combinedCats = (cats: Cat[], t: number) => renderCombined(cats, 'all', 'Al
   cats.map((c, i) => `<span><b class="num">${i + 1}</b>${miniSvg(catStatus(c, t).face, lookFor(c), !isActive(c) && c.status !== 'dead')}${esc(c.name)}</span>`).join(''),
   'Each day is split into one slice per cat, in the order shown above.');
 
-const combinedHabits = (habits: MindfulTask[]) => renderCombined(habits.map(habitSubject), 'all-habits', 'All treats',
+const combinedHabits = (habits: MindfulTask[]) => renderCombined(habits.map(habitSubject), 'all-habits', 'All stray kitties',
   habits.map((h, i) => `<span><b class="num">${i + 1}</b>${esc(h.name)}</span>`).join(''),
   'Each day is split into one slice per habit, in the order shown above.');
 
@@ -476,7 +481,7 @@ const HEAT_LEGEND = `<div class="legend"><span><i class="fed"></i>fed</span><spa
 function renderHeat() {
   const cats = heatCats();
   const habits = save.state.tasks.filter((k) => k.kind === 'habit');
-  const habitCards = habits.length ? `<h2>Treats</h2>${combinedHabits(habits)}` : '';
+  const habitCards = habits.length ? `<h2>Stray kitties</h2>${combinedHabits(habits)}` : '';
   const body = cats.length ? combinedCats(cats, today()) : '<p class="muted">No living cats to show.</p>';
   $('heat').innerHTML = body + habitCards + HEAT_LEGEND + '<p class="muted" style="text-align:center;font-size:15px">Press and hold a kitty to see just its heatmap.</p>';
 }
@@ -507,11 +512,27 @@ const napUntil = new Map<string, number>();   // cat id -> when a daytime nap en
 const isNapping = (id: string, phase: 'day' | 'dusk' | 'night', asleep = phase === 'night') => asleep || (napUntil.get(id) ?? 0) > Date.now();
 
 const roomBg = roomSvg;
+// The diary book and the trophy on the wall shelf (drawn in roomSvg); these are their click areas, in room pixels.
+const prop = (action: string, label: string, [x, y, w, h]: [number, number, number, number]) =>
+  `<button class="prop" type="button" data-action="${action}" aria-label="${label}" style="left:calc(${x} * var(--px));top:calc(${y} * var(--px));width:calc(${w} * var(--px));height:calc(${h} * var(--px))"></button>`;
+const PROPS = prop('book', "Kitty diary: everyone's day", SHELF_BOOK) + prop('trophies', 'Achievements', SHELF_TROPHY);
 
 // Cats that are away (sitter, ran away) aren't home, so they aren't in the room.
 const homeCats = () => sortedCats().filter((c) => c.status === 'alive').slice(0, SPOTS.length);
 
+// The room tab has two rooms: the cozy room (kitties) and the outdoors (strays, who only turn up now and then).
+type RoomView = 'indoor' | 'outdoor';
+let roomView: RoomView = 'indoor';
+
 function renderRoom() {
+  document.querySelectorAll<HTMLElement>('#room-seg [data-view]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.view === roomView)));
+  $('room').hidden = roomView !== 'indoor';
+  $('outdoor').hidden = roomView !== 'outdoor';
+  renderRoomTitle();
+  if (roomView === 'outdoor') renderOutdoor(); else renderIndoor();
+}
+
+function renderIndoor() {
   const t = today();
   const phase = skyPhase();
   const pets = homeCats();
@@ -530,7 +551,7 @@ function renderRoom() {
     roomPos.set(c.id, k);
     return k;
   };
-  $('room').innerHTML = `<div class="room ${phase}">${roomBg(phase)}${pets.map((c, i) => {
+  $('room').innerHTML = `<div class="room ${phase}">${roomBg(phase)}${PROPS}${pets.map((c, i) => {
     const pos = asleep ? NIGHT_SPOTS[i] : SPOTS[spotIdx(c, i)];
     const nap = isNapping(c.id, phase, asleep);
     return `<div class="pet${nap ? ' napping' : ''}" data-id="${c.id}" data-fx="${pos[0]}" data-fy="${pos[1]}" data-nap="${nap ? 1 : ''}" data-hold="cat" style="${petStyle(pos, nap)}">${nap ? napSvg(lookFor(c)) : bodySvg(faceOf(c), lookFor(c), hash(c.id))}${nap ? '<b class="zz">z z</b>' : ''}<em>${esc(c.name)}</em></div>`;
@@ -540,11 +561,57 @@ function renderRoom() {
 // The note under the room shows the time, so it is redrawn every few seconds, not only when the room itself changes.
 function renderRoomNote() {
   const clock = now().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
+  if (roomView === 'outdoor') {
+    const n = visibleStrays().length, all = save.state.tasks.filter((k) => k.kind === 'habit').length;
+    $('room-note').textContent = !all ? 'No strays live here yet. Add a stray kitty, or release a kitty to the stray colony.'
+      : !n ? `It's ${clock}. No strays around right now. They drop by now and then.`
+      : `It's ${clock}. ${plural(n, 'stray')} dropped by. Press and hold one to feed it.`;
+    return;
+  }
   const away = save.state.cats.filter((c) => c.status === 'sitter').length;
   $('room-note').textContent = !homeCats().length
     ? (away ? 'Everyone is with the pet sitter. The room is quiet.' : 'It is quiet in here. Adopt a kitty and they will move in.')
     : `It's ${clock}. ${asleepNow() ? 'Everyone is asleep.' : 'Your cats are making themselves at home.'}${away ? ` ${plural(away, 'cat')} with the sitter.` : ''}`;
 }
+
+// ---- outdoors: strays are habits, so there is nothing to save. Each one turns up with a 30% chance every 6 hours, one that is due to be fed today turns up with 80%, and one that is fed leaves with 50%. ----
+const OUT_SPOTS: [number, number][] = [[2, 112], [39, 110], [76, 112], [2, 146], [39, 142], [76, 146]];
+const strayLook = (k: MindfulTask) => lookFor({ id: k.id, look: k.former?.look });
+const strayName = strayNameOf;   // a nickname, a released kitty's name, or a stable one from its id
+const strayDoneToday = (k: MindfulTask, t: number) => k.lastDoneDay === t;
+// A stray that is due today and not yet fed turns up with an 80% chance and comes first; the rest keep the 30% roll.
+// A stray that has turned up stays for the rest of its window, unless it wandered off after being fed.
+const strayShown = new Map<string, number>();   // stray id -> window it turned up in
+const visibleStrays = () => {
+  const w = strayWindow(now()), t = today();
+  const strays = save.state.tasks.filter((k) => k.kind === 'habit' && save.strayLeft?.[k.id] !== w);
+  const due = (k: MindfulTask) => !strayDoneToday(k, t) && daysUntilReady(k, t) === 0;
+  const shown = (k: MindfulTask) => strayShown.get(k.id) === w || strayVisible(k.id, w);
+  const list = [...strays.filter((k) => due(k) && (strayShown.get(k.id) === w || strayVisible(k.id, w, CONFIG.strayDueChance))),
+    ...strays.filter((k) => !due(k) && shown(k))].slice(0, OUT_SPOTS.length);
+  for (const k of list) strayShown.set(k.id, w);
+  return list;
+};
+const shortName = (s: string, n = 14) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+let outdoorSig = '';
+
+function renderOutdoor() {
+  const t = today();
+  const phase = skyPhase();
+  const asleep = asleepNow();
+  const strays = visibleStrays();
+  const faceOf = (k: MindfulTask): Face => (asleep ? 'sleepy' : strayDoneToday(k, t) ? 'happy' : 'open');
+  const sig = phase + (asleep ? 'z' : '') + '|' + strays.map((k) => `${k.id}:${faceOf(k)}:${strayName(k)}`).join('|');
+  renderRoomNote();
+  if (sig === outdoorSig) return;
+  outdoorSig = sig;
+  $('outdoor').innerHTML = `<div class="room outdoor ${phase}">${outdoorSvg(phase)}${strays.map((k, i) => {
+    const pos = OUT_SPOTS[i];
+    const look = strayLook(k);
+    return `<div class="pet${asleep ? ' napping' : ''}" data-id="${k.id}" data-fx="${pos[0]}" data-fy="${pos[1]}" data-nap="${asleep ? 1 : ''}" data-hold="stray" style="${petStyle(pos, asleep)}">${asleep ? napSvg(look) : bodySvg(faceOf(k), look, hash(k.id))}${asleep ? '<b class="zz">z z</b>' : ''}<em>${esc(shortName(strayName(k)))}</em></div>`;
+  }).join('')}</div>`;
+}
+
 setInterval(() => { if (tab === 'room') { renderRoom(); renderRoomNote(); } }, 5000);
 
 // How often each personality gets up and goes somewhere (rolled every WANDER_MS).
@@ -574,7 +641,7 @@ function setNap(el: HTMLElement, on: boolean) {
 const NAP_CHANCE: Record<CatTrait, number> = { lazy: 0.12, grumpy: 0.05, cuddly: 0.05, shy: 0.04, curious: 0.02, playful: 0.012 };
 
 function wander() {
-  if (tab !== 'room' || asleepNow()) return;
+  if (tab !== 'room' || roomView !== 'indoor' || asleepNow()) return;
   const els = [...document.querySelectorAll<HTMLElement>('#room .pet')];
   const taken = new Set(els.map((el) => roomPos.get(el.dataset.id ?? '')));
   els.forEach((el) => {
@@ -612,7 +679,7 @@ const ZOOM_CHANCE: Record<CatTrait, number> = { playful: 0.9, curious: 0.5, cudd
 let zooming = false;
 function zoomies() {
   const phase = skyPhase();
-  if (phase === 'day' || tab !== 'room' || document.hidden || zooming || Math.random() > 0.4) return;
+  if (phase === 'day' || tab !== 'room' || roomView !== 'indoor' || document.hidden || zooming || Math.random() > 0.4) return;
   const els = [...document.querySelectorAll<HTMLElement>('#room .pet')].filter((el) => !el.classList.contains('thinking'));
   const el = els[Math.floor(Math.random() * els.length)];
   if (!el || Math.random() > ZOOM_CHANCE[traitOf(el.dataset.id ?? '')]) return;
@@ -685,7 +752,8 @@ async function pictureData(svg: string): Promise<string> {
 
 let widgetSig = '', widgetTimer = 0;
 function queueWidget() {
-  if (!Capacitor.isNativePlatform()) return;
+  // The home screen only shows the picture while the app is in the background, and going there pushes it (see visibilitychange).
+  if (!Capacitor.isNativePlatform() || !document.hidden) return;
   clearTimeout(widgetTimer);
   widgetTimer = window.setTimeout(pushWidget, 3000);
 }
@@ -724,7 +792,7 @@ const THOUGHT_FACE: Record<ThoughtKind, { face: Face; faded: boolean; mark: stri
 };
 
 function think() {
-  if (tab !== 'room' || document.hidden || asleepNow() || document.querySelector('#room .thought')) return;
+  if (tab !== 'room' || roomView !== 'indoor' || document.hidden || asleepNow() || document.querySelector('#room .thought')) return;
   const t = Date.now();
   if (t - lastThought < THINK_GAP_MS) return;
   const pick = pickThought(save.state.cats, today(), save.returned ?? {}, (id) => t - (thoughtAt.get(id) ?? 0) > THINK_REST_MS);
@@ -806,7 +874,7 @@ for (const k of ['bgm', 'meow', 'purr'] as const) {
 
 // Double-tap an awake cat to make a heart float up from it.
 let lastTap = { id: '', at: 0 };
-$('room').addEventListener('click', (ev) => {
+for (const roomEl of [$('room'), $('outdoor')]) roomEl.addEventListener('click', (ev) => {
   const pet = (ev.target as HTMLElement).closest<HTMLElement>('.pet');
   if (!pet || asleepNow()) return;
   if (pet.dataset.nap === '1') { napUntil.delete(pet.dataset.id ?? ''); setNap(pet, false); return; }   // a tap wakes a napping cat
@@ -847,23 +915,41 @@ function renderTasks() {
   const cap = isTask ? CONFIG.taskMaxXp : CONFIG.habitMaxXp;
   document.querySelectorAll<HTMLElement>('#mindful-seg [data-view]').forEach((b) =>
     b.setAttribute('aria-selected', String(b.dataset.view === kind)));
-  $('mindful-title').textContent = isTask ? 'Kibbles' : 'Treats';
+  $('mindful-title').textContent = isTask ? 'Treats' : 'Stray kitties';
   $('mindful-desc').textContent = isTask
     ? `One-off jobs. Do it once, tick it off, earn up to ${cap} XP. Tap the X or press and hold to delete.`
-    : `Small habits you might not want to do every day, like cleaning your desk after a work-from-home session. Earn up to ${cap} XP a day. Track them before you commit to a kitty. Tap the X or press and hold to delete.`;
+    : `Small habits you might not want to do every day, like cleaning your desk after a work-from-home session. Earn up to ${cap} XP a day. Feed them by doing them. Nothing bad happens if you skip a day. Adopt one as a kitty when you are ready to commit. Tap the X or press and hold to delete.`;
   const e = save.state.mindfulEarned?.day === t ? save.state.mindfulEarned : undefined;
   $('mindful-travel').hidden = !save.timeTravel;
   $('mindful-cap').textContent = `Earned today: ${(isTask ? e?.task : e?.habit) ?? 0}/${cap} XP`;
-  $('form-title').textContent = isTask ? 'New kibble' : 'New treat';
+  $('form-title').textContent = isTask ? 'New treat' : 'New stray kitty';
   $('task-xp-label').textContent = `Reward (XP, max ${cap})`;
   ($('task-xp') as HTMLInputElement).max = String(cap);
   ($('repeat-wrap') as HTMLElement).hidden = isTask;
   ($('task-days-wrap') as HTMLElement).hidden = isTask || ($('task-repeat') as HTMLSelectElement).value !== 'custom';
   ($('task-weekdays-wrap') as HTMLElement).hidden = isTask || ($('task-repeat') as HTMLSelectElement).value !== 'weekdays';
   ($('task-form').querySelector('.row') as HTMLElement).style.gridTemplateColumns = isTask ? '1fr' : '';
-  $('task-submit').textContent = isTask ? 'Add kibble' : 'Add habit';
+  $('task-submit').textContent = isTask ? 'Add treat' : 'Add stray';
+  ($('nick-wrap') as HTMLElement).hidden = isTask;
+  $('task-name-label').textContent = isTask ? 'Name' : 'Habit';
   ($('task-name') as HTMLInputElement).placeholder = isTask ? 'Book a dentist appointment' : 'Stretch for 5 minutes';
 
+  // Stray kitties look like the Today tab: one card per stray. Treats stay a plain list.
+  $('tasks-panel').hidden = !isTask;
+  $('strays').hidden = isTask;
+  $('strays-note').hidden = isTask;
+  if (!isTask) {
+    const strays = save.state.tasks.filter((k) => k.kind === 'habit');
+    $('strays').innerHTML = strays.length ? strays.map((k) => `<article class="cat">
+      ${strayHead(k, t, true)}
+      ${renderWeek(habitSubject(k), t)}
+      <p class="muted habit-foot">${k.doneDays.length ? `Fed ${plural(k.doneDays.length, 'time')}` : 'Not fed yet'}${k.cooldownDays === 1 && !k.weekdays?.length ? ` · streak ${habitStreak(k.doneDays, t)}` : ''}${save.timeTravel ? ` ${TRAVEL(k.id)}` : ''}</p>
+    </article>`).join('')
+      : `<div class="cat"><div class="cat-head">${sprite('open', { fur: '#e8a04c', pattern: 'plain' }, true)}
+      <div><p class="cat-name">No stray kitties yet</p><p class="cat-habit">Add one below. Strays are habits with no penalty.</p></div></div></div>`;
+    $('strays-note').textContent = `Earned today: ${e?.habit ?? 0}/${cap} XP · Press and hold a stray for more options.${save.timeTravel ? ' Time travel is on: use the rewind button on a card.' : ''}`;
+    return;
+  }
   const list = save.state.tasks.filter((k) => k.kind === kind);
   if (isTask) list.sort((a, b) => Number(a.lastDoneDay !== null) - Number(b.lastDoneDay !== null));
   $('tasks').innerHTML = list.length ? list.map((k) => {
@@ -874,19 +960,20 @@ function renderTasks() {
     }
     const left = daysUntilReady(k, t);
     const daily = k.cooldownDays === 1;
-    return `<li class="habit" data-task="${k.id}" data-hold="task"><span>${esc(k.name)} <span class="muted">· +${k.xp} XP · ${scheduleText(k)}</span></span>
-      <span class="row-btns"><button class="btn small" data-action="task" data-id="${k.id}" ${left ? 'disabled' : ''}>${left ? `in ${plural(left, 'day')}` : 'Done'}</button><button class="btn small" data-action="rename-habit" data-id="${k.id}" aria-label="Rename treat">Edit</button>${TRAVEL(k.id)}${DEL(k.id)}</span>
+    return `<li class="habit" data-task="${k.id}" data-hold="stray"><span>${esc(k.name)} <span class="muted">· +${k.xp} XP · ${scheduleText(k)}</span></span>
+      <span class="row-btns"><button class="btn small" data-action="task" data-id="${k.id}" ${left ? 'disabled' : ''}>${left ? `in ${plural(left, 'day')}` : 'Feed'}</button><button class="btn small" data-action="rename-habit" data-id="${k.id}" aria-label="Rename stray kitty">Edit</button>${TRAVEL(k.id)}${DEL(k.id)}</span>
       ${renderWeek(habitSubject(k), t)}
       <span class="muted habit-foot">${k.doneDays.length ? `Done ${plural(k.doneDays.length, 'time')}` : 'Not done yet'}${daily ? ` · streak ${habitStreak(k.doneDays, t)}` : ''}</span>
-      ${daily ? `<button class="btn small" data-action="habit-kitty" data-id="${k.id}">Make it a kitty</button>` : ''}</li>`;
-  }).join('') : `<li class="muted">No ${isTask ? 'kibbles' : 'treats'} yet. Add one below.</li>`;
+      ${daily ? `<button class="btn small" data-action="habit-kitty" data-id="${k.id}">Adopt the kitty</button>` : ''}</li>`;
+  }).join('') : `<li class="muted">No ${isTask ? 'treats' : 'stray kitties'} yet. Add one below.</li>`;
 }
 
-const roomTitle = () => save.roomName?.trim() || 'Cozy room';
+// The tabs carry the two rooms' names ("Cosy Room" and "Garden" unless renamed).
+const indoorName = () => save.roomName?.trim() || 'Cosy Room';
+const outdoorName = () => save.outdoorName?.trim() || 'Garden';
 function renderRoomTitle() {
-  $('room-title').textContent = roomTitle();
-  $('room-book').innerHTML = pixelArt(BOOK_ART);
-  $('room-trophy').innerHTML = pixelArt(TROPHY_ART);
+  $('room-tab-indoor').textContent = indoorName();
+  $('room-tab-outdoor').textContent = outdoorName();
 }
 
 function renderClock() {
@@ -958,7 +1045,8 @@ const hasPage = (e?: DiaryEntry) => !!e && (!!e.text.trim() || !!e.photo);   // 
 
 // ---- Diary files: one Markdown file per day and one small JPEG per day, in the app's private storage ----
 const ROOT = 'habit-kitty';
-const at = (path: string) => ({ path: `${ROOT}/${path}`, directory: Directory.Data });
+const STAGE = 'habit-kitty-restore';   // a restore is written here first, then swapped in
+const at = (path: string, root = ROOT) => ({ path: `${root}/${path}`, directory: Directory.Data });
 
 const toBase64 = (bytes: Uint8Array) => {
   let s = '';
@@ -981,15 +1069,15 @@ async function writeOk(run: () => Promise<unknown>): Promise<boolean> {
   try { await run(); return true; } catch { return false; }
 }
 
-const writeEntry = (day: number, e: DiaryEntry) =>
-  writeOk(() => Filesystem.writeFile({ ...at(diaryPath(day)), data: entryToMarkdown(e), encoding: Encoding.UTF8, recursive: true }));
-const writePhoto = (day: number, bytes: Uint8Array) =>
-  writeOk(() => Filesystem.writeFile({ ...at(photoPath(day)), data: toBase64(bytes), recursive: true }));
+const writeEntry = (day: number, e: DiaryEntry, root = ROOT) =>
+  writeOk(() => Filesystem.writeFile({ ...at(diaryPath(day), root), data: entryToMarkdown(e), encoding: Encoding.UTF8, recursive: true }));
+const writePhoto = (day: number, bytes: Uint8Array, root = ROOT) =>
+  writeOk(() => Filesystem.writeFile({ ...at(photoPath(day), root), data: toBase64(bytes), recursive: true }));
 const getPhoto = async (day: number) => {
   const b = await fileBytes(photoPath(day));
   return b && new Blob([b as BlobPart], { type: 'image/jpeg' });
 };
-const clearDiaryFiles = () => writeOk(() => Filesystem.rmdir({ ...at(''), recursive: true }));
+const clearDiaryFiles = (root = ROOT) => writeOk(() => Filesystem.rmdir({ ...at('', root), recursive: true }));
 
 async function readDiaryFiles(): Promise<Record<string, DiaryEntry>> {
   const out: Record<string, DiaryEntry> = {};
@@ -1005,12 +1093,19 @@ async function readDiaryFiles(): Promise<Record<string, DiaryEntry>> {
 
 // Replace everything on disk with these entries and photos (used by a restore).
 async function writeDiaryFiles(diary: Record<number, DiaryEntry>, photos: Record<number, Uint8Array>): Promise<boolean> {
-  if (!await clearDiaryFiles()) return false;
-  for (const [k, e] of Object.entries(diary)) {
-    if (!await writeEntry(Number(k), e)) return false;
-    if (photos[Number(k)] && !await writePhoto(Number(k), photos[Number(k)])) return false;
-  }
-  return true;
+  // Written next to the live folder and swapped in only when complete, so a failure leaves the old diary untouched.
+  await clearDiaryFiles(STAGE);
+  const staged = await writeOk(async () => {
+    await Filesystem.mkdir({ ...at('', STAGE), recursive: true });
+    for (const [k, e] of Object.entries(diary)) {
+      const day = Number(k);
+      if (!await writeEntry(day, e, STAGE)) throw new Error('write');
+      if (photos[day] && !await writePhoto(day, photos[day], STAGE)) throw new Error('write');
+    }
+  });
+  if (!staged) { await clearDiaryFiles(STAGE); return false; }
+  if (!await clearDiaryFiles()) { await clearDiaryFiles(STAGE); return false; }
+  return writeOk(() => Filesystem.rename({ from: STAGE, to: ROOT, directory: Directory.Data, toDirectory: Directory.Data }));
 }
 
 // Old versions kept the diary text inside the save and the photos in IndexedDB. Move them into files once.
@@ -1113,6 +1208,7 @@ async function exportBackup() {
   a.href = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/zip' }));
   a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
   toast('Backup downloaded.');
 }
 
@@ -1181,11 +1277,12 @@ function renderDiary() {
 }
 
 // ---- one day's page ----
-let diaryDraft: { day: number; mood?: Mood; photo: Blob | null; photoUrl: string; loaded?: Promise<unknown> } | null = null;
+let diaryDraft: { day: number; mood?: Mood; photo: Blob | null; photoUrl: string; photoLost?: boolean; reading?: boolean; loaded?: Promise<unknown> } | null = null;   // photoLost: the saved photo could not be read, so keep its file
 
 function drawDraftPhoto() {
   if (!diaryDraft) return;
   const box = $('diary-photo');
+  if (diaryDraft.reading) { box.innerHTML = diaryDraft.photoUrl ? `<img src="${diaryDraft.photoUrl}" alt="Attached photo">` : ''; return; }
   box.innerHTML = diaryDraft.photoUrl
     ? `<img src="${diaryDraft.photoUrl}" alt="Attached photo"><button class="btn small" type="button" data-action="diary-photo-remove">Remove photo</button>`
     : '<p class="muted">No photo attached.</p>';
@@ -1208,11 +1305,25 @@ function markMood() {
   document.querySelectorAll<HTMLElement>('#diary-moods [data-mood]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mood === diaryDraft?.mood)));
 }
 
-function openDiary(day: number) {
+// A page with text opens as read-only; an empty one, or "Edit entry", opens the form.
+function openDiary(day: number, edit = false) {
   const e = save.diary?.[day];
-  diaryDraft = { day, mood: e?.mood, photo: null, photoUrl: '' };
+  if (diaryDraft?.photoUrl) URL.revokeObjectURL(diaryDraft.photoUrl);
+  const reading = !edit && !!e?.text.trim();
+  diaryDraft = { day, mood: e?.mood, photo: null, photoUrl: '', reading };
+  const heading = `<h3>${esc(dateOf(day).toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }))}</h3>`;
+  if (reading && e) {
+    openModal(`<div class="panel" id="diary-read"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
+      ${heading}
+      <div class="diary-mood">${e.mood ? `<span class="mood-now">${moodSprite(e.mood)}<span>${MOODS[e.mood].label}</span></span>` : ''}<button class="btn small" type="button" data-action="diary-edit">Edit entry</button></div>
+      <p class="diary-read">${esc(e.text)}</p>
+      <div id="diary-photo" class="diary-photo"></div>
+    </div>`);
+    if (e.photo) diaryDraft.loaded = getPhoto(day).then((b) => { if (diaryDraft?.day === day && !diaryDraft.photo) setDraftPhoto(b || null); });
+    return;
+  }
   openModal(`<form class="panel" id="diary-form" novalidate><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
-    <h3>${esc(dateOf(day).toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }))}</h3>
+    ${heading}
     <div class="field"><span>How are you feeling?</span>
       <div class="moods" id="diary-moods">${MOOD_KEYS.map((k) =>
         `<button type="button" data-action="diary-mood" data-mood="${k}" aria-pressed="false">${moodSprite(k)}<span>${MOODS[k].label}</span></button>`).join('')}</div></div>
@@ -1226,7 +1337,7 @@ function openDiary(day: number) {
   markMood();
   drawDraftPhoto();
   if (e?.photo) showPhotoBusy('Loading photo…');
-  if (e?.photo) diaryDraft.loaded = getPhoto(day).then((b) => { if (diaryDraft?.day === day && !diaryDraft.photo) setDraftPhoto(b || null); });
+  if (e?.photo) diaryDraft.loaded = getPhoto(day).then((b) => { if (diaryDraft?.day === day && !diaryDraft.photo) { setDraftPhoto(b || null); diaryDraft.photoLost = !b; } });
 }
 
 async function saveDiary() {
@@ -1235,8 +1346,8 @@ async function saveDiary() {
   await Promise.all([dr.loaded, diaryLoading]);   // don't mistake a photo that is still loading for a removed one
   const text = ($('diary-text') as HTMLTextAreaElement).value.replace(/\s+$/, '');
   const entries = { ...save.diary };
-  if (!text.trim() && !dr.mood && !dr.photo) delete entries[dr.day];
-  else entries[dr.day] = { text, mood: dr.mood, photo: !!dr.photo, updated: Date.now() };
+  if (!text.trim() && !dr.mood && !dr.photo && !dr.photoLost) delete entries[dr.day];
+  else entries[dr.day] = { text, mood: dr.mood, photo: !!dr.photo || !!dr.photoLost, updated: Date.now() };
   const entry = entries[dr.day];
   const stored = entry
     ? (!dr.photo || await writePhoto(dr.day, new Uint8Array(await dr.photo.arrayBuffer()))) && await writeEntry(dr.day, entry)
@@ -1248,13 +1359,14 @@ async function saveDiary() {
     return;
   }
   if (!entry) { await removeFile(diaryPath(dr.day)); }
-  if (!dr.photo) await removeFile(photoPath(dr.day));
+  if (!dr.photo && !dr.photoLost) await removeFile(photoPath(dr.day));
   save.diary = entries;
   persist();
   closeModal();
   renderDiary();
   checkAchievements();
   toast(entries[dr.day] ? 'Diary page saved.' : 'Diary page cleared.');
+  if (entries[dr.day]?.text.trim()) openDiary(dr.day);   // back to the page, now read-only
 }
 
 // ===================== Feeding reminders =====================
@@ -1282,6 +1394,7 @@ function notifyLargeIcon(p: { catId?: string; face: Face }): { largeIcon?: strin
 }
 
 let webTimer = 0;
+let planSig = '';   // what is currently scheduled; an unchanged plan needs no native calls
 let syncing: Promise<void> = Promise.resolve();
 let syncDebounce = 0;
 const queueReminderSync = () => {
@@ -1293,22 +1406,25 @@ const queueReminderSync = () => {
 // this any number of times never leaves duplicates. Called after every change and every time the app opens.
 async function syncReminders() {
   const r = reminderSettings();
-  clearTimeout(webTimer);
   try {
+    const perm = await notifPermission(false);
+    const on = anyReminder(r) && perm === 'granted';
+    const { plan, picks } = on ? planReminders(save.state, r, now()) : { plan: [], picks: {} as Record<string, string> };
+    // The playtest clock shifts game time away from real time; notifications fire in real time.
+    const real = plan.map((p) => ({ ...p, at: new Date(p.at.getTime() - save.offsetHours * 3_600_000) }));
+    const sig = JSON.stringify(real.map((p) => [p.id, p.at.getTime(), p.body, p.catId, p.face, notifyLargeIcon(p).largeIcon]));
+    reminderInfo = { perm, next: real[0]?.at ?? null };
+    if (sig === planSig) { renderReminder(); return; }
+    clearTimeout(webTimer);
     if (NATIVE) {
       const pending = await LocalNotifications.getPending();
       if (pending.notifications.length) await LocalNotifications.cancel({ notifications: pending.notifications.map((n) => ({ id: n.id })) });
     }
-    reminderInfo = { perm: await notifPermission(false), next: null };
-    if (anyReminder(r) && reminderInfo.perm === 'granted') {
-      const { plan, picks } = planReminders(save.state, r, now());
-      // The playtest clock shifts game time away from real time; notifications fire in real time.
-      const real = plan.map((p) => ({ ...p, at: new Date(p.at.getTime() - save.offsetHours * 3_600_000) }));
+    if (on) {
       if (JSON.stringify(picks) !== JSON.stringify(r.picks ?? {})) {
         save.reminder = { ...r, picks };
         try { localStorage.setItem(KEY, JSON.stringify(gameOnly())); } catch { /* ignore */ }
       }
-      reminderInfo.next = real[0]?.at ?? null;
       if (NATIVE) {
         if (real.length) await LocalNotifications.schedule({ notifications: real.map((p) => ({
           id: p.id, title: p.title, body: p.body, schedule: { at: p.at, allowWhileIdle: true }, smallIcon: 'ic_stat_notify',
@@ -1325,7 +1441,8 @@ async function syncReminders() {
         }, Math.min(2_000_000_000, Math.max(0, first.at.getTime() - Date.now())));
       }
     }
-  } catch { reminderInfo = { ...reminderInfo, error: true }; }
+    planSig = sig;
+  } catch { planSig = ''; reminderInfo = { ...reminderInfo, error: true }; }
   renderReminder();
 }
 
@@ -1389,19 +1506,18 @@ let tabBeforeSettings = 'today';   // where the settings icon takes you back to
 function showTab(name: string) {
   if (name !== 'settings') tabBeforeSettings = name;
   tab = name;
-  if (name === 'diary') renderDiary();
   renderTop();
+  renderTab(name);
   for (const t of TABS) $(`tab-${t}`).classList.toggle('on', t === name);
   document.querySelectorAll<HTMLElement>('.tabbar [data-tab]').forEach((b) =>
     b.setAttribute('aria-selected', String(b.dataset.tab === name)));
-  if (name === 'room') renderRoom();
   window.scrollTo(0, 0);
 }
 
 function closeModal() {
   closeLayer(false);
   if (diaryDraft?.photoUrl) URL.revokeObjectURL(diaryDraft.photoUrl);
-  diaryDraft = null; gate = null; menuCat = null;
+  diaryDraft = null; gate = null; menuCat = null; menuStray = null;
   $('modal').hidden = true; $('modal').innerHTML = '';
 }
 function openModal(html: string) {
@@ -1506,14 +1622,14 @@ function startAdopt(habitId?: string) {
     if (!save.unlimited) {
       openModal(`<div class="panel"><h3>${next} habits is a lot</h3>
         <p>${next} habits is a lot for people to handle, and it will be very sad if a kitty goes hungry.</p>
-        <p>Consider returning one kitty to the shelter to make room for a new one, or use a treat as a temporary try-out for a habit you're not sure about yet.</p>
+        <p>Consider returning one kitty to the shelter to make room for a new one, or let a stray kitty be a temporary try-out for a habit you're not sure about yet.</p>
         <div class="btns"><button class="btn" data-action="modal-close">OK</button>
-        <button class="btn primary" data-action="goto-habits">Try a treat</button></div></div>`);
+        <button class="btn primary" data-action="goto-habits">Try a stray</button></div></div>`);
       return;
     }
     runGate([
       { title: `Kitty #${next}? That's a lot`, yes: 'I still want to',
-        text: `${next} habits is a lot for people to handle, and it will be very sad if a kitty goes hungry. Consider returning a kitty to the shelter, or trying this one as a treat first.` },
+        text: `${next} habits is a lot for people to handle, and it will be very sad if a kitty goes hungry. Consider returning a kitty to the shelter, or trying this one as a stray first.` },
       { title: 'Are you really sure?', yes: 'Yes, really',
         text: `Every kitty needs you every single day. Miss a day and you lose ${CONFIG.starvePenalty} affection for each hungry kitty, and a classic kitty can die. With ${next} kitties that adds up fast.` },
       { title: 'Last chance', yes: 'I promise',
@@ -1541,26 +1657,27 @@ const lookPickers = () =>
 const redrawLook = () => { $('adopt-preview').innerHTML = sprite('happy', draftLook); $('adopt-look').innerHTML = lookPickers(); };
 let adoptFrom: string | null = null;   // mindful habit being turned into a cat
 function openAdopt(habitId?: string) {
-  draftLook = randomLook();
-  draftGender = Math.random() < 0.5 ? 'girl' : 'boy';
   adoptFrom = habitId ?? null;
   const habit = habitId ? save.state.tasks.find((k) => k.id === habitId) : undefined;
+  const former = habit?.former;   // a released kitty comes back as itself
+  draftLook = former?.look ? { ...former.look } : randomLook();
+  draftGender = former?.gender ?? (Math.random() < 0.5 ? 'girl' : 'boy');
   openModal(`<form class="panel" id="adopt" novalidate>
-    <h3>${habit ? 'Make a kitty' : 'Adopt a kitty'}</h3>
+    <h3>${habit ? 'Adopt the kitty' : 'Adopt a kitty'}</h3>
     <div class="preview"><div id="adopt-preview">${sprite('happy', draftLook)}</div>
       <button class="btn" type="button" data-action="randomise">${iconSvg('dice')} Randomise look</button></div>
     <div class="look-pick" id="adopt-look">${lookPickers()}</div>
     <p class="muted">${habit ? `Your history with this habit comes along. Days you did it show in teal; days before the kitty show as empty.`
       : 'Each cat stands for one habit. Do the habit, feed the cat.'}</p>
-    <label class="field">Cat's name <input id="adopt-name" maxlength="24" placeholder="Mochi" autocomplete="off"></label>
+    <label class="field">Cat's name <input id="adopt-name" maxlength="24" placeholder="Mochi" autocomplete="off" value="${habit ? esc(strayName(habit)) : ''}"></label>
     <label class="field">Daily habit <input id="adopt-habit" maxlength="40" placeholder="Drink a glass of water" autocomplete="off" value="${habit ? esc(habit.name) : ''}" ${habit ? 'readonly' : ''}></label>
     <fieldset class="modes">
       <legend>If you neglect it for 3 days</legend>
-      <label><input type="radio" name="mode" value="classic" checked><b>Classic</b>the cat dies</label>
-      <label><input type="radio" name="mode" value="lighthearted"><b>Light-hearted</b>it runs away, and comes back once</label>
+      <label><input type="radio" name="mode" value="classic" ${former?.mode === 'lighthearted' ? '' : 'checked'}><b>Classic</b>the cat dies</label>
+      <label><input type="radio" name="mode" value="lighthearted" ${former?.mode === 'lighthearted' ? 'checked' : ''}><b>Light-hearted</b>it runs away, and comes back once</label>
     </fieldset>
     <p class="form-error" id="adopt-error" hidden></p>
-    <div class="btns"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">${habit ? 'Make kitty' : 'Adopt'}</button></div>
+    <div class="btns"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Adopt</button></div>
   </form>`);
 }
 
@@ -1609,7 +1726,7 @@ function openBook(day: number = today()) {
       : `<p class="muted">${home.length ? 'Nothing happened yet.' : 'Nobody is home, so nothing to write about.'}</p>`}</div>`);
 }
 
-// ---- time travel: mark or unmark a treat or kibble on any day up to today ----
+// ---- time travel: mark or unmark a stray kitty or treat on any day up to today ----
 let travelBack = 0;   // months back from the current one
 function openTravel(id: string, back = travelBack) {
   const task = save.state.tasks.find((k) => k.id === id);
@@ -1631,7 +1748,7 @@ function openTravel(id: string, back = travelBack) {
   ].join('');
   openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
     <h3>Time travel</h3><p><b>${esc(task.name)}</b></p>
-    <p class="muted">Tap a day to mark it done or not done. This only fixes your record: no XP is paid or taken away.${task.kind === 'task' ? ' A kibble is done once, so tapping another day moves it.' : ''}</p>
+    <p class="muted">Tap a day to mark it done or not done. This only fixes your record: no XP is paid or taken away.${task.kind === 'task' ? ' A treat is done once, so tapping another day moves it.' : ''}</p>
     <div class="month-nav">
       <button type="button" data-action="travel-month" data-id="${id}" data-step="1" aria-label="Previous month">${iconSvg('prev')}</button>
       <strong>${dateOf(first).toLocaleString('en', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</strong>
@@ -1671,8 +1788,20 @@ function showWhatsNew() {
     <div class="btns"><button class="btn primary" type="button" data-action="modal-close">Got it</button></div></div>`);
 }
 
+// Only the visible tab is drawn; showTab draws a tab when it is opened.
+function renderTab(name: string) {
+  switch (name) {
+    case 'today': renderCats(); break;
+    case 'heat': renderHeat(); break;
+    case 'room': renderRoom(); break;
+    case 'mindful': renderTasks(); break;
+    case 'diary': renderDiary(); break;
+    case 'settings': renderChangelog(); renderReminder(); break;
+  }
+}
 function renderAll() {
-  renderTop(); renderLog(); renderCats(); renderHeat(); renderRoom(); renderRoomTitle(); renderTasks(); renderClock(); renderSaved(); renderChangelog(); renderDiary(); renderReminder();
+  renderTop(); renderLog(); renderRoomTitle(); renderClock(); renderSaved();   // the clock pop-up floats over every tab
+  renderTab(tab);
   queueWidget();
   checkAchievements();
 }
@@ -1703,12 +1832,22 @@ document.addEventListener('click', (ev) => {
         return e?.day === today() ? (e[kind] ?? 0) : 0;
       };
       const before = earned();
-      act((s, at) => doMindfulTask(s, id, at), () => {
+      // A stray fed while it is in the garden may wander off again.
+      const leaves = kind === 'habit' && visibleStrays().some((k) => k.id === id) && Math.random() < CONFIG.strayLeaveChance;
+      const ok = act((s, at) => doMindfulTask(s, id, at), () => {
         const paid = earned() - before;
-        return paid >= task.xp ? `Nice. +${paid} XP`
-          : paid > 0 ? `+${paid} XP. That's today's ${cap} XP limit for ${kind}s.`
-          : `Done! You've already earned today's ${cap} XP from ${kind}s, so no extra XP.`;
+        const xp = paid >= task.xp ? `Nice. +${paid} XP`
+          : paid > 0 ? `+${paid} XP. That's today's ${cap} XP limit for ${kind === 'task' ? 'treats' : 'strays'}.`
+          : `Done! You've already earned today's ${cap} XP from ${kind === 'task' ? 'treats' : 'strays'}, so no extra XP.`;
+        return leaves ? `${strayName(task)} is fed and happily going roaming again. ${xp}` : xp;
       });
+      if (ok && leaves) {
+        const w = strayWindow(now());
+        save.strayLeft = { ...Object.fromEntries(Object.entries(save.strayLeft ?? {}).filter(([, v]) => v === w)), [id]: w };
+        persist();
+        if (tab === 'room') renderRoom();
+      }
+      if (menuStray === id) openStrayMenu(id);   // keep the open menu in step (fed)
       break;
     }
     case 'tab':
@@ -1730,11 +1869,12 @@ document.addEventListener('click', (ev) => {
     case 'picker-month': pickMonth(Number(btn.dataset.m)); break;
     case 'layer-close': if (ev.target === btn || btn.tagName === 'BUTTON') closeLayer(); break;
     case 'diary-open': openDiary(Number(btn.dataset.day)); break;
+    case 'diary-edit': if (diaryDraft) openDiary(diaryDraft.day, true); break;
     case 'diary-mood':
       if (diaryDraft) { diaryDraft.mood = diaryDraft.mood === btn.dataset.mood ? undefined : (btn.dataset.mood as Mood); markMood(); }
       break;
     case 'diary-photo-add': $('diary-file').click(); break;
-    case 'diary-photo-remove': setDraftPhoto(null); break;
+    case 'diary-photo-remove': setDraftPhoto(null); if (diaryDraft) diaryDraft.photoLost = false; break;
     case 'diary-clear':
       openLayer(`<h3>Clear this page?</h3>
         <p>This empties the text, mood and photo on this diary page. Nothing is deleted until you press Save, so closing the page without saving keeps it as it was.</p>
@@ -1743,10 +1883,11 @@ document.addEventListener('click', (ev) => {
     case 'diary-clear-yes':
       closeLayer();
       ($('diary-text') as HTMLTextAreaElement).value = '';
-      if (diaryDraft) { diaryDraft.mood = undefined; markMood(); setDraftPhoto(null); }
+      if (diaryDraft) { diaryDraft.mood = undefined; diaryDraft.photoLost = false; markMood(); setDraftPhoto(null); }
       break;
     case 'log-close': save.logHidden = true; persist(); renderLog(); break;
     case 'adopt-open': startAdopt(); break;
+    case 'room-view': roomView = btn.dataset.view === 'outdoor' ? 'outdoor' : 'indoor'; renderRoom(); break;
     case 'habit-kitty': startAdopt(id); break;
     case 'task-del': askDeleteTask(id); break;
     case 'gate-yes': {
@@ -1760,6 +1901,20 @@ document.addEventListener('click', (ev) => {
     }
     case 'goto-habits': closeModal(); mindfulView = 'habit'; renderTasks(); showTab('mindful'); break;
     case 'menu-tab': openCatMenu(id, btn.dataset.view as MenuTab); break;
+    case 'stray-tab': openStrayMenu(id, btn.dataset.view as StrayTab); break;
+    case 'release-ask':
+      if (!cat) break;
+      openModal(`<div class="panel"><h3>Release ${esc(cat.name)} to the stray colony?</h3>
+        <p>${esc(cat.name)} becomes a stray kitty: no penalty, and your history together comes along. Strays can't starve, so a missed day costs nothing. You can adopt ${esc(cat.name)} again any time.</p>
+        <div class="btns"><button class="btn" data-action="modal-close">Keep ${esc(cat.name)}</button>
+        <button class="btn primary" data-action="release-yes" data-id="${id}">Release</button></div></div>`);
+      break;
+    case 'release-yes': {
+      const name = cat?.name ?? 'Your cat';
+      closeModal();
+      act((s, at) => releaseToColony(s, id, uid(), at), `${name} joined the stray colony. Find them in ${outdoorName()}, or adopt them again.`, cat);
+      break;
+    }
     case 'mindful-view': mindfulView = btn.dataset.view === 'habit' ? 'habit' : 'task'; renderTasks(); break;
     case 'today-view': todayView = (btn.dataset.view as TodayView) ?? 'home'; renderCats(); break;
     case 'randomise':
@@ -1794,6 +1949,15 @@ document.addEventListener('click', (ev) => {
         <div class="btns"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`);
       break;
     }
+    case 'rename-stray': {
+      const k = save.state.tasks.find((x) => x.id === id);
+      if (!k) break;
+      closeModal();
+      openModal(`<form class="panel" id="rename-stray" data-id="${id}" novalidate><h3>Rename stray kitty</h3>
+        <label class="field">Name <input id="rename-stray-input" maxlength="24" autocomplete="off" value="${esc(strayName(k))}"></label>
+        <div class="btns"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`);
+      break;
+    }
     case 'rename-habit': {
       const cur = cat ? cat.habit : save.state.tasks.find((k) => k.id === id)?.name;
       if (cur === undefined) break;
@@ -1805,8 +1969,8 @@ document.addEventListener('click', (ev) => {
       break;
     }
     case 'room-rename':
-      openModal(`<form class="panel" id="room-name" novalidate><h3>Name your room</h3>
-        <label class="field">Room name <input id="room-name-input" maxlength="24" autocomplete="off" placeholder="Cozy room" value="${esc(save.roomName ?? '')}"></label>
+      openModal(`<form class="panel" id="room-name" novalidate><h3>Name your ${roomView === 'outdoor' ? 'garden' : 'room'}</h3>
+        <label class="field">${roomView === 'outdoor' ? 'Garden' : 'Room'} name <input id="room-name-input" maxlength="24" autocomplete="off" placeholder="${roomView === 'outdoor' ? 'Garden' : 'Cosy Room'}" value="${esc((roomView === 'outdoor' ? save.outdoorName : save.roomName) ?? '')}"></label>
         <div class="btns"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`);
       break;
     case 'book': openBook(); break;
@@ -1821,11 +1985,14 @@ document.addEventListener('click', (ev) => {
       break;
     }
     case 'clock-toggle': $('clock-pop').classList.toggle('open'); break;
-    case 'modal-close': if (ev.target === btn) closeModal(); break;
-    case 'delete-task-yes':
+    // The scrim closes only on a tap outside the panel; a close button closes even when the tap lands on its icon.
+    case 'modal-close': if (ev.target === btn || !btn.classList.contains('scrim')) closeModal(); break;
+    case 'delete-task-yes': {
+      const removed = save.state.tasks.find((k) => k.id === id);
       save.state = removeMindfulTask(save.state, id);
-      persist(); closeModal(); renderTasks(); toast('Kibble deleted.');
+      persist(); closeModal(); renderTasks(); toast(`${removed?.kind === 'habit' ? 'Stray kitty' : 'Treat'} deleted.`);
       break;
+    }
     case 'cat-alarm-clear': {
       const alarms = { ...reminderSettings().catAlarms };
       delete alarms[id];
@@ -1887,7 +2054,11 @@ document.addEventListener('click', (ev) => {
 function validGame(d: any): Save | null {
   if (d?.v !== 1 || !Array.isArray(d.state?.cats) || !Array.isArray(d.state?.tasks) || typeof d.state.xp !== 'number') return null;
   const { diary, ...game } = d;
-  return { ...game, log: Array.isArray(d.log) ? d.log : [], offsetHours: Number(d.offsetHours) || 0 };
+  // Ids go into HTML attributes, so only plain ones are accepted.
+  const plain = (x: any) => typeof x?.id === 'string' && /^[\w-]{1,64}$/.test(x.id);
+  if (!Number.isFinite(d.state.xp) || !d.state.cats.every(plain) || !d.state.tasks.every(plain)) return null;
+  const cats = d.state.cats.map((c: Cat) => ({ ...c, fedDays: c.fedDays ?? [], sitterTrips: c.sitterTrips ?? [] }));
+  return { ...game, state: { ...d.state, cats }, log: Array.isArray(d.log) ? d.log : [], offsetHours: Number(d.offsetHours) || 0 };
 }
 
 // Game only: the diary and photos on this device stay as they are.
@@ -1916,7 +2087,7 @@ $('show-clock').addEventListener('change', (ev) => {
 $('time-travel').addEventListener('change', (ev) => {
   save.timeTravel = (ev.target as HTMLInputElement).checked;
   persist(); renderTasks();
-  toast(save.timeTravel ? 'Time travel on. Every treat and kibble now has a rewind button.' : 'Time travel off.');
+  toast(save.timeTravel ? 'Time travel on. Every stray kitty and treat now has a rewind button.' : 'Time travel off.');
 });
 $('unlimited-cats').addEventListener('change', (ev) => {
   save.unlimited = (ev.target as HTMLInputElement).checked;
@@ -2004,7 +2175,7 @@ document.addEventListener('submit', (ev) => {
     renderAll();
     if (!r.ok) { const err = $('adopt-error'); err.textContent = reasonText(r.reason); err.hidden = false; return; }
     closeModal();
-    toast(adoptFrom ? `${name.trim()} is a kitty now, and remembers your history.` : `Welcome home, ${name.trim()}! Feed them today.`);
+    toast(adoptFrom ? `${name.trim()} is adopted, and remembers your history.` : `Welcome home, ${name.trim()}! Feed them today.`);
     adoptFrom = null;
   } else if (form.id === 'rename-cat') {
     const id = form.dataset.id ?? '';
@@ -2012,6 +2183,12 @@ document.addEventListener('submit', (ev) => {
     if (!name || !save.allowRename) return;
     save.state = { ...save.state, cats: save.state.cats.map((c) => (c.id === id ? { ...c, name } : c)) };
     persist(); closeModal(); renderAll(); toast('Kitty renamed.');
+  } else if (form.id === 'rename-stray') {
+    const id = form.dataset.id ?? '';
+    const nickname = ($('rename-stray-input') as HTMLInputElement).value.trim();
+    if (!nickname) return;
+    save.state = { ...save.state, tasks: save.state.tasks.map((k) => (k.id === id ? { ...k, nickname } : k)) };
+    persist(); closeModal(); renderAll(); toast('Stray kitty renamed.');
   } else if (form.id === 'rename') {
     const id = form.dataset.id ?? '';
     const name = ($('rename-input') as HTMLInputElement).value.trim();
@@ -2023,25 +2200,27 @@ document.addEventListener('submit', (ev) => {
     };
     persist(); closeModal(); renderAll(); toast('Habit renamed.');
   } else if (form.id === 'room-name') {
-    save.roomName = ($('room-name-input') as HTMLInputElement).value.trim() || undefined;
-    persist(); closeModal(); renderRoomTitle(); toast('Room renamed.');
+    const name = ($('room-name-input') as HTMLInputElement).value.trim() || undefined;
+    if (roomView === 'outdoor') save.outdoorName = name; else save.roomName = name;
+    persist(); closeModal(); renderRoomTitle(); renderRoomNote(); toast(roomView === 'outdoor' ? 'Garden renamed.' : 'Room renamed.');
   } else if (form.id === 'task-form') {
     const input = $('task-name') as HTMLInputElement;
     const kind = mindfulView;
-    if (!input.value.trim()) { toast(`Name the ${kind === 'habit' ? 'treat' : 'kibble'} first.`); return; }
+    if (!input.value.trim()) { toast(`Name the ${kind === 'habit' ? 'stray kitty' : 'treat'} first.`); return; }
     const rep = ($('task-repeat') as HTMLSelectElement).value;
     const weekdays = rep === 'weekdays'
       ? [...form.querySelectorAll<HTMLInputElement>('input[name="weekday"]:checked')].map((c) => Number(c.value)) : [];
     if (rep === 'weekdays' && !weekdays.length) { toast('Pick at least one weekday.'); return; }
     const days = rep === 'custom' ? Number(($('task-days') as HTMLInputElement).value) : Number(rep);
     save.state = addMindfulTask(save.state, {
-      id: uid(), name: input.value, kind, xp: Number(($('task-xp') as HTMLInputElement).value) || 1, cooldownDays: days || 1, weekdays,
+      id: uid(), name: input.value, kind, nickname: ($('task-nick') as HTMLInputElement).value, xp: Number(($('task-xp') as HTMLInputElement).value) || 1, cooldownDays: days || 1, weekdays,
     }, now());
     input.value = '';
+    ($('task-nick') as HTMLInputElement).value = '';
     form.querySelectorAll<HTMLInputElement>('input[name="weekday"]').forEach((c) => { c.checked = false; });
     persist();
     renderAll();
-    toast(kind === 'task' ? 'Kibble added.' : 'Treat added.');
+    toast(kind === 'task' ? 'Treat added.' : 'Stray kitty added.');
   }
 });
 
@@ -2085,7 +2264,7 @@ function endHold() { clearTimeout(holdTimer); holdEl?.classList.remove('pressing
 function askDeleteTask(id: string) {
   const task = save.state.tasks.find((k) => k.id === id);
   if (!task) return;
-    openModal(`<div class="panel"><h3>Delete this ${task.kind === 'habit' ? 'treat' : 'kibble'}?</h3><p>${esc(task.name)}</p>${task.kind === 'habit' && task.doneDays.length ? '<p class="muted">Its history will be lost.</p>' : ''}
+    openModal(`<div class="panel"><h3>Delete this ${task.kind === 'habit' ? 'stray kitty' : 'treat'}?</h3><p>${esc(task.name)}</p>${task.kind === 'habit' && task.doneDays.length ? '<p class="muted">Its history will be lost.</p>' : ''}
       <div class="btns"><button class="btn" data-action="modal-close">Keep</button>
       <button class="btn primary" data-action="delete-task-yes" data-id="${id}">Delete</button></div></div>`);
 }
@@ -2094,6 +2273,7 @@ function fireHold(el: HTMLElement) {
   endHold();
   const id = el.dataset.id ?? el.dataset.task ?? '';
   if (el.dataset.hold === 'cat') openCatMenu(id, 'diary');
+  else if (el.dataset.hold === 'stray') openStrayMenu(id);
   else askDeleteTask(id);
 }
 
@@ -2127,11 +2307,53 @@ function openCatMenu(id: string, tab?: MenuTab) {
     : `<div style="display:grid;gap:8px">${sitterBtn}
       <button class="btn" data-action="rename-habit" data-id="${id}">Rename habit</button>
       ${save.allowRename ? `<button class="btn" data-action="rename-cat" data-id="${id}">Rename ${esc(cat.name)}</button>` : ''}
+      ${cat.status === 'alive' ? `<button class="btn" data-action="release-ask" data-id="${id}">Release to the stray colony</button>` : ''}
       <button class="btn" data-action="shelter-ask" data-id="${id}">Return to the shelter</button></div>`;
   openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
     ${catHead(cat, today(), false)}
     <div class="seg" role="tablist">${(Object.keys(MENU_TABS) as MenuTab[]).map((v) =>
       `<button type="button" role="tab" data-action="menu-tab" data-view="${v}" data-id="${id}" aria-selected="${v === menuTab}">${MENU_TABS[v]}</button>`).join('')}</div>
+    ${pane}</div>`);
+}
+
+// Long press on a stray (in the stray list or outdoors): the same layout as the kitty menu, with Heatmap and Options tabs.
+// A stray is a habit, so feeding one is doing the habit; nothing bad happens if you skip a day.
+type StrayTab = 'heat' | 'options';
+let menuStray: string | null = null;
+let strayTab: StrayTab = 'heat';
+const STRAY_TABS: Record<StrayTab, string> = { heat: 'Heatmap', options: 'Options' };
+
+function strayHead(k: MindfulTask, t: number, holdable = false): string {
+  const left = daysUntilReady(k, t);
+  const fed = strayDoneToday(k, t);
+  const look = strayLook(k);
+  const face: Face = fed ? 'happy' : 'open';
+  const label = fed ? 'Fed today' : left ? `Next in ${plural(left, 'day')}` : 'Waiting for a meal';
+  const button = `<button class="btn primary sq" data-action="task" data-id="${k.id}" ${left ? 'disabled' : ''} aria-label="${left ? `${esc(k.name)} is fed for now` : `Feed ${esc(k.name)}`}">${left ? `<b>${iconSvg('check')}</b>` : foodIcon(FOOD_KEYS[hash(`${k.id}:${t}`) % FOOD_KEYS.length])}</button>`;
+  return `<div class="cat-head"${holdable ? ` data-hold="stray" data-id="${k.id}"` : ''}><div class="cat-side">${sprite(face, look)}${button}</div>
+    <div><p class="cat-name">${esc(strayName(k))}<span class="mode">stray · ${look.trait}</span></p>
+      <p class="cat-habit">${esc(k.name)} · ${scheduleText(k)} · +${k.xp} XP</p>
+      <span class="chip ${fed ? 'fed' : left ? 'none' : 'today'}">${label}</span></div>
+</div>`;
+}
+
+function openStrayMenu(id: string, tab?: StrayTab) {
+  const k = save.state.tasks.find((x) => x.id === id && x.kind === 'habit');
+  if (!k) return;
+  if (tab) strayTab = tab;
+  menuStray = id;
+  const pane = strayTab === 'heat'
+    ? renderMonth(habitSubject(k), today(), k) + HEAT_LEGEND
+    : `<div style="display:grid;gap:8px">
+      ${k.cooldownDays === 1 && !k.weekdays?.length ? `<button class="btn primary" data-action="habit-kitty" data-id="${id}">Adopt the kitty</button>` : '<p class="muted">Only daily strays can be adopted.</p>'}
+      <button class="btn" data-action="rename-stray" data-id="${id}">Rename ${esc(strayName(k))}</button>
+      <button class="btn" data-action="rename-habit" data-id="${id}">Rename habit</button>
+      ${save.timeTravel ? `<button class="btn" data-action="travel" data-id="${id}">Time travel</button>` : ''}
+      <button class="btn" data-action="task-del" data-id="${id}">Delete stray kitty</button></div>`;
+  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
+    ${strayHead(k, today())}
+    <div class="seg" role="tablist">${(Object.keys(STRAY_TABS) as StrayTab[]).map((v) =>
+      `<button type="button" role="tab" data-action="stray-tab" data-view="${v}" data-id="${id}" aria-selected="${v === strayTab}">${STRAY_TABS[v]}</button>`).join('')}</div>
     ${pane}</div>`);
 }
 

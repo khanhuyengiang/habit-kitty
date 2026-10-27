@@ -1,7 +1,7 @@
 import { afterEach, describe, it, expect } from 'vitest';
 import {
   newState, adoptCat, feedCat, startSitter, resumeCat, settleAll,
-  addMindfulTask, doMindfulTask, removeMindfulTask, returnToShelter, habitToCat, dayIndex, setDayStart, levelFor, levelProgress,
+  addMindfulTask, doMindfulTask, removeMindfulTask, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, STRAY_NAMES, dayIndex, setDayStart, levelFor, levelProgress,
   graveyard, runaways, hunger, setTaskDay, genderOf, type ActionResult, type AppState, type CatMode,
 } from './rules';
 
@@ -289,6 +289,83 @@ describe('mindful habits', () => {
   it('removes a habit', () => {
     const s = addMindfulTask(newState(), { id: 't1', name: 'Stretch', xp: 2, cooldownDays: 1 }, at(0));
     expect(removeMindfulTask(s, 't1').tasks).toHaveLength(0);
+  });
+});
+
+describe('the stray colony', () => {
+  it('turns a released kitty into a daily stray with its history', () => {
+    let s = setup();
+    s = ok(feedCat(s, 'c1', at(0)));
+    s = ok(feedCat(s, 'c1', at(1)));
+    s = ok(releaseToColony(s, 'c1', 'h1', at(1)));
+    expect(s.cats).toHaveLength(0);
+    expect(s.tasks).toHaveLength(1);
+    const stray = s.tasks[0];
+    expect(stray).toMatchObject({ id: 'h1', name: 'Meditate', kind: 'habit', cooldownDays: 1 });
+    expect(stray.doneDays).toEqual([dayIndex(at(0)), dayIndex(at(1))]);
+    expect(stray.lastDoneDay).toBe(dayIndex(at(1)));
+    expect(stray.former).toMatchObject({ name: 'Mochi', mode: 'classic' });
+    expect(s.xp).toBe(10);   // nothing is taken away
+  });
+
+  it('keeps the days it was a habit before it became a kitty', () => {
+    let s = addMindfulTask(newState(), { id: 'h0', name: 'Stretch', xp: 2, cooldownDays: 1 }, at(0));
+    s = ok(doMindfulTask(s, 'h0', at(0)));
+    s = ok(habitToCat(s, 'h0', { id: 'c1', name: 'Mochi' }, at(1)));
+    s = ok(feedCat(s, 'c1', at(1)));
+    s = ok(releaseToColony(s, 'c1', 'h1', at(2)));
+    expect(s.tasks[0].doneDays).toEqual([dayIndex(at(0)), dayIndex(at(1))]);
+  });
+
+  it('only lets a kitty that is at home be released', () => {
+    const s = ok(startSitter(setup(), 'c1', at(0)));
+    const r = releaseToColony(s, 'c1', 'h1', at(1));
+    expect(r.ok).toBe(false);
+    const gone = releaseToColony(setup(), 'nope', 'h1', at(0));
+    expect(gone.ok).toBe(false);
+  });
+
+  it('can adopt a released stray again', () => {
+    let s = ok(releaseToColony(setup(), 'c1', 'h1', at(0)));
+    s = ok(habitToCat(s, 'h1', { id: 'c2', name: 'Mochi' }, at(1)));
+    expect(s.tasks).toHaveLength(0);
+    expect(s.cats[0].habit).toBe('Meditate');
+  });
+});
+
+describe('stray names', () => {
+  it('uses the nickname, else the released kitty, else a stable name from the id', () => {
+    let s = addMindfulTask(newState(), { id: 'a', name: 'Stretch', xp: 2, nickname: ' Pip ' }, at(0));
+    s = addMindfulTask(s, { id: 'b', name: 'Read', xp: 2 }, at(0));
+    expect(strayNameOf(s.tasks[0])).toBe('Pip');
+    expect(STRAY_NAMES).toContain(strayNameOf(s.tasks[1]));
+    expect(strayNameOf(s.tasks[1])).toBe(strayNameOf(s.tasks[1]));
+    const released = ok(releaseToColony(setup(), 'c1', 'h1', at(0)));
+    expect(strayNameOf(released.tasks[0])).toBe('Mochi');
+  });
+  it('gives only habits a nickname', () => {
+    const s = addMindfulTask(newState(), { id: 'a', name: 'Book dentist', xp: 2, kind: 'task', nickname: 'Pip' }, at(0));
+    expect(s.tasks[0].nickname).toBeUndefined();
+  });
+});
+
+describe('strays outdoors', () => {
+  it('holds still within a window', () => {
+    const w = strayWindow(at(3, 7));
+    expect(strayVisible('a', w)).toBe(strayVisible('a', w));
+    expect(strayWindow(at(3, 6))).toBe(strayWindow(at(3, 11)));
+    expect(strayWindow(at(3, 11))).not.toBe(strayWindow(at(3, 12)));
+  });
+
+  it('shows about 30% of strays in any window, and a stray does not stick', () => {
+    const ids = Array.from({ length: 400 }, (_, i) => `stray-${i}`);
+    const w = strayWindow(at(0));
+    const share = ids.filter((id) => strayVisible(id, w)).length / ids.length;
+    expect(share).toBeGreaterThan(0.22);
+    expect(share).toBeLessThan(0.38);
+    const over = Array.from({ length: 400 }, (_, k) => strayVisible('stray-1', w + k)).filter(Boolean).length / 400;
+    expect(over).toBeGreaterThan(0.22);
+    expect(over).toBeLessThan(0.38);
   });
 });
 

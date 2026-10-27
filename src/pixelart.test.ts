@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BOOK_ART, FOODS, ICONS, MARKS, PAL, ROOM_H, ROOM_W, TROPHY_ART, artSvg, iconSvg, roomSvg } from './pixelart.ts';
+import { BOOK_ART, FOODS, ICONS, MARKS, PAL, ROOM_H, ROOM_W, TROPHY_ART, artSvg, iconSvg, outdoorSvg, roomSvg } from './pixelart.ts';
 import { BODY_H, BODY_W, FACE_W, FURS, MINI_W, PATTERNS, bodySvg, faceSvg, miniSvg, popperSvg } from './pixelcat.ts';
 
 const arts: Record<string, string[]> = { book: BOOK_ART, trophy: TROPHY_ART, ...Object.fromEntries(Object.entries(FOODS)), ...MARKS };
@@ -32,11 +32,12 @@ describe('one pixel grid', () => {
 
   it('draws the room only with whole-pixel rectangles', () => {
     for (const phase of ['day', 'dusk', 'night'] as const) {
-      const svg = roomSvg(phase);
-      expect(svg).toContain(`viewBox="0 0 ${ROOM_W} ${ROOM_H}"`);
-      expect(svg).not.toMatch(/<(circle|ellipse|path|line)\b/);
-      for (const m of svg.matchAll(/<rect x="([^"]*)" y="([^"]*)" width="([^"]*)" height="([^"]*)"/g)) {
-        m.slice(1).forEach((v) => expect(Number.isInteger(Number(v)), `${phase} rect ${m[0]}`).toBe(true));
+      for (const svg of [roomSvg(phase), outdoorSvg(phase)]) {
+        expect(svg).toContain(`viewBox="0 0 ${ROOM_W} ${ROOM_H}"`);
+        expect(svg).not.toMatch(/<(circle|ellipse|path|line)\b/);
+        for (const m of svg.matchAll(/<rect x="([^"]*)" y="([^"]*)" width="([^"]*)" height="([^"]*)"/g)) {
+          m.slice(1).forEach((v) => expect(Number.isInteger(Number(v)), `${phase} rect ${m[0]}`).toBe(true));
+        }
       }
     }
   });
