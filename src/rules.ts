@@ -18,6 +18,8 @@ export const CONFIG = {
   lightheartedReturns: 1,    // a runaway cat can come back this many times
   strayAppearChance: 0.3,    // each stray shows up outdoors with this chance...
   strayWindowHours: 6,       // ...once every this many hours
+  strayDueChance: 0.8,       // a stray that is due to be fed today turns up with this chance instead
+  strayLeaveChance: 0.5,     // a stray that is fed in the garden wanders off with this chance
 } as const;
 
 // ===================== Types =====================
@@ -107,7 +109,7 @@ export type ActionResult =
   | { ok: true; state: AppState; events: GameEvent[] }
   | { ok: false; reason: Reason; state: AppState; events: GameEvent[] };
 
-const idHash = (id: string) => [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+export const idHash = (id: string) => [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
 // Cats adopted before genders existed get a stable one derived from their id.
 export const genderOf = (c: { id: string; gender?: CatGender }): CatGender =>
   c.gender ?? ((idHash(c.id) >> 3) % 2 === 0 ? 'girl' : 'boy');
@@ -236,13 +238,15 @@ export function settleAll(state: AppState, now: Date): { state: AppState; events
   const today = dayIndex(now);
   let xp = state.xp;
   const events: GameEvent[] = [];
+  let departed = false;
   const cats = state.cats.map((cat) => {
     const r = settleCat(cat, today);
     xp += r.xpDelta;
-    if (r.events.some((e) => e.type === 'died' || e.type === 'ranAway' || e.type === 'leftForever')) xp = CONFIG.departureXp;   // losing a cat drops affection to -30
+    if (r.events.some((e) => e.type === 'died' || e.type === 'ranAway' || e.type === 'leftForever')) departed = true;
     events.push(...r.events);
     return r.cat;
   });
+  if (departed) xp = CONFIG.departureXp;   // losing a cat drops affection to -30, whatever order the cats are in
   return { state: { ...state, xp, cats }, events };
 }
 
@@ -502,12 +506,12 @@ export const strayNameOf = (t: { id: string; nickname?: string; former?: { name:
 // and the window, so it holds still between reloads and nothing has to be saved.
 export const strayWindow = (now: Date) =>
   Math.floor((now.getTime() - now.getTimezoneOffset() * 60_000) / (CONFIG.strayWindowHours * 3_600_000));
-export function strayVisible(id: string, window: number): boolean {
+export function strayVisible(id: string, window: number, chance: number = CONFIG.strayAppearChance): boolean {
   let h = (idHash(id) ^ Math.imul(window, 0x9e3779b1)) | 0;
   h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
   h ^= h >>> 16;
-  return (h >>> 0) / 2 ** 32 < CONFIG.strayAppearChance;
+  return (h >>> 0) / 2 ** 32 < chance;   // the same roll for every chance, so a stray seen at 30% is also seen at 80%
 }
 
 // ===================== Selectors for the UI =====================

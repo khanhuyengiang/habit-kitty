@@ -41,7 +41,7 @@ single web page and as an offline Android app (via Capacitor).
 
 1. **Room**: a cosy room that follows the clock. Awake cats wander and climb the cat tree, and sleep at night.
    Double-tap an awake cat for a heart. Cats with the sitter are away from home.
-   Switch to **Nancy park** to meet your strays: each stray turns up with a 30% chance every 6 hours. Press and hold one for its menu.
+   Switch to the **Garden** to meet your strays: a stray that is due to be fed today turns up with an 80% chance, and the others with 30%, every 6 hours. A stray you feed in the garden has a 50% chance of wandering off again. Press and hold one for its menu.
 2. **Strays**: switch between repeating **Stray kitties** (habits) and one-off **Treats**. Press and hold a stray for its menu (heatmap, adopt, rename, delete), or a treat to delete it.
 3. **Today**: your cats, sorted into **Home**, **Sitter** and **Memories** (cats that died, ran away or went to the shelter, each with a condensed all-time heatmap from adoption to departure). Press and hold a cat for the sitter, its heatmap or the shelter.
 4. **Heatmap**: a switch toggles between all kitties on one calendar (each day split into a slice per kitty) and one calendar per kitty. Stray kitties are listed below. Dead and runaway cats are not shown.

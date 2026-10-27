@@ -385,6 +385,9 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .moods button { display: grid; justify-items: center; gap: var(--s1); padding: var(--s2) var(--s1); font-size: 15px; font-weight: 700; border-color: var(--line); background: var(--surface2); color: var(--muted); }
 .moods button[aria-pressed="true"] { border-color: var(--accent-edge); background: var(--accent-soft); color: var(--ink); }
 .diary-text { min-height: calc(55 * var(--px)); font: 500 20px/1.4 var(--font) !important; resize: none; }
+.diary-mood { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+.mood-now { display: inline-flex; align-items: center; gap: var(--s2); font-size: 18px; font-weight: 700; }
+.diary-read { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 500 20px/1.4 var(--font); }
 .diary-photo img { display: block; width: 100%; max-height: calc(87 * var(--px)); object-fit: cover; border: var(--px) solid var(--line); margin-bottom: var(--s2); image-rendering: pixelated; }
 .look-pick { display: grid; gap: var(--s1); }
 .party { position: fixed; inset: 0; pointer-events: none; z-index: 30; overflow: hidden; }
@@ -474,7 +477,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 <div class="wrap">
   <header class="top" id="top"></header>
 
-  <main id="tab-room" class="tab"><div class="seg" id="room-seg" role="tablist" aria-label="Room"><button type="button" role="tab" id="room-tab-indoor" data-action="room-view" data-view="indoor">Bunker</button><button type="button" role="tab" data-action="room-view" data-view="outdoor">Nancy park</button></div><div id="room"></div><div id="outdoor" hidden></div><div class="room-foot"><p class="muted" id="room-note"></p><button class="btn small" id="room-rename" type="button" data-action="room-rename">Rename</button></div></main>
+  <main id="tab-room" class="tab"><div class="seg" id="room-seg" role="tablist" aria-label="Room"><button type="button" role="tab" id="room-tab-indoor" data-action="room-view" data-view="indoor">Bunker</button><button type="button" role="tab" data-action="room-view" id="room-tab-outdoor" data-view="outdoor">Garden</button></div><div id="room"></div><div id="outdoor" hidden></div><div class="room-foot"><p class="muted" id="room-note"></p><button class="btn small" id="room-rename" type="button" data-action="room-rename">Rename</button></div></main>
 
   <main id="tab-mindful" class="tab">
     <div class="seg" id="mindful-seg" role="tablist" aria-label="Stray kitties or treats">
@@ -558,7 +561,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
       <label class="vol"><span>Music</span><input type="range" id="vol-bgm" min="0" max="100" step="5"><output id="vol-bgm-out" class="num" for="vol-bgm"></output></label>
       <label class="vol"><span>Meows</span><input type="range" id="vol-meow" min="0" max="100" step="5"><output id="vol-meow-out" class="num" for="vol-meow"></output></label>
       <label class="vol"><span>Purrs</span><input type="range" id="vol-purr" min="0" max="100" step="5"><output id="vol-purr-out" class="num" for="vol-purr"></output></label>
-      <p class="muted">Kitties in the Bunker (and strays in Nancy park) meow now and then, and may purr or meow when you pet them. Slide a sound all the way down to turn it off.</p>
+      <p class="muted">Kitties indoors (and strays outdoors) meow now and then, and may purr or meow when you pet them. Slide a sound all the way down to turn it off.</p>
       <p class="muted">Music: Strawberry Walk 【BGM： IchinoseSound】 <a href="https://www.youtube.com/@IchinoseSound" target="_blank" rel="noopener">youtube.com/@IchinoseSound</a></p>
     </div></details>
 
@@ -607,7 +610,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
         <li>Below 0 affection, cats only trust you with one cat at a time. Feeding strays and doing treats earn it back.</li>
         <li>Heatmap shows each cat's month (switch between combined and individual); the gold outline is today.</li>
         <li><b>Treats</b> are one-offs (up to 15 XP a day). <b>Stray kitties</b> are small habits you might not do every day, like cleaning your desk after working from home; they repeat and keep their history (up to 10 XP a day), and nothing bad happens if you skip a day. Feed a stray by doing its habit. A daily stray can be adopted as a kitty and keeps its history in teal. A kitty you release to the stray colony becomes a stray again.</li>
-        <li>The Room tab has two places: the Bunker for your kitties and Nancy park, where strays turn up now and then (each has a 30% chance every 6 hours).</li>
+        <li>The Room tab has two places: indoors for your kitties and the garden outside, where strays turn up now and then (a stray that is due today has an 80% chance every 6 hours, the others 30%; one you feed there may wander off again, 50%). Rename either one with the Rename button under it.</li>
         <li>You can keep up to 9 kitties.</li>
       </ul>
     </div></details>

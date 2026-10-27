@@ -71,7 +71,11 @@ export const isZip = (bytes: Uint8Array) => bytes.length > 3 && bytes[0] === 0x5
 
 // Throws when the bytes are not a Habit Kitty backup.
 export function unpackBackup(bytes: Uint8Array): Backup {
-  const files = unzipSync(bytes, { filter: (f) => f.originalSize < 8_000_000 });   // refuse zip bombs
+  let total = 0;
+  const files = unzipSync(bytes, { filter: (f) => {   // refuse zip bombs: each file, and all of them together, stay small
+    total += f.originalSize;
+    return f.originalSize < 8_000_000 && total < 64_000_000 && (!f.name.startsWith('photos/') || f.originalSize <= PHOTO_MAX_BYTES * 4);
+  } });
   if (!files['manifest.json'] || !files['game.json']) throw new Error('not a backup');
   const manifest = JSON.parse(strFromU8(files['manifest.json']));
   if (manifest?.app !== 'habit-kitty' || manifest.format !== BACKUP_FORMAT) throw new Error('unsupported backup');
