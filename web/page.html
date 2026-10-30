@@ -384,6 +384,15 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .moods { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--s2); }
 .moods button { display: grid; justify-items: center; gap: var(--s1); padding: var(--s2) var(--s1); font-size: 15px; font-weight: 700; border-color: var(--line); background: var(--surface2); color: var(--muted); }
 .moods button[aria-pressed="true"] { border-color: var(--accent-edge); background: var(--accent-soft); color: var(--ink); }
+.diary-nav { display: flex; align-items: center; justify-content: space-between; padding-right: calc(13 * var(--px)); }   /* leave room for the close button in the corner */
+.mood-split { display: grid; }
+.mood-split > .sprite { grid-area: 1 / 1; }
+.mood-split > .sprite:first-child { clip-path: inset(0 50% 0 0); }
+.mood-split > .sprite:last-child { clip-path: inset(0 0 0 50%); }
+.moods:has([data-weather]), #diary-weather { grid-template-columns: repeat(5, 1fr); }
+.moods .weather { width: calc(var(--w) * var(--px)); height: auto; }
+#mood-names .field { display: flex; align-items: center; gap: var(--s2); }
+#mood-names .field input { flex: 1; }
 .diary-text { min-height: calc(55 * var(--px)); font: 500 20px/1.4 var(--font) !important; resize: none; }
 .diary-mood { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
 .mood-now { display: inline-flex; align-items: center; gap: var(--s2); font-size: 18px; font-weight: 700; }
@@ -491,6 +500,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
       <p class="num" id="mindful-cap"></p>
       <p class="travel-note" id="mindful-travel" hidden>Time travel is on. Use the rewind button on a row to mark or unmark it on any day.</p>
       <ul class="tasks" id="tasks"></ul>
+      <div id="tasks-done"></div>
     </section>
     <p class="muted" id="strays-note" style="text-align:center;font-size:13px"></p>
     <form class="panel" id="task-form" novalidate>
@@ -592,8 +602,14 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
       <p class="form-error" id="save-error" hidden></p>
     </div></details>
 
+    <details class="panel fold"><summary>Emotion names</summary><div class="fold-body">
+      <p class="muted">Rename the five diary emotions. Leave a box empty to keep the original name.</p>
+      <div id="mood-names"></div>
+    </div></details>
+
     <details class="panel fold"><summary>Game options</summary><div class="fold-body">
       <label class="check"><input type="checkbox" id="allow-rename"><span><b>Allow renaming kitties</b><br><span class="muted">Adds a Rename button to the long-press menu. Off by default, so a kitty keeps the name you gave it.</span></span></label>
+      <label class="check"><input type="checkbox" id="trackamaniac"><span><b>Trackamaniac</b><br><span class="muted">Adds a weather choice (sunny, cloudy, rainy, storm, snow) to every diary page.</span></span></label>
       <label class="check"><input type="checkbox" id="show-clock"><span><b>Playtest clock</b><br><span class="muted">Shows a small clock button for skipping ahead in time, to try out how days and streaks play out.</span></span></label>
       <label class="check"><input type="checkbox" id="time-travel"><span><b>Time travel</b><br><span class="muted">Adds a rewind button to every stray kitty and treat, so you can mark or unmark it as done on any past day (or today). It only fixes your record: no XP is paid or taken away.</span></span></label>
       <label class="check"><input type="checkbox" id="unlimited-cats"><span><b>Unlimited kitties</b><br><span class="muted">Normally you can keep 9 kitties. Turn this on to adopt more, but you will have to confirm three times for every extra kitty.</span></span></label>

@@ -2,6 +2,16 @@
 
 Newest first. The app bundles this file: it shows the latest entry once after an update, and the whole list under Settings → Change log.
 
+## 0.4.1 - 2026-10-29
+
+### New
+- **Diary: previous and next day.** Arrows at the top of every diary page step through the days.
+- **Two emotions.** Pick up to two emotions for a day; the kitty on the calendar is split down the middle, one half each.
+- **Your own word for a feeling.** A text box under the emotions replaces the emotion name on the page.
+- **Emotion names.** Settings → Emotion names lets you rename the five emotions.
+- **Trackamaniac.** A new option in Game options that adds a pixel-art weather choice (sunny, cloudy, rainy, storm, snow) to diary pages.
+- **Done treats.** Finished treats now sit in a "Done" drop-down on the Treats tab, with a **Delete all done** button (it asks first).
+
 ## 0.4.0 - 2026-10-26
 
 ### New

@@ -34,13 +34,20 @@
   #prev, #prevFace { background: #ffe3ef; border: 3px solid var(--line); image-rendering: pixelated; max-width: 100%; }
   label { display: inline-flex; gap: 4px; align-items: center; }
   .hint { font-size: 16px; color: #7a69a8; }
+  .free-row { display: grid; grid-template-columns: 34px 34px 1fr 28px; gap: 4px; align-items: center; }
+  .free-row input[type=text] { width: 100%; min-width: 0; }
+  .free-row input[type=color] { width: 34px; height: 30px; padding: 0; border: 3px solid var(--line); background: var(--soft); }
+  .free-row .letter { text-align: center; font-size: 22px; padding: 0; }
+  .free-row.on .letter { background: var(--pink); border-color: var(--pink-edge); }
+  .free-row button { padding: 0; box-shadow: none; }
+  .free-row input.bad { border-color: #c23f7c; }
   #status { font-size: 16px; color: #3a9d7d; min-height: 1.3em; }
 </style>
 </head>
 <body>
 <header>
   <h1>Kitty pixel editor</h1>
-  <label>part <select id="part"><option value="sit">sitting cat + face</option><option value="tailA">tail frame A</option><option value="tailB">tail frame B</option><option value="nap">napping cat</option><option value="mini">mini face</option></select></label>
+  <label>part <select id="part"><option value="sit">sitting cat + face</option><option value="tailA">tail frame A</option><option value="tailB">tail frame B</option><option value="nap">napping cat</option><option value="mini">mini face</option><option value="free">free drawing</option></select></label>
   <label>coat <select id="coat"></select></label>
   <span class="row">size <input id="w" type="number" min="1" max="128" value="43"> x <input id="h" type="number" min="1" max="128" value="28"> <button id="resize">Resize</button></span>
   <span class="row">zoom <input id="zoom" type="range" min="6" max="32" value="16"></span>
@@ -59,10 +66,10 @@
       <button data-tool="select" title="drag a box; drag inside it to move it">Select</button><button data-tool="move" title="drag to move the selection, or the whole layer if nothing is selected">Move</button>
     </div>
     <p class="hint">Keys: B pencil, E erase, G fill, I pick, S select, M move, 1-9 slots, ctrl+Z undo. Right-click erases. With a selection: arrows nudge it, Delete clears it, ctrl+C / ctrl+V copy and paste, Esc deselects.</p>
-    <h2>Colours (slots)</h2>
+    <h2 id="slotsTitle">Colours (slots)</h2>
     <div class="slots" id="slots"></div>
-    <h2>Fur colour (preview)</h2>
-    <div class="row"><input id="fur" type="color" value="#ffb98a" title="fur colour used for plain, stripes, point"></div>
+    <h2 id="furTitle">Fur colour (preview)</h2>
+    <div class="row" id="furRow"><input id="fur" type="color" value="#ffb98a" title="fur colour used for plain, stripes, point"></div>
     <p class="hint" id="coatHelp"></p>
   </section>
 
@@ -90,8 +97,13 @@ const SLOTS = [
   ['p', 'ear pink'], ['F', 'F (mini fur)'], ['m', 'mouth'], ['e', 'eye'], ['n', 'nose'], ['c', 'blush'],
 ];
 const PATTERNS = ['stripes', 'mask', 'patch', 'calico', 'point', 'plain'];
-const PARTS = { sit: { art: 'SIT_HALF', coat: 'sit' }, tailA: { art: 'TAIL_A' }, tailB: { art: 'TAIL_B' }, nap: { art: 'NAP', coat: 'nap' }, mini: { art: 'MINI', coat: 'mini' } };
-const DIMS = { sit: [14, 26], tailA: [28, 26], tailB: [28, 26], nap: [43, 28], mini: [13, 9] };
+const PARTS = { free: { art: 'ART' }, sit: { art: 'SIT_HALF', coat: 'sit' }, tailA: { art: 'TAIL_A' }, tailB: { art: 'TAIL_B' }, nap: { art: 'NAP', coat: 'nap' }, mini: { art: 'MINI', coat: 'mini' } };
+const DIMS = { sit: [14, 26], tailA: [28, 26], tailB: [28, 26], nap: [43, 28], mini: [13, 9], free: [16, 16] };
+// Free drawing: you make the palette. Each entry is a letter and any CSS colour (a #hex or a name like "hotpink").
+const free = { grid: null, pal: [{ k: 'o', v: '#5a4380' }, { k: 'r', v: '#ff8fb8' }, { k: 'y', v: '#ffd36e' }, { k: 'u', v: '#8fd0fa' }, { k: 'w', v: '#fffafc' }] };
+const validColour = (v) => CSS.supports('color', v);
+const toHex = (v) => { const c = document.createElement('canvas').getContext('2d'); c.fillStyle = '#000'; c.fillStyle = v; return c.fillStyle.startsWith('#') ? c.fillStyle : '#000000'; };
+const slotKeys = () => (part === 'free' ? free.pal.map((e) => e.k) : SLOTS.map((x) => x[0]));
 const WHITE = '#fffafc';
 const $ = (id) => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d'), prev = $('prev'), pctx = prev.getContext('2d');
@@ -109,6 +121,7 @@ const isTail = () => part === 'tailA' || part === 'tailB';
 const HEAD_ROWS = 14, FACE_X = 2;
 
 function colours() {
+  if (part === 'free') return Object.fromEntries(free.pal.filter((e) => validColour(e.v)).map((e) => [e.k, e.v]));
   const fur = $('fur').value, pat = overlayMode() ? coat : 'plain';
   const c = { plain: { f: fur, s: fur, W: fur, a: shade(fur, .8), b: shade(fur, .8) },
     stripes: { f: fur, s: shade(fur, .74), W: WHITE, a: shade(fur, .8), b: shade(fur, .8) },
@@ -122,7 +135,7 @@ function colours() {
   return m;
 }
 function coatHelp() {
-  $('coatHelp').textContent = isTail() ? 'Tails have no coat layers: they take the cat\'s fur colour.' :
+  $('coatHelp').textContent = part === 'free' ? 'Free drawing: add colours with any letter and a #hex or colour name. Paste code with a palette to load it; the code box shows rows plus the palette.' : isTail() ? 'Tails have no coat layers: they take the cat\'s fur colour.' :
     overlayMode() ? `Painting the ${coat} layer: a letter recolours the fur underneath, a gap (erase) leaves the base alone. Plain and mask normally need no layer.` : 'Editing the base art (shown in plain fur). Pick a coat to paint its patches.';
 }
 
@@ -148,7 +161,40 @@ function composite() {
   layer.forEach((row, y) => row.forEach((ch, x) => { const cur = g[y]?.[x]; if (ch !== '.' && cur && over.includes(cur)) g[y][x] = ch; }));
   return g;
 }
+function freePanel() {
+  const box = $('slots'); box.innerHTML = '';
+  free.pal.forEach((e, i) => {
+    const row = document.createElement('div');
+    row.className = 'free-row' + (cur === e.k ? ' on' : '');
+    row.innerHTML = `<input class="letter" type="text" maxlength="1" value="${e.k.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}" title="letter used in the code (click to draw with it)">
+      <input type="color" value="${toHex(e.v)}"><input type="text" value="${e.v.replace(/"/g, '&quot;')}" placeholder="#hex or name" spellcheck="false"><button title="remove colour">×</button>`;
+    const [letter, picker, text, del] = row.querySelectorAll('input,button');
+    const mark = () => { text.classList.toggle('bad', !validColour(text.value)); };
+    letter.onfocus = () => { cur = e.k; if (tool === 'erase' || tool === 'pick') setTool('pencil'); box.querySelectorAll('.free-row').forEach((r, j) => r.classList.toggle('on', j === i)); };
+    letter.onchange = () => {
+      const k = letter.value;
+      if (!k || k === '.' || k === ' ' || free.pal.some((o, j) => j !== i && o.k === k)) { letter.value = e.k; say('Pick a free letter (not "." or a space).', true); return; }
+      push(); grid = grid.map((r) => r.map((c) => (c === e.k ? k : c)));
+      if (cur === e.k) cur = k;
+      e.k = k; render(); slotsPanel();
+    };
+    picker.oninput = () => { e.v = picker.value; text.value = e.v; mark(); render(); };
+    text.oninput = () => { e.v = text.value.trim(); mark(); if (validColour(e.v)) { picker.value = toHex(e.v); render(); } };
+    del.onclick = () => { push(); grid = grid.map((r) => r.map((c) => (c === e.k ? '.' : c))); free.pal.splice(i, 1); if (cur === e.k) cur = free.pal[0]?.k ?? 'o'; render(); slotsPanel(); };
+    mark(); box.append(row);
+  });
+  const add = document.createElement('button'); add.textContent = '+ Add colour';
+  add.onclick = () => {
+    const k = [...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'].find((c) => !free.pal.some((e) => e.k === c));
+    if (!k) return;
+    free.pal.push({ k, v: '#ff8fb8' }); cur = k; slotsPanel(); render();
+  };
+  box.append(add);
+}
 function slotsPanel() {
+  $('slotsTitle').textContent = part === 'free' ? 'Colours (your palette)' : 'Colours (slots)';
+  $('furTitle').hidden = $('furRow').hidden = part === 'free';
+  if (part === 'free') { freePanel(); return; }
   const col = colours();
   $('slots').innerHTML = '';
   SLOTS.forEach(([k, name], i) => {
@@ -220,17 +266,36 @@ function render() {
 }
 const artName = () => PARTS[part].art;
 const label = () => (overlayMode() ? `COAT_${PARTS[part].coat.toUpperCase()}.${coat}` : artName());
+const quoteKey = (k) => (/^\w$/.test(k) ? k : `'${k.replace(/['\\]/g, '\\$&')}'`);
 function toCode() {
   $('name').value = label();
   const rows = grid.map((r) => r.join(''));
+  if (part === 'free') {
+    const used = new Set(rows.join(''));
+    const pal = free.pal.filter((e) => used.has(e.k)).map((e) => `${quoteKey(e.k)}: '${e.v}'`).join(', ');
+    return `export const ART = [\n${rows.map((r) => `  '${r}',`).join('\n')}\n];\nexport const ART_PAL = { ${pal} };\n`;
+  }
   return overlayMode() ? `  ${coat}: [\n${rows.map((r) => `    '${r}',`).join('\n')}\n  ],\n`
     : `export const ${artName()} = [\n${rows.map((r) => `  '${r}',`).join('\n')}\n];\n`;
 }
 function fromCode(text) {
+  if (part === 'free') {   // a palette is a { letter: colour } block; everything else quoted is a row
+    const pal = [];
+    text = text.replace(/\{([^}]*)\}/g, (all, inner) => {
+      const found = [...inner.matchAll(/(?:['"]([^'"]+)['"]|(\w+))\s*:\s*['"]([^'"]+)['"]/g)].filter((m) => (m[1] ?? m[2]).length === 1);
+      found.forEach((m) => pal.push({ k: m[1] ?? m[2], v: m[3].trim() }));
+      return found.length ? '' : all;
+    });
+    if (pal.length) free.pal = pal;
+  }
   const rows = [...text.matchAll(/'([^'\n]*)'|"([^"\n]*)"/g)].map((m) => m[1] ?? m[2]);
   if (!rows.length) throw new Error('no rows found');
   const w = Math.max(...rows.map((r) => r.length));
   grid = rows.map((r) => [...r.padEnd(w, '.')]);
+  if (part === 'free') {   // a letter with no colour yet gets a grey one, so nothing vanishes
+    for (const ch of new Set(grid.flat())) if (ch !== '.' && ch !== ' ' && !free.pal.some((e) => e.k === ch)) free.pal.push({ k: ch, v: '#999999' });
+    slotsPanel();
+  }
 }
 // ---- selection and move ----
 const inSel = (x, y) => sel && x >= sel.x && y >= sel.y && x < sel.x + sel.w && y < sel.y + sel.h;
@@ -361,8 +426,15 @@ const rowsFrom = (text) => [...text.matchAll(/'([^']*)'/g)].map((m) => m[1]);
 async function fetchRows(url) { const r = await fetch(url); if (!r.ok) return null; const t = await r.text(); return t.startsWith('{') ? JSON.parse(t).rows : rowsFrom(t); }
 async function loadPart(announce = true) {
   undoS = []; redoS = []; ghost = null; baseRows = null; sel = null; floating = null; drag = null;
-  const hasCoat = !isTail(); if (!hasCoat) coat = 'base';
+  const hasCoat = !isTail() && part !== 'free'; if (!hasCoat) coat = 'base';
   $('coat').value = coat; $('coat').disabled = !hasCoat;
+  $('fetchSrc').disabled = $('saveSrc').disabled = part === 'free';
+  if (part === 'free') {
+    grid = free.grid ?? blank(...DIMS.free); free.grid = null;
+    if (!free.pal.some((e) => e.k === cur)) cur = free.pal[0]?.k ?? 'o';
+    if (announce) say('Free drawing: paste code into the box and press "Load from box", or just draw.');
+    render(); slotsPanel(); return;
+  }
   const base = await fetchRows('/api/art?name=' + artName()).catch(() => null);
   baseRows = base;
   if (!overlayMode()) {
@@ -391,7 +463,12 @@ $('saveSrc').onclick = async () => {
     say(`Saved ${label()} (the preview reloads).`);
   } catch (e) { say(String(e.message || 'start the editor with npm run editor'), true); }
 };
-$('part').onchange = () => { part = $('part').value; loadPart(); };
+$('part').onchange = () => {
+  if (part === 'free') { commitFloat(); free.grid = grid; }
+  part = $('part').value;
+  if (part !== 'free' && !SLOTS.some((x) => x[0] === cur)) cur = 'o';
+  loadPart();
+};
 $('coat').onchange = () => { coat = $('coat').value; loadPart(); };
 addEventListener('keydown', (e) => {
   if (['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement.tagName)) return;
@@ -404,7 +481,7 @@ addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && k === 'v') { e.preventDefault(); pasteClip(); return; }
   if (k === 's') setTool('select'); else if (k === 'm') setTool('move');
   else if (k === 'b') setTool('pencil'); else if (k === 'e') setTool('erase'); else if (k === 'g') setTool('fill'); else if (k === 'i') setTool('pick');
-  else if (/^[1-9]$/.test(k)) { cur = SLOTS[+k - 1][0]; setTool('pencil'); slotsPanel(); }
+  else if (/^[1-9]$/.test(k) && slotKeys()[+k - 1]) { cur = slotKeys()[+k - 1]; setTool('pencil'); slotsPanel(); }
 });
 
 $('coat').innerHTML = '<option value="base">base art (no coat)</option>' + PATTERNS.map((p) => `<option value="${p}">${p}</option>`).join('');

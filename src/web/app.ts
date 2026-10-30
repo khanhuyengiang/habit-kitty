@@ -18,16 +18,18 @@ import CHANGELOG_MD from '../../CHANGELOG.md';
 import { pickThought, type ThoughtKind } from '../thoughts.ts';
 import {
   PHOTO_MAX_BYTES, PHOTO_MAX_SIDE, dayFromName, diaryPath, entryFromMarkdown, entryToMarkdown, isZip, packBackup, photoPath, unpackBackup,
-  type Backup, type DiaryEntry, type Mood,
+  type Backup, type DiaryEntry, type Mood, type Weather, WEATHER_KEYS,
 } from '../store.ts';
 import { CONFETTI_COLORS, TRAITS, notifyIconName, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../pixelcat.ts';
-import { BOOK_ART, FOODS, MARKS, ROOM_H, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, heartSvg, iconSvg, markSvg, outdoorSvg, roomSvg } from '../pixelart.ts';
+import { BOOK_ART, FOODS, MARKS, ROOM_H, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, weatherSvg, heartSvg, iconSvg, markSvg, outdoorSvg, roomSvg } from '../pixelart.ts';
 import { dateOf, dayOf, firstDay, habitStreak, monthGrid, streak, weekRow, type DayKind, type Trackable } from '../calendar.ts';
 
 // ===================== Save =====================
 interface LogLine { at: number; text: string }
 interface Save {
   v: 1; state: AppState; offsetHours: number; log: LogLine[]; savedAt: number; logHidden?: boolean; unlimited?: boolean; roomName?: string; outdoorName?: string; allowRename?: boolean; showClock?: boolean;
+  trackamaniac?: boolean;              // adds a weather choice to every diary page
+  moodNames?: Partial<Record<Mood, string>>;   // the user's own names for the five emotions
   diary?: Record<string, DiaryEntry>;   // in memory only: each page lives in its own file (see "Diary files")
   reminder?: ReminderSettings;
   returned?: Record<string, number>;   // cat id -> day it last came home (feeds the "welcome back" thoughts)
@@ -938,6 +940,7 @@ function renderTasks() {
   $('tasks-panel').hidden = !isTask;
   $('strays').hidden = isTask;
   $('strays-note').hidden = isTask;
+  $('tasks-done').hidden = !isTask;
   if (!isTask) {
     const strays = save.state.tasks.filter((k) => k.kind === 'habit');
     $('strays').innerHTML = strays.length ? strays.map((k) => `<article class="cat">
@@ -950,13 +953,19 @@ function renderTasks() {
     $('strays-note').textContent = `Earned today: ${e?.habit ?? 0}/${cap} XP · Press and hold a stray for more options.${save.timeTravel ? ' Time travel is on: use the rewind button on a card.' : ''}`;
     return;
   }
-  const list = save.state.tasks.filter((k) => k.kind === kind);
-  if (isTask) list.sort((a, b) => Number(a.lastDoneDay !== null) - Number(b.lastDoneDay !== null));
+  const all = save.state.tasks.filter((k) => k.kind === kind);
+  const doneTreats = all.filter((k) => k.lastDoneDay !== null);
+  const list = all.filter((k) => k.lastDoneDay === null);
+  const treatRow = (k: typeof all[number]) => `<li data-task="${k.id}" data-hold="task"><span class="done">${esc(k.name)} <span class="muted">· +${k.xp} XP</span></span>
+        <span class="row-btns"><button class="btn small" data-action="task" data-id="${k.id}" disabled>${iconSvg('check')} Done</button>${TRAVEL(k.id)}${DEL(k.id)}</span></li>`;
+  // Finished treats are tucked into a drop-down so the list stays short; it stays open across redraws.
+  $('tasks-done').innerHTML = doneTreats.length ? `<details class="more" id="done-treats" ${doneTreatsOpen ? 'open' : ''}><summary>Done (${doneTreats.length})</summary>
+    <ul class="tasks">${doneTreats.map(treatRow).join('')}</ul>
+    <div class="btns"><button class="btn small" type="button" data-action="delete-done">Delete all done</button></div></details>` : '';
   $('tasks').innerHTML = list.length ? list.map((k) => {
     if (isTask) {
-      const done = k.lastDoneDay !== null;
-      return `<li data-task="${k.id}" data-hold="task"><span class="${done ? 'done' : ''}">${esc(k.name)} <span class="muted">· +${k.xp} XP</span></span>
-        <span class="row-btns"><button class="btn small" data-action="task" data-id="${k.id}" ${done ? 'disabled' : ''}>${done ? `${iconSvg('check')} Done` : 'Done'}</button>${TRAVEL(k.id)}${DEL(k.id)}</span></li>`;
+      return `<li data-task="${k.id}" data-hold="task"><span>${esc(k.name)} <span class="muted">· +${k.xp} XP</span></span>
+        <span class="row-btns"><button class="btn small" data-action="task" data-id="${k.id}">Done</button>${TRAVEL(k.id)}${DEL(k.id)}</span></li>`;
     }
     const left = daysUntilReady(k, t);
     const daily = k.cooldownDays === 1;
@@ -965,8 +974,10 @@ function renderTasks() {
       ${renderWeek(habitSubject(k), t)}
       <span class="muted habit-foot">${k.doneDays.length ? `Done ${plural(k.doneDays.length, 'time')}` : 'Not done yet'}${daily ? ` · streak ${habitStreak(k.doneDays, t)}` : ''}</span>
       ${daily ? `<button class="btn small" data-action="habit-kitty" data-id="${k.id}">Adopt the kitty</button>` : ''}</li>`;
-  }).join('') : `<li class="muted">No ${isTask ? 'treats' : 'stray kitties'} yet. Add one below.</li>`;
+  }).join('') : `<li class="muted">${doneTreats.length ? 'Every treat is done.' : 'No treats yet. Add one below.'}</li>`;
 }
+let doneTreatsOpen = false;
+$('tasks-done').addEventListener('toggle', (ev) => { doneTreatsOpen = (ev.target as HTMLDetailsElement).open; }, true);
 
 // The tabs carry the two rooms' names ("Cosy Room" and "Garden" unless renamed).
 const indoorName = () => save.roomName?.trim() || 'Cosy Room';
@@ -1019,6 +1030,8 @@ function setDayBoundary(h: number) {
 function renderSaved() {
   ($('unlimited-cats') as HTMLInputElement).checked = !!save.unlimited;
   ($('allow-rename') as HTMLInputElement).checked = !!save.allowRename;
+  ($('trackamaniac') as HTMLInputElement).checked = !!save.trackamaniac;
+  document.querySelectorAll<HTMLInputElement>('#mood-names input').forEach((i) => { if (i !== document.activeElement) i.value = save.moodNames?.[i.dataset.mood as Mood] ?? ''; });
   ($('show-clock') as HTMLInputElement).checked = !!save.showClock;
   ($('time-travel') as HTMLInputElement).checked = !!save.timeTravel;
   renderDaySetting();
@@ -1040,7 +1053,16 @@ const MOODS: Record<Mood, { label: string; face: Face; fur: string }> = {
   stressed: { label: 'Stressed', face: 'starving', fur: '#c3a9ee' },
 };
 const MOOD_KEYS = Object.keys(MOODS) as Mood[];
-const moodSprite = (m: Mood) => miniSvg(MOODS[m].face, { fur: MOODS[m].fur, pattern: 'plain' }).replace('class="sprite', 'class="sprite mood');
+const WEATHER: Record<Weather, string> = { sunny: 'Sunny', cloudy: 'Cloudy', rainy: 'Rainy', storm: 'Storm', snow: 'Snow' };
+const moodName = (m: Mood) => save.moodNames?.[m]?.trim() || MOODS[m].label;
+// What a page calls its feeling: the user's own words if they wrote any, else the emotion names ("Joyful + Tired").
+const feelingText = (e: { mood?: Mood; mood2?: Mood; feeling?: string }) =>
+  e.feeling?.trim() || [e.mood, e.mood2].filter((m): m is Mood => !!m).map(moodName).join(' + ');
+const moodFace = (m: Mood) => miniSvg(MOODS[m].face, { fur: MOODS[m].fur, pattern: 'plain' });
+const moodSprite = (m: Mood) => moodFace(m).replace('class="sprite', 'class="sprite mood');
+// Two emotions share one kitty: the left half of the first face beside the right half of the second.
+const moodsSprite = (a: Mood, b?: Mood) => b && b !== a
+  ? `<span class="mood mood-split">${moodFace(a)}${moodFace(b)}</span>` : moodSprite(a);
 const hasPage = (e?: DiaryEntry) => !!e && (!!e.text.trim() || !!e.photo);   // a written page or a photo turns the day pink
 
 // ---- Diary files: one Markdown file per day and one small JPEG per day, in the app's private storage ----
@@ -1261,9 +1283,9 @@ function renderDiary() {
     const has = hasPage(e);
     if (has) pages++;
     const future = d > t;
-    const what = [has ? 'entry' : '', e?.mood ? `feeling ${MOODS[e.mood].label.toLowerCase()}` : ''].filter(Boolean).join(', ') || 'empty';
+    const what = [has ? 'entry' : '', e?.mood ? `feeling ${feelingText(e).toLowerCase()}` : '', e?.weather ? WEATHER[e.weather].toLowerCase() : ''].filter(Boolean).join(', ') || 'empty';
     cells.push(`<button type="button" class="dc${has ? ' has' : ''}${d === t ? ' now' : ''}" data-action="diary-open" data-day="${d}" ${future ? 'disabled' : ''}
-      aria-label="${fmtDay(d)}: ${what}"><span class="dn">${d - first + 1}</span>${e?.mood ? moodSprite(e.mood) : ''}</button>`);
+      aria-label="${fmtDay(d)}: ${what}"><span class="dn">${d - first + 1}</span>${e?.mood ? moodsSprite(e.mood, e.mood2) : ''}</button>`);
   }
   $('diary-cal').innerHTML = cells.join('');
   const head = $('diary-title');
@@ -1273,11 +1295,11 @@ function renderDiary() {
   ($('diary-next') as HTMLButtonElement).disabled = atNow;
   $('diary-stats').innerHTML = pages ? `<b class="num">${pages}</b> ${pages === 1 ? 'page' : 'pages'} written this month` : 'No pages this month yet. Tap a day to write one.';
   $('diary-legend').innerHTML = `<span><i class="has"></i>has an entry</span><span><i class="now"></i>today</span>` +
-    MOOD_KEYS.map((k) => `<span>${moodSprite(k)}${MOODS[k].label}</span>`).join('');
+    MOOD_KEYS.map((k) => `<span>${moodSprite(k)}${esc(moodName(k))}</span>`).join('');
 }
 
 // ---- one day's page ----
-let diaryDraft: { day: number; mood?: Mood; photo: Blob | null; photoUrl: string; photoLost?: boolean; reading?: boolean; loaded?: Promise<unknown> } | null = null;   // photoLost: the saved photo could not be read, so keep its file
+let diaryDraft: { day: number; moods: Mood[]; weather?: Weather; photo: Blob | null; photoUrl: string; photoLost?: boolean; reading?: boolean; loaded?: Promise<unknown> } | null = null;   // photoLost: the saved photo could not be read, so keep its file
 
 function drawDraftPhoto() {
   if (!diaryDraft) return;
@@ -1302,20 +1324,26 @@ function setDraftPhoto(b: Blob | null) {
   drawDraftPhoto();
 }
 function markMood() {
-  document.querySelectorAll<HTMLElement>('#diary-moods [data-mood]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mood === diaryDraft?.mood)));
+  document.querySelectorAll<HTMLElement>('#diary-moods [data-mood]').forEach((b) => b.setAttribute('aria-pressed', String(!!diaryDraft?.moods.includes(b.dataset.mood as Mood))));
+  document.querySelectorAll<HTMLElement>('#diary-weather [data-weather]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.weather === diaryDraft?.weather)));
 }
+const diaryNav = (day: number) => `<div class="diary-nav">
+  <button class="btn small" type="button" data-action="diary-go" data-day="${day - 1}" aria-label="Previous day">${iconSvg('prev')}</button>
+  <span class="muted">${day === today() ? 'Today' : ''}</span>
+  <button class="btn small" type="button" data-action="diary-go" data-day="${day + 1}" aria-label="Next day" ${day >= today() ? 'disabled' : ''}>${iconSvg('next')}</button></div>`;
 
 // A page with text opens as read-only; an empty one, or "Edit entry", opens the form.
 function openDiary(day: number, edit = false) {
   const e = save.diary?.[day];
   if (diaryDraft?.photoUrl) URL.revokeObjectURL(diaryDraft.photoUrl);
   const reading = !edit && !!e?.text.trim();
-  diaryDraft = { day, mood: e?.mood, photo: null, photoUrl: '', reading };
+  diaryDraft = { day, moods: [e?.mood, e?.mood2].filter((m): m is Mood => !!m), weather: e?.weather, photo: null, photoUrl: '', reading };
   const heading = `<h3>${esc(dateOf(day).toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }))}</h3>`;
   if (reading && e) {
     openModal(`<div class="panel" id="diary-read"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
-      ${heading}
-      <div class="diary-mood">${e.mood ? `<span class="mood-now">${moodSprite(e.mood)}<span>${MOODS[e.mood].label}</span></span>` : ''}<button class="btn small" type="button" data-action="diary-edit">Edit entry</button></div>
+      ${diaryNav(day)}${heading}
+      <div class="diary-mood">${e.mood ? `<span class="mood-now">${moodsSprite(e.mood, e.mood2)}<span>${esc(feelingText(e))}</span></span>` : '<span></span>'}<button class="btn small" type="button" data-action="diary-edit">Edit entry</button></div>
+      ${e.weather ? `<span class="mood-now">${weatherSvg(e.weather)}<span>${WEATHER[e.weather]}</span></span>` : ''}
       <p class="diary-read">${esc(e.text)}</p>
       <div id="diary-photo" class="diary-photo"></div>
     </div>`);
@@ -1323,10 +1351,14 @@ function openDiary(day: number, edit = false) {
     return;
   }
   openModal(`<form class="panel" id="diary-form" novalidate><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
-    ${heading}
-    <div class="field"><span>How are you feeling?</span>
+    ${diaryNav(day)}${heading}
+    <div class="field"><span>How are you feeling? <span class="muted">(pick up to 2)</span></span>
       <div class="moods" id="diary-moods">${MOOD_KEYS.map((k) =>
-        `<button type="button" data-action="diary-mood" data-mood="${k}" aria-pressed="false">${moodSprite(k)}<span>${MOODS[k].label}</span></button>`).join('')}</div></div>
+        `<button type="button" data-action="diary-mood" data-mood="${k}" aria-pressed="false">${moodSprite(k)}<span>${esc(moodName(k))}</span></button>`).join('')}</div>
+      <input id="diary-feeling" maxlength="40" autocomplete="off" placeholder="In your own words (optional)" value="${esc(e?.feeling ?? '')}" aria-label="Your own word for this feeling"></div>
+    ${save.trackamaniac ? `<div class="field"><span>Weather</span>
+      <div class="moods" id="diary-weather">${(Object.keys(WEATHER) as Weather[]).map((k) =>
+        `<button type="button" data-action="diary-weather" data-weather="${k}" aria-pressed="false">${weatherSvg(k)}<span>${WEATHER[k]}</span></button>`).join('')}</div></div>` : ''}
     <label class="field">Dear diary <textarea id="diary-text" class="diary-text" maxlength="5000" placeholder="What happened today?">${esc(e?.text ?? '')}</textarea></label>
     <div class="field"><span>Photo</span><div id="diary-photo" class="diary-photo"></div>
       <div class="btns"><button class="btn" type="button" data-action="diary-photo-add">Add photo</button></div>
@@ -1346,8 +1378,11 @@ async function saveDiary() {
   await Promise.all([dr.loaded, diaryLoading]);   // don't mistake a photo that is still loading for a removed one
   const text = ($('diary-text') as HTMLTextAreaElement).value.replace(/\s+$/, '');
   const entries = { ...save.diary };
-  if (!text.trim() && !dr.mood && !dr.photo && !dr.photoLost) delete entries[dr.day];
-  else entries[dr.day] = { text, mood: dr.mood, photo: !!dr.photo || !!dr.photoLost, updated: Date.now() };
+  const feeling = ($('diary-feeling') as HTMLInputElement).value.replace(/\s+/g, ' ').trim();
+  const [mood, mood2] = dr.moods;
+  const weather = save.trackamaniac ? dr.weather : save.diary?.[dr.day]?.weather;   // the weather stays put while Trackamaniac is off
+  if (!text.trim() && !mood && !feeling && !weather && !dr.photo && !dr.photoLost) delete entries[dr.day];
+  else entries[dr.day] = { text, mood, ...(mood2 && { mood2 }), ...(feeling && { feeling }), ...(weather && { weather }), photo: !!dr.photo || !!dr.photoLost, updated: Date.now() };
   const entry = entries[dr.day];
   const stored = entry
     ? (!dr.photo || await writePhoto(dr.day, new Uint8Array(await dr.photo.arrayBuffer()))) && await writeEntry(dr.day, entry)
@@ -1871,19 +1906,28 @@ document.addEventListener('click', (ev) => {
     case 'diary-open': openDiary(Number(btn.dataset.day)); break;
     case 'diary-edit': if (diaryDraft) openDiary(diaryDraft.day, true); break;
     case 'diary-mood':
-      if (diaryDraft) { diaryDraft.mood = diaryDraft.mood === btn.dataset.mood ? undefined : (btn.dataset.mood as Mood); markMood(); }
+      if (diaryDraft) {
+        const k = btn.dataset.mood as Mood, ms = diaryDraft.moods;
+        diaryDraft.moods = ms.includes(k) ? ms.filter((x) => x !== k) : [...ms, k].slice(-2);   // a third pick replaces the oldest
+        markMood();
+      }
       break;
+    case 'diary-weather':
+      if (diaryDraft) { diaryDraft.weather = diaryDraft.weather === btn.dataset.weather ? undefined : (btn.dataset.weather as Weather); markMood(); }
+      break;
+    case 'diary-go': if (!btn.hasAttribute('disabled')) openDiary(Number(btn.dataset.day)); break;
     case 'diary-photo-add': $('diary-file').click(); break;
     case 'diary-photo-remove': setDraftPhoto(null); if (diaryDraft) diaryDraft.photoLost = false; break;
     case 'diary-clear':
       openLayer(`<h3>Clear this page?</h3>
-        <p>This empties the text, mood and photo on this diary page. Nothing is deleted until you press Save, so closing the page without saving keeps it as it was.</p>
+        <p>This empties the text, feelings, weather and photo on this diary page. Nothing is deleted until you press Save, so closing the page without saving keeps it as it was.</p>
         <div class="btns"><button class="btn" type="button" data-action="layer-close" data-focus>Cancel</button><button class="btn primary" type="button" data-action="diary-clear-yes">Clear</button></div>`, 'Clear this page?', btn);
       break;
     case 'diary-clear-yes':
       closeLayer();
       ($('diary-text') as HTMLTextAreaElement).value = '';
-      if (diaryDraft) { diaryDraft.mood = undefined; diaryDraft.photoLost = false; markMood(); setDraftPhoto(null); }
+      ($('diary-feeling') as HTMLInputElement).value = '';
+      if (diaryDraft) { diaryDraft.moods = []; diaryDraft.weather = undefined; diaryDraft.photoLost = false; markMood(); setDraftPhoto(null); }
       break;
     case 'log-close': save.logHidden = true; persist(); renderLog(); break;
     case 'adopt-open': startAdopt(); break;
@@ -1987,6 +2031,18 @@ document.addEventListener('click', (ev) => {
     case 'clock-toggle': $('clock-pop').classList.toggle('open'); break;
     // The scrim closes only on a tap outside the panel; a close button closes even when the tap lands on its icon.
     case 'modal-close': if (ev.target === btn || !btn.classList.contains('scrim')) closeModal(); break;
+    case 'delete-done': {
+      const n = save.state.tasks.filter((k) => k.kind === 'task' && k.lastDoneDay !== null).length;
+      if (!n) break;
+      openModal(`<div class="panel"><h3>Delete all done treats?</h3><p>${plural(n, 'finished treat')} will be removed. Treats you have not done yet stay.</p>
+        <div class="btns"><button class="btn" data-action="modal-close">Keep</button>
+        <button class="btn primary" data-action="delete-done-yes">Delete all</button></div></div>`);
+      break;
+    }
+    case 'delete-done-yes':
+      save.state = { ...save.state, tasks: save.state.tasks.filter((k) => !(k.kind === 'task' && k.lastDoneDay !== null)) };
+      persist(); closeModal(); renderTasks(); toast('Done treats deleted.');
+      break;
     case 'delete-task-yes': {
       const removed = save.state.tasks.find((k) => k.id === id);
       save.state = removeMindfulTask(save.state, id);
@@ -2079,6 +2135,21 @@ $('allow-rename').addEventListener('change', (ev) => {
   save.allowRename = (ev.target as HTMLInputElement).checked;
   persist();
   toast(save.allowRename ? 'Kitties can be renamed from their long-press menu.' : 'Kitty names are locked.');
+});
+$('trackamaniac').addEventListener('change', (ev) => {
+  save.trackamaniac = (ev.target as HTMLInputElement).checked;
+  persist();
+  toast(save.trackamaniac ? 'Trackamaniac on. Diary pages now have a weather choice.' : 'Trackamaniac off. Weather you already saved is kept.');
+});
+$('mood-names').innerHTML = MOOD_KEYS.map((k) =>
+  `<label class="field">${moodSprite(k)} <input data-mood="${k}" maxlength="14" autocomplete="off" placeholder="${MOODS[k].label}" aria-label="Name for ${MOODS[k].label}"></label>`).join('');
+$('mood-names').addEventListener('change', (ev) => {
+  const i = ev.target as HTMLInputElement, k = i.dataset.mood as Mood | undefined;
+  if (!k) return;
+  const names = { ...save.moodNames }, v = i.value.trim();
+  if (v && v !== MOODS[k].label) names[k] = v; else delete names[k];
+  save.moodNames = names;
+  persist(); renderDiary();
 });
 $('show-clock').addEventListener('change', (ev) => {
   save.showClock = (ev.target as HTMLInputElement).checked;
