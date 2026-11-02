@@ -1,14 +1,14 @@
 // Phone playtest build of Habit Kitty. Bundled into one HTML page by `npm run build:web`.
 import {
   CONFIG, newState, adoptCat, feedCat, startSitter, resumeCat, settleAll, addMindfulTask,
-  doMindfulTask, setTaskDay, genderOf, daysUntilReady, removeMindfulTask, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, idHash, dayIndex, dayStartHour, setDayStart, nextReset, levelProgress, hunger, sitterCooldownLeft,
+  doMindfulTask, setTaskDay, setCatDay, replay, rewind, genderOf, daysUntilReady, removeMindfulTask, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, idHash, dayIndex, dayStartHour, setDayStart, nextReset, levelProgress, hunger, sitterCooldownLeft,
   type ActionResult, type AppState, type Cat, type CatMode, type CatGender, type CatLook, type CatTrait, type GameEvent, type MindfulTask, type Reason, type TaskKind,
 } from '../rules.ts';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { anyReminder, defaultReminder, planReminders, type LastCall, type ReminderSettings } from '../reminders.ts';
+import { anyReminder, catAlarmsOn, defaultReminder, planReminders, type LastCall, type ReminderSettings } from '../reminders.ts';
 import { allCatsDiary, catDiary, clock } from '../catdiary.ts';
 import { fedMessage } from '../encourage.ts';
 import { achievements } from '../achievements.ts';
@@ -33,7 +33,9 @@ interface Save {
   diary?: Record<string, DiaryEntry>;   // in memory only: each page lives in its own file (see "Diary files")
   reminder?: ReminderSettings;
   returned?: Record<string, number>;   // cat id -> day it last came home (feeds the "welcome back" thoughts)
-  timeTravel?: boolean;                // lets stray kitties and treats be marked done on past days
+  timeTravel?: boolean;                // lets kitties, stray kitties and treats be marked fed or done on past days
+  amnesia?: boolean;                   // asks about meals forgotten yesterday on the first open of a day
+  amnesiaDay?: number;                 // the day Amnesia last asked
   achieved?: Record<string, number>;   // achievement id -> day it was unlocked
   seenVersion?: string;                // last app version whose change log was shown
   sound?: Partial<Record<SoundKind, number>>;   // volume per sound, 0..100 (see SOUND_DEFAULTS)
@@ -150,6 +152,7 @@ function reasonText(r: Reason, cat?: Cat): string {
     case 'low_affection_cat_limit':
       return 'Your affection is below 0, so cats only trust you with one at a time. Feed your cat, feed a stray or do treats to earn it back.';
     case 'future_day': return "That day hasn't happened yet.";
+    case 'before_adoption': return `${n} wasn't with you yet that day.`;
     case 'task_on_cooldown': return 'You did this one recently. It comes back after its repeat time.';
     case 'task_already_done': return 'This treat is already done. Press and hold it to delete it.';
     case 'not_daily_habit': return 'Only daily habits can become a kitty.';
@@ -158,6 +161,9 @@ function reasonText(r: Reason, cat?: Cat): string {
     case 'no_such_cat': case 'no_such_task': return 'That no longer exists.';
   }
 }
+
+const xpChange = (before: number) =>
+  save.state.xp === before ? 'Affection unchanged.' : `Affection ${before} → ${save.state.xp}.`;
 
 function logEvents(events: GameEvent[]) {
   const at = now().getTime();
@@ -195,6 +201,37 @@ function settle() {
   if (!r.events.length) return;
   logEvents(r.events);
   persist();
+}
+
+// The playtest clock. Going forward plays the days out like real time. Going back to an earlier day rewinds:
+// anything logged after it is forgotten and every kitty is as hungry as it was then. True when it went back.
+function moveClock(offsetHours: number): boolean {
+  const from = today();
+  save.offsetHours = offsetHours;
+  const back = today() < from;
+  if (back) save.state = rewind(save.state, now()); else settle();
+  persist();
+  renderAll();
+  if (!back) checkAmnesia();
+  return back;
+}
+
+// Amnesia: the first time the app is open on a new day, ask about kitties that went unfed yesterday, in case a
+// meal wasn't logged. Saying yes marks it like time travel does, so a kitty lost to that missed meal comes back.
+function checkAmnesia() {
+  const t = today(), y = t - 1;
+  if (!save.amnesia || save.amnesiaDay === t || !$('modal').hidden) return;   // a dialog is open: ask once it closes
+  save.amnesiaDay = t;
+  persist();
+  const forgot = save.state.cats.filter((c) => c.adoptedDay <= y && !c.fedDays.includes(y)
+    && (c.status === 'alive' || (['dead', 'ranAway', 'leftForever'].includes(c.status) && c.endedDay === t))
+    && !c.sitterTrips.some((tr) => tr.start < y && (tr.end === null || tr.end > y)));
+  if (!forgot.length) return;
+  openModal(`<div class="panel"><h3>Did you feed a kitty yesterday?</h3>
+    <p>Nothing was logged for ${forgot.length === 1 ? 'this kitty' : 'these kitties'} on ${fmtDay(y)}. Tick any you did feed and forgot to log.</p>
+    ${forgot.map((c) => `<label class="check"><input type="checkbox" data-forgot="${c.id}"><span><b>${esc(c.name)}</b><br><span class="muted">${esc(c.habit)}${c.status === 'alive' ? '' : ` · ${c.status === 'dead' ? 'lost' : 'ran off'} last night`}</span></span></label>`).join('')}
+    <div class="btns"><button class="btn" data-action="modal-close">No, all logged</button>
+    <button class="btn primary" data-action="amnesia-yes">Log as fed</button></div></div>`);
 }
 
 // ===================== Pixel cats =====================
@@ -828,12 +865,70 @@ let soundOk = false;
 let music: HTMLAudioElement | null = null;
 let purring: HTMLAudioElement | null = null;
 
+// The user's own music replaces Strawberry Walk. The file stays on this device only (not in the save or a backup),
+// so what it is lives in localStorage like the theme. Its gain turns a loud song down to about as loud as the meows.
+interface OwnMusic { name: string; type: string; gain: number }
+const MUSIC_KEY = 'hk-music', MUSIC_DIR = 'habit-kitty-music', MUSIC_FILE = 'bgm';
+const MUSIC_MAX_BYTES = 20_000_000;
+const MUSIC_TARGET_DB = -20;   // RMS level of Strawberry Walk, which matches the meows and purrs
+let ownMusic: OwnMusic | null = (() => {
+  try { return JSON.parse(localStorage.getItem(MUSIC_KEY) ?? 'null'); } catch { return null; }
+})();
+let musicUrl: string | null = null;   // what plays: an object URL for the user's own file, else Strawberry Walk; null while loading
+
 function syncMusic() {
   const v = volumeOf('bgm') / 100;
-  if (!soundOk || !v || document.hidden) { music?.pause(); return; }
-  if (!music) { music = new Audio(__SOUNDS__.bgm); music.loop = true; }
-  music.volume = v;
+  if (!soundOk || !v || document.hidden || !musicUrl) { music?.pause(); return; }
+  if (!music) { music = new Audio(); music.loop = true; }
+  if (music.dataset.src !== musicUrl) { music.dataset.src = musicUrl; music.src = musicUrl; }
+  music.volume = v * (ownMusic && musicUrl !== __SOUNDS__.bgm ? ownMusic.gain : 1);
   if (music.paused) music.play().catch(() => { /* not allowed yet: the next tap tries again */ });
+}
+
+async function loadMusic() {
+  const bytes = ownMusic ? await fileBytes(MUSIC_FILE, MUSIC_DIR) : undefined;
+  if (musicUrl?.startsWith('blob:')) URL.revokeObjectURL(musicUrl);
+  musicUrl = bytes ? URL.createObjectURL(new Blob([bytes as BlobPart], { type: ownMusic?.type })) : __SOUNDS__.bgm;
+  syncMusic();
+  renderSound();
+}
+
+// How much to turn a song down so it plays about as loud as Strawberry Walk (never up: an audio element can't go past 1).
+// Decoding also checks the file is music this device can play.
+async function musicGain(file: Blob): Promise<number> {
+  const ctx = new AudioContext();
+  try {
+    const buf = await ctx.decodeAudioData(await file.arrayBuffer());
+    let sum = 0, n = 0;
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < d.length; i += 4) { sum += d[i] * d[i]; n++; }
+    }
+    const db = 10 * Math.log10(sum / Math.max(1, n) || 1e-10);
+    return Math.min(1, 10 ** ((MUSIC_TARGET_DB - db) / 20));
+  } finally { ctx.close().catch(() => {}); }
+}
+
+async function useOwnMusic(file: File) {
+  if (file.size > MUSIC_MAX_BYTES) { toast('That song is too big. Pick one under 20 MB.'); return; }
+  toast('Loading your music…');
+  const gain = await musicGain(file).catch(() => null);
+  if (gain === null) { toast("Couldn't play that file. Try an MP3."); return; }
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const ok = await writeOk(() => Filesystem.writeFile({ ...at(MUSIC_FILE, MUSIC_DIR), data: toBase64(bytes), recursive: true }));
+  if (!ok) { toast("Couldn't store that song on the device. Try again."); return; }
+  ownMusic = { name: file.name.replace(/\.[^.]+$/, '') || 'Your music', type: file.type || 'audio/mpeg', gain };
+  try { localStorage.setItem(MUSIC_KEY, JSON.stringify(ownMusic)); } catch { /* plays until the app closes */ }
+  await loadMusic();
+  toast(`Now playing ${ownMusic.name}.`);
+}
+
+async function useDefaultMusic() {
+  ownMusic = null;
+  try { localStorage.removeItem(MUSIC_KEY); } catch { /* ignore */ }
+  await removeFile(MUSIC_FILE, MUSIC_DIR);
+  await loadMusic();
+  toast('Back to Strawberry Walk.');
 }
 
 function playSound(k: 'meow' | 'purr') {
@@ -863,7 +958,15 @@ function renderSound() {
     input.style.setProperty('--fill', `${v}%`);
     $(`vol-${k}-out`).textContent = v ? `${v}%` : 'Off';
   }
+  $('music-now').textContent = `Playing: ${ownMusic ? ownMusic.name : 'Strawberry Walk'}`;
+  $('music-reset').hidden = !ownMusic;
 }
+$('music-file').addEventListener('change', (ev) => {
+  const input = ev.target as HTMLInputElement;
+  const f = input.files?.[0];
+  input.value = '';
+  if (f) useOwnMusic(f);
+});
 for (const k of ['bgm', 'meow', 'purr'] as const) {
   const input = $<HTMLInputElement>(`vol-${k}`);
   input.addEventListener('input', () => {
@@ -1034,6 +1137,7 @@ function renderSaved() {
   document.querySelectorAll<HTMLInputElement>('#mood-names input').forEach((i) => { if (i !== document.activeElement) i.value = save.moodNames?.[i.dataset.mood as Mood] ?? ''; });
   ($('show-clock') as HTMLInputElement).checked = !!save.showClock;
   ($('time-travel') as HTMLInputElement).checked = !!save.timeTravel;
+  ($('amnesia') as HTMLInputElement).checked = !!save.amnesia;
   renderDaySetting();
   renderSound();
   $('version').textContent = `v${VERSION}`;
@@ -1077,16 +1181,16 @@ const toBase64 = (bytes: Uint8Array) => {
 };
 const fromBase64 = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
-async function fileBytes(path: string): Promise<Uint8Array | undefined> {
+async function fileBytes(path: string, root = ROOT): Promise<Uint8Array | undefined> {
   try {
-    const r = await Filesystem.readFile(at(path));
+    const r = await Filesystem.readFile(at(path, root));
     return typeof r.data === 'string' ? fromBase64(r.data) : new Uint8Array(await r.data.arrayBuffer());
   } catch { return undefined; }
 }
 async function fileNames(dir: string): Promise<string[]> {
   try { return (await Filesystem.readdir(at(dir))).files.map((f) => f.name); } catch { return []; }
 }
-async function removeFile(path: string) { try { await Filesystem.deleteFile(at(path)); } catch { /* already gone */ } }
+async function removeFile(path: string, root = ROOT) { try { await Filesystem.deleteFile(at(path, root)); } catch { /* already gone */ } }
 async function writeOk(run: () => Promise<unknown>): Promise<boolean> {
   try { await run(); return true; } catch { return false; }
 }
@@ -1490,6 +1594,11 @@ function renderReminder() {
   ($('reminder-time') as HTMLInputElement).disabled = !r.enabled;
   ($('last-call') as HTMLSelectElement).value = r.lastCall ?? 'off';
   const home = save.state.cats.filter((c) => c.status === 'alive');
+  const alarmsOn = catAlarmsOn(r);
+  ($('cat-alarms-on') as HTMLInputElement).checked = alarmsOn;
+  $('cat-alarms-fold').hidden = !alarmsOn;
+  const set = home.filter((c) => r.catAlarms?.[c.id]).length;
+  $('cat-alarms-sum').textContent = home.length ? `Kitty alarms (${set} of ${home.length} set)` : 'Kitty alarms';
   $('cat-alarms').innerHTML = home.length ? home.map((c) => {
     const a = r.catAlarms?.[c.id];
     return `<li><span class="nm">${esc(c.name)}</span><span class="when"><input type="time" data-cat-alarm="${c.id}" value="${a ? hhmm(a) : ''}" aria-label="Feeding alarm for ${esc(c.name)}">
@@ -1554,6 +1663,7 @@ function closeModal() {
   if (diaryDraft?.photoUrl) URL.revokeObjectURL(diaryDraft.photoUrl);
   diaryDraft = null; gate = null; menuCat = null; menuStray = null;
   $('modal').hidden = true; $('modal').innerHTML = '';
+  if (save.amnesia && save.amnesiaDay !== today()) queueMicrotask(checkAmnesia);   // it waited for this dialog
 }
 function openModal(html: string) {
   const m = $('modal');
@@ -1763,27 +1873,31 @@ function openBook(day: number = today()) {
 
 // ---- time travel: mark or unmark a stray kitty or treat on any day up to today ----
 let travelBack = 0;   // months back from the current one
+// Time travel works on a stray or treat (done days) and on a kitty (fed days, from its adoption on).
 function openTravel(id: string, back = travelBack) {
   const task = save.state.tasks.find((k) => k.id === id);
-  if (!task) return;
+  const cat = task ? undefined : save.state.cats.find((c) => c.id === id);
+  if (!task && !cat) return;
   travelBack = back;
   const t = today(), d = dateOf(t);
   const shown = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - back, 1));
   const y = shown.getUTCFullYear(), m = shown.getUTCMonth();
   const first = dayOf(y, m, 1), last = dayOf(y, m + 1, 0), lead = (dateOf(first).getUTCDay() + 6) % 7;
-  const doneSet = new Set(task.doneDays);
+  const doneSet = new Set(task ? task.doneDays : cat?.fedDays);
+  const word = cat ? 'fed' : 'done';
   const cells = [
     ...['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((x) => `<div class="dow">${x}</div>`),
     ...Array.from({ length: lead }, () => '<div class="dc blank"></div>'),
     ...Array.from({ length: last - first + 1 }, (_, i) => {
       const day = first + i, on = doneSet.has(day);
-      return `<button type="button" class="dc${on ? ' has' : ''}${day === t ? ' now' : ''}" data-action="travel-day" data-id="${id}" data-day="${day}" ${day > t ? 'disabled' : ''}
-        aria-pressed="${on}" aria-label="${fmtDay(day)}: ${on ? 'done' : 'not done'}"><span class="dn">${i + 1}</span>${on ? `<b class="tick">${iconSvg('tick')}</b>` : ''}</button>`;
+      const off = day > t || (cat && day < cat.adoptedDay);
+      return `<button type="button" class="dc${on ? ' has' : ''}${day === t ? ' now' : ''}" data-action="travel-day" data-id="${id}" data-day="${day}" ${off ? 'disabled' : ''}
+        aria-pressed="${on}" aria-label="${fmtDay(day)}: ${on ? word : `not ${word}`}"><span class="dn">${i + 1}</span>${on ? `<b class="tick">${iconSvg('tick')}</b>` : ''}</button>`;
     }),
   ].join('');
   openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
-    <h3>Time travel</h3><p><b>${esc(task.name)}</b></p>
-    <p class="muted">Tap a day to mark it done or not done. This only fixes your record: no XP is paid or taken away.${task.kind === 'task' ? ' A treat is done once, so tapping another day moves it.' : ''}</p>
+    <h3>Time travel</h3><p><b>${esc(task ? task.name : `${cat?.name} · ${cat?.habit}`)}</b></p>
+    <p class="muted">Tap a day to mark it ${word} or not ${word}. Affection is worked out again from your record${cat ? `, and so is how hungry ${esc(cat.name)} is` : ''}.${task?.kind === 'task' ? ' A treat is done once, so tapping another day moves it.' : ''}</p>
     <div class="month-nav">
       <button type="button" data-action="travel-month" data-id="${id}" data-step="1" aria-label="Previous month">${iconSvg('prev')}</button>
       <strong>${dateOf(first).toLocaleString('en', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</strong>
@@ -2024,8 +2138,41 @@ document.addEventListener('click', (ev) => {
     case 'travel-month': openTravel(id, Math.max(0, travelBack + Number(btn.dataset.step))); break;
     case 'travel-day': {
       const day = Number(btn.dataset.day);
-      const on = save.state.tasks.find((k) => k.id === id)?.doneDays.includes(day);
-      if (act((s, at) => setTaskDay(s, id, day, !on, at), on ? `Unmarked ${fmtDay(day)}.` : `Marked ${fmtDay(day)} as done.`)) openTravel(id);
+      const cat = save.state.cats.find((c) => c.id === id);
+      const on = cat ? cat.fedDays.includes(day) : save.state.tasks.find((k) => k.id === id)?.doneDays.includes(day);
+      const xp = save.state.xp;
+      const told = () => `${on ? `Unmarked ${fmtDay(day)}` : `Marked ${fmtDay(day)} as ${cat ? 'fed' : 'done'}`}. ${xpChange(xp)}`;
+      const ok = cat ? act((s, at) => setCatDay(s, id, day, !on, at), told, cat) : act((s, at) => setTaskDay(s, id, day, !on, at), told);
+      if (ok) openTravel(id);
+      break;
+    }
+    case 'fix-xp': {
+      const next = replay(save.state, now());
+      openModal(`<div class="panel"><h3>Fix affection?</h3>
+        <p>Working it out again from your heatmaps and strays: <b>${save.state.xp}</b> → <b>${next.xp}</b>.</p>
+        <p class="muted">Kitties' hunger is worked out again too. Strays and treats deleted before v0.4.1 can't be counted.</p>
+        <div class="btns"><button class="btn" data-action="modal-close">Keep</button>
+        <button class="btn primary" data-action="fix-xp-yes">Fix it</button></div></div>`);
+      break;
+    }
+    case 'fix-xp-yes': {
+      const xp = save.state.xp;
+      save.state = replay(save.state, now());
+      persist(); closeModal(); renderAll();
+      toast(save.state.xp === xp ? 'Affection was already right.' : `Affection fixed: ${xp} → ${save.state.xp}.`);
+      break;
+    }
+    case 'amnesia-yes': {
+      const picked = [...document.querySelectorAll<HTMLInputElement>('#modal [data-forgot]:checked')].map((i) => i.dataset.forgot as string);
+      closeModal();
+      if (!picked.length) break;
+      const xp = save.state.xp, y = today() - 1;
+      for (const cid of picked) { const r = setCatDay(save.state, cid, y, true, now()); save.state = r.state; }
+      const names = picked.map((cid) => catName(cid));
+      save.log.unshift({ at: now().getTime(), text: `Remembered: ${names.join(', ')} ${names.length === 1 ? 'was' : 'were'} fed yesterday after all.` });
+      save.log = save.log.slice(0, 8);
+      persist(); renderAll();
+      toast(`Logged for yesterday. ${xpChange(xp)}`);
       break;
     }
     case 'clock-toggle': $('clock-pop').classList.toggle('open'); break;
@@ -2040,7 +2187,7 @@ document.addEventListener('click', (ev) => {
       break;
     }
     case 'delete-done-yes':
-      save.state = { ...save.state, tasks: save.state.tasks.filter((k) => !(k.kind === 'task' && k.lastDoneDay !== null)) };
+      save.state = save.state.tasks.filter((k) => k.kind === 'task' && k.lastDoneDay !== null).reduce((s, k) => removeMindfulTask(s, k.id), save.state);
       persist(); closeModal(); renderTasks(); toast('Done treats deleted.');
       break;
     case 'delete-task-yes': {
@@ -2065,6 +2212,8 @@ document.addEventListener('click', (ev) => {
     }
     case 'load-text': loadSave(($('save-text') as HTMLTextAreaElement).value); break;
     case 'load-file': $('load-file').click(); break;
+    case 'music-pick': $('music-file').click(); break;
+    case 'music-reset': useDefaultMusic(); break;
     case 'month':
       viewMonth.set(id, Math.max(0, (viewMonth.get(id) ?? 0) + Number(btn.dataset.step)));
       renderHeat();
@@ -2072,19 +2221,14 @@ document.addEventListener('click', (ev) => {
       break;
     case 'skip': {
       const before = save.log.length ? save.log[0] : null;
-      save.offsetHours += Number(btn.dataset.hours);
-      settle();
-      persist();
-      renderAll();
+      const back = moveClock(save.offsetHours + Number(btn.dataset.hours));
       const news = save.log[0] && save.log[0] !== before ? save.log[0].text : null;
-      toast(news ?? `Skipped to ${now().toLocaleString('en', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}.`);
+      toast(back ? `Back to ${now().toLocaleString('en', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}. Anything logged after it is undone.`
+        : news ?? `Skipped to ${now().toLocaleString('en', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}.`);
       break;
     }
     case 'real-time':
-      save.offsetHours = 0;
-      persist();
-      renderAll();
-      toast('Back to real time. Days you skipped still count.');
+      toast(moveClock(0) ? 'Back to real time. Anything logged on the days you skipped is undone.' : 'Back to real time.');
       break;
     case 'reset-ask':
       $('reset-area').innerHTML = `<span>Delete all cats and progress?</span>
@@ -2158,7 +2302,13 @@ $('show-clock').addEventListener('change', (ev) => {
 $('time-travel').addEventListener('change', (ev) => {
   save.timeTravel = (ev.target as HTMLInputElement).checked;
   persist(); renderTasks();
-  toast(save.timeTravel ? 'Time travel on. Every stray kitty and treat now has a rewind button.' : 'Time travel off.');
+  toast(save.timeTravel ? "Time travel on. Strays and treats have a rewind button; kitties have one in their long-press menu." : 'Time travel off.');
+});
+$('amnesia').addEventListener('change', (ev) => {
+  save.amnesia = (ev.target as HTMLInputElement).checked;
+  save.amnesiaDay = today();   // the first question comes tomorrow
+  persist();
+  toast(save.amnesia ? "Amnesia on. Tomorrow you'll be asked about any meal you forgot to log." : 'Amnesia off.');
 });
 $('unlimited-cats').addEventListener('change', (ev) => {
   save.unlimited = (ev.target as HTMLInputElement).checked;
@@ -2173,6 +2323,12 @@ $('last-call').addEventListener('change', async (ev) => {
   if (v !== 'off' && !await ensureNotifications()) { setReminders({ lastCall: 'off' }); return; }
   setReminders({ lastCall: v });
   toast(v === 'off' ? 'Last-call alerts off.' : 'Last-call alerts on. They only go out for kitties that are still hungry.');
+});
+$('cat-alarms-on').addEventListener('change', (ev) => {
+  const on = (ev.target as HTMLInputElement).checked;
+  setReminders({ catAlarmsOn: on });
+  if (on) ($('cat-alarms-fold') as HTMLDetailsElement).open = true;
+  toast(on ? 'Pick a time for each kitty that should get its own alarm.' : 'Kitty alarms off. Their times are kept for when you turn them back on.');
 });
 $('cat-alarms').addEventListener('change', async (ev) => {
   const input = ev.target as HTMLInputElement;
@@ -2378,6 +2534,7 @@ function openCatMenu(id: string, tab?: MenuTab) {
     : `<div style="display:grid;gap:8px">${sitterBtn}
       <button class="btn" data-action="rename-habit" data-id="${id}">Rename habit</button>
       ${save.allowRename ? `<button class="btn" data-action="rename-cat" data-id="${id}">Rename ${esc(cat.name)}</button>` : ''}
+      ${save.timeTravel ? `<button class="btn" data-action="travel" data-id="${id}">Time travel</button>` : ''}
       ${cat.status === 'alive' ? `<button class="btn" data-action="release-ask" data-id="${id}">Release to the stray colony</button>` : ''}
       <button class="btn" data-action="shelter-ask" data-id="${id}">Return to the shelter</button></div>`;
   openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
@@ -2453,18 +2610,20 @@ document.addEventListener('contextmenu', (ev) => {
 });
 
 // Re-settle when the page comes back and at each 2am rollover.
-function tick() { settle(); renderAll(); queueReminderSync(); }
+function tick() { settle(); renderAll(); queueReminderSync(); checkAmnesia(); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
 function scheduleRollover() {
   setTimeout(() => { tick(); scheduleRollover(); }, Math.min(nextReset(now()).getTime() - now().getTime() + 1000, 60_000));
 }
 
 const diaryLoading = loadDiary();
+loadMusic();
 settle();
 renderAll();
 showTab('today');
 openWidgetTab();
 scheduleRollover();
 showWhatsNew();
+checkAmnesia();
 connectAccount();
 queueReminderSync();

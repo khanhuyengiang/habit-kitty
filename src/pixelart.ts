@@ -57,15 +57,15 @@ export const ICONS: Record<string, string[]> = {
   '....o....',
 ],
   moon: [
-  '...ooo...',
-  '..oo.....',
-  '.oo......',
-  '.oo......',
-  '.oo......',
-  '.oo......',
-  '..oo.....',
-  '...ooo...',
-  '.........',
+  '...ooo..',
+  '..oo..o.',
+  '.oo.....',
+  '.oo.....',
+  '.oo.....',
+  '.oo.....',
+  '..oo..o.',
+  '...ooo..',
+  '........',
 ],
   clock: ['..ooooo..', '.o.....o.', 'o...o...o', 'o...o...o', 'o...ooo.o', 'o.......o', 'o.......o', '.o.....o.', '..ooooo..'],
   // tab bar
@@ -131,7 +131,7 @@ export const FOODS: Record<string, string[]> = {
   '....ooeeo.',
   '...oeooo..',
   '..ooo.....',
-],
+] ,
   meat: ['..........', '..oooooo..', '.ommmmmmo.', 'omMMmmmwmo', 'ommmMmmmmo', '.ommmmmmo.', '..oooooo..', '..........'],
 };
 export const BOOK_ART = ['.ooooooo.', 'orrrrrrro', 'orrwwwrro', 'orrrrrrro', 'orrwwwrro', 'orrrrrrro', 'orrrrrrro', 'owwwwwwwo', '.ooooooo.'];

@@ -10,6 +10,7 @@ export interface ReminderSettings {
   hour: number;                       // local time of the daily reminder
   minute: number;
   catAlarms?: Record<string, CatAlarm>;   // a feeding alarm per kitty, by cat id
+  catAlarmsOn?: boolean;              // the per-kitty alarms as a whole; older saves count as on when any is set
   lastCall?: LastCall;                // extra alerts while a kitty is still unfed as the day runs out
   lastFired?: number;                 // id of the last reminder the web page showed (de-duplicates)
   picks?: Record<string, string>;     // fire day index -> the hungry cat chosen for it (kept so replanning is stable)
@@ -30,7 +31,9 @@ export const defaultReminder = (): ReminderSettings => ({ enabled: false, hour: 
 // Minutes before the day ends (dayStartHour) at which a last-call alert goes out.
 export const LAST_CALL_MINUTES: Record<LastCall, number[]> = { off: [], gentle: [180], insistent: [180, 60, 15] };
 
-export const anyReminder = (r: ReminderSettings) => r.enabled || (r.lastCall ?? 'off') !== 'off' || Object.keys(r.catAlarms ?? {}).length > 0;
+export const catAlarmsOn = (r: ReminderSettings) => r.catAlarmsOn ?? Object.keys(r.catAlarms ?? {}).length > 0;
+export const anyReminder = (r: ReminderSettings) =>
+  r.enabled || (r.lastCall ?? 'off') !== 'off' || (catAlarmsOn(r) && Object.keys(r.catAlarms ?? {}).length > 0);
 
 export const HAPPY_BODY = 'All cats are fed and happy! Visit and play with them!';
 
@@ -108,7 +111,7 @@ export function planReminders(
       }
     }
 
-    for (const c of cats) {
+    for (const c of catAlarmsOn(settings) ? cats : []) {
       const a = settings.catAlarms?.[c.id];
       if (!a) continue;
       const at = date(a.hour, a.minute);
