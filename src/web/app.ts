@@ -11,7 +11,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { anyReminder, catAlarmsOn, defaultReminder, planReminders, type LastCall, type ReminderSettings } from '../reminders.ts';
 import { allCatsDiary, catDiary, clock } from '../catdiary.ts';
 import { fedMessage } from '../encourage.ts';
-import { achievements } from '../achievements.ts';
+import { accomplishments } from '../accomplishments.ts';
 import { entriesSince, parseChangelog, type ChangeEntry } from '../changelog.ts';
 import { VERSION } from '../version.ts';
 import CHANGELOG_MD from '../../CHANGELOG.md';
@@ -36,7 +36,7 @@ interface Save {
   timeTravel?: boolean;                // lets kitties, stray kitties and treats be marked fed or done on past days
   amnesia?: boolean;                   // asks about meals forgotten yesterday on the first open of a day
   amnesiaDay?: number;                 // the day Amnesia last asked
-  achieved?: Record<string, number>;   // achievement id -> day it was unlocked
+  accomplished?: Record<string, number>;   // accomplishment id -> day it was unlocked
   seenVersion?: string;                // last app version whose change log was shown
   sound?: Partial<Record<SoundKind, number>>;   // volume per sound, 0..100 (see SOUND_DEFAULTS)
   strayLeft?: Record<string, number>;  // stray id -> garden window it wandered off in after being fed
@@ -44,7 +44,7 @@ interface Save {
 }
 
 const KEY = 'habit-kitty-save-v1';
-const fresh = (): Save => ({ v: 1, state: newState(), offsetHours: 0, log: [], savedAt: 0, achieved: {}, seenVersion: VERSION });
+const fresh = (): Save => ({ v: 1, state: newState(), offsetHours: 0, log: [], savedAt: 0, accomplished: {}, seenVersion: VERSION });
 
 function readLocal(): Save | null {
   try {
@@ -53,8 +53,11 @@ function readLocal(): Save | null {
   } catch { return null; }
 }
 
-// Older saves: every mindful item was a repeating habit with no history.
-function normalize(sv: Save): Save {
+// Older saves: every mindful item was a repeating habit with no history, and accomplishments were "achieved".
+function normalize(sv: Save & { achieved?: Record<string, number> }): Save {
+  const { achieved, ...rest } = sv;
+  if (achieved && !rest.accomplished) rest.accomplished = achieved;
+  sv = rest;
   setDayStart(sv.dayStart);   // every day index from here on, this one included, follows the save's day start
   const day = dayIndex(new Date(Date.now() + (Number(sv.offsetHours) || 0) * 3_600_000));
   const tasks = (sv.state.tasks ?? []).map((k) => {
@@ -554,7 +557,7 @@ const roomBg = roomSvg;
 // The diary book and the trophy on the wall shelf (drawn in roomSvg); these are their click areas, in room pixels.
 const prop = (action: string, label: string, [x, y, w, h]: [number, number, number, number]) =>
   `<button class="prop" type="button" data-action="${action}" aria-label="${label}" style="left:calc(${x} * var(--px));top:calc(${y} * var(--px));width:calc(${w} * var(--px));height:calc(${h} * var(--px))"></button>`;
-const PROPS = prop('book', "Kitty diary: everyone's day", SHELF_BOOK) + prop('trophies', 'Achievements', SHELF_TROPHY);
+const PROPS = prop('book', "Kitty diary: everyone's day", SHELF_BOOK) + prop('trophies', 'Accomplishments', SHELF_TROPHY);
 
 // Cats that are away (sitter, ran away) aren't home, so they aren't in the room.
 const homeCats = () => sortedCats().filter((c) => c.status === 'alive').slice(0, SPOTS.length);
@@ -1503,7 +1506,7 @@ async function saveDiary() {
   persist();
   closeModal();
   renderDiary();
-  checkAchievements();
+  checkAccomplishments();
   toast(entries[dr.day] ? 'Diary page saved.' : 'Diary page cleared.');
   if (entries[dr.day]?.text.trim()) openDiary(dr.day);   // back to the page, now read-only
 }
@@ -1826,30 +1829,30 @@ function openAdopt(habitId?: string) {
   </form>`);
 }
 
-// ---- achievements: worked out from the save; the unlocked ones are remembered so they never disappear ----
+// ---- accomplishments: worked out from the save; the unlocked ones are remembered so they never disappear ----
 const diaryPageCount = () => Object.values(save.diary ?? {}).filter(hasPage).length;
-function checkAchievements() {
-  const got = achievements(save.state, diaryPageCount(), today()).filter((a) => a.unlocked);
-  const known = save.achieved;
+function checkAccomplishments() {
+  const got = accomplishments(save.state, diaryPageCount(), today()).filter((a) => a.unlocked);
+  const known = save.accomplished;
   const fresh = got.filter((a) => !known || !(a.id in known));
   if (!fresh.length) return;
-  save.achieved = { ...known, ...Object.fromEntries(fresh.map((a) => [a.id, today()])) };
+  save.accomplished = { ...known, ...Object.fromEntries(fresh.map((a) => [a.id, today()])) };
   persist();
-  if (!known) return;   // a save from before achievements: hand out what is already earned quietly
+  if (!known) return;   // a save from before accomplishments: hand out what is already earned quietly
   const names = fresh.map((a) => a.title);
-  setTimeout(() => toast(`Achievement unlocked: ${names[0]}${names.length > 1 ? ` (+${names.length - 1} more)` : ''}`), 1800);
+  setTimeout(() => toast(`Accomplishment unlocked: ${names[0]}${names.length > 1 ? ` (+${names.length - 1} more)` : ''}`), 1800);
 }
 
 function openTrophies() {
-  const list = achievements(save.state, diaryPageCount(), today());
+  const list = accomplishments(save.state, diaryPageCount(), today());
   const unlocked = list.filter((a) => a.unlocked).length;
   const groups = [...new Set(list.map((a) => a.group))];
   openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
-    <h3>Achievements</h3><p class="muted"><b class="num">${unlocked}</b> of ${list.length} unlocked</p>
-    ${groups.map((g) => `<h4 class="ach-group">${g}</h4><ul class="ach">${list.filter((a) => a.group === g).map((a) =>
-      `<li class="${a.unlocked ? 'got' : ''}"><span class="ach-icon">${a.unlocked ? pixelArt(TROPHY_ART) : pixelArt(TROPHY_ART, 'dim')}</span>
+    <h3>Accomplishments</h3><p class="muted"><b class="num">${unlocked}</b> of ${list.length} unlocked</p>
+    ${groups.map((g) => `<h4 class="acc-group">${g}</h4><ul class="acc">${list.filter((a) => a.group === g).map((a) =>
+      `<li class="${a.unlocked ? 'got' : ''}"><span class="acc-icon">${a.unlocked ? pixelArt(TROPHY_ART) : pixelArt(TROPHY_ART, 'dim')}</span>
         <span><b>${esc(a.title)}</b><br><span class="muted">${esc(a.text)}</span>
-        ${a.unlocked ? '' : `<span class="ach-bar" role="img" aria-label="${a.progress} of ${a.target}"><i style="width:${Math.round((100 * a.progress) / a.target)}%"></i></span>`}</span></li>`).join('')}</ul>`).join('')}</div>`);
+        ${a.unlocked ? '' : `<span class="acc-bar" role="img" aria-label="${a.progress} of ${a.target}"><i style="width:${Math.round((100 * a.progress) / a.target)}%"></i></span>`}</span></li>`).join('')}</ul>`).join('')}</div>`);
 }
 
 // ---- everyone's diary: the kitties' days in one list ----
@@ -1952,7 +1955,7 @@ function renderAll() {
   renderTop(); renderLog(); renderRoomTitle(); renderClock(); renderSaved();   // the clock pop-up floats over every tab
   renderTab(tab);
   queueWidget();
-  checkAchievements();
+  checkAccomplishments();
 }
 
 // ===================== Events =====================

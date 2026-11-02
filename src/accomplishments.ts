@@ -1,8 +1,8 @@
-// Achievements are worked out from the save (cats, treats, diary) so they can never drift from the real history.
-// Which ones have been unlocked is remembered by the app, so an achievement never goes away again.
+// Accomplishments are worked out from the save (cats, treats, diary) so they can never drift from the real history.
+// Which ones have been unlocked is remembered by the app, so an accomplishment never goes away again.
 import { levelFor, type AppState, type Cat } from './rules.ts';
 
-export interface Achievement {
+export interface Accomplishment {
   id: string;
   group: 'Care' | 'Kitties' | 'Streaks' | 'Mindful' | 'Diary';
   title: string;
@@ -48,8 +48,8 @@ export const TREATS_DONE = [10, 50, 100];
 export const LEVELS = [1, 5, 10];
 export const DIARY_PAGES = [1, 7, 30];
 
-export function achievements(s: AppState, diaryPages: number, today: number): Achievement[] {
-  const make = (id: string, group: Achievement['group'], title: string, text: string, have: number, target: number): Achievement =>
+export function accomplishments(s: AppState, diaryPages: number, today: number): Accomplishment[] {
+  const make = (id: string, group: Accomplishment['group'], title: string, text: string, have: number, target: number): Accomplishment =>
     ({ id, group, title, text, progress: Math.min(have, target), target, unlocked: have >= target });
   const feedings = s.cats.reduce((n, c) => n + c.totalFeedings, 0);
   const streak = longestFedStreak(s.cats);
