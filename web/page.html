@@ -80,7 +80,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 /* ---------- pixel boxes: one-pixel border, one-pixel notch in every corner ---------- */
 .panel, .cat, .log, .update, .distrust, .travel-note, .focus-bar, .reminder-status.bad, .week, .toast, .seg, .switch, .chip,
 .btn, .gear, .clock-btn, .x-close, .field input, .field select, .field textarea, .modes label, .chips span, .moods button,
-.catlog li, .ach li, .tabbar button.mid, .dot, .bar, .hp, .room, .checkbox-box {
+.catlog li, .acc li, .tabbar button.mid, .dot, .bar, .hp, .room, .checkbox-box {
   border: var(--px) solid var(--edge); clip-path: var(--notch);
 }
 
@@ -384,6 +384,15 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .moods { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--s2); }
 .moods button { display: grid; justify-items: center; gap: var(--s1); padding: var(--s2) var(--s1); font-size: 15px; font-weight: 700; border-color: var(--line); background: var(--surface2); color: var(--muted); }
 .moods button[aria-pressed="true"] { border-color: var(--accent-edge); background: var(--accent-soft); color: var(--ink); }
+.diary-nav { display: flex; align-items: center; justify-content: space-between; padding-right: calc(13 * var(--px)); }   /* leave room for the close button in the corner */
+.mood-split { display: grid; }
+.mood-split > .sprite { grid-area: 1 / 1; }
+.mood-split > .sprite:first-child { clip-path: inset(0 50% 0 0); }
+.mood-split > .sprite:last-child { clip-path: inset(0 0 0 50%); }
+.moods:has([data-weather]), #diary-weather { grid-template-columns: repeat(5, 1fr); }
+.moods .weather { width: calc(var(--w) * var(--px)); height: auto; }
+#mood-names .field { display: flex; align-items: center; gap: var(--s2); }
+#mood-names .field input { flex: 1; }
 .diary-text { min-height: calc(55 * var(--px)); font: 500 20px/1.4 var(--font) !important; resize: none; }
 .diary-mood { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
 .mood-now { display: inline-flex; align-items: center; gap: var(--s2); font-size: 18px; font-weight: 700; }
@@ -434,12 +443,12 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .travel-note { background: var(--accent-pastel); border-color: var(--accent-edge); padding: var(--s2) var(--s3); font-size: 18px; }
 .dc .tick { position: absolute; right: var(--s1); bottom: var(--s1); color: var(--accent-text); display: grid; }
 .x-close ~ h3 { padding-right: calc(12 * var(--px)); }
-.ach-group { margin: var(--s2) 0 0; font: 700 18px/1 var(--font); color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
-.ach { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
-.ach li { display: flex; gap: var(--s3); align-items: center; padding: var(--s2) var(--s3); background: var(--surface2); border-color: var(--line); }
-.ach li.got { background: var(--accent-pastel); border-color: var(--accent-edge); }
-.ach-bar { display: block; height: calc(2 * var(--px)); margin-top: var(--s2); background: var(--line); }
-.ach-bar i { display: block; height: 100%; background: var(--accent); }
+.acc-group { margin: var(--s2) 0 0; font: 700 18px/1 var(--font); color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.acc { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.acc li { display: flex; gap: var(--s3); align-items: center; padding: var(--s2) var(--s3); background: var(--surface2); border-color: var(--line); }
+.acc li.got { background: var(--accent-pastel); border-color: var(--accent-edge); }
+.acc-bar { display: block; height: calc(2 * var(--px)); margin-top: var(--s2); background: var(--line); }
+.acc-bar i { display: block; height: 100%; background: var(--accent); }
 .change h4 { margin: 0 0 var(--s1); font: 700 20px/1.2 var(--font); }
 .change summary { cursor: pointer; font: 700 20px/1.2 var(--font); padding: var(--s1) 0; }
 .change summary .muted { font: 500 18px/1 var(--font); }
@@ -491,6 +500,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
       <p class="num" id="mindful-cap"></p>
       <p class="travel-note" id="mindful-travel" hidden>Time travel is on. Use the rewind button on a row to mark or unmark it on any day.</p>
       <ul class="tasks" id="tasks"></ul>
+      <div id="tasks-done"></div>
     </section>
     <p class="muted" id="strays-note" style="text-align:center;font-size:13px"></p>
     <form class="panel" id="task-form" novalidate>
@@ -553,12 +563,19 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
         </select>
       </label>
       <p class="muted"><span id="day-end-note">The day ends at 02:00.</span> These only go out for kitties that haven't been fed yet.</p>
-      <div class="field"><span>Feeding alarm for each kitty</span><ul class="alarms" id="cat-alarms"></ul></div>
+      <label class="check"><input type="checkbox" id="cat-alarms-on"><span><b>Feeding alarm for each kitty</b><br><span class="muted">Give each kitty its own time to ask for a meal.</span></span></label>
+      <details class="more" id="cat-alarms-fold" hidden><summary id="cat-alarms-sum">Kitty alarms</summary><ul class="alarms" id="cat-alarms"></ul></details>
       <p class="reminder-status" id="reminder-status" role="status"></p>
     </div></details>
 
     <details class="panel fold"><summary>Sound</summary><div class="fold-body">
       <label class="vol"><span>Music</span><input type="range" id="vol-bgm" min="0" max="100" step="5"><output id="vol-bgm-out" class="num" for="vol-bgm"></output></label>
+      <p class="muted" id="music-now"></p>
+      <div class="btns">
+        <button class="btn" type="button" data-action="music-pick">Use my own music…</button>
+        <button class="btn" type="button" data-action="music-reset" id="music-reset" hidden>Back to Strawberry Walk</button>
+      </div>
+      <input type="file" id="music-file" accept="audio/*" hidden>
       <label class="vol"><span>Meows</span><input type="range" id="vol-meow" min="0" max="100" step="5"><output id="vol-meow-out" class="num" for="vol-meow"></output></label>
       <label class="vol"><span>Purrs</span><input type="range" id="vol-purr" min="0" max="100" step="5"><output id="vol-purr-out" class="num" for="vol-purr"></output></label>
       <p class="muted">Kitties indoors (and strays outdoors) meow now and then, and may purr or meow when you pet them. Slide a sound all the way down to turn it off.</p>
@@ -592,10 +609,19 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
       <p class="form-error" id="save-error" hidden></p>
     </div></details>
 
+    <details class="panel fold"><summary>Emotion names</summary><div class="fold-body">
+      <p class="muted">Rename the five diary emotions. Leave a box empty to keep the original name.</p>
+      <div id="mood-names"></div>
+    </div></details>
+
     <details class="panel fold"><summary>Game options</summary><div class="fold-body">
       <label class="check"><input type="checkbox" id="allow-rename"><span><b>Allow renaming kitties</b><br><span class="muted">Adds a Rename button to the long-press menu. Off by default, so a kitty keeps the name you gave it.</span></span></label>
+      <label class="check"><input type="checkbox" id="trackamaniac"><span><b>Trackamaniac</b><br><span class="muted">Adds a weather choice (sunny, cloudy, rainy, storm, snow) to every diary page.</span></span></label>
       <label class="check"><input type="checkbox" id="show-clock"><span><b>Playtest clock</b><br><span class="muted">Shows a small clock button for skipping ahead in time, to try out how days and streaks play out.</span></span></label>
-      <label class="check"><input type="checkbox" id="time-travel"><span><b>Time travel</b><br><span class="muted">Adds a rewind button to every stray kitty and treat, so you can mark or unmark it as done on any past day (or today). It only fixes your record: no XP is paid or taken away.</span></span></label>
+      <label class="check"><input type="checkbox" id="time-travel"><span><b>Time travel</b><br><span class="muted">Adds a rewind button to every stray kitty and treat, and a Time travel button to every kitty's long-press menu, so you can mark or unmark any past day (or today) as done or fed. Affection and your kitties' hunger are worked out again to match, as with Fix affection.</span></span></label>
+      <label class="check"><input type="checkbox" id="amnesia"><span><b>Amnesia</b><br><span class="muted">The first time you open the app on a new day, it asks whether you fed a kitty yesterday and forgot to log it. Say yes and it counts as if you had.</span></span></label>
+      <div class="field"><span><b>Fix affection</b><br><span class="muted">Works out your affection again from the heatmaps: every meal, missed day, sitter day, stray and treat. Handy if it looks off.</span></span>
+        <div class="btns"><button class="btn" type="button" data-action="fix-xp">Fix affection…</button></div></div>
       <label class="check"><input type="checkbox" id="unlimited-cats"><span><b>Unlimited kitties</b><br><span class="muted">Normally you can keep 9 kitties. Turn this on to adopt more, but you will have to confirm three times for every extra kitty.</span></span></label>
     </div></details>
 

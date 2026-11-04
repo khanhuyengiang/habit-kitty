@@ -3,7 +3,7 @@
 //
 //   manifest.json            { app, format, exportedAt }
 //   game.json                cats, tasks, settings (no diary)
-//   diary/2026-10-12.md      frontmatter (mood, photo, updated) + the text as plain Markdown
+//   diary/2026-10-12.md      frontmatter (mood, mood2, feeling, weather, photo, updated) + the text as plain Markdown
 //   photos/2026-10-12.jpg
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
 import { dateOf, dayOf } from './calendar.ts';
@@ -11,7 +11,11 @@ import { dateOf, dayOf } from './calendar.ts';
 export const MOOD_KEYS = ['joyful', 'calm', 'tired', 'sad', 'stressed'] as const;
 export type Mood = typeof MOOD_KEYS[number];
 // One diary page per day, keyed by day index. `photo` says whether photos/<date>.jpg exists.
-export interface DiaryEntry { text: string; mood?: Mood; photo?: boolean; updated: number }
+export const WEATHER_KEYS = ['sunny', 'cloudy', 'rainy', 'storm', 'snow'] as const;
+export type Weather = typeof WEATHER_KEYS[number];
+// `mood2` is an optional second emotion (the kitty is drawn half and half); `feeling` is the user's own word for it and
+// replaces the emotion name on the page; `weather` is only set when the Trackamaniac option is on.
+export interface DiaryEntry { text: string; mood?: Mood; mood2?: Mood; feeling?: string; weather?: Weather; photo?: boolean; updated: number }
 
 export const BACKUP_FORMAT = 1;
 // Every photo (on the phone and in a backup) is scaled to fit under this, so a backup stays small.
@@ -29,7 +33,8 @@ export const diaryPath = (day: number) => `diary/${dayName(day)}.md`;
 export const photoPath = (day: number) => `photos/${dayName(day)}.jpg`;
 
 export function entryToMarkdown(e: DiaryEntry): string {
-  const head = [e.mood ? `mood: ${e.mood}` : '', e.photo ? 'photo: yes' : '', `updated: ${Math.round(e.updated)}`].filter(Boolean);
+  const feeling = e.feeling?.replace(/\s+/g, ' ').trim();
+  const head = [e.mood ? `mood: ${e.mood}` : '', e.mood && e.mood2 && e.mood2 !== e.mood ? `mood2: ${e.mood2}` : '', feeling ? `feeling: ${feeling}` : '', e.weather ? `weather: ${e.weather}` : '', e.photo ? 'photo: yes' : '', `updated: ${Math.round(e.updated)}`].filter(Boolean);
   return `---\n${head.join('\n')}\n---\n${e.text}\n`;
 }
 
@@ -42,8 +47,10 @@ export function entryFromMarkdown(md: string): DiaryEntry | null {
     if (i > 0) meta[line.slice(0, i).trim()] = line.slice(i + 1).trim();
   }
   const mood = (MOOD_KEYS as readonly string[]).includes(meta.mood) ? (meta.mood as Mood) : undefined;
+  const mood2 = mood && (MOOD_KEYS as readonly string[]).includes(meta.mood2) && meta.mood2 !== mood ? (meta.mood2 as Mood) : undefined;
+  const weather = (WEATHER_KEYS as readonly string[]).includes(meta.weather) ? (meta.weather as Weather) : undefined;
   const updated = Number(meta.updated);
-  return { text: m[2].replace(/\n$/, ''), mood, photo: meta.photo === 'yes', updated: Number.isFinite(updated) ? updated : 0 };
+  return { text: m[2].replace(/\n$/, ''), mood, ...(mood2 && { mood2 }), ...(meta.feeling && { feeling: meta.feeling }), ...(weather && { weather }), photo: meta.photo === 'yes', updated: Number.isFinite(updated) ? updated : 0 };
 }
 
 export interface Backup {

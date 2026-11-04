@@ -2,7 +2,7 @@ import { afterEach, describe, it, expect } from 'vitest';
 import {
   newState, adoptCat, feedCat, startSitter, resumeCat, settleAll,
   addMindfulTask, doMindfulTask, removeMindfulTask, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, STRAY_NAMES, dayIndex, setDayStart, levelFor, levelProgress,
-  graveyard, runaways, hunger, setTaskDay, genderOf, type ActionResult, type AppState, type CatMode,
+  graveyard, runaways, hunger, setTaskDay, setCatDay, replay, rewind, genderOf, type ActionResult, type AppState, type CatMode,
 } from './rules';
 
 // day n at a given hour (all test dates are local time)
@@ -432,13 +432,14 @@ describe('time travel', () => {
   const habit = () => addMindfulTask(newState(), { id: 'h', name: 'Stretch', xp: 5, kind: 'habit', cooldownDays: 1 }, at(0));
   const day = (n: number) => dayIndex(at(n));
 
-  it('marks and unmarks past and present days without touching xp', () => {
+  it('marks and unmarks past and present days, and affection follows the record', () => {
     let s = ok(setTaskDay(habit(), 'h', day(5), true, at(10)));
     s = ok(setTaskDay(s, 'h', day(10), true, at(10)));
     s = ok(setTaskDay(s, 'h', day(5), true, at(10)));   // marking twice changes nothing
     expect(s.tasks[0].doneDays).toEqual([day(5), day(10)]);
     expect(s.tasks[0].lastDoneDay).toBe(day(10));
-    expect(s.xp).toBe(0);
+    expect(s.xp).toBe(10);
+    expect(s.mindfulEarned).toEqual({ day: day(10), task: 0, habit: 5 });
     s = ok(setTaskDay(s, 'h', day(10), false, at(10)));
     expect(s.tasks[0].doneDays).toEqual([day(5)]);
     expect(s.tasks[0].lastDoneDay).toBe(day(5));
@@ -459,6 +460,116 @@ describe('time travel', () => {
   it('reaches back before the task was created', () => {
     const s = ok(setTaskDay(habit(), 'h', day(-3), true, at(2)));
     expect(s.tasks[0].createdDay).toBe(day(-3));
+  });
+});
+
+describe('replay', () => {
+  const day = (n: number) => dayIndex(at(n));
+  // the fields a replay rebuilds (a dead kitty's settledDay only says when the app was last opened)
+  const shape = (s: AppState) => ({
+    xp: s.xp,
+    cats: s.cats.map((c) => ({ id: c.id, status: c.status, lastFedDay: c.lastFedDay, missed: c.missed, endedDay: c.endedDay,
+      totalFeedings: c.totalFeedings, runAwayCount: c.runAwayCount, sitterStartDay: c.sitterStartDay, lastSitterStartDay: c.lastSitterStartDay })),
+    tasks: s.tasks.map((t) => t.lastDoneDay),
+  });
+
+  // Forty days of play, opening the app at odd times: meals, misses, a death, a runaway that comes home,
+  // a sitter trip, the shelter, strays over their cap and a deleted treat.
+  function play(): AppState {
+    let s = newState();
+    s = ok(adoptCat(s, { id: 'a', name: 'A', habit: 'x', mode: 'classic' }, at(0)));
+    s = ok(adoptCat(s, { id: 'b', name: 'B', habit: 'x', mode: 'lighthearted' }, at(0)));
+    s = ok(adoptCat(s, { id: 'c', name: 'C', habit: 'x', unlimited: true }, at(0)));
+    s = addMindfulTask(s, { id: 'h1', name: 'h1', xp: 7, kind: 'habit', cooldownDays: 1 }, at(0));
+    s = addMindfulTask(s, { id: 'h2', name: 'h2', xp: 6, kind: 'habit', cooldownDays: 1 }, at(0));
+    s = addMindfulTask(s, { id: 't1', name: 't1', xp: 15, kind: 'task' }, at(0));
+    s = addMindfulTask(s, { id: 't2', name: 't2', xp: 4, kind: 'task' }, at(0));
+    for (let n = 0; n < 40; n++) {
+      if (n === 9) s = resumeCat(s, 'c', at(n, 8)).state;
+      if (n < 10 || n > 14) s = feedCat(s, 'a', at(n, 9)).state;          // a: misses 10..12 and dies
+      if (n % 5 !== 0 && (n < 20 || n > 24)) s = feedCat(s, 'b', at(n, 20)).state;   // b: runs away 20..22, back on 25
+      if (n % 3 === 0) s = feedCat(s, 'c', at(n, 23)).state;
+      if (n === 6) s = startSitter(s, 'c', at(n, 23)).state;
+      if (n % 2 === 0) { s = doMindfulTask(s, 'h1', at(n)).state; s = doMindfulTask(s, 'h2', at(n)).state; }
+      if (n === 3) s = doMindfulTask(s, 't1', at(n)).state;
+      if (n === 4) { s = doMindfulTask(s, 't2', at(n)).state; s = removeMindfulTask(s, 't2'); }
+      if (n === 33) s = returnToShelter(s, 'c', at(n)).state;
+    }
+    return settleAll(s, at(40)).state;
+  }
+
+  it('rebuilds the same state as playing day by day', () => {
+    const s = play();
+    expect(s.cats.map((c) => c.status)).toEqual(['dead', 'alive', 'shelter']);
+    expect(shape(replay(s, at(40)))).toEqual(shape(s));
+  });
+
+  it('a sitter trip undone the same day leaves the kitty home', () => {
+    let s = setup();
+    for (let n = 0; n < 12; n++) {
+      if (n === 2) { s = ok(startSitter(s, 'c1', at(n, 10))); s = ok(resumeCat(s, 'c1', at(n, 11))); }
+      s = ok(feedCat(s, 'c1', at(n, 20)));
+    }
+    s = settleAll(s, at(12)).state;
+    expect(s.cats[0].status).toBe('alive');
+    expect(shape(replay(s, at(12)))).toEqual(shape(s));
+  });
+
+  it('counts a stray adopted as a kitty at what it paid', () => {
+    let s = addMindfulTask(newState(), { id: 'h', name: 'Stretch', xp: 8, kind: 'habit', cooldownDays: 1 }, at(0));
+    s = doMindfulTask(s, 'h', at(0)).state;
+    s = ok(habitToCat(s, 'h', { id: 'k', name: 'K' }, at(1)));
+    s = ok(feedCat(s, 'k', at(1)));
+    expect(s.xp).toBe(13);
+    expect(replay(s, at(1)).xp).toBe(13);
+  });
+
+  it('time travel on a kitty saves it from a missed meal', () => {
+    let s = setup();
+    s = ok(feedCat(s, 'c1', at(0)));
+    s = settleAll(s, at(2)).state;   // missed day 1
+    expect(s.cats[0].missed).toBe(1);
+    expect(s.xp).toBe(5 - 15);
+    s = ok(setCatDay(s, 'c1', day(1), true, at(2)));
+    expect(s.cats[0]).toMatchObject({ missed: 0, lastFedDay: day(1), totalFeedings: 2 });
+    expect(s.xp).toBe(10);
+    expect(hunger(s.cats[0], day(2))).toBe('peckish');
+  });
+
+  it('time travel brings back a kitty lost to forgotten meals, and refuses days before adoption', () => {
+    let s = setup();
+    s = settleAll(s, at(3)).state;
+    expect(s.cats[0].status).toBe('dead');
+    s = ok(setCatDay(s, 'c1', day(2), true, at(3)));
+    expect(s.cats[0]).toMatchObject({ status: 'alive', missed: 0, endedDay: null });
+    expect(s.xp).toBe(-15 - 15 + 5);
+    const r = setCatDay(s, 'c1', day(-1), true, at(3));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('before_adoption');
+  });
+
+  it('keeps what a deleted treat paid', () => {
+    let s = addMindfulTask(newState(), { id: 't', name: 'Dentist', xp: 12, kind: 'task' }, at(0));
+    s = ok(doMindfulTask(s, 't', at(0)));
+    s = removeMindfulTask(s, 't');
+    expect(replay(s, at(1)).xp).toBe(12);
+  });
+
+  it('going back a day forgets what came after it', () => {
+    let s = setup();
+    s = ok(feedCat(s, 'c1', at(0)));
+    s = ok(adoptCat(s, { id: 'c2', name: 'Late', habit: 'y' }, at(1)));
+    s = settleAll(s, at(3)).state;   // both missed days 1 and 2
+    s = ok(feedCat(s, 'c1', at(3)));
+    expect(hunger(s.cats[0], day(3))).toBe('fed');
+    s = rewind(s, at(2));
+    expect(s.cats[0]).toMatchObject({ fedDays: [day(0)], lastFedDay: day(0), missed: 1, settledDay: day(2) });
+    expect(hunger(s.cats[0], day(2))).toBe('hungry');
+    expect(s.xp).toBe(5 - 15 - 15);
+    s = rewind(s, at(0));
+    expect(s.cats[1].adoptedDay).toBe(day(0));   // adopted later: kept, as if adopted today
+    expect(s.cats.map((c) => c.missed)).toEqual([0, 0]);
+    expect(s.xp).toBe(5);
   });
 });
 

@@ -30,3 +30,6 @@ save.json
 
 # Dev preview server output
 .preview/
+
+# Others
+achievement-kitty/

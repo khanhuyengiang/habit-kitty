@@ -16,6 +16,15 @@ describe('diary markdown', () => {
   it('is readable by a human', () => {
     expect(entryToMarkdown({ text: 'Hi', mood: 'joyful', updated: 1 })).toBe('---\nmood: joyful\nupdated: 1\n---\nHi\n');
   });
+  it('round-trips a second emotion, your own word and the weather', () => {
+    const e: DiaryEntry = { text: 'x', mood: 'joyful', mood2: 'tired', feeling: 'cosy: but sleepy', weather: 'snow', updated: 3 };
+    expect(entryFromMarkdown(entryToMarkdown(e))).toEqual({ ...e, photo: false });
+  });
+  it('drops a second emotion that has no first or repeats it, and an unknown weather', () => {
+    const e = entryFromMarkdown('---\nmood2: sad\nweather: hail\nupdated: 1\n---\nx');
+    expect(e?.mood).toBeUndefined(); expect(e?.mood2).toBeUndefined(); expect(e?.weather).toBeUndefined();
+    expect(entryFromMarkdown('---\nmood: sad\nmood2: sad\nupdated: 1\n---\nx')?.mood2).toBeUndefined();
+  });
   it('ignores an unknown mood and rejects files without frontmatter', () => {
     expect(entryFromMarkdown('---\nmood: furious\nupdated: 1\n---\nx')?.mood).toBeUndefined();
     expect(entryFromMarkdown('just text')).toBeNull();

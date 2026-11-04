@@ -53,6 +53,7 @@ export interface Cat {
   look?: CatLook;                  // chosen appearance; older saves derive one from the id
   gender?: CatGender;              // older saves derive it from the id (see genderOf)
   habitDays?: number[];            // days it was done as a mindful habit, before it became a cat
+  habitXp?: number;                // what that habit paid a day (see replay); older saves count CONFIG.xpPerFeeding
 }
 
 // Days start..end-1 were spent with the sitter; end is the day the cat came home
@@ -88,7 +89,10 @@ export interface AppState {
   cats: Cat[];
   tasks: MindfulTask[];
   mindfulEarned?: { day: number; task: number; habit: number };   // mindful xp already paid out today
+  retired?: RetiredTask[];         // deleted strays and treats, so a replay still counts what they paid
 }
+
+export interface RetiredTask { kind: TaskKind; xp: number; days: number[] }
 
 export type GameEvent =
   | { type: 'starved'; catId: string; missed: number }
@@ -102,7 +106,7 @@ export type Reason =
   | 'no_such_cat' | 'no_such_task' | 'invalid_input'
   | 'cat_not_active' | 'with_sitter' | 'already_with_sitter' | 'not_with_sitter'
   | 'already_fed_today' | 'sitter_cooldown'
-  | 'future_day' | 'low_affection_cat_limit' | 'task_on_cooldown' | 'cat_limit' | 'task_already_done' | 'not_daily_habit';
+  | 'future_day' | 'before_adoption' | 'low_affection_cat_limit' | 'task_on_cooldown' | 'cat_limit' | 'task_already_done' | 'not_daily_habit';
 
 // On failure the (settled) state is still returned: always persist result.state.
 export type ActionResult =
@@ -233,6 +237,8 @@ function settleCat(cat: Cat, today: number): Settled {
   return { cat, xpDelta: 0, events: [] };
 }
 
+const departs = (e: GameEvent) => e.type === 'died' || e.type === 'ranAway' || e.type === 'leftForever';
+
 // Call on every app open (every action below also does this first). Idempotent.
 export function settleAll(state: AppState, now: Date): { state: AppState; events: GameEvent[] } {
   const today = dayIndex(now);
@@ -242,7 +248,7 @@ export function settleAll(state: AppState, now: Date): { state: AppState; events
   const cats = state.cats.map((cat) => {
     const r = settleCat(cat, today);
     xp += r.xpDelta;
-    if (r.events.some((e) => e.type === 'died' || e.type === 'ranAway' || e.type === 'leftForever')) departed = true;
+    if (r.events.some(departs)) departed = true;
     events.push(...r.events);
     return r.cat;
   });
@@ -267,7 +273,7 @@ export const maxActiveCats = (xp: number) =>
 
 export function adoptCat(
   state: AppState,
-  input: { id: string; name: string; habit: string; mode?: CatMode; look?: CatLook; gender?: CatGender; habitDays?: number[]; unlimited?: boolean },
+  input: { id: string; name: string; habit: string; mode?: CatMode; look?: CatLook; gender?: CatGender; habitDays?: number[]; habitXp?: number; unlimited?: boolean },
   now: Date,
 ): ActionResult {
   const { s, events, today } = begin(state, now);
@@ -287,7 +293,7 @@ export function adoptCat(
     fedDays: [], sitterTrips: [], runAwayCount: 0,
     gender: input.gender ?? genderOf({ id: input.id }),
     ...(input.look ? { look: input.look } : {}),
-    ...(input.habitDays?.length ? { habitDays: input.habitDays } : {}),
+    ...(input.habitDays?.length ? { habitDays: input.habitDays, habitXp: input.habitXp ?? CONFIG.xpPerFeeding } : {}),
   };
   return done({ ...s, cats: [...s.cats, cat] }, events);
 }
@@ -409,8 +415,15 @@ export function daysUntilReady(task: MindfulTask, today: number): number {
   return 7;
 }
 
-export const removeMindfulTask = (state: AppState, taskId: string): AppState =>
+const dropTask = (state: AppState, taskId: string): AppState =>
   ({ ...state, tasks: state.tasks.filter((t) => t.id !== taskId) });
+
+// Delete a stray or treat. What it paid is kept (see replay), so deleting never changes affection later.
+export function removeMindfulTask(state: AppState, taskId: string): AppState {
+  const t = state.tasks.find((k) => k.id === taskId);
+  if (!t?.doneDays.length) return dropTask(state, taskId);
+  return { ...dropTask(state, taskId), retired: [...state.retired ?? [], { kind: t.kind, xp: t.xp, days: t.doneDays }] };
+}
 
 export function doMindfulTask(state: AppState, taskId: string, now: Date): ActionResult {
   const { s, events, today } = begin(state, now);
@@ -439,8 +452,8 @@ export function doMindfulTask(state: AppState, taskId: string, now: Date): Actio
   );
 }
 
-// Time travel: mark (or unmark) a task as done on any day up to today. This fixes the record, so it never
-// pays xp, and unmarking never takes any back. A one-off task has a single done day; marking another day moves it.
+// Time travel: mark (or unmark) a task as done on any day up to today. Affection is then replayed from the fixed
+// record (see replay). A one-off task has a single done day; marking another day moves it.
 export function setTaskDay(state: AppState, taskId: string, day: number, isDone: boolean, now: Date): ActionResult {
   const { s, events, today } = begin(state, now);
   const task = s.tasks.find((t) => t.id === taskId);
@@ -451,15 +464,27 @@ export function setTaskDay(state: AppState, taskId: string, day: number, isDone:
     ? task.doneDays.filter((d) => d !== day)
     : task.kind === 'task' ? [day] : had ? task.doneDays : [...task.doneDays, day].sort((a, b) => a - b);
   return done(
-    {
+    replay({
       ...s,
       tasks: s.tasks.map((t) => (t.id === taskId ? {
         ...t, doneDays, lastDoneDay: doneDays.length ? doneDays[doneDays.length - 1] : null,
         createdDay: isDone ? Math.min(t.createdDay, day) : t.createdDay,
       } : t)),
-    },
+    }, now),
     events,
   );
+}
+
+// Time travel for a kitty: mark (or unmark) it as fed on a day between its adoption and today, then replay, so its
+// hunger, whether it is still here, and affection all follow the fixed record. A forgotten meal can save a kitty.
+export function setCatDay(state: AppState, catId: string, day: number, isFed: boolean, now: Date): ActionResult {
+  const { s, events, today } = begin(state, now);
+  const cat = s.cats.find((c) => c.id === catId);
+  if (!cat) return fail(s, events, 'no_such_cat');
+  if (!Number.isInteger(day) || day > today) return fail(s, events, 'future_day');
+  if (day < cat.adoptedDay) return fail(s, events, 'before_adoption');
+  const fedDays = isFed ? [...new Set([...cat.fedDays, day])].sort((a, b) => a - b) : cat.fedDays.filter((d) => d !== day);
+  return done(replay(mapCat(s, catId, (c) => ({ ...c, fedDays })), now), events);
 }
 
 // Turn a daily habit into a cat. The cat keeps the habit's history (as habitDays) and the habit is removed.
@@ -472,9 +497,9 @@ export function habitToCat(
   const task = state.tasks.find((t) => t.id === taskId);
   if (!task) return fail(state, [], 'no_such_task');
   if (task.kind !== 'habit' || task.cooldownDays !== 1) return fail(state, [], 'not_daily_habit');
-  const r = adoptCat(state, { ...input, habit: task.name, habitDays: task.doneDays }, now);
+  const r = adoptCat(state, { ...input, habit: task.name, habitDays: task.doneDays, habitXp: task.xp }, now);
   if (!r.ok) return r;
-  return done(removeMindfulTask(r.state, taskId), r.events);
+  return done(dropTask(r.state, taskId), r.events);   // its days now live on the cat
 }
 
 // Release a kitty to the stray colony: it becomes a daily stray (a habit) that keeps its history and can be adopted again.
@@ -512,6 +537,94 @@ export function strayVisible(id: string, window: number, chance: number = CONFIG
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
   h ^= h >>> 16;
   return (h >>> 0) / 2 ** 32 < chance;   // the same roll for every chance, so a stray seen at 30% is also seen at 80%
+}
+
+// ===================== Replay =====================
+// Rebuild everything that follows from the history (every kitty's hunger and whereabouts, and affection) by playing
+// the game again day by day: adoptions, meals, sitter trips and trips to the shelter, strays and treats under their
+// daily caps. Used by Fix affection, time travel, amnesia and the playtest clock going back. Strays and treats that
+// were deleted before they were kept in `retired` (and the missed days of a kitty later released) are gone for good.
+export function replay(state: AppState, now: Date): AppState {
+  const today = dayIndex(now);
+  const habitDays = state.cats.filter((c) => c.habitDays?.length)
+    .map((c) => ({ kind: 'habit' as TaskKind, xp: c.habitXp ?? CONFIG.xpPerFeeding, days: c.habitDays as number[] }));
+  const mindful = [...state.tasks.map((t) => ({ kind: t.kind, xp: t.xp, days: t.doneDays })), ...state.retired ?? [], ...habitDays];
+  const owed = new Map<number, { task: number; habit: number }>();
+  for (const m of mindful) for (const d of m.days) {
+    const o = owed.get(d) ?? { task: 0, habit: 0 };
+    o[m.kind] += m.xp;
+    owed.set(d, o);
+  }
+  const fed = new Map(state.cats.map((c) => [c.id, new Set(c.fedDays)]));
+  const first = Math.min(today, ...state.cats.map((c) => c.adoptedDay), ...owed.keys());
+
+  let xp = 0;
+  let mindfulEarned: AppState['mindfulEarned'];
+  const live = new Map<string, Cat>();
+  for (let d = first; d <= today; d++) {
+    // the rollover into day d: missed meals and sitter days cost affection
+    let departed = false;
+    for (const [id, c] of live) {
+      const r = settleCat(c, d);
+      xp += r.xpDelta;
+      if (r.events.some(departs)) departed = true;
+      live.set(id, r.cat);
+    }
+    if (departed) xp = CONFIG.departureXp;
+
+    for (const orig of state.cats) {
+      let c = orig.adoptedDay === d
+        ? { ...orig, status: 'alive' as CatStatus, lastFedDay: null, missed: 0, sitterStartDay: null, lastSitterStartDay: null,
+            endedDay: null, totalFeedings: 0, runAwayCount: 0 }
+        : live.get(orig.id);
+      if (!c) continue;
+      const home = orig.sitterTrips.some((t) => t.end === d && t.end - t.start < CONFIG.sitterMaxDays);
+      if (home && c.status === 'sitter') c = { ...c, status: 'alive', sitterStartDay: null };
+      if (fed.get(orig.id)?.has(d) && (c.status === 'alive' || c.status === 'ranAway') && c.lastFedDay !== d) {
+        xp += CONFIG.xpPerFeeding;
+        c = { ...c, status: 'alive', missed: 0, lastFedDay: d, endedDay: null, totalFeedings: c.totalFeedings + 1 };
+      }
+      const trip = orig.sitterTrips.find((t) => t.start === d);
+      if (trip && c.status === 'alive') {   // a trip that ends the day it starts never leaves the kitty with the sitter
+        c = trip.end === d ? { ...c, lastSitterStartDay: d } : { ...c, status: 'sitter', sitterStartDay: d, lastSitterStartDay: d };
+      }
+      if (orig.status === 'shelter' && orig.endedDay === d && ['alive', 'sitter', 'ranAway'].includes(c.status)) {
+        c = { ...c, status: 'shelter', endedDay: d, sitterStartDay: null };
+      }
+      live.set(orig.id, { ...c, settledDay: c.status === 'ranAway' ? c.settledDay : d });
+    }
+
+    const o = owed.get(d);
+    const paid = { task: Math.min(CONFIG.taskMaxXp, o?.task ?? 0), habit: Math.min(CONFIG.habitMaxXp, o?.habit ?? 0) };
+    xp += paid.task + paid.habit;
+    if (d === today) mindfulEarned = { day: d, ...paid };
+  }
+
+  const lastOf = (days: number[]) => days.reduce<number | null>((m, d) => (d <= today && (m === null || d > m) ? d : m), null);
+  return {
+    ...state, xp, mindfulEarned,
+    cats: state.cats.map((c) => live.get(c.id) ?? c),
+    tasks: state.tasks.map((t) => ({ ...t, lastDoneDay: lastOf(t.doneDays) })),
+  };
+}
+
+// Going back in time (the playtest clock): forget everything logged after today, then replay.
+// A kitty adopted later is kept, as if adopted today.
+export function rewind(state: AppState, now: Date): AppState {
+  const today = dayIndex(now);
+  const upTo = (days: number[]) => days.filter((d) => d <= today);
+  return replay({
+    ...state,
+    cats: state.cats.map((c) => ({
+      ...c,
+      adoptedDay: Math.min(c.adoptedDay, today),
+      fedDays: upTo(c.fedDays),
+      ...(c.habitDays ? { habitDays: upTo(c.habitDays) } : {}),
+      sitterTrips: c.sitterTrips.filter((t) => t.start <= today).map((t) => (t.end !== null && t.end > today ? { ...t, end: null } : t)),
+    })),
+    tasks: state.tasks.map((t) => ({ ...t, doneDays: upTo(t.doneDays), createdDay: Math.min(t.createdDay, today) })),
+    retired: state.retired?.map((r) => ({ ...r, days: upTo(r.days) })),
+  }, now);
 }
 
 // ===================== Selectors for the UI =====================

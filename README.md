@@ -29,7 +29,7 @@ single web page and as an offline Android app (via Capacitor).
   Each cat has its own look, which you can randomise when adopting.
 
 - Every kitty is a girl or a boy (chosen when you adopt). Feeding earns a warm message, with special ones for first meals, streaks and milestones.
-- **Achievements** (trophy in the Room): meals served, weeks of raising kitties, streaks, strays fed and treats done, levels, diary pages.
+- **Accomplishments** (trophy in the Room): meals served, weeks of raising kitties, streaks, strays fed and treats done, levels, diary pages.
 - **Kitty diary** (book in the Room): what all your kitties got up to, day by day. Press and hold one kitty for its own.
 - **Time travel** (Settings → Game options): mark or unmark stray kitties and treats as done on any past day. Edits the record only, no XP.
 - Reminders mention the habit, and on Android the notification icon is the kitty's face in its mood and fur colour
@@ -101,7 +101,7 @@ You can also open the `android/` folder in Android Studio and press Run after `n
 | `src/rules.ts` | Game rules: feeding, starvation, sitter, shelter, mindful tasks, levels. Pure functions, no UI. |
 | `src/calendar.ts` | Week and month data for the dots and heatmaps. |
 | `src/store.ts` | Save format: game, diary pages and photos, and packing them into a `.kitty` backup. |
-| `src/achievements.ts` | Achievements, worked out from the save. |
+| `src/accomplishments.ts` | Accomplishments, worked out from the save. |
 | `src/catdiary.ts` | Each cat's own diary of little happenings (pure, seeded). |
 | `src/reminders.ts` | What each daily reminder says and when (pure, tested). |
 | `src/thoughts.ts` | Who a cat thinks about, and how often (pure, tested). |

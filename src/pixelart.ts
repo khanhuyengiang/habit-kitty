@@ -45,8 +45,28 @@ export const ICONS: Record<string, string[]> = {
   prev: ['..o', '.o.', 'o..', '.o.', '..o'],
   next: ['o..', '.o.', '..o', '.o.', 'o..'],
   gear: ['....o....', '.o.ooo.o.', '..ooooo..', '.ooo.ooo.', 'ooo...ooo', '.ooo.ooo.', '..ooooo..', '.o.ooo.o.', '....o....'],
-  sun: ['....o....', '.o..o..o.', '..ooooo..', '..ooooo.o', 'ooooooooo', 'o.ooooo..', '..ooooo..', '.o..o..o.', '....o....'],
-  moon: ['...ooo...', '..oo.....', '.oo......', '.oo......', '.oo......', '.oo...o..', '..oo..o..', '...oooo..', '.........'],
+  sun: [
+  '....o....',
+  '.o.....o.',
+  '...ooo...',
+  '..ooooo..',
+  'o.ooooo.o',
+  '..ooooo..',
+  '...ooo...',
+  '.o.....o.',
+  '....o....',
+],
+  moon: [
+  '...ooo..',
+  '..oo..o.',
+  '.oo.....',
+  '.oo.....',
+  '.oo.....',
+  '.oo.....',
+  '..oo..o.',
+  '...ooo..',
+  '........',
+],
   clock: ['..ooooo..', '.o.....o.', 'o...o...o', 'o...o...o', 'o...ooo.o', 'o.......o', 'o.......o', '.o.....o.', '..ooooo..'],
   // tab bar
   room: ['.....o.....', '....ooo....', '...ooooo...', '..ooooooo..', '.ooooooooo.', 'ooooooooooo', '.ooooooooo.', '.ooo...ooo.', '.ooo...ooo.', '.ooo...ooo.'],
@@ -62,6 +82,26 @@ export function iconSvg(name: string, cls = ''): string {
   const w = Math.max(...art.map((r) => r.length));
   return `<svg class="pxs ico ${cls}" style="--w:${w};--h:${art.length}" viewBox="0 0 ${w} ${art.length}" aria-hidden="true" shape-rendering="crispEdges"><path d="${run(art)}"/></svg>`;
 }
+
+// ---- weather, for the Trackamaniac diary option (13 x 10, same palette as the room) ----
+const CLOUD = [
+  '.....oooo....',
+  '...ooUUUUoo..',
+  '..oUUwwUUUUo.',
+  '.oUUUUUUUUUUo',
+  'oUUUUUUUUUUUo',
+  '.ooooooooooo.',
+];
+export const WEATHER_ART: Record<string, string[]> = {
+  sunny: [
+    '......y......', '.y....y....y.', '..y.YYYYY.y..', '....YyyyY....', '.y.YyyyyyY.y.',
+    'yyyYyyyyyYyyy', '.y.YyyyyyY.y.', '....YyyyY....', '..y.YYYYY.y..', '......y......'],
+  cloudy: ['.............', '.....oooo....', '...ooUUUUoo..', '..oUUwwUUUUo.', '.oUUUUUUUUUUo', 'oUUUUUUUUUUUo', 'oUUUUUUUUUUUo', '.oUUUUUUUUUo.', '..ooooooooo..', '.............'],
+  rainy: [...CLOUD, '..u..u..u....', '.u..u..u..u..', '.u..u..u.....', '..u..u..u.u..'],
+  storm: [...CLOUD.map((r) => r.replace(/U/g, 'd')), '.....yy......', '....yy.......', '...yyyy......', '.....yy......'],
+  snow: [...CLOUD, '..w...w...w..', '....w...w....', '..w...w...w..', '....w...w....'],
+};
+export const weatherSvg = (k: string) => artSvg(WEATHER_ART[k], 'weather');
 
 // ---- the petting heart ----
 const HEART_ART = ['.oo..oo.', 'orroorro', 'orwrrrro', 'orrrrrro', '.orrrro.', '..orro..', '...oo...'];
@@ -82,7 +122,16 @@ export const FOODS: Record<string, string[]> = {
   'wet food': ['..........', '.oooooooo.', '.owwwwwwo.', '.orrrrrro.', '.orwppwro.', '.orrrrrro.', '.oooooooo.', '..........'],
   fish: ['..........', '....oooo.o', '..ooggggoo', '.oggoggggo', 'oggggggggo', '.ogsssggoo', '..oogggoo.', '....oooo.o'],
   chicken: ['..oooo....', '.occCco...', '.oCccCco..', '.occCcco..', '..ooccoo..', '....oowo..', '.....owwo.', '......oo..'],
-  shrimp: ['...oooo...', '..oeeeeo..', '.oeeoeeeo.', '.oeeo.oeo.', '..oo.oeeo.', '....oeeeo.', '...oeeeo..', '..oeeoo...'],
+  shrimp: [
+  '...oooo...',
+  '..ooeeeo..',
+  '.oeooeeeo.',
+  '.oeeo.oeo.',
+  '..oo.oeeo.',
+  '....ooeeo.',
+  '...oeooo..',
+  '..ooo.....',
+] ,
   meat: ['..........', '..oooooo..', '.ommmmmmo.', 'omMMmmmwmo', 'ommmMmmmmo', '.ommmmmmo.', '..oooooo..', '..........'],
 };
 export const BOOK_ART = ['.ooooooo.', 'orrrrrrro', 'orrwwwrro', 'orrrrrrro', 'orrwwwrro', 'orrrrrrro', 'orrrrrrro', 'owwwwwwwo', '.ooooooo.'];

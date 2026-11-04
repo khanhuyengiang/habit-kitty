@@ -2,6 +2,26 @@
 
 Newest first. The app bundles this file: it shows the latest entry once after an update, and the whole list under Settings → Change log.
 
+## 0.4.1 - 2026-10-29
+
+### New
+- **Diary: previous and next day.** Arrows at the top of every diary page step through the days.
+- **Two emotions.** Pick up to two emotions for a day; the kitty on the calendar is split down the middle, one half each.
+- **Your own word for a feeling.** A text box under the emotions replaces the emotion name on the page.
+- **Emotion names.** Settings → Emotion names lets you rename the five emotions.
+- **Trackamaniac.** A new option in Game options that adds a pixel-art weather choice (sunny, cloudy, rainy, storm, snow) to diary pages.
+- **Done treats.** Finished treats now sit in a "Done" drop-down on the Treats tab, with a **Delete all done** button (it asks first).
+- **Fix affection.** Game options → **Fix affection…** works out your affection again from the heatmaps (every meal, missed day, sitter day, stray and treat) and shows the new number before changing it.
+- **Time travel for kitties.** With Time travel on, a kitty's long-press menu has a Time travel button for marking past days as fed or not fed. Time travel now works out affection and hunger again to match, so a forgotten meal can even bring back a kitty you lost.
+- **Amnesia.** A new game option: the first time you open the app on a new day, it asks whether you fed a kitty yesterday and forgot to log it, and counts it if you did.
+- **Kitty alarms switch.** The feeding alarm for each kitty now has its own on/off switch, and the list folds away so it stays short with many kitties.
+- **Your own music.** Settings → Sound → **Use my own music…** plays a song of your choice instead of Strawberry Walk, turned down to match the meows. It stays on this device and isn't part of backups.
+
+### Changed
+- **Quieter music.** The background music now plays at about the same loudness as the meows and purrs, and takes up half as much space.
+- **Playtest clock going back.** −1 day (or Now, after skipping ahead) really goes back: anything logged after that day is undone, and every kitty is as hungry as it was then.
+- **Deleting strays and treats** no longer loses the affection they earned when affection is worked out again.
+
 ## 0.4.0 - 2026-10-26
 
 ### New
