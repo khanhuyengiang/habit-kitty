@@ -1,5 +1,5 @@
 // What a kitty says (well, what the app says for it) when it has been fed. Pure: pass `rand` for a fixed roll.
-import { lookOf } from './pixelcat.ts';
+import { lookOf } from './shared/pixelcat.ts';
 import { genderOf, CONFIG, type Cat } from './rules.ts';
 
 export const STREAK_MILESTONES = [3, 7, 14, 30, 50, 100];

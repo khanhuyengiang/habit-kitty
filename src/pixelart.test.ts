@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BOOK_ART, FOODS, ICONS, MARKS, PAL, ROOM_H, ROOM_W, TROPHY_ART, WEATHER_ART, artSvg, iconSvg, outdoorSvg, roomSvg } from './pixelart.ts';
-import { BODY_H, BODY_W, FACE_W, FURS, MINI_W, PATTERNS, bodySvg, faceSvg, miniSvg, popperSvg } from './pixelcat.ts';
+import { BODY_H, BODY_W, FACE_W, FURS, MINI_W, PATTERNS, bodySvg, faceSvg, miniSvg, popperSvg } from './shared/pixelcat.ts';
 
 const arts: Record<string, string[]> = { book: BOOK_ART, trophy: TROPHY_ART, ...Object.fromEntries(Object.entries(FOODS)), ...MARKS, ...WEATHER_ART };
 
@@ -45,7 +45,7 @@ describe('one pixel grid', () => {
 
 describe('napping cat', () => {
   it('draws at its own pixel size for every coat, and shares the sitting cat colour slots', async () => {
-    const { napSvg, NAP, NAP_W, NAP_H } = await import('./pixelcat.ts');
+    const { napSvg, NAP, NAP_W, NAP_H } = await import('./shared/pixelcat.ts');
     NAP.forEach((row, i) => expect(row.length, `nap row ${i}`).toBeLessThanOrEqual(NAP_W));
     for (const pattern of PATTERNS) {
       const svg = napSvg({ fur: FURS[0], pattern });

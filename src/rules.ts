@@ -27,11 +27,9 @@ export type CatMode = 'classic' | 'lighthearted';
 export type CatStatus =
   | 'alive' | 'sitter' | 'dead' | 'ranAway' | 'leftForever' | 'gone' | 'shelter';
 
-export type CatPattern = 'plain' | 'stripes' | 'patch' | 'mask' | 'calico' | 'point';
+import type { CatLook } from './shared/pixelcat.ts';
+export type { CatLook, CatPattern, CatTrait } from './shared/pixelcat.ts';
 export type CatGender = 'girl' | 'boy';
-export type CatTrait = 'playful' | 'curious' | 'cuddly' | 'lazy' | 'shy' | 'grumpy';
-// Older saves only have fur and pattern; the personality is derived from the cat's id.
-export interface CatLook { fur: string; pattern: CatPattern; trait?: CatTrait }
 
 export interface Cat {
   id: string;

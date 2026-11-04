@@ -2,7 +2,7 @@
 // Run with `npm run icons` after changing the pixel cats. Uses no dependencies (writes PNG with zlib).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
-import { FURS, NOTIFY_FACES, faceSvg } from '../src/pixelcat.ts';
+import { FURS, NOTIFY_FACES, faceSvg } from '../src/shared/pixelcat.ts';
 
 const OUT = 'android/app/src/main/res/drawable-nodpi';
 const SIZE = 96, SCALE = 4, BG = [255, 243, 230];

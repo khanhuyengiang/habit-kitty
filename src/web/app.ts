@@ -17,11 +17,15 @@ import { VERSION } from '../version.ts';
 import CHANGELOG_MD from '../../CHANGELOG.md';
 import { pickThought, type ThoughtKind } from '../thoughts.ts';
 import {
-  PHOTO_MAX_BYTES, PHOTO_MAX_SIDE, dayFromName, diaryPath, entryFromMarkdown, entryToMarkdown, isZip, packBackup, photoPath, unpackBackup,
+  dayFromName, diaryPath, entryFromMarkdown, entryToMarkdown, isZip, packBackup, photoPath, unpackBackup,
   type Backup, type DiaryEntry, type Mood, type Weather, WEATHER_KEYS,
 } from '../store.ts';
-import { CONFETTI_COLORS, TRAITS, notifyIconName, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../pixelcat.ts';
+import { CONFETTI_COLORS, TRAITS, notifyIconName, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
 import { BOOK_ART, FOODS, MARKS, ROOM_H, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, weatherSvg, heartSvg, iconSvg, markSvg, outdoorSvg, roomSvg } from '../pixelart.ts';
+import { habitKittySvg, onAppShown, onShown, switchButton } from '../shared/apps.ts';
+import { paintBackdrop } from '../shared/backdrop.ts';
+import { provideMusic } from '../shared/music.ts';
+import { compressPhoto } from '../shared/photo.ts';
 import { dateOf, dayOf, firstDay, habitStreak, monthGrid, streak, weekRow, type DayKind, type Trackable } from '../calendar.ts';
 
 // ===================== Save =====================
@@ -248,7 +252,7 @@ const HEART = heartSvg();
 document.documentElement.style.setProperty('--face-w', String(FACE_W));   // the cat card's picture column follows the art
 
 // Static buttons in the page template name their icon with data-icon; draw them on the same pixel grid.
-document.querySelectorAll<HTMLElement>('[data-icon]').forEach((el) => el.insertAdjacentHTML('afterbegin', el.dataset.icon === 'cat' ? miniSvg('happy', { fur: '#ffb3cf', pattern: 'plain' }) : iconSvg(el.dataset.icon ?? 'x')));
+document.querySelectorAll<HTMLElement>('[data-icon]').forEach((el) => el.insertAdjacentHTML('afterbegin', el.dataset.icon === 'cat' ? habitKittySvg() : iconSvg(el.dataset.icon ?? 'x')));
 
 // ===================== Food =====================
 const FOOD_KEYS = Object.keys(FOODS);
@@ -286,6 +290,7 @@ function toggleTheme() {
   const next = isDark() ? 'light' : 'dark';
   document.documentElement.dataset.theme = next;
   try { localStorage.setItem('hk-theme', next); } catch { /* not remembered */ }
+  paintBackdrop();
   renderTop();
 }
 
@@ -297,11 +302,11 @@ function renderTop() {
   const bar = Array.from({ length: 10 }, (_, i) => `<i class="${i < filled ? 'on' : ''}"></i>`).join('');
   $('top').innerHTML = `
     <div class="brand"><h1>Habit <span>Kitty</span></h1>
-      <div class="brand-r"><span class="muted">Level <b class="num">${level}</b></span>
+      <div class="brand-r">${switchButton('habit')}
         <button class="gear" type="button" data-action="theme-toggle" aria-label="${isDark() ? 'Switch to light mode' : 'Switch to dark mode'}">${iconSvg(isDark() ? 'sun' : 'moon')}</button>
         <button class="gear" type="button" data-action="settings-toggle" aria-label="Settings" aria-pressed="${tab === 'settings'}">${iconSvg('gear')}</button></div></div>
     <div class="meter">
-      <div class="meter-row"><span>Affection <b>${save.state.xp}</b> XP</span>
+      <div class="meter-row"><span>Level <b class="num">${level}</b> · Affection <b>${save.state.xp}</b> XP</span>
         <span class="muted num">${xpIntoLevel}/${xpForNextLevel} to level ${level + 1}</span></div>
       <div class="bar" role="img" aria-label="${xpIntoLevel} of ${xpForNextLevel} XP to the next level">${bar}</div>
     </div>
@@ -979,6 +984,11 @@ for (const k of ['bgm', 'meow', 'purr'] as const) {
   });
   input.addEventListener('change', () => { persist(); if (k !== 'bgm') playSound(k); });   // let go of a slider: hear how loud it is
 }
+provideMusic({
+  volume: () => volumeOf('bgm'),
+  setVolume: (v, keep) => { save.sound = { ...save.sound, bgm: v }; renderSound(); syncMusic(); if (keep) persist(); },
+  playing: () => (ownMusic ? ownMusic.name : 'Strawberry Walk'),
+});
 
 // Double-tap an awake cat to make a heart float up from it.
 let lastTap = { id: '', at: 0 };
@@ -1281,33 +1291,6 @@ async function loadDiary() {
   diaryReady = true;
   persist();   // from now on the save no longer carries the diary
   renderDiary();
-}
-
-// Scale down and re-encode as JPEG until it fits under PHOTO_MAX_BYTES.
-// The full-size photo is decoded and drawn only once; every retry re-encodes from the small copy.
-async function compressPhoto(file: Blob): Promise<Blob> {
-  const img = await createImageBitmap(file);
-  const draw = (src: CanvasImageSource, w: number, h: number) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(w));
-    canvas.height = Math.max(1, Math.round(h));
-    const g = canvas.getContext('2d') as CanvasRenderingContext2D;
-    g.fillStyle = '#fff';
-    g.fillRect(0, 0, canvas.width, canvas.height);
-    g.drawImage(src, 0, 0, canvas.width, canvas.height);
-    return canvas;
-  };
-  const k0 = Math.min(1, PHOTO_MAX_SIDE / Math.max(img.width, img.height));
-  let canvas = draw(img, img.width * k0, img.height * k0);
-  img.close();
-  const encode = (c: HTMLCanvasElement, q: number) => new Promise<Blob | null>((r) => c.toBlob(r, 'image/jpeg', q));
-  let quality = 0.7;
-  for (let i = 0; ; i++) {
-    const blob = await encode(canvas, quality);
-    if (!blob) throw new Error('encode failed');
-    if (blob.size <= PHOTO_MAX_BYTES || i >= 14 || Math.max(canvas.width, canvas.height) < 200) return blob;
-    if (quality > 0.45) quality -= 0.1; else canvas = draw(canvas, canvas.width * 0.85, canvas.height * 0.85);
-  }
 }
 
 // ---- Backup: one .kitty file (a zip) holding the game, every diary page and every photo ----
@@ -1959,7 +1942,7 @@ function renderAll() {
 }
 
 // ===================== Events =====================
-document.addEventListener('click', (ev) => {
+onShown('habit', 'click', (ev) => {
   const btn = (ev.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!btn || (btn as HTMLButtonElement).disabled) return;
   const id = btn.dataset.id ?? '';
@@ -2353,7 +2336,7 @@ $('reminder-time').addEventListener('change', (ev) => {
   persist(); renderReminder();
   toast(`Reminder time set to ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}.`);
 });
-document.addEventListener('change', (ev) => {
+onShown('habit', 'change', (ev) => {
   const sel = ev.target as HTMLSelectElement;
   if (sel.dataset?.gender !== undefined) { draftGender = sel.value as CatGender; redrawLook(); return; }
   const key = sel.dataset?.look;
@@ -2362,7 +2345,7 @@ document.addEventListener('change', (ev) => {
   redrawLook();
 });
 // The file input lives inside the diary dialog, so listen on the document.
-document.addEventListener('change', async (ev) => {
+onShown('habit', 'change', async (ev) => {
   const input = ev.target as HTMLInputElement;
   if (input.id !== 'diary-file') return;
   const f = input.files?.[0];
@@ -2389,7 +2372,7 @@ $('load-file').addEventListener('change', async (ev) => {
   catch { err.textContent = "That doesn't look like a Habit Kitty backup."; err.hidden = false; }
 });
 
-document.addEventListener('submit', (ev) => {
+onShown('habit', 'submit', (ev) => {
   ev.preventDefault();
   const form = ev.target as HTMLFormElement;
   if (form.id === 'diary-form') { saveDiary(); return; }
@@ -2454,7 +2437,7 @@ document.addEventListener('submit', (ev) => {
   }
 });
 
-document.addEventListener('click', (ev) => {
+onShown('habit', 'click', (ev) => {
   if (!(ev.target as HTMLElement).closest('#clock-pop')) $('clock-pop').classList.remove('open');
 });
 
@@ -2462,7 +2445,7 @@ $('task-repeat').addEventListener('change', () => renderTasks());
 
 // Keys in a small dialog: Escape closes it, Tab stays inside it, arrows move around the month and year grids.
 const GRID_STEP: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -4, ArrowDown: 4 };
-document.addEventListener('keydown', (ev) => {
+onShown('habit', 'keydown', (ev) => {
   const layer = document.getElementById('layer');
   if (!layer) return;
   if (ev.key === 'Escape') { ev.preventDefault(); closeLayer(); return; }
@@ -2589,7 +2572,7 @@ function openStrayMenu(id: string, tab?: StrayTab) {
 }
 
 const holdTarget = (ev: Event) => (ev.target as HTMLElement).closest<HTMLElement>('[data-hold], li[data-task]');
-document.addEventListener('pointerdown', (ev) => {
+onShown('habit', 'pointerdown', (ev) => {
   const el = holdTarget(ev);
   if (!el || (ev.target as HTMLElement).closest('button')) return;
   endHold();
@@ -2598,14 +2581,14 @@ document.addEventListener('pointerdown', (ev) => {
   el.classList.add('pressing');
   holdTimer = window.setTimeout(() => fireHold(el), HOLD_MS);
 });
-document.addEventListener('pointermove', (ev) => {
+onShown('habit', 'pointermove', (ev) => {
   if (holdEl && Math.hypot(ev.clientX - holdFrom.x, ev.clientY - holdFrom.y) > 12) endHold();
 });
-document.addEventListener('pointerup', endHold);
+onShown('habit', 'pointerup', endHold);
 // Android cancels the pointer when its own long-press fires, so a cancel must not abort the hold;
 // only an actual scroll does.
-document.addEventListener('scroll', endHold, true);
-document.addEventListener('contextmenu', (ev) => {
+onShown('habit', 'scroll', endHold, true);
+onShown('habit', 'contextmenu', (ev) => {
   const el = holdTarget(ev);
   if (!el) return;
   ev.preventDefault();
@@ -2615,6 +2598,8 @@ document.addEventListener('contextmenu', (ev) => {
 // Re-settle when the page comes back and at each 2am rollover.
 function tick() { settle(); renderAll(); queueReminderSync(); checkAmnesia(); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+// Back from Achievement Kitty: the theme may have changed there, and the clock moved on.
+onAppShown('habit', tick);
 function scheduleRollover() {
   setTimeout(() => { tick(); scheduleRollover(); }, Math.min(nextReset(now()).getTime() - now().getTime() + 1000, 60_000));
 }

@@ -1,6 +1,6 @@
 // Sprite sheet for `npm run preview`: every face x pattern, so shape edits in src/pixelcat.ts
 // can be seen side by side. Dev only — never bundled into the app.
-import { FACE_X, FURS, NAP_W, PATTERNS, TRAITS, WIDTH, BODY_W, bodySvg, faceSvg, miniSvg, napSvg, popperSvg, MINI_W, type Face } from '../pixelcat.ts';
+import { FACE_X, FURS, NAP_W, PATTERNS, TRAITS, WIDTH, BODY_W, bodySvg, faceSvg, miniSvg, napSvg, popperSvg, MINI_W, type Face } from '../shared/pixelcat.ts';
 import type { CatLook } from '../rules.ts';
 
 const FACES: Face[] = ['open', 'happy', 'sleepy', 'sad', 'starving', 'dead'];

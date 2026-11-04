@@ -3,7 +3,7 @@
 // has fur, shade or white); a . leaves the base alone. A coat with no layer here (plain, mask) is just the base art.
 //   a, b the coat's two accent colours (calico: brown, orange)   s shade   f main colour   W white
 //   (the napping cat uses S, not s, for the coat's shade, because its belly shade is already s)
-import type { CatPattern } from './rules.ts';
+import type { CatPattern } from './pixelcat.ts';
 
 // The sitting cat and the round face: the whole mirrored cat (27 wide), so the two sides can differ.
 export const COAT_SIT: Partial<Record<CatPattern, string[]>> = {

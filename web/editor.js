@@ -1,14 +1,14 @@
 // Pixel editor for the kitty art: `npm run editor`, then open http://127.0.0.1:8001.
 // The page also works on its own (open web/pixel-editor.html); this server adds "Load from" / "Save to"
-// src/pixelcat.ts for the art arrays (a style's sitting cat and two tail frames, the napping cat, the mini face),
-// and reads/writes the per-coat layers in src/coats.ts.
+// src/shared/pixelcat.ts for the art arrays (a style's sitting cat and two tail frames, the napping cat, the mini face),
+// and reads/writes the per-coat layers in src/shared/coats.ts.
 import { createServer } from 'node:http';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const SRC = process.env.KITTY_SRC ?? 'src/pixelcat.ts';   // (the env var is for testing against a copy)
+const SRC = process.env.KITTY_SRC ?? 'src/shared/pixelcat.ts';   // (the env var is for testing against a copy)
 const PORT = Number(process.env.PORT ?? 8001);
 const block = (name) => new RegExp(`((?:export )?const ${name} = \\[\\n)[\\s\\S]*?(\\n\\];\\n)`);
-const COATS_SRC = process.env.KITTY_COATS ?? 'src/coats.ts';
+const COATS_SRC = process.env.KITTY_COATS ?? 'src/shared/coats.ts';
 const COAT_PARTS = { sit: 'COAT_SIT', nap: 'COAT_NAP', mini: 'COAT_MINI' };
 const ORDER = ['stripes', 'mask', 'patch', 'calico', 'point', 'plain'];
 const coatBlock = (name) => new RegExp(`(export const ${name}: [^=]*= \\{\\n)([\\s\\S]*?)(\\};\\n)`);
@@ -20,7 +20,7 @@ createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   const body = (fn) => { let data = ''; req.on('data', (c) => (data += c)); req.on('end', () => { try { fn(JSON.parse(data || '{}')); } catch (e) { send(400, 'text/plain', String(e.message)); } }); };
 
-  // coat layers live in src/coats.ts (COAT_SIT, COAT_NAP, COAT_MINI): one array of rows per coat pattern
+  // coat layers live in src/shared/coats.ts (COAT_SIT, COAT_NAP, COAT_MINI): one array of rows per coat pattern
   if (url.pathname === '/api/coat') {
     const part = url.searchParams.get('part'), pattern = url.searchParams.get('pattern');
     if (!COAT_PARTS[part] || !ORDER.includes(pattern)) return send(400, 'text/plain', 'bad part or pattern');

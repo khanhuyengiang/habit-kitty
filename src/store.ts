@@ -7,6 +7,7 @@
 //   photos/2026-10-12.jpg
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
 import { dateOf, dayOf } from './calendar.ts';
+import { PHOTO_MAX_BYTES } from './shared/photo.ts';
 
 export const MOOD_KEYS = ['joyful', 'calm', 'tired', 'sad', 'stressed'] as const;
 export type Mood = typeof MOOD_KEYS[number];
@@ -18,9 +19,8 @@ export type Weather = typeof WEATHER_KEYS[number];
 export interface DiaryEntry { text: string; mood?: Mood; mood2?: Mood; feeling?: string; weather?: Weather; photo?: boolean; updated: number }
 
 export const BACKUP_FORMAT = 1;
-// Every photo (on the phone and in a backup) is scaled to fit under this, so a backup stays small.
-export const PHOTO_MAX_BYTES = 60_000;
-export const PHOTO_MAX_SIDE = 900;
+// Every photo (on the phone and in a backup) is scaled to fit under PHOTO_MAX_BYTES, so a backup stays small.
+export { PHOTO_MAX_BYTES, PHOTO_MAX_SIDE } from './shared/photo.ts';
 
 export const dayName = (day: number) => dateOf(day).toISOString().slice(0, 10);
 export function dayFromName(name: string): number | null {

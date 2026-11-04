@@ -105,11 +105,17 @@ You can also open the `android/` folder in Android Studio and press Run after `n
 | `src/catdiary.ts` | Each cat's own diary of little happenings (pure, seeded). |
 | `src/reminders.ts` | What each daily reminder says and when (pure, tested). |
 | `src/thoughts.ts` | Who a cat thinks about, and how often (pure, tested). |
-| `src/pixelart.ts` | The shared pixel grid, pastel palette, icons, food and room art (pure, returns SVG). |
-| `src/pixelcat.ts`, `src/coats.ts` | The pixel cats and the per-coat pattern layers (edit them with `npm run editor`). |
+| `src/pixelart.ts` | Icons, weather, food and room art (pure, returns SVG). |
+| `src/shared/pixelart.ts` | Shared by both apps: the pixel grid and pastel palette that every picture is drawn with. |
+| `src/shared/pixelcat.ts`, `src/shared/coats.ts` | Shared by both apps: the pixel cats and the per-coat pattern layers (edit them with `npm run editor`). |
+| `src/achievement/` | Achievement Kitty: its data model, rules (`ops.ts`), storage, backup, card art and UI. |
+| `src/web/shell.ts` | The page's entry: shows one app at a time, behind the switch in each app's top bar. |
+| `src/shared/apps.ts`, `src/shared/backdrop.ts`, `src/shared/music.ts` | Shared by both apps: switching between them (and Android's back button, in `src/web/shell.ts`), the dithered pixel background, and the music volume. |
+| `src/shared/photo.ts` | Shared by both apps: every photo is scaled down to fit under 60 KB. |
 | `src/web/app.ts` | The UI: tabs, pixel sprites, room, dialogs, save and load. |
 | `web/page.html` | Page markup and styles. |
 | `web/build.js` | Bundles the page, font and sounds for the web and for the Android app. |
+| `web/achievement.html` | Achievement Kitty's part of the page (its markup and styles); the build puts it into `web/page.html`. |
 | `web/editor.js`, `web/pixel-editor.html` | The pixel editor for the cat art. |
 | `web/preview.js`, `src/web/preview.ts` | Live sprite sheet for `npm run preview` (dev only). |
 | `scripts/notify-icons.ts` | Draws the Android notification icons (`npm run icons`). |

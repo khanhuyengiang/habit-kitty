@@ -21,4 +21,4 @@ const ctx = await context({
 
 await ctx.watch();
 const { hosts, port } = await ctx.serve({ servedir: OUT, host: '127.0.0.1' });
-console.log(`pixel cat preview: http://${hosts[0]}:${port}  (edits to src/pixelcat.ts reload the page)`);
+console.log(`pixel cat preview: http://${hosts[0]}:${port}  (edits to src/shared/pixelcat.ts reload the page)`);

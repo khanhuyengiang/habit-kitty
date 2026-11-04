@@ -1,8 +1,12 @@
 // Pixel kitties, redrawn from the reference sheet: a round face (cards, moods, bubbles) and a sitting
 // cat with a curled tail (cozy room). Each is one hand-cleaned template made of colour slots, drawn as the
 // LEFT half and mirrored, so every coat is the same shape recoloured. Pure functions that return SVG.
-import type { CatLook, CatPattern, CatTrait } from './rules.ts';
 import { COAT_MINI, COAT_NAP, COAT_SIT } from './coats.ts';
+
+export type CatPattern = 'plain' | 'stripes' | 'patch' | 'mask' | 'calico' | 'point';
+export type CatTrait = 'playful' | 'curious' | 'cuddly' | 'lazy' | 'shy' | 'grumpy';
+// Older saves only have fur and pattern; the personality is derived from the cat's id.
+export interface CatLook { fur: string; pattern: CatPattern; trait?: CatTrait }
 
 export type Face = 'open' | 'happy' | 'sleepy' | 'sad' | 'starving' | 'dead';
 

@@ -1,6 +1,6 @@
 // Daily feeding reminders: decides what each upcoming reminder says. Pure, no platform code.
 import { dayIndex, dayStartHour, type AppState, type Cat } from './rules.ts';
-import type { Face } from './pixelcat.ts';
+import type { Face } from './shared/pixelcat.ts';
 
 export type LastCall = 'off' | 'gentle' | 'insistent';
 export interface CatAlarm { hour: number; minute: number }
