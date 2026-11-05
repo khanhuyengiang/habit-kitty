@@ -6,6 +6,8 @@ import {
 } from '../rules.ts';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Share } from '@capacitor/share';
+import { BACKUP_EXT, BACKUP_PREFIX, backupNow, backupStatus, chooseFolder, folderBackups, markDirty, nativeBackups, onBackupStatus, readFolderBackup, refreshFolder, registerBackupSource, saveBackupToDevice, shareBackup as shareBackupFile, stopBackups } from '../shared/backupfolder.ts';
+import { achievementCount, restoreAchievement, snapshotAchievement } from '../achievement/web/snapshot.ts';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { anyReminder, catAlarmsOn, defaultReminder, planReminders, type LastCall, type ReminderSettings } from '../reminders.ts';
@@ -89,6 +91,7 @@ const gameOnly = (): Save => { const { diary, ...game } = save; return diaryRead
 
 function persist() {
   save.savedAt = Date.now();
+  markDirty(BACKUP_PREFIX);
   queueReminderSync();
   try { localStorage.setItem(KEY, JSON.stringify(gameOnly())); } catch { /* private mode: keep playing in memory */ }
   if (remote) {
@@ -1153,6 +1156,7 @@ function renderSaved() {
   ($('amnesia') as HTMLInputElement).checked = !!save.amnesia;
   renderDaySetting();
   renderSound();
+  renderAutoBackup();
   $('version').textContent = `v${VERSION}`;
   $('clock-pop').hidden = !save.showClock;
   if (!save.showClock) $('clock-pop').classList.remove('open');
@@ -1301,36 +1305,79 @@ async function collectBackup(): Promise<Backup> {
     diary[Number(k)] = e;
     if (e.photo) { const b = await fileBytes(photoPath(Number(k))); if (b) photos[Number(k)] = b; }
   }
-  return { game: gameOnly(), diary, photos };
+  return { game: gameOnly(), diary, photos, achievement: await snapshotAchievement() };
 }
 
-async function exportBackup() {
-  const bytes = packBackup(await collectBackup());
-  const name = `habit-kitty-${new Date().toISOString().slice(0, 10)}.kitty`;
-  if (Capacitor.isNativePlatform()) {
-    try {
-      const f = await Filesystem.writeFile({ path: name, data: toBase64(bytes), directory: Directory.Cache });
-      await Share.share({ title: 'Habit Kitty backup', files: [f.uri], dialogTitle: 'Save your Habit Kitty backup' });
-    } catch (e) {
-      if (!/cancel/i.test(String((e as Error)?.message ?? e))) toast("Couldn't make the backup file. Try again.");
-    }
-    return;
-  }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/zip' }));
-  a.download = name;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
-  toast('Backup downloaded.');
+registerBackupSource({ prefix: BACKUP_PREFIX, ext: BACKUP_EXT, pack: async () => packBackup(await collectBackup()) });
+
+// Save as: the system picker asks where the file goes (a download in a browser).
+async function saveBackupFile() {
+  try {
+    const where = await saveBackupToDevice();
+    if (where !== null) toast(where ? `Backup saved: ${where}` : 'Backup downloaded.');
+  } catch { toast("Couldn't save the backup file. Try again."); }
+}
+
+// Share sheet: Drive, Bluetooth, mail... (Android only).
+async function shareBackup() {
+  try { await shareBackupFile(); }
+  catch (e) { if (!/cancel/i.test(String((e as Error)?.message ?? e))) toast("Couldn't make the backup file. Try again."); }
+}
+
+// ---- Auto-backup: the folder, when it last ran, and restoring from it ----
+const ago = (t: number) => {
+  const m = Math.round((Date.now() - t) / 60_000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  return h < 24 ? `${h} h ago` : `${Math.round(h / 24)} days ago`;
+};
+function renderAutoBackup() {
+  const box = $('auto-backup');
+  box.hidden = !nativeBackups;
+  document.querySelectorAll<HTMLElement>('[data-native-only]').forEach((el) => { el.hidden = !nativeBackups; });
+  if (!nativeBackups) return;
+  const st = backupStatus();
+  const f = st.folder;
+  const lines = f.chosen
+    ? `<p>Folder: <b>${esc(f.name || 'chosen folder')}</b>${f.ok ? '' : ' (not reachable)'}<br>Last backup: ${st.running ? 'saving…' : st.last ? ago(st.last) : 'none yet'}</p>`
+    : '<p class="muted">Off. Pick a folder once (for example Documents, then make a folder called HabitKitty) and a fresh copy is saved there whenever you leave the app after changing something. The newest 7 days are kept.</p>';
+  box.innerHTML = `<h4 class="sub">Auto-backup</h4>${lines}${st.error ? `<p class="form-error">${esc(st.error)}</p>` : ''}
+    <div class="btns wrap">${f.chosen
+      ? `<button class="btn" type="button" data-action="backup-now" ${st.running ? 'disabled' : ''}>Back up now</button>
+         <button class="btn" type="button" data-action="restore-folder">Restore from folder…</button>
+         <button class="btn" type="button" data-action="backup-folder">Change folder</button>
+         <button class="btn" type="button" data-action="backup-stop">Stop</button>`
+      : '<button class="btn primary" type="button" data-action="backup-folder">Choose backup folder</button>'}</div>`;
+}
+onBackupStatus(renderAutoBackup);
+
+async function openFolderRestore() {
+  try {
+    const names = await folderBackups(BACKUP_PREFIX, 'kitty');
+    if (!names.length) { toast('No Habit Kitty backups in that folder yet.'); return; }
+    openModal(`<div class="panel"><h3>Restore from folder</h3><p class="muted">Pick a backup. The newest is first.</p>
+      <div class="btns col">${names.map((n) => `<button class="btn" type="button" data-action="restore-pick" data-name="${esc(n)}">${esc(n.replace(/^habit-kitty-|\.kitty$/g, ''))}</button>`).join('')}</div>
+      <div class="btns"><button class="btn" data-action="modal-close">Cancel</button></div></div>`);
+  } catch { toast("Couldn't open the backup folder."); refreshFolder(); }
+}
+async function pickFolderBackup(name: string) {
+  try { askRestore(unpackBackup(await readFolderBackup(name))); }
+  catch { closeModal(); toast("Couldn't read that backup."); }
 }
 
 let pendingBackup: Backup | null = null;
 function askRestore(b: Backup) {
   pendingBackup = b;
   const pages = Object.keys(b.diary).length, photos = Object.keys(b.photos).length;
+  const ach = b.achievement ? achievementCount(b.achievement) : 0;
+  const parts = [
+    b.game ? `your kitties, ${pages} diary ${pages === 1 ? 'page' : 'pages'} and ${photos} ${photos === 1 ? 'photo' : 'photos'}` : '',
+    b.achievement ? `${ach} ${ach === 1 ? 'achievement' : 'achievements'} (Achievement Kitty)` : '',
+  ].filter(Boolean);
   openModal(`<div class="panel"><h3>Restore this backup?</h3>
-    <p>It holds your kitties, ${pages} diary ${pages === 1 ? 'page' : 'pages'} and ${photos} ${photos === 1 ? 'photo' : 'photos'}.</p>
-    <p class="muted">Everything currently on this device will be replaced.</p>
+    <p>It holds ${parts.join(' and ')}.</p>
+    <p class="muted">${b.game && b.achievement ? 'Everything in both apps' : b.game ? 'Everything in Habit Kitty' : 'Everything in Achievement Kitty'} on this device will be replaced.</p>
     <div class="btns"><button class="btn" data-action="modal-close">Cancel</button>
     <button class="btn primary" data-action="restore-yes">Restore</button></div></div>`);
 }
@@ -1339,12 +1386,25 @@ async function restoreBackup() {
   const b = pendingBackup;
   pendingBackup = null;
   if (!b) return;
-  const g = validGame(b.game);
-  if (!g || !await writeDiaryFiles(b.diary, b.photos)) { closeModal(); toast("Couldn't restore that backup."); return; }
-  save = normalize({ ...g, diary: b.diary as unknown as Save['diary'] });
-  lastLevel = null;
-  diaryReady = true;
-  persist(); settle(); renderAll(); closeModal();
+  const g = b.game === null ? null : validGame(b.game);
+  if (b.game !== null && !g) { closeModal(); toast("Couldn't restore that backup."); return; }
+  // Achievement Kitty first: if it fails nothing has been touched yet.
+  if (b.achievement) {
+    try { await restoreAchievement(b.achievement); } catch { closeModal(); toast("Couldn't restore that backup."); return; }
+  }
+  if (g) {
+    if (!await writeDiaryFiles(b.diary, b.photos)) { closeModal(); toast("Couldn't restore the kitties and diary. Achievements were restored."); return; }
+    save = normalize({ ...g, diary: b.diary as unknown as Save['diary'] });
+    lastLevel = null;
+    diaryReady = true;
+    persist(); settle(); renderAll();
+  }
+  closeModal();
+  if (b.achievement) {   // that app may already be running with the old save: start it again from the restored one
+    toast('Backup restored. Reloading…');
+    setTimeout(() => location.reload(), 900);
+    return;
+  }
   toast('Backup restored.');
 }
 
@@ -2188,7 +2248,13 @@ onShown('habit', 'click', (ev) => {
       setReminders({ catAlarms: alarms });
       break;
     }
-    case 'save-file': exportBackup(); break;
+    case 'save-file': saveBackupFile(); break;
+    case 'share-file': shareBackup(); break;
+    case 'backup-folder': chooseFolder(); break;
+    case 'backup-now': backupNow().then(() => { const e = backupStatus().error; toast(e || 'Backed up.'); }); break;
+    case 'backup-stop': stopBackups().then(() => toast('Auto-backup is off. Your old backups stay in the folder.')); break;
+    case 'restore-folder': openFolderRestore(); break;
+    case 'restore-pick': pickFolderBackup(btn.dataset.name ?? ''); break;
     case 'restore-yes': restoreBackup(); break;
     case 'save-copy': {
       const text = JSON.stringify(gameOnly());

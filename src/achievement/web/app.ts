@@ -9,12 +9,11 @@ import {
   ageOf, levelOf, migrate, monthOf, moveSideQuest, photosOf, pickColor, saveAchievement, saveMainQuest, saveSideQuest, setMainQuestArchived,
   setSideQuestArchived, sideQuestsOf, titleFor, updateProfile, type AchievementInput, type Errors, type Filter,
 } from '../ops.ts';
-import { IDB_PREFIX, IndexedDbRepo, MemoryRepo, Saver, isLocalRef, type Repo } from '../storage.ts';
+import { IDB_PREFIX, MemoryRepo, Saver, isLocalRef, type Repo } from '../storage.ts';
 import { Capacitor } from '@capacitor/core';
-import { Directory, Filesystem } from '@capacitor/filesystem';
-import { Share } from '@capacitor/share';
-import { BACKUP_EXT, packBackup, unpackBackup } from '../backup.ts';
-import { FileRepo, blobToBase64 } from './filerepo.ts';
+import { unpackBackup } from '../backup.ts';
+import { BACKUP_PREFIX, backupStatus, markDirty, nativeBackups, saveBackupToDevice, shareBackup } from '../../shared/backupfolder.ts';
+import { platformRepo } from './snapshot.ts';
 import { onAppShown, onShown, shownApp, switchButton } from '../../shared/apps.ts';
 import { paintBackdrop } from '../../shared/backdrop.ts';
 import { music } from '../../shared/music.ts';
@@ -83,6 +82,7 @@ function dropStore(k: string) { try { localStorage.removeItem(k); } catch { /* n
 
 function commit(next: Data, removedPhotos: string[] = []) {
   data = next;
+  markDirty(BACKUP_PREFIX);
   render();
   saver.save(next).then((ok) => {
     if (ok) {
@@ -542,11 +542,13 @@ case 'achievement': case 'complete': return `<div class="panel wide form-panel" 
       <h3 id="mt">Settings</h3>
       ${musicHtml()}
       <h4 class="sub">Save and load</h4>
-      <p>${Capacitor.isNativePlatform() ? 'Your quests and photos are stored as files on this phone.' : 'Your quests and photos are stored in this browser.'} A save file (.${BACKUP_EXT}) holds all of it, so you can keep a copy or move to another device.</p>
+      <p>${Capacitor.isNativePlatform() ? 'Your quests and photos are stored as files on this phone.' : 'Your quests and photos are stored in this browser.'} One backup file (.kitty) holds all of it <b>and Habit Kitty's kitties and diary</b>, so you can keep a copy or move to another device.</p>
       <p class="err" data-err="form" role="alert"></p>
-      <div class="btns"><button class="btn primary grow" data-action="save-backup">Save to file</button>
-      <label class="btn grow">Load from file<input class="sr" type="file" data-upload="backup"></label></div>
-      <p class="hint">Loading replaces everything in the app with the file's contents.</p></div>`;
+      <div class="btns"><button class="btn primary grow" data-action="save-backup">Save to device</button>
+      ${Capacitor.isNativePlatform() ? '<button class="btn grow" data-action="share-backup">Share…</button>' : ''}
+      <label class="btn grow">Load achievements<input class="sr" type="file" data-upload="backup"></label></div>
+      ${nativeBackups ? `<p class="hint">${backupStatus().folder.chosen ? 'It is also backed up automatically to your backup folder.' : 'To back up automatically, choose a backup folder in Habit Kitty → Settings → Backup.'}</p>` : ''}
+      <p class="hint">Loading here only replaces your achievements, from a backup or an older Achievement Kitty save file. To restore everything, use Habit Kitty → Settings → Backup → Restore.</p></div>`;
     case 'confirm': return `<div class="panel" role="alertdialog" aria-modal="true" aria-labelledby="mt" aria-describedby="mb"><h3 id="mt">${esc(m.title)}</h3><p id="mb">${esc(m.body)}</p>
       <div class="btns end"><button class="btn" data-action="close-modal" autofocus>Cancel</button><button class="btn danger" data-action="confirm-yes">${esc(m.label)}</button></div></div>`;
   }
@@ -823,6 +825,7 @@ function onAction(el: HTMLElement) {
     }
     case 'open-settings': openModal({ kind: 'settings' }); break;
     case 'save-backup': exportBackup(); break;
+    case 'share-backup': shareBackupFile(); break;
     case 'retry-save': saver.retry().then(() => renderStatus()); break;
     case 'edit-profile': openProfile(); break;
     case 'avatar-clear': if (m?.kind === 'profile') { keepProfileFields(m); m.avatar = null; m.avatarBlob = undefined; renderModal(); } break;
@@ -1079,26 +1082,15 @@ function backupError(msg: string) {
   if (el) el.textContent = msg; else toast(msg);
 }
 
+// One backup file holds both apps (Habit Kitty builds it, see shared/backupfolder.ts), so Save and Share are the same here.
 async function exportBackup() {
   try {
-    const photos = new Map<string, Blob>();
-    for (const ref of urls.keys()) { const b = await (await fetch(urls.get(ref)!)).blob(); photos.set(ref, b); }
-    const bytes = await packBackup(data, photos);
-    const name = `achievement-kitty-${todayStr()}.${BACKUP_EXT}`;
-    if (Capacitor.isNativePlatform()) {
-      const f = await Filesystem.writeFile({ path: name, data: await blobToBase64(new Blob([bytes as BlobPart])), directory: Directory.Cache });
-      await Share.share({ title: 'Achievement Kitty save', files: [f.uri], dialogTitle: 'Save your Achievement Kitty file' });
-      return;
-    }
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/zip' }));
-    a.download = name;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
-    toast('Save file downloaded.');
-  } catch (e) {
-    if (!/cancel/i.test(String((e as Error)?.message ?? e))) backupError("Couldn't make the save file. Try again.");
-  }
+    const where = await saveBackupToDevice();
+    if (where !== null) toast(where ? `Backup saved: ${where}` : 'Backup downloaded.');
+  } catch { backupError("Couldn't make the backup file. Try again."); }
+}
+async function shareBackupFile() {
+  try { await shareBackup(); } catch (e) { if (!/cancel/i.test(String((e as Error)?.message ?? e))) backupError("Couldn't make the backup file. Try again."); }
 }
 
 // Save files from before the two apps shared one limit can hold photos of a few hundred KB: shrink those to the same
@@ -1118,7 +1110,7 @@ async function readBackup(file: File | undefined, input: HTMLInputElement) {
   if (!file) return;
   let b: ReturnType<typeof unpackBackup>;
   try { b = unpackBackup(new Uint8Array(await file.arrayBuffer())); }
-  catch { input.value = ''; backupError("That isn't an Achievement Kitty save file."); return; }
+  catch { input.value = ''; backupError("That isn't a Habit Kitty backup or an Achievement Kitty save file."); return; }
   input.value = '';
   const n = b.data.achievements.length;
   confirmDialog('Replace everything?', `This file has ${plural(b.data.mainQuests.length, 'main quest')} and ${plural(n, 'achievement')}. Loading it deletes what is in the app now.`, 'Replace everything', async () => {
@@ -1163,7 +1155,7 @@ async function boot() {
   if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
   paintBackdrop();
   try {
-    repo = Capacitor.isNativePlatform() ? new FileRepo() : new IndexedDbRepo();
+    repo = platformRepo();
     const loaded = await repo.load();
     if (loaded.data && !looksValid(loaded.data)) throw new Error('unreadable');
     for (const [ref, blob] of loaded.photos) urls.set(ref, URL.createObjectURL(blob));

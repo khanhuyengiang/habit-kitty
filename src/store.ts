@@ -18,7 +18,11 @@ export type Weather = typeof WEATHER_KEYS[number];
 // replaces the emotion name on the page; `weather` is only set when the Trackamaniac option is on.
 export interface DiaryEntry { text: string; mood?: Mood; mood2?: Mood; feeling?: string; weather?: Weather; photo?: boolean; updated: number }
 
-export const BACKUP_FORMAT = 1;
+// Format 2 can carry Achievement Kitty's whole save as one more entry (achievement.achkitty, itself a zip, see achievement/backup.ts),
+// so one file backs up both apps. Format 1 files (Habit Kitty only) still load.
+export const BACKUP_FORMAT = 2;
+export const ACHIEVEMENT_ENTRY = 'achievement.achkitty';
+const ACHIEVEMENT_MAX = 128_000_000;
 // Every photo (on the phone and in a backup) is scaled to fit under PHOTO_MAX_BYTES, so a backup stays small.
 export { PHOTO_MAX_BYTES, PHOTO_MAX_SIDE } from './shared/photo.ts';
 
@@ -54,9 +58,10 @@ export function entryFromMarkdown(md: string): DiaryEntry | null {
 }
 
 export interface Backup {
-  game: unknown;
+  game: unknown;                     // null in a file that only holds Achievement Kitty (an old .achkitty save)
   diary: Record<number, DiaryEntry>;
   photos: Record<number, Uint8Array>;
+  achievement?: Uint8Array;          // Achievement Kitty's save file, as is
 }
 
 export function packBackup(b: Backup, exportedAt = Date.now()): Uint8Array {
@@ -64,6 +69,7 @@ export function packBackup(b: Backup, exportedAt = Date.now()): Uint8Array {
     'manifest.json': strToU8(JSON.stringify({ app: 'habit-kitty', format: BACKUP_FORMAT, exportedAt })),
     'game.json': strToU8(JSON.stringify(b.game)),
   };
+  if (b.achievement) files[ACHIEVEMENT_ENTRY] = [b.achievement, { level: 0 }];   // photos inside are JPEGs already
   for (const [k, e] of Object.entries(b.diary)) {
     const day = Number(k);
     files[diaryPath(day)] = strToU8(entryToMarkdown({ ...e, photo: !!b.photos[day] }));
@@ -81,11 +87,14 @@ export function unpackBackup(bytes: Uint8Array): Backup {
   let total = 0;
   const files = unzipSync(bytes, { filter: (f) => {   // refuse zip bombs: each file, and all of them together, stay small
     total += f.originalSize;
-    return f.originalSize < 8_000_000 && total < 64_000_000 && (!f.name.startsWith('photos/') || f.originalSize <= PHOTO_MAX_BYTES * 4);
+    if (f.name === ACHIEVEMENT_ENTRY) return f.originalSize < ACHIEVEMENT_MAX && total < ACHIEVEMENT_MAX + 64_000_000;
+    return f.originalSize < 8_000_000 && total < ACHIEVEMENT_MAX + 64_000_000 && (!f.name.startsWith('photos/') || f.originalSize <= PHOTO_MAX_BYTES * 4);
   } });
-  if (!files['manifest.json'] || !files['game.json']) throw new Error('not a backup');
+  if (!files['manifest.json']) throw new Error('not a backup');
   const manifest = JSON.parse(strFromU8(files['manifest.json']));
-  if (manifest?.app !== 'habit-kitty' || manifest.format !== BACKUP_FORMAT) throw new Error('unsupported backup');
+  // An Achievement Kitty save on its own (the older separate file): there is no game in it.
+  if (manifest?.app === 'achievement-kitty') return { game: null, diary: {}, photos: {}, achievement: bytes };
+  if (!files['game.json'] || manifest?.app !== 'habit-kitty' || ![1, BACKUP_FORMAT].includes(manifest.format)) throw new Error('unsupported backup');
   const diary: Record<number, DiaryEntry> = {};
   const photos: Record<number, Uint8Array> = {};
   for (const [path, data] of Object.entries(files)) {
@@ -98,5 +107,5 @@ export function unpackBackup(bytes: Uint8Array): Backup {
     } else if (m[1] === 'photos' && m[3] === 'jpg') photos[day] = data;
   }
   for (const [k, e] of Object.entries(diary)) e.photo = !!photos[Number(k)];   // the photo file is the truth
-  return { game: JSON.parse(strFromU8(files['game.json'])), diary, photos };
+  return { game: JSON.parse(strFromU8(files['game.json'])), diary, photos, ...(files[ACHIEVEMENT_ENTRY] && { achievement: files[ACHIEVEMENT_ENTRY] }) };
 }

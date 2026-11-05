@@ -57,6 +57,23 @@ describe('.kitty backup', () => {
     const back = unpackBackup(packBackup({ game: {}, diary: {}, photos: { [day]: photo } }));
     expect(back.photos).toEqual({});
   });
+  it('carries Achievement Kitty\'s save inside, untouched', () => {
+    const ach = new Uint8Array([0x50, 0x4b, 3, 4, 9, 9, 9]);   // stands for the nested save file
+    const back = unpackBackup(packBackup({ game: { v: 1 }, diary: {}, photos: {}, achievement: ach }));
+    expect(back.game).toEqual({ v: 1 });
+    expect([...back.achievement!]).toEqual([...ach]);
+    expect(unpackBackup(packBackup({ game: {}, diary: {}, photos: {} })).achievement).toBeUndefined();
+  });
+  it('still loads a format 1 file from before', () => {
+    const old = zipSync({ 'manifest.json': strToU8('{"app":"habit-kitty","format":1}'), 'game.json': strToU8('{"v":1}') });
+    expect(unpackBackup(old).game).toEqual({ v: 1 });
+  });
+  it('reads an older Achievement Kitty save file as achievements only', () => {
+    const achOnly = zipSync({ 'manifest.json': strToU8('{"app":"achievement-kitty","format":1}'), 'data.json': strToU8('{}') });
+    const back = unpackBackup(achOnly);
+    expect(back.game).toBeNull();
+    expect([...back.achievement!]).toEqual([...achOnly]);
+  });
   it('rejects zips that are not backups and non-zips', () => {
     expect(() => unpackBackup(zipSync({ 'x.txt': strToU8('hi') }))).toThrow();
     expect(() => unpackBackup(strToU8('{"v":1}'))).toThrow();

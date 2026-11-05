@@ -244,6 +244,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .catlog li { padding: var(--s2) var(--s3); background: var(--surface2); border-color: var(--line); }
 .catlog .num { color: var(--muted); margin-right: var(--s2); }
 .btns { display: flex; gap: var(--s2); } .btns .btn { flex: 1; }
+.btns.col { flex-direction: column; } .btns.wrap { flex-wrap: wrap; } .btns.wrap .btn { flex: 1 1 42%; }
 
 .food { margin-right: var(--s2); vertical-align: middle; }
 
@@ -606,11 +607,13 @@ body {
     </div></details>
 
     <details class="panel fold"><summary>Backup</summary><div class="fold-body">
-      <p class="muted">One <b>.kitty</b> file holds your kitties, every diary page and your photos (scaled down so the file stays small). Keep it somewhere safe, like Drive or an email to yourself.</p>
-      <div class="btns">
-        <button class="btn primary" type="button" data-action="save-file">Back up…</button>
+      <p class="muted">One <b>.kitty</b> file holds <b>both apps</b>: your kitties, every diary page and photo, and your Achievement Kitty quests and achievements (photos are scaled down so the file stays small). Save it on this device, or share it to Drive or by mail.</p>
+      <div class="btns wrap">
+        <button class="btn primary" type="button" data-action="save-file">Save to device…</button>
+        <button class="btn" type="button" data-action="share-file" data-native-only>Share…</button>
         <button class="btn" type="button" data-action="load-file">Restore…</button>
       </div>
+      <div id="auto-backup" hidden></div>
       <input type="file" id="load-file" accept=".kitty,.zip,.json,application/zip,application/octet-stream,application/json,text/plain" hidden>
       <details class="more"><summary>Game only, as text</summary>
         <p class="muted">Copies just the kitties and settings, without diary or photos.</p>

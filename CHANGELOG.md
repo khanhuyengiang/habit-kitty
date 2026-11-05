@@ -2,6 +2,14 @@
 
 Newest first. The app bundles this file: it shows the latest entry once after an update, and the whole list under Settings → Change log.
 
+## 0.4.2 - 2026-11-05
+
+### New
+- **One backup for both apps.** The .kitty file now also holds Achievement Kitty's quests, achievements and photos. Restoring it brings both back (the app reloads once). Older Habit Kitty files and Achievement Kitty save files still load.
+- **Save to device.** Settings → Backup → **Save to device…** (in both Habit Kitty and Achievement Kitty) opens the phone's own save dialog, so you choose the folder (Downloads, Documents, an SD card…). **Share…** is still there for Drive, Bluetooth and mail.
+- **Auto-backup.** Pick a backup folder once (Settings → Backup → **Choose backup folder**) and one fresh dated file is saved there whenever you leave the app after changing something, plus once when the app opens if the last one is a day old. The newest 7 days are kept. **Back up now** and **Restore from folder…** are next to it.
+- If the folder can't be reached (deleted, or the card is out), the app tells you instead of failing quietly.
+
 ## 0.4.1 - 2026-10-29
 
 ### New

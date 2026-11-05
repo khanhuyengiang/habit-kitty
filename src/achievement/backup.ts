@@ -32,6 +32,12 @@ const looksValid = (d: any): d is Data => !!d && d.version === 1 && !!d.user && 
 // Throws when the bytes are not an Achievement Kitty save file.
 export function unpackBackup(bytes: Uint8Array): { data: Data; photos: Map<string, Blob> } {
   if (!isZip(bytes)) throw new Error('not a backup');
+  // A combined .kitty backup carries this app's save as one entry: use that.
+  const peek = unzipSync(bytes, { filter: (f) => (f.name === 'manifest.json' && f.originalSize < 1_000_000) || (f.name === 'achievement.achkitty' && f.originalSize < 128_000_000) });
+  if (peek['manifest.json'] && JSON.parse(strFromU8(peek['manifest.json']))?.app === 'habit-kitty') {
+    if (!peek['achievement.achkitty']) throw new Error('no achievements in this file');
+    return unpackBackup(peek['achievement.achkitty']);
+  }
   let total = 0;
   const files = unzipSync(bytes, { filter: (f) => { total += f.originalSize; return f.originalSize < MAX_FILE && total < MAX_TOTAL; } });   // refuse zip bombs
   if (!files['manifest.json'] || !files['data.json']) throw new Error('not a backup');
