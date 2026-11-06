@@ -6,7 +6,7 @@ import { iconSvg, weatherSvg } from '../pixelart.ts';
 import { mpLine } from '../player.ts';
 import { dayIndex } from '../rules.ts';
 import { monoSvg } from '../shared/pixelart.ts';
-import { onAppShown, onShown } from '../shared/apps.ts';
+import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
 import { meterHtml } from '../shared/meter.ts';
 import { compressPhoto } from '../shared/photo.ts';
 import { habitStats } from '../shared/stats.ts';
@@ -48,11 +48,11 @@ const isDark = () => document.documentElement.dataset.theme
   : matchMedia('(prefers-color-scheme: dark)').matches;
 const HOUSE = ['....o....', '...ooo...', '..ooooo..', '.ooooooo.', '..ooooo..', '..oo.oo..', '..oo.oo..'];
 function renderTop() {
-  $('diary-top').innerHTML = `<div class="brand"><h1>Kitty <span>Diary</span></h1>
+  $('diary-top').innerHTML = `<div class="brand"><h1>Kitty <span>Journal</span></h1>
     <div class="brand-r">
       <button class="gear" type="button" data-action="go" data-to="home" aria-label="Home">${monoSvg(HOUSE)}</button>
       <button class="gear" type="button" data-action="diary-theme" aria-label="${isDark() ? 'Switch to light mode' : 'Switch to dark mode'}">${iconSvg(isDark() ? 'sun' : 'moon')}</button>
-      <button class="gear" type="button" data-action="go" data-to="habit" data-tab="settings" aria-label="Settings">${iconSvg('gear')}</button></div></div>`;
+      <button class="gear" type="button" data-action="go" data-to="habit" data-tab="settings" aria-label="Settings">${iconSvg('gear')}</button></div></div>${journalTabs('diary')}`;
 }
 
 // ---- the page ----

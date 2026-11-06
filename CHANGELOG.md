@@ -6,6 +6,7 @@ Newest first. The app bundles this file: it shows the latest entry once after an
 
 ### New
 - **Diary has its own screen.** The Diary button on the home page opens it; it is no longer a tab in Habit Kitty, which now has Room, Strays, Today and Heatmap. Your pages, photos, Trackamaniac setting and emotion names carry over by themselves, and the backup holds all of it.
+- **Journal.** The home page's Diary button is now **Journal**, with two tabs at the top: **Diary** and **Notes** (Simple Notes moved in here).
 - **Monthly reflection.** Under the calendar, a note for the month (what went well, what was hard, what to change), with a tally of the moods you picked.
 - **Birthdays.** Add the people whose birthdays you want to remember (the year is optional). A cake marks the day on the calendar and on that day's page, and the next three are listed in the Birthdays section at the bottom.
 - **Simple Notes.** A new screen on the home page: a list of notes with a search box, and an editor that saves as you type, with a Markdown preview. Each note is one `.md` file named after its title, and notes are part of the backup. On Android, **Settings → Notes → Sync with the notes folder** keeps them in step with the **Notes** folder inside your backup folder, so you can open it as a vault in Obsidian. A note changed on both sides keeps both versions; deleting in Obsidian does not delete in the app. Notes can also be exported (.zip) and imported (.md).

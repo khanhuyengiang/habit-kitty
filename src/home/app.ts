@@ -77,8 +77,7 @@ const PERSON = ['..ooo..', '.ooooo.', '.ooooo.', '..ooo..', 'ooooooo', 'ooooooo'
 interface Entry { label: string; icon: string; to?: string; tab?: string; soon?: boolean; action?: string }
 const MENU: Entry[] = [
   { label: 'Habit Kitty', icon: habitKittySvg(), to: 'habit' },
-  { label: 'Diary', icon: iconSvg('diary'), to: 'diary' },
-  { label: 'Simple Notes', icon: iconSvg('pencil'), to: 'notes' },
+  { label: 'Journal', icon: iconSvg('diary'), to: 'diary' },
   { label: 'Shopping Lists', icon: iconSvg('treats'), soon: true },
   { label: 'Achievements', icon: trophyIcon(), to: 'achievement' },
   { label: 'Player Stat', icon: monoSvg(PERSON), action: 'player-stat' },

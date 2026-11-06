@@ -4,9 +4,9 @@
 import { monoSvg } from './pixelart.ts';
 import { miniSvg } from './pixelcat.ts';
 
-// The home page, the diary, the notes and the two apps: <html data-app> says which one is showing. (Habit Kitty's styles also serve the home page, the diary and the notes.)
+// The home page, the diary and the notes (the Journal's two tabs) and the two apps: <html data-app> says which one is showing. (Habit Kitty's styles also serve the home page, the diary and the notes.)
 export type AppName = 'home' | 'habit' | 'diary' | 'notes' | 'achievement';
-export const APP_TITLE: Record<AppName, string> = { home: 'Kitty Home', habit: 'Habit Kitty', diary: 'Kitty Diary', notes: 'Kitty Notes', achievement: 'Achievement Kitty' };
+export const APP_TITLE: Record<AppName, string> = { home: 'Kitty Home', habit: 'Habit Kitty', diary: 'Kitty Journal', notes: 'Kitty Journal', achievement: 'Achievement Kitty' };
 
 export const shownApp = (): AppName => {
   const a = document.documentElement.dataset.app;
@@ -36,6 +36,11 @@ export const trophyIcon = () => monoSvg(TROPHY);
 // The button in each app's top bar that goes back to the home page, drawn like the light/dark button.
 export const homeButton = () =>
   `<button class="gear" type="button" data-action="go" data-to="home" aria-label="Home">${monoSvg(HOUSE)}</button>`;
+
+// The Journal: the diary and the notes are its two tabs. Each is its own screen, so the tabs are buttons that go to the other one.
+export const journalTabs = (on: 'diary' | 'notes') =>
+  `<nav class="nav" aria-label="Journal"><div class="seg" role="tablist">${([['diary', 'Diary'], ['notes', 'Notes']] as const).map(([to, label]) =>
+    `<button type="button" role="tab" ${to === on ? '' : `data-action="go" data-to="${to}" `}aria-selected="${to === on}">${label}</button>`).join('')}</div></nav>`;
 
 // Ask the shell to show a screen (it listens for this and for clicks on [data-action="go"]).
 export const GO_EVENT = 'kitty-go';

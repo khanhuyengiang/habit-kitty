@@ -50,13 +50,13 @@ A row of buttons at the top: **Kitty**, **Stray**, **Treats**, and, only while t
 
 ### Notes
 
-**Simple Notes** (home page): a list of notes with a search box, and an editor that saves as you type, with a Markdown preview (headings, bold and italic, lists and tasks, quotes, code, links). Each note is one `.md` file named after its title.
+**Notes** (the **Notes** tab of the **Journal** on the home page): a list of notes with a search box, and an editor that saves as you type, with a Markdown preview (headings, bold and italic, lists and tasks, quotes, code, links). Each note is one `.md` file named after its title.
 On Android, **Settings → Notes → Sync with the notes folder** keeps a copy of every note in the **Notes** folder of your backup folder and picks up changes made there, so you can open that folder as a vault in Obsidian
 (a note changed on both sides keeps both versions; deleting a note in the app deletes it from the folder, but deleting it in Obsidian does not delete it in the app). Notes can also be exported as a .zip and imported from .md files, and they are part of the backup.
 
 ### Diary
 
-The **Diary** has its own button on the home page (it is no longer a tab in Habit Kitty).
+The **Diary** is the first tab of the **Journal** button on the home page (the other tab is **Notes**). It is no longer a tab in Habit Kitty.
 
 - **Calendar:** a monthly calendar. Tap a day to write a page, pick one or two moods (little pixel cats) and attach a photo from your gallery.
   Days with a page turn pink and the mood shows inside the day. Photos are shrunk to at most 60 KB (900 px on the long side) and kept on the device (not in saved text).

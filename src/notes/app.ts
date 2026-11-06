@@ -2,7 +2,7 @@
 // The data is in ./data.ts (Habit Kitty starts it), the pure parts in ./model.ts. Drawn with Habit Kitty's stylesheet, in web/notes.html.
 import { iconSvg } from '../pixelart.ts';
 import { monoSvg } from '../shared/pixelart.ts';
-import { onAppShown, onShown } from '../shared/apps.ts';
+import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
 import { paintBackdrop } from '../shared/backdrop.ts';
 import { allNotes, deleteNote, noteOf, notesInitialised, notesReady, onNotes, saveNote } from './data.ts';
 import { MAX_NOTES, MAX_TEXT, excerpt, renderMarkdown, searchNotes, titleFromText } from './model.ts';
@@ -24,11 +24,11 @@ const isDark = () => document.documentElement.dataset.theme
   : matchMedia('(prefers-color-scheme: dark)').matches;
 const HOUSE = ['....o....', '...ooo...', '..ooooo..', '.ooooooo.', '..ooooo..', '..oo.oo..', '..oo.oo..'];
 function renderTop() {
-  $('notes-top').innerHTML = `<div class="brand"><h1>Kitty <span>Notes</span></h1>
+  $('notes-top').innerHTML = `<div class="brand"><h1>Kitty <span>Journal</span></h1>
     <div class="brand-r">
       <button class="gear" type="button" data-action="go" data-to="home" aria-label="Home">${monoSvg(HOUSE)}</button>
       <button class="gear" type="button" data-action="notes-theme" aria-label="${isDark() ? 'Switch to light mode' : 'Switch to dark mode'}">${iconSvg(isDark() ? 'sun' : 'moon')}</button>
-      <button class="gear" type="button" data-action="go" data-to="habit" data-tab="settings" aria-label="Settings">${iconSvg('gear')}</button></div></div>`;
+      <button class="gear" type="button" data-action="go" data-to="habit" data-tab="settings" aria-label="Settings">${iconSvg('gear')}</button></div></div>${journalTabs('notes')}`;
 }
 
 // ---- state ----
