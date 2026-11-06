@@ -14,7 +14,9 @@ import { Capacitor } from '@capacitor/core';
 import { unpackBackup } from '../backup.ts';
 import { BACKUP_PREFIX, backupStatus, markDirty, nativeBackups, saveBackupToDevice, shareBackup } from '../../shared/backupfolder.ts';
 import { platformRepo } from './snapshot.ts';
-import { onAppShown, onShown, shownApp, switchButton } from '../../shared/apps.ts';
+import { homeButton, onAppShown, onShown, shownApp } from '../../shared/apps.ts';
+import { meterHtml } from '../../shared/meter.ts';
+import { lvLine } from '../../player.ts';
 import { paintBackdrop } from '../../shared/backdrop.ts';
 import { music } from '../../shared/music.ts';
 import { PHOTO_MAX_BYTES, compressPhoto } from '../../shared/photo.ts';
@@ -186,9 +188,9 @@ function headerHtml(): string {
   const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
   return `<header class="top"><h1>Achievement <span>Kitty</span></h1>
     <div class="top-r">${saver.busy ? '<span class="saving">Saving…</span>' : ''}
-    ${switchButton('achievement')}
+    ${homeButton()}
     <button class="gear" data-action="toggle-theme" aria-label="Switch to ${dark ? 'light' : 'dark'} mode">${iconSvg(dark ? 'sun' : 'night')}</button>
-    <button class="gear" data-action="open-settings" aria-label="Settings">${iconSvg('gear')}</button></div></header>`;
+    <button class="gear" data-action="go" data-to="habit" data-tab="settings" aria-label="Settings">${iconSvg('gear')}</button></div></header>`;
 }
 
 function bannerHtml(): string {
@@ -207,20 +209,9 @@ function renderStatus() {
   if (banner.innerHTML !== b) banner.innerHTML = b;
 }
 
+// The player's level, as the same stat line the other screens have. The player themself (name, picture...) is on the home page.
 function profileHtml(): string {
-  const L = levelOf(data);
-  const age = ageOf(data.user);
-  const about = [data.user.gender ? PLAYER_GENDER_LABEL[data.user.gender] : '', age === null ? '' : `${age} years old`].filter(Boolean).join(' · ');
-  const cells = Math.min(L.per, 10);
-  const on = L.per <= 10 ? L.into : Math.floor((L.into / L.per) * 10);
-  const avatar = data.user.avatarUrl && src(data.user.avatarUrl) ? `<img src="${esc(src(data.user.avatarUrl))}" alt="">` : avatarSvg();
-  const planned = data.achievements.filter((a) => a.status === 'planned').length;
-  return `<section class="panel profile" data-profile aria-label="Profile (long-press to edit)">
-    <div class="avatar">${avatar}</div>
-    <div class="profile-main"><div class="pname"><b>${esc(data.user.displayName)}</b><span aria-hidden="true">·</span><span class="ptitle">${esc(titleFor(L.level))}</span></div>
-      ${about ? `<span class="muted small">${esc(about)}</span>` : ''}
-      <div class="lvl"><strong>LVL ${L.level}</strong><span class="muted">${L.completed} unlocked · ${planned} locked</span></div>
-      <div class="bar" role="img" aria-label="${L.into} of ${L.per} achievements to the next level">${Array.from({ length: cells }, (_, i) => `<i class="${i < on ? 'on' : ''}"></i>`).join('')}</div></div></section>`;
+  return `<section class="stat-top" aria-label="Level">${meterHtml('lv', 'Lv', lvLine(levelOf(data)))}</section>`;
 }
 
 // One small block per achievement, in the side quest's colour (grey and dashed while locked), and a + block to add another.
@@ -1177,5 +1168,17 @@ async function boot() {
   render();
 }
 // Back from Habit Kitty: the window may have been resized, or the theme changed, while this app was hidden.
-onAppShown('achievement', () => { if (ready) { fitCards(); render(); } });
+// The player (name, picture...) is shared and can be edited on the home page: read it again whenever this app is shown.
+async function refreshPlayer() {
+  if (!ready || repo instanceof MemoryRepo) return;
+  try {
+    const fresh = await repo.loadData();
+    if (!fresh || JSON.stringify(fresh.user) === JSON.stringify(data.user)) return;
+    const ref = fresh.user.avatarUrl;
+    if (ref && isLocalRef(ref) && !urls.has(ref)) { const b = await repo.getPhoto(ref); if (b) urls.set(ref, URL.createObjectURL(b)); }
+    data = { ...data, user: fresh.user };
+    render();
+  } catch { /* keep what is on screen */ }
+}
+onAppShown('achievement', () => { if (ready) { fitCards(); render(); refreshPlayer(); } });
 boot();

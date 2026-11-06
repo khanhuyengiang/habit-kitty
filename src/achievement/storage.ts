@@ -4,6 +4,9 @@ import type { Data } from './model.ts';
 
 export interface Repo {
   load(): Promise<{ data: Data | null; photos: Map<string, Blob> }>;
+  // Just the records, or just one photo: for reading the player without loading every photo.
+  loadData(): Promise<Data | null>;
+  getPhoto(ref: string): Promise<Blob | null>;
   saveData(d: Data): Promise<void>;
   putPhoto(ref: string, blob: Blob): Promise<void>;
   deletePhotos(refs: string[]): Promise<void>;
@@ -43,6 +46,16 @@ export class IndexedDbRepo implements Repo {
     return { data, photos: new Map(keys.map((k, i) => [String(k), blobs[i] as Blob])) };
   }
 
+  async loadData() {
+    const tx = (await this.db).transaction(STATE, 'readonly');
+    return ((await done(tx.objectStore(STATE).get(KEY))) as Data | undefined) ?? null;
+  }
+
+  async getPhoto(ref: string) {
+    const tx = (await this.db).transaction(PHOTOS, 'readonly');
+    return ((await done(tx.objectStore(PHOTOS).get(ref))) as Blob | undefined) ?? null;
+  }
+
   async saveData(d: Data) {
     const tx = (await this.db).transaction(STATE, 'readwrite');
     tx.objectStore(STATE).put(d, KEY);
@@ -76,6 +89,8 @@ export class MemoryRepo implements Repo {
   data: Data | null = null;
   photos = new Map<string, Blob>();
   async load() { return { data: this.data ? structuredClone(this.data) : null, photos: new Map(this.photos) }; }
+  async loadData() { return this.data ? structuredClone(this.data) : null; }
+  async getPhoto(ref: string) { return this.photos.get(ref) ?? null; }
   async saveData(d: Data) { this.data = structuredClone(d); }
   async putPhoto(ref: string, blob: Blob) { this.photos.set(ref, blob); }
   async deletePhotos(refs: string[]) { for (const r of refs) this.photos.delete(r); }

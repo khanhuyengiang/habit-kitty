@@ -35,6 +35,15 @@ export class FileRepo implements Repo {
     return { data, photos };
   }
 
+  async loadData() {
+    try { return JSON.parse((await Filesystem.readFile({ path: DATA, directory: dir, encoding: Encoding.UTF8 })).data as string) as Data; }
+    catch (e) { if (!/not exist|no such|not found/i.test(String((e as Error)?.message ?? e))) throw e; return null; }
+  }
+
+  async getPhoto(ref: string) {
+    try { return base64ToBlob((await Filesystem.readFile({ path: fileOf(ref), directory: dir })).data as string); } catch { return null; }
+  }
+
   async saveData(d: Data) {
     await Filesystem.writeFile({ path: TMP, directory: dir, data: JSON.stringify(d), encoding: Encoding.UTF8, recursive: true });
     await Filesystem.rename({ from: TMP, to: DATA, directory: dir, toDirectory: dir });

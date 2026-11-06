@@ -8,6 +8,7 @@
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
 import { dateOf, dayOf } from './calendar.ts';
 import { PHOTO_MAX_BYTES } from './shared/photo.ts';
+import { MAX_NOTES, MAX_TEXT, safeName } from './notes/model.ts';
 
 export const MOOD_KEYS = ['joyful', 'calm', 'tired', 'sad', 'stressed'] as const;
 export type Mood = typeof MOOD_KEYS[number];
@@ -20,6 +21,13 @@ export interface DiaryEntry { text: string; mood?: Mood; mood2?: Mood; feeling?:
 
 // Format 2 can carry Achievement Kitty's whole save as one more entry (achievement.achkitty, itself a zip, see achievement/backup.ts),
 // so one file backs up both apps. Format 1 files (Habit Kitty only) still load.
+// A person whose birthday the diary reminds you of. `year` is optional (the age is only shown when it is known).
+export interface Person { id: string; name: string; month: number; day: number; year?: number; note?: string }
+// Monthly reflection: one note for a whole month, kept as reflections/YYYY-MM.md.
+export interface Reflection { text: string; updated: number }
+// The diary's own settings and the people, kept in diary.json next to the pages.
+export interface DiaryExtras { trackamaniac?: boolean; moodNames?: Partial<Record<Mood, string>>; people?: Person[] }
+
 export const BACKUP_FORMAT = 2;
 export const ACHIEVEMENT_ENTRY = 'achievement.achkitty';
 const ACHIEVEMENT_MAX = 128_000_000;
@@ -35,6 +43,42 @@ export function dayFromName(name: string): number | null {
 }
 export const diaryPath = (day: number) => `diary/${dayName(day)}.md`;
 export const photoPath = (day: number) => `photos/${dayName(day)}.jpg`;
+
+const two = (n: number) => String(n).padStart(2, '0');
+export const monthKey = (y: number, m: number) => `${y}-${two(m + 1)}`;                 // m is 0-based, like Date
+export const reflectionPath = (key: string) => `reflections/${key}.md`;
+export const monthFromKey = (key: string): { y: number; m: number } | null => {
+  const r = /^(\d{4})-(\d{2})$/.exec(key);
+  return r && Number(r[2]) >= 1 && Number(r[2]) <= 12 ? { y: Number(r[1]), m: Number(r[2]) - 1 } : null;
+};
+export const EXTRAS_FILE = 'diary.json';
+
+const MAX_NAME = 40, MAX_NOTE = 200;
+// Anything read from a file or a backup is checked before use: only well-formed people, known moods, booleans.
+export function sanitizeExtras(raw: unknown): DiaryExtras {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const out: DiaryExtras = {};
+  if (r.trackamaniac === true) out.trackamaniac = true;
+  if (r.moodNames && typeof r.moodNames === 'object') {
+    const names: Partial<Record<Mood, string>> = {};
+    for (const k of MOOD_KEYS) { const v = (r.moodNames as Record<string, unknown>)[k]; if (typeof v === 'string' && v.trim()) names[k] = v.trim().slice(0, 14); }
+    if (Object.keys(names).length) out.moodNames = names;
+  }
+  if (Array.isArray(r.people)) {
+    const people: Person[] = [];
+    for (const p of r.people as Record<string, unknown>[]) {
+      const name = typeof p?.name === 'string' ? p.name.replace(/\s+/g, ' ').trim().slice(0, MAX_NAME) : '';
+      const month = Number(p?.month), day = Number(p?.day);
+      if (!name || !Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(day) || day < 1 || day > new Date(Date.UTC(2024, month, 0)).getUTCDate()) continue;
+      const year = Number(p?.year);
+      const note = typeof p?.note === 'string' ? p.note.trim().slice(0, MAX_NOTE) : '';
+      people.push({ id: typeof p?.id === 'string' && p.id ? p.id.slice(0, 64) : `${people.length}-${name}`, name, month, day,
+        ...(Number.isInteger(year) && year >= 1900 && year <= 2200 && p?.year != null ? { year } : {}), ...(note && { note }) });
+    }
+    if (people.length) out.people = people;
+  }
+  return out;
+}
 
 export function entryToMarkdown(e: DiaryEntry): string {
   const feeling = e.feeling?.replace(/\s+/g, ' ').trim();
@@ -62,6 +106,9 @@ export interface Backup {
   diary: Record<number, DiaryEntry>;
   photos: Record<number, Uint8Array>;
   achievement?: Uint8Array;          // Achievement Kitty's save file, as is
+  reflections?: Record<string, Reflection>;   // by month, 'YYYY-MM'
+  extras?: DiaryExtras;
+  notes?: Record<string, string>;     // the notes, by name (notes/<name>.md in the file)
 }
 
 export function packBackup(b: Backup, exportedAt = Date.now()): Uint8Array {
@@ -69,6 +116,12 @@ export function packBackup(b: Backup, exportedAt = Date.now()): Uint8Array {
     'manifest.json': strToU8(JSON.stringify({ app: 'habit-kitty', format: BACKUP_FORMAT, exportedAt })),
     'game.json': strToU8(JSON.stringify(b.game)),
   };
+  for (const [key, r] of Object.entries(b.reflections ?? {})) {
+    if (monthFromKey(key) && r.text.trim()) files[reflectionPath(key)] = strToU8(entryToMarkdown({ text: r.text, updated: r.updated }));
+  }
+  for (const [name, text] of Object.entries(b.notes ?? {})) if (name === safeName(name) && text.length <= MAX_TEXT) files[`notes/${name}.md`] = strToU8(text);
+  const extras = sanitizeExtras(b.extras);
+  if (Object.keys(extras).length) files[EXTRAS_FILE] = strToU8(JSON.stringify(extras));
   if (b.achievement) files[ACHIEVEMENT_ENTRY] = [b.achievement, { level: 0 }];   // photos inside are JPEGs already
   for (const [k, e] of Object.entries(b.diary)) {
     const day = Number(k);
@@ -107,5 +160,20 @@ export function unpackBackup(bytes: Uint8Array): Backup {
     } else if (m[1] === 'photos' && m[3] === 'jpg') photos[day] = data;
   }
   for (const [k, e] of Object.entries(diary)) e.photo = !!photos[Number(k)];   // the photo file is the truth
-  return { game: JSON.parse(strFromU8(files['game.json'])), diary, photos, ...(files[ACHIEVEMENT_ENTRY] && { achievement: files[ACHIEVEMENT_ENTRY] }) };
+  const reflections: Record<string, Reflection> = {};
+  for (const [path, data] of Object.entries(files)) {
+    const m = /^reflections\/(\d{4}-\d{2})\.md$/.exec(path);
+    const e = m && monthFromKey(m[1]) ? entryFromMarkdown(strFromU8(data)) : null;
+    if (m && e && e.text.trim()) reflections[m[1]] = { text: e.text, updated: e.updated };
+  }
+  const notes: Record<string, string> = {};
+  for (const [path, data] of Object.entries(files)) {
+    const m = /^notes\/(.+)\.md$/.exec(path);
+    if (!m || m[1] !== safeName(m[1]) || Object.keys(notes).length >= MAX_NOTES) continue;
+    const text = strFromU8(data);
+    if (text.length <= MAX_TEXT) notes[m[1]] = text;
+  }
+  let extras: DiaryExtras = {};
+  try { if (files[EXTRAS_FILE]) extras = sanitizeExtras(JSON.parse(strFromU8(files[EXTRAS_FILE]))); } catch { /* ignore a damaged settings file */ }
+  return { game: JSON.parse(strFromU8(files['game.json'])), diary, photos, reflections, extras, notes, ...(files[ACHIEVEMENT_ENTRY] && { achievement: files[ACHIEVEMENT_ENTRY] }) };
 }

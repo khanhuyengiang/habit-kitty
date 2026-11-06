@@ -42,6 +42,15 @@ public class BackupFolderPlugin extends Plugin {
         return d != null && d.exists() && d.isDirectory() && d.canWrite() ? d : null;
     }
 
+    /** The chosen folder, or its subfolder {sub} (made when asked to) when one is given; null when it is not there. */
+    private DocumentFile within(DocumentFile root, String sub, boolean create) {
+        if (root == null || sub == null || sub.isEmpty()) return root;
+        if (sub.contains("/") || sub.contains("..")) return null;
+        DocumentFile d = root.findFile(sub);
+        if (d != null && d.isDirectory()) return d;
+        return create && d == null ? root.createDirectory(sub) : null;
+    }
+
     private File cacheFile(String name) {
         if (name == null || name.isEmpty() || name.contains("/") || name.contains("..")) return null;
         return new File(getContext().getCacheDir(), name);
@@ -113,7 +122,7 @@ public class BackupFolderPlugin extends Plugin {
     public void put(PluginCall call) {
         File src = cacheFile(call.getString("cache"));
         String name = call.getString("name");
-        DocumentFile dir = folder();
+        DocumentFile dir = within(folder(), call.getString("dir"), true);
         if (src == null || !src.exists() || name == null || name.isEmpty()) { call.reject("Nothing to save."); return; }
         if (dir == null) { call.reject("no-folder"); return; }
         try {
@@ -131,9 +140,11 @@ public class BackupFolderPlugin extends Plugin {
 
     @PluginMethod
     public void list(PluginCall call) {
-        DocumentFile dir = folder();
-        if (dir == null) { call.reject("no-folder"); return; }
+        DocumentFile root = folder();
+        if (root == null) { call.reject("no-folder"); return; }
+        DocumentFile dir = within(root, call.getString("dir"), false);
         JSArray files = new JSArray();
+        if (dir == null) { JSObject none = new JSObject(); none.put("files", files); call.resolve(none); return; }   // no such subfolder yet
         for (DocumentFile f : dir.listFiles()) {
             if (!f.isFile() || f.getName() == null) continue;
             JSObject o = new JSObject();
@@ -150,7 +161,7 @@ public class BackupFolderPlugin extends Plugin {
     /** Copies the folder's file {name} into the cache as {cache}, for the web app to read. */
     @PluginMethod
     public void fetch(PluginCall call) {
-        DocumentFile dir = folder();
+        DocumentFile dir = within(folder(), call.getString("dir"), false);
         File dst = cacheFile(call.getString("cache"));
         String name = call.getString("name");
         if (dir == null) { call.reject("no-folder"); return; }
@@ -166,9 +177,11 @@ public class BackupFolderPlugin extends Plugin {
 
     @PluginMethod
     public void remove(PluginCall call) {
-        DocumentFile dir = folder();
+        DocumentFile root = folder();
         String name = call.getString("name");
-        if (dir == null) { call.reject("no-folder"); return; }
+        if (root == null) { call.reject("no-folder"); return; }
+        DocumentFile dir = within(root, call.getString("dir"), false);
+        if (dir == null) { call.resolve(); return; }
         DocumentFile f = name == null ? null : dir.findFile(name);
         if (f != null) f.delete();
         call.resolve();

@@ -1,0 +1,44 @@
+<style>
+/* The home page. It is drawn with Habit Kitty's stylesheet (same colours, buttons, panels and pixel grid); these are only its own parts. */
+[data-app-root="home"] { image-rendering: auto; }
+.home .brand h1 span { color: var(--accent-text); }
+
+/* the player card (Player Stat dialog) */
+.player { display: grid; gap: var(--s4); }
+.player-head { display: grid; grid-template-columns: auto 1fr auto; gap: var(--s4); align-items: center; }
+.avatar { width: calc(29 * var(--px)); height: calc(29 * var(--px)); display: grid; place-items: center; background: var(--accent-soft);
+  border: var(--px) solid var(--edge); clip-path: var(--notch); overflow: hidden; }
+.avatar .sprite { margin: auto; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.p-info { display: grid; gap: var(--s1); min-width: 0; }
+.p-name { font: 700 25px/1.1 var(--font); overflow-wrap: anywhere; }
+.p-info .muted { font-size: 18px; }
+.pstats { display: grid; gap: var(--s4); }
+.title-line { color: var(--accent-text); font-weight: 700; font-size: 18px; }
+
+/* the menu: stacked pixel keys like the other apps' buttons, with a cat perched on the first one */
+.menu { display: grid; gap: var(--s5); padding: calc(26 * var(--px)) calc(12 * var(--px)) 0; }
+.perch { position: relative; }
+.menu-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: var(--s3); font-size: 24px; padding: var(--s4) var(--s4) var(--s5); text-align: center; white-space: nowrap; }
+.menu-btn .soon { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.menu-btn:disabled { opacity: .85; }
+.perch .sitter { position: absolute; right: calc(7 * var(--px)); bottom: calc(100% - var(--px)); pointer-events: none; }
+.perch .wing { position: absolute; top: 50%; margin-top: calc(-3.5 * var(--px)); color: var(--surface); pointer-events: none;
+  filter: drop-shadow(var(--px) 0 0 var(--edge)) drop-shadow(calc(-1 * var(--px)) 0 0 var(--edge)) drop-shadow(0 var(--px) 0 var(--edge)) drop-shadow(0 calc(-1 * var(--px)) 0 var(--edge)); }
+.perch .wing.l { right: calc(100% + var(--s2)); }
+.perch .wing.r { left: calc(100% + var(--s2)); transform: scaleX(-1); }
+.home-foot { text-align: center; font-size: 15px; }
+.pform { display: grid; gap: var(--s4); }
+.avatar-row { display: flex; gap: var(--s4); align-items: center; }
+.avatar-btns { display: grid; gap: var(--s2); }
+.pform .row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
+</style>
+<div data-app-root="home" hidden>
+  <div class="wrap home">
+    <header class="top" id="home-top"></header>
+    <nav class="menu" id="home-menu" aria-label="Menu"></nav>
+    <p class="home-foot muted" id="home-foot"></p>
+  </div>
+  <div id="home-modal" hidden></div>
+  <div class="toast" id="home-toast" role="status" hidden></div>
+</div>

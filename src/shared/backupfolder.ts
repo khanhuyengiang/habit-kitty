@@ -14,10 +14,10 @@ interface BackupFolderPlugin {
   folder(): Promise<FolderState>;
   pickFolder(): Promise<FolderState>;
   forget(): Promise<void>;
-  put(o: { cache: string; name: string }): Promise<void>;
-  list(): Promise<{ files: { name: string; modified: number; size: number }[] }>;
-  fetch(o: { name: string; cache: string }): Promise<void>;
-  remove(o: { name: string }): Promise<void>;
+  put(o: { cache: string; name: string; dir?: string }): Promise<void>;
+  list(o?: { dir?: string }): Promise<{ files: { name: string; modified: number; size: number }[] }>;
+  fetch(o: { name: string; cache: string; dir?: string }): Promise<void>;
+  remove(o: { name: string; dir?: string }): Promise<void>;
   saveAs(o: { cache: string; name: string }): Promise<{ name: string }>;
 }
 const Plugin = registerPlugin<BackupFolderPlugin>('BackupFolder');
@@ -170,6 +170,28 @@ async function doBackup(o: { force?: boolean; launch?: boolean }) {
 }
 
 export const backupNow = () => runBackup({ force: true });
+
+// ---- files in a subfolder of the backup folder (the notes go in Notes/, where Obsidian can open them) ----
+export interface FolderFile { name: string; modified: number }
+export async function listSubfolder(dir: string): Promise<FolderFile[]> {
+  return (await Plugin.list({ dir })).files.map((f) => ({ name: f.name, modified: f.modified }));
+}
+export async function putInSubfolder(dir: string, name: string, bytes: Uint8Array): Promise<void> {
+  const cache = `put-${Math.random().toString(36).slice(2)}`;
+  await toCache(cache, bytes);
+  try { await Plugin.put({ cache, name, dir }); } finally { await dropCache(cache); }
+}
+export async function readFromSubfolder(dir: string, name: string): Promise<Uint8Array> {
+  const cache = `get-${Math.random().toString(36).slice(2)}`;
+  await Plugin.fetch({ name, cache, dir });
+  try {
+    const r = await Filesystem.readFile({ path: cache, directory: Directory.Cache });
+    return typeof r.data === 'string' ? base64ToBytes(r.data) : new Uint8Array(await r.data.arrayBuffer());
+  } finally { await dropCache(cache); }
+}
+export const removeFromSubfolder = (dir: string, name: string) => Plugin.remove({ name, dir });
+// True when a backup folder was chosen and can be written to.
+export const folderUsable = async () => { await refreshFolder(); return status.folder.chosen && status.folder.ok; };
 
 // The backups in the folder for one app, newest first.
 export async function folderBackups(prefix: string, ext: string): Promise<string[]> {

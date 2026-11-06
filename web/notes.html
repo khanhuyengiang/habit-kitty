@@ -1,0 +1,38 @@
+<style>
+/* The Notes screen. Drawn with Habit Kitty's stylesheet; these are its own parts. */
+[data-app-root="notes"] { image-rendering: auto; }
+.notes .brand h1 span { color: var(--accent-text); }
+.notes-body { display: grid; gap: var(--s4); }
+.nbar { display: flex; gap: var(--s3); align-items: stretch; }
+.nbar .field { flex: 1; }
+.nbar .btn { flex: none; }
+.nlist { display: grid; gap: var(--s3); }
+.note-row { display: grid; gap: var(--s1); text-align: left; width: 100%; padding: var(--s3) var(--s4) var(--s4); font-weight: 500; }
+.note-row b { font: 700 22px/1.1 var(--font); overflow-wrap: anywhere; }
+.note-row .ex { color: var(--muted); font-size: 18px; overflow-wrap: anywhere; }
+.note-row .when { color: var(--muted); font-size: 15px; }
+.ntools { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
+.ntools .grow { flex: 1; }
+.ntext { min-height: calc(110 * var(--px)); font: 500 20px/1.4 var(--font) !important; resize: vertical; }
+.nstate { font-size: 15px; color: var(--muted); }
+.md { font: 500 20px/1.4 var(--font); overflow-wrap: anywhere; display: grid; gap: var(--s3); }
+.md > * { margin: 0; }
+.md h1, .md h2, .md h3, .md h4 { font: 700 26px/1.15 var(--font); }
+.md h2 { font-size: 23px; } .md h3, .md h4 { font-size: 20px; }
+.md ul, .md ol { padding-left: calc(6 * var(--px)); display: grid; gap: var(--s1); }
+.md li.task { list-style: none; margin-left: calc(-5 * var(--px)); }
+.md code { background: var(--surface2); padding: 0 var(--s1); }
+.md pre { background: var(--surface2); border: var(--px) solid var(--line); padding: var(--s3); overflow-x: auto; white-space: pre; }
+.md blockquote { border-left: var(--s1) solid var(--accent); padding-left: var(--s3); color: var(--muted); }
+.md hr { border: 0; border-top: var(--px) solid var(--line); width: 100%; }
+.md a { color: var(--accent-text); }
+.md .wikilink { color: var(--accent-text); }
+</style>
+<div data-app-root="notes" hidden>
+  <div class="wrap notes">
+    <header class="top" id="notes-top"></header>
+    <div class="notes-body" id="notes-body"></div>
+  </div>
+  <div id="notes-layer-host"></div>
+  <div class="toast" id="notes-toast" role="status" hidden></div>
+</div>

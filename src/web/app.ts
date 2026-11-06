@@ -19,15 +19,23 @@ import { VERSION } from '../version.ts';
 import CHANGELOG_MD from '../../CHANGELOG.md';
 import { pickThought, type ThoughtKind } from '../thoughts.ts';
 import {
-  dayFromName, diaryPath, entryFromMarkdown, entryToMarkdown, isZip, packBackup, photoPath, unpackBackup,
-  type Backup, type DiaryEntry, type Mood, type Weather, WEATHER_KEYS,
+  isZip, packBackup, unpackBackup,
+  type Backup, type DiaryEntry, type Mood,
 } from '../store.ts';
 import { CONFETTI_COLORS, TRAITS, notifyIconName, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
 import { BOOK_ART, FOODS, MARKS, ROOM_H, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, weatherSvg, heartSvg, iconSvg, markSvg, outdoorSvg, roomSvg } from '../pixelart.ts';
-import { habitKittySvg, onAppShown, onShown, switchButton } from '../shared/apps.ts';
+import { GO_EVENT, TAB_EVENT, habitKittySvg, homeButton, onAppShown, onShown, trophyIcon, type AppName } from '../shared/apps.ts';
+import { mountDiarySettings } from '../diary/settings.ts';
+import { collectNotes, initNotes, restoreNotes } from '../notes/data.ts';
+import { mountNotesSettings } from '../notes/settings.ts';
+import { publishHabitStats } from '../shared/stats.ts';
+import { meterHtml } from '../shared/meter.ts';
+import { hpLine } from '../player.ts';
+import { collectDiary, initDiary, pageCount, restoreDiary } from '../diary/data.ts';
 import { paintBackdrop } from '../shared/backdrop.ts';
 import { provideMusic } from '../shared/music.ts';
 import { compressPhoto } from '../shared/photo.ts';
+import { at, fileBytes, removeFile, toBase64, writeOk } from '../shared/files.ts';
 import { dateOf, dayOf, firstDay, habitStreak, monthGrid, streak, weekRow, type DayKind, type Trackable } from '../calendar.ts';
 
 // ===================== Save =====================
@@ -92,6 +100,7 @@ const gameOnly = (): Save => { const { diary, ...game } = save; return diaryRead
 function persist() {
   save.savedAt = Date.now();
   markDirty(BACKUP_PREFIX);
+  publishStats();
   queueReminderSync();
   try { localStorage.setItem(KEY, JSON.stringify(gameOnly())); } catch { /* private mode: keep playing in memory */ }
   if (remote) {
@@ -112,7 +121,7 @@ async function connectAccount() {
     const snap = await ref.get();
     const theirs = snap.exists ? (snap.data() as Save) : null;
     if (theirs?.state && theirs.savedAt > save.savedAt) {
-      save = normalize({ ...theirs, diary: save.diary });
+      save = normalize(theirs);
       try { localStorage.setItem(KEY, JSON.stringify(gameOnly())); } catch { /* ignore */ }
     }
     remote = ref;
@@ -255,7 +264,7 @@ const HEART = heartSvg();
 document.documentElement.style.setProperty('--face-w', String(FACE_W));   // the cat card's picture column follows the art
 
 // Static buttons in the page template name their icon with data-icon; draw them on the same pixel grid.
-document.querySelectorAll<HTMLElement>('[data-icon]').forEach((el) => el.insertAdjacentHTML('afterbegin', el.dataset.icon === 'cat' ? habitKittySvg() : iconSvg(el.dataset.icon ?? 'x')));
+document.querySelectorAll<HTMLElement>('[data-icon]').forEach((el) => el.insertAdjacentHTML('afterbegin', el.dataset.icon === 'cat' ? habitKittySvg() : el.dataset.icon === 'trophy' ? trophyIcon() : iconSvg(el.dataset.icon ?? 'x')));
 
 // ===================== Food =====================
 const FOOD_KEYS = Object.keys(FOODS);
@@ -297,24 +306,31 @@ function toggleTheme() {
   renderTop();
 }
 
+// What the home page shows for HP (affection); the diary publishes its own days (MP).
+const publishStats = () => publishHabitStats({ xp: save.state.xp, offsetHours: save.offsetHours });
+
 function renderTop() {
-  const { level, xpIntoLevel, xpForNextLevel } = levelProgress(save.state.xp);
+  publishStats();
+  const { level } = levelProgress(save.state.xp);
   if (lastLevel !== null && level > lastLevel) celebrate(level);
   lastLevel = level;
-  const filled = save.state.xp < 0 ? 0 : Math.round((10 * xpIntoLevel) / xpForNextLevel);
-  const bar = Array.from({ length: 10 }, (_, i) => `<i class="${i < filled ? 'on' : ''}"></i>`).join('');
+  if (tab === 'settings') {   // the one Settings screen, reached from every app's gear
+    $('top').innerHTML = `
+      <div class="brand"><h1>Kitty <span>Settings</span></h1>
+        <div class="brand-r"><button class="gear" type="button" data-action="settings-back" aria-label="Back">${iconSvg('prev')}</button>
+          ${homeButton()}
+          <button class="gear" type="button" data-action="theme-toggle" aria-label="${isDark() ? 'Switch to light mode' : 'Switch to dark mode'}">${iconSvg(isDark() ? 'sun' : 'moon')}</button></div></div>`;
+    return;
+  }
   $('top').innerHTML = `
     <div class="brand"><h1>Habit <span>Kitty</span></h1>
-      <div class="brand-r">${switchButton('habit')}
+      <div class="brand-r">${homeButton()}
         <button class="gear" type="button" data-action="theme-toggle" aria-label="${isDark() ? 'Switch to light mode' : 'Switch to dark mode'}">${iconSvg(isDark() ? 'sun' : 'moon')}</button>
-        <button class="gear" type="button" data-action="settings-toggle" aria-label="Settings" aria-pressed="${tab === 'settings'}">${iconSvg('gear')}</button></div></div>
-    <div class="meter">
-      <div class="meter-row"><span>Level <b class="num">${level}</b> · Affection <b>${save.state.xp}</b> XP</span>
-        <span class="muted num">${xpIntoLevel}/${xpForNextLevel} to level ${level + 1}</span></div>
-      <div class="bar" role="img" aria-label="${xpIntoLevel} of ${xpForNextLevel} XP to the next level">${bar}</div>
-    </div>
+        <button class="gear" type="button" data-action="settings-open" aria-label="Settings">${iconSvg('gear')}</button></div></div>
+    ${meterHtml('hp', 'HP', hpLine(save.state.xp))}
     ${save.state.xp < CONFIG.lowXpThreshold
-      ? '<p class="distrust">Your affection is below 0. Until it recovers, you can only keep one cat.</p>' : ''}`;
+      ? '<p class="distrust">Your affection is below 0. Until it recovers, you can only keep one cat.</p>' : ''}
+    ${navHtml()}`;
 }
 
 function renderLog() {
@@ -458,18 +474,14 @@ function catHead(c: Cat, t: number, holdable: boolean): string {
 </div>`;
 }
 
+// The line under a week row: what was done so far, and (with Time travel on) the rewind button: the same on a kitty, a stray and a treat.
+const catFoot = (c: Cat, t: number) => `<p class="muted habit-foot">${c.fedDays.length ? `Fed ${plural(c.fedDays.length, 'time')}` : 'Not fed yet'}${c.status === 'alive' ? ` · streak ${streak(c, t)}` : ''}${save.timeTravel ? ` ${TRAVEL(c.id)}` : ''}</p>`;
+
 function renderCats() {
   const t = today();
+  $('adopt-btn').hidden = todayView !== 'home';   // Pet sitter and Memory only list the kitties that are away or gone
   const all = sortedCats();
-  const seg = $('today-seg');
-  // Sitter and Memories only matter once a cat is away or gone; until then there is just Home.
-  const awayCats = all.some((c) => viewOf(c) !== 'home');
-  if (!awayCats) todayView = 'home';
-  seg.hidden = !awayCats;
-  const labels: Record<TodayView, string> = { home: 'Home', sitter: 'Sitter', memories: 'Memories' };
-  seg.innerHTML = (Object.keys(labels) as TodayView[]).map((v) =>
-    `<button type="button" role="tab" data-action="today-view" data-view="${v}" aria-selected="${v === todayView}">${labels[v]} <span class="num">${all.filter((c) => viewOf(c) === v).length}</span></button>`).join('');
-  if (!all.length) {
+  if (!all.length && todayView === 'home') {
     $('cats').innerHTML = `<div class="cat"><div class="cat-head">${sprite('open', { fur: '#e8a04c', pattern: 'plain' }, true)}
       <div><p class="cat-name">No cats yet</p><p class="cat-habit">Tap Adopt kitty to get your first one.</p></div></div></div>`;
     return;
@@ -487,7 +499,7 @@ function renderCats() {
     return `<article class="cat${ended ? ' ended' : ''}">
       ${catHead(c, t, c.status === 'ranAway' || !ended)}
       ${s.note ? `<p class="note">${esc(s.note)}</p>` : ''}
-      ${todayView === 'memories' ? renderLife(c, t) : renderWeek(c, t)}
+      ${todayView === 'memories' ? renderLife(c, t) : renderWeek(c, t) + catFoot(c, t)}
     </article>`;
   }).join('');
 }
@@ -529,11 +541,15 @@ const HEAT_LEGEND = `<div class="legend"><span><i class="fed"></i>fed</span><spa
   <span><i class="missed"></i>missed</span><span><i class="today"></i>today (outlined)</span><span><i class="sitter"></i>with sitter</span><span><i></i>not tracked</span></div>`;
 
 function renderHeat() {
+  if (heatMode === 'strays') {
+    const habits = save.state.tasks.filter((k) => k.kind === 'habit');
+    $('heat').innerHTML = (habits.length ? combinedHabits(habits) : '<p class="muted">No stray kitties yet.</p>') + HEAT_LEGEND +
+      '<p class="muted" style="text-align:center;font-size:15px">Press and hold a stray kitty to see just its heatmap.</p>';
+    return;
+  }
   const cats = heatCats();
-  const habits = save.state.tasks.filter((k) => k.kind === 'habit');
-  const habitCards = habits.length ? `<h2>Stray kitties</h2>${combinedHabits(habits)}` : '';
-  const body = cats.length ? combinedCats(cats, today()) : '<p class="muted">No living cats to show.</p>';
-  $('heat').innerHTML = body + habitCards + HEAT_LEGEND + '<p class="muted" style="text-align:center;font-size:15px">Press and hold a kitty to see just its heatmap.</p>';
+  $('heat').innerHTML = (cats.length ? combinedCats(cats, today()) : '<p class="muted">No living cats to show.</p>') + HEAT_LEGEND +
+    '<p class="muted" style="text-align:center;font-size:15px">Press and hold a kitty to see just its heatmap.</p>';
 }
 
 // ---- cozy room: lives in real time (sky follows the clock, cats wander, sleep at night) ----
@@ -575,10 +591,8 @@ type RoomView = 'indoor' | 'outdoor';
 let roomView: RoomView = 'indoor';
 
 function renderRoom() {
-  document.querySelectorAll<HTMLElement>('#room-seg [data-view]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.view === roomView)));
   $('room').hidden = roomView !== 'indoor';
   $('outdoor').hidden = roomView !== 'outdoor';
-  renderRoomTitle();
   if (roomView === 'outdoor') renderOutdoor(); else renderIndoor();
 }
 
@@ -826,7 +840,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) pushW
 // Tapping the widget asks for the Room tab.
 async function openWidgetTab() {
   if (!Capacitor.isNativePlatform()) return;
-  try { if ((await RoomWidget.pendingTab()).tab === 'room') showTab('room'); } catch { /* no widget plugin */ }
+  try { if ((await RoomWidget.pendingTab()).tab === 'room') document.dispatchEvent(new CustomEvent(GO_EVENT, { detail: { to: 'habit', tab: 'room' } })); } catch { /* no widget plugin */ }
 }
 
 // ---- thought bubbles: a cat at home now and then thinks of one that is away or gone ----
@@ -1034,8 +1048,6 @@ function renderTasks() {
   const kind = mindfulView;
   const isTask = kind === 'task';
   const cap = isTask ? CONFIG.taskMaxXp : CONFIG.habitMaxXp;
-  document.querySelectorAll<HTMLElement>('#mindful-seg [data-view]').forEach((b) =>
-    b.setAttribute('aria-selected', String(b.dataset.view === kind)));
   $('mindful-title').textContent = isTask ? 'Treats' : 'Stray kitties';
   $('mindful-desc').textContent = isTask
     ? `One-off jobs. Do it once, tick it off, earn up to ${cap} XP. Tap the X or press and hold to delete.`
@@ -1101,10 +1113,7 @@ $('tasks-done').addEventListener('toggle', (ev) => { doneTreatsOpen = (ev.target
 // The tabs carry the two rooms' names ("Cosy Room" and "Garden" unless renamed).
 const indoorName = () => save.roomName?.trim() || 'Cosy Room';
 const outdoorName = () => save.outdoorName?.trim() || 'Garden';
-function renderRoomTitle() {
-  $('room-tab-indoor').textContent = indoorName();
-  $('room-tab-outdoor').textContent = outdoorName();
-}
+function renderRoomTitle() { renderTop(); }   // the room names are on the navigation buttons
 
 function renderClock() {
   const n = now();
@@ -1149,8 +1158,6 @@ function setDayBoundary(h: number) {
 function renderSaved() {
   ($('unlimited-cats') as HTMLInputElement).checked = !!save.unlimited;
   ($('allow-rename') as HTMLInputElement).checked = !!save.allowRename;
-  ($('trackamaniac') as HTMLInputElement).checked = !!save.trackamaniac;
-  document.querySelectorAll<HTMLInputElement>('#mood-names input').forEach((i) => { if (i !== document.activeElement) i.value = save.moodNames?.[i.dataset.mood as Mood] ?? ''; });
   ($('show-clock') as HTMLInputElement).checked = !!save.showClock;
   ($('time-travel') as HTMLInputElement).checked = !!save.timeTravel;
   ($('amnesia') as HTMLInputElement).checked = !!save.amnesia;
@@ -1163,149 +1170,21 @@ function renderSaved() {
   $('saved').textContent = remote ? 'Saved to your Claude account' : 'Saved on this device';
 }
 
-// ===================== Diary =====================
-// Moods are little cats drawn with the same pixel sprites as everything else. Their fur follows the rainbow:
-// warm for good feelings, cool for bad ones.
-const MOODS: Record<Mood, { label: string; face: Face; fur: string }> = {
-  joyful:   { label: 'Joyful',   face: 'happy',    fur: '#ffb8cf' },
-  calm:     { label: 'Calm',     face: 'open',     fur: '#ffe58a' },
-  tired:    { label: 'Tired',    face: 'sleepy',   fur: '#a9dfb0' },
-  sad:      { label: 'Sad',      face: 'sad',      fur: '#9cc7f0' },
-  stressed: { label: 'Stressed', face: 'starving', fur: '#c3a9ee' },
-};
-const MOOD_KEYS = Object.keys(MOODS) as Mood[];
-const WEATHER: Record<Weather, string> = { sunny: 'Sunny', cloudy: 'Cloudy', rainy: 'Rainy', storm: 'Storm', snow: 'Snow' };
-const moodName = (m: Mood) => save.moodNames?.[m]?.trim() || MOODS[m].label;
-// What a page calls its feeling: the user's own words if they wrote any, else the emotion names ("Joyful + Tired").
-const feelingText = (e: { mood?: Mood; mood2?: Mood; feeling?: string }) =>
-  e.feeling?.trim() || [e.mood, e.mood2].filter((m): m is Mood => !!m).map(moodName).join(' + ');
-const moodFace = (m: Mood) => miniSvg(MOODS[m].face, { fur: MOODS[m].fur, pattern: 'plain' });
-const moodSprite = (m: Mood) => moodFace(m).replace('class="sprite', 'class="sprite mood');
-// Two emotions share one kitty: the left half of the first face beside the right half of the second.
-const moodsSprite = (a: Mood, b?: Mood) => b && b !== a
-  ? `<span class="mood mood-split">${moodFace(a)}${moodFace(b)}</span>` : moodSprite(a);
-const hasPage = (e?: DiaryEntry) => !!e && (!!e.text.trim() || !!e.photo);   // a written page or a photo turns the day pink
-
-// ---- Diary files: one Markdown file per day and one small JPEG per day, in the app's private storage ----
-const ROOT = 'habit-kitty';
-const STAGE = 'habit-kitty-restore';   // a restore is written here first, then swapped in
-const at = (path: string, root = ROOT) => ({ path: `${root}/${path}`, directory: Directory.Data });
-
-const toBase64 = (bytes: Uint8Array) => {
-  let s = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(s);
-};
-const fromBase64 = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-
-async function fileBytes(path: string, root = ROOT): Promise<Uint8Array | undefined> {
-  try {
-    const r = await Filesystem.readFile(at(path, root));
-    return typeof r.data === 'string' ? fromBase64(r.data) : new Uint8Array(await r.data.arrayBuffer());
-  } catch { return undefined; }
-}
-async function fileNames(dir: string): Promise<string[]> {
-  try { return (await Filesystem.readdir(at(dir))).files.map((f) => f.name); } catch { return []; }
-}
-async function removeFile(path: string, root = ROOT) { try { await Filesystem.deleteFile(at(path, root)); } catch { /* already gone */ } }
-async function writeOk(run: () => Promise<unknown>): Promise<boolean> {
-  try { await run(); return true; } catch { return false; }
-}
-
-const writeEntry = (day: number, e: DiaryEntry, root = ROOT) =>
-  writeOk(() => Filesystem.writeFile({ ...at(diaryPath(day), root), data: entryToMarkdown(e), encoding: Encoding.UTF8, recursive: true }));
-const writePhoto = (day: number, bytes: Uint8Array, root = ROOT) =>
-  writeOk(() => Filesystem.writeFile({ ...at(photoPath(day), root), data: toBase64(bytes), recursive: true }));
-const getPhoto = async (day: number) => {
-  const b = await fileBytes(photoPath(day));
-  return b && new Blob([b as BlobPart], { type: 'image/jpeg' });
-};
-const clearDiaryFiles = (root = ROOT) => writeOk(() => Filesystem.rmdir({ ...at('', root), recursive: true }));
-
-async function readDiaryFiles(): Promise<Record<string, DiaryEntry>> {
-  const out: Record<string, DiaryEntry> = {};
-  const photos = new Set(await fileNames('photos'));
-  await Promise.all((await fileNames('diary')).map(async (name) => {
-    const day = dayFromName(name.replace(/\.md$/, ''));
-    const bytes = day === null ? undefined : await fileBytes(`diary/${name}`);
-    const e = bytes && entryFromMarkdown(new TextDecoder().decode(bytes));
-    if (day !== null && e) out[day] = { ...e, photo: photos.has(photoPath(day).slice('photos/'.length)) };
-  }));
-  return out;
-}
-
-// Replace everything on disk with these entries and photos (used by a restore).
-async function writeDiaryFiles(diary: Record<number, DiaryEntry>, photos: Record<number, Uint8Array>): Promise<boolean> {
-  // Written next to the live folder and swapped in only when complete, so a failure leaves the old diary untouched.
-  await clearDiaryFiles(STAGE);
-  const staged = await writeOk(async () => {
-    await Filesystem.mkdir({ ...at('', STAGE), recursive: true });
-    for (const [k, e] of Object.entries(diary)) {
-      const day = Number(k);
-      if (!await writeEntry(day, e, STAGE)) throw new Error('write');
-      if (photos[day] && !await writePhoto(day, photos[day], STAGE)) throw new Error('write');
-    }
-  });
-  if (!staged) { await clearDiaryFiles(STAGE); return false; }
-  if (!await clearDiaryFiles()) { await clearDiaryFiles(STAGE); return false; }
-  return writeOk(() => Filesystem.rename({ from: STAGE, to: ROOT, directory: Directory.Data, toDirectory: Directory.Data }));
-}
-
-// Old versions kept the diary text inside the save and the photos in IndexedDB. Move them into files once.
-function legacyPhotos(): Promise<Record<number, Blob>> {
-  return new Promise((resolve) => {
-    const out: Record<number, Blob> = {};
-    try {
-      const req = indexedDB.open('habit-kitty-photos', 1);
-      req.onupgradeneeded = () => { req.transaction?.abort(); };   // nothing was ever stored
-      req.onerror = () => resolve(out);
-      req.onsuccess = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains('photos')) { db.close(); resolve(out); return; }
-        const cur = db.transaction('photos').objectStore('photos').openCursor();
-        cur.onsuccess = () => {
-          const c = cur.result;
-          if (c) { out[Number(c.key)] = c.value; c.continue(); } else { db.close(); resolve(out); }
-        };
-        cur.onerror = () => { db.close(); resolve(out); };
-      };
-    } catch { resolve(out); }
-  });
-}
-
-async function migrateLegacyDiary(): Promise<boolean> {
-  const old = Object.entries(save.diary ?? {});
-  if (!old.length) return true;
-  const photos = await legacyPhotos();
-  for (const [k, e] of old) {
-    const day = Number(k);
-    if (!await writeEntry(day, e)) return false;
-    if (e.photo && photos[day]) {
-      const small = await compressPhoto(photos[day]).catch(() => null);
-      if (small && !await writePhoto(day, new Uint8Array(await small.arrayBuffer()))) return false;
-    }
-  }
-  try { indexedDB.deleteDatabase('habit-kitty-photos'); } catch { /* ignore */ }
-  return true;
-}
-
+// ===================== Diary data =====================
+// The Diary screen (src/diary/) owns the diary. Habit Kitty starts its data, because the backup and the accomplishments need it.
+// Old saves kept the diary text inside the save (and the settings in it): hand those over once, then drop them from the save.
 async function loadDiary() {
-  if (!await migrateLegacyDiary()) return;   // keep the old copy in the save and try again next launch
-  save.diary = await readDiaryFiles();
+  const ok = await initDiary({ diary: save.diary, trackamaniac: save.trackamaniac, moodNames: save.moodNames });
+  if (!ok) return;   // keep the old copy in the save and try again next launch
   diaryReady = true;
+  delete save.diary; delete save.trackamaniac; delete save.moodNames;
   persist();   // from now on the save no longer carries the diary
-  renderDiary();
+  checkAccomplishments();
 }
 
 // ---- Backup: one .kitty file (a zip) holding the game, every diary page and every photo ----
 async function collectBackup(): Promise<Backup> {
-  const diary: Record<number, DiaryEntry> = {};
-  const photos: Record<number, Uint8Array> = {};
-  for (const [k, e] of Object.entries(save.diary ?? {})) {
-    diary[Number(k)] = e;
-    if (e.photo) { const b = await fileBytes(photoPath(Number(k))); if (b) photos[Number(k)] = b; }
-  }
-  return { game: gameOnly(), diary, photos, achievement: await snapshotAchievement() };
+  return { game: gameOnly(), ...await collectDiary(), notes: collectNotes(), achievement: await snapshotAchievement() };
 }
 
 registerBackupSource({ prefix: BACKUP_PREFIX, ext: BACKUP_EXT, pack: async () => packBackup(await collectBackup()) });
@@ -1373,11 +1252,12 @@ function askRestore(b: Backup) {
   const ach = b.achievement ? achievementCount(b.achievement) : 0;
   const parts = [
     b.game ? `your kitties, ${pages} diary ${pages === 1 ? 'page' : 'pages'} and ${photos} ${photos === 1 ? 'photo' : 'photos'}` : '',
+    b.notes && Object.keys(b.notes).length ? `${plural(Object.keys(b.notes).length, 'note')}` : '',
     b.achievement ? `${ach} ${ach === 1 ? 'achievement' : 'achievements'} (Achievement Kitty)` : '',
   ].filter(Boolean);
   openModal(`<div class="panel"><h3>Restore this backup?</h3>
     <p>It holds ${parts.join(' and ')}.</p>
-    <p class="muted">${b.game && b.achievement ? 'Everything in both apps' : b.game ? 'Everything in Habit Kitty' : 'Everything in Achievement Kitty'} on this device will be replaced.</p>
+    <p class="muted">${b.game && b.achievement ? 'Everything in both apps' : b.game ? 'Everything in Habit Kitty' : 'Everything in Achievement Kitty'} on this device will be replaced.${b.notes && Object.keys(b.notes).length ? ' So will your notes.' : ''}</p>
     <div class="btns"><button class="btn" data-action="modal-close">Cancel</button>
     <button class="btn primary" data-action="restore-yes">Restore</button></div></div>`);
 }
@@ -1393,8 +1273,10 @@ async function restoreBackup() {
     try { await restoreAchievement(b.achievement); } catch { closeModal(); toast("Couldn't restore that backup."); return; }
   }
   if (g) {
-    if (!await writeDiaryFiles(b.diary, b.photos)) { closeModal(); toast("Couldn't restore the kitties and diary. Achievements were restored."); return; }
-    save = normalize({ ...g, diary: b.diary as unknown as Save['diary'] });
+    if (!await restoreDiary(b, g)) { closeModal(); toast("Couldn't restore the kitties and diary. Achievements were restored."); return; }
+    if (b.notes && Object.keys(b.notes).length && !await restoreNotes(b.notes)) toast("Couldn't restore the notes. Everything else was restored.");   // a backup from before notes leaves yours alone
+    const { trackamaniac, moodNames, ...rest } = g;   // older backups kept the diary settings here (restoreDiary took them)
+    save = normalize(rest);
     lastLevel = null;
     diaryReady = true;
     persist(); settle(); renderAll();
@@ -1406,152 +1288,6 @@ async function restoreBackup() {
     return;
   }
   toast('Backup restored.');
-}
-
-// ---- calendar ----
-let diaryYM: { y: number; m: number } | null = null;
-const diaryMonth = () => {
-  if (!diaryYM) { const d = dateOf(today()); diaryYM = { y: d.getUTCFullYear(), m: d.getUTCMonth() }; }
-  return diaryYM;
-};
-
-function renderDiary() {
-  const t = today();
-  const { y, m } = diaryMonth();
-  const first = dayOf(y, m, 1), last = dayOf(y, m + 1, 0);
-  const lead = (dateOf(first).getUTCDay() + 6) % 7;
-  const title = dateOf(first).toLocaleString('en', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-  const cur = dateOf(t);
-  const atNow = y * 12 + m >= cur.getUTCFullYear() * 12 + cur.getUTCMonth();
-  let pages = 0;
-  const cells = [
-    ...['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((x) => `<div class="dow">${x}</div>`),
-    ...Array.from({ length: lead }, () => '<div class="dc blank"></div>'),
-  ];
-  for (let d = first; d <= last; d++) {
-    const e = save.diary?.[d];
-    const has = hasPage(e);
-    if (has) pages++;
-    const future = d > t;
-    const what = [has ? 'entry' : '', e?.mood ? `feeling ${feelingText(e).toLowerCase()}` : '', e?.weather ? WEATHER[e.weather].toLowerCase() : ''].filter(Boolean).join(', ') || 'empty';
-    cells.push(`<button type="button" class="dc${has ? ' has' : ''}${d === t ? ' now' : ''}" data-action="diary-open" data-day="${d}" ${future ? 'disabled' : ''}
-      aria-label="${fmtDay(d)}: ${what}"><span class="dn">${d - first + 1}</span>${e?.mood ? moodsSprite(e.mood, e.mood2) : ''}</button>`);
-  }
-  $('diary-cal').innerHTML = cells.join('');
-  const head = $('diary-title');
-  head.textContent = title;
-  head.dataset.y = String(y); head.dataset.m = String(m);
-  head.setAttribute('aria-label', `${title}. Pick a month`);
-  ($('diary-next') as HTMLButtonElement).disabled = atNow;
-  $('diary-stats').innerHTML = pages ? `<b class="num">${pages}</b> ${pages === 1 ? 'page' : 'pages'} written this month` : 'No pages this month yet. Tap a day to write one.';
-  $('diary-legend').innerHTML = `<span><i class="has"></i>has an entry</span><span><i class="now"></i>today</span>` +
-    MOOD_KEYS.map((k) => `<span>${moodSprite(k)}${esc(moodName(k))}</span>`).join('');
-}
-
-// ---- one day's page ----
-let diaryDraft: { day: number; moods: Mood[]; weather?: Weather; photo: Blob | null; photoUrl: string; photoLost?: boolean; reading?: boolean; loaded?: Promise<unknown> } | null = null;   // photoLost: the saved photo could not be read, so keep its file
-
-function drawDraftPhoto() {
-  if (!diaryDraft) return;
-  const box = $('diary-photo');
-  if (diaryDraft.reading) { box.innerHTML = diaryDraft.photoUrl ? `<img src="${diaryDraft.photoUrl}" alt="Attached photo">` : ''; return; }
-  box.innerHTML = diaryDraft.photoUrl
-    ? `<img src="${diaryDraft.photoUrl}" alt="Attached photo"><button class="btn small" type="button" data-action="diary-photo-remove">Remove photo</button>`
-    : '<p class="muted">No photo attached.</p>';
-  box.parentElement?.querySelector<HTMLElement>('[data-action="diary-photo-add"]')?.replaceChildren(diaryDraft.photoUrl ? 'Change photo' : 'Add photo');
-}
-// A pixel bar that sweeps back and forth while a photo is being converted or loaded.
-function showPhotoBusy(text: string) {
-  $('diary-photo').innerHTML = `<div class="loading" role="status"><p class="muted">${text}</p><div class="bar busy"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>`;
-  document.querySelectorAll<HTMLButtonElement>('#diary-form [data-action="diary-photo-add"], #diary-form button[type="submit"]').forEach((b) => (b.disabled = true));
-}
-function setDraftPhoto(b: Blob | null) {
-  document.querySelectorAll<HTMLButtonElement>('#diary-form [data-action="diary-photo-add"], #diary-form button[type="submit"]').forEach((x) => (x.disabled = false));
-  if (!diaryDraft) return;
-  if (diaryDraft.photoUrl) URL.revokeObjectURL(diaryDraft.photoUrl);
-  diaryDraft.photo = b;
-  diaryDraft.photoUrl = b ? URL.createObjectURL(b) : '';
-  drawDraftPhoto();
-}
-function markMood() {
-  document.querySelectorAll<HTMLElement>('#diary-moods [data-mood]').forEach((b) => b.setAttribute('aria-pressed', String(!!diaryDraft?.moods.includes(b.dataset.mood as Mood))));
-  document.querySelectorAll<HTMLElement>('#diary-weather [data-weather]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.weather === diaryDraft?.weather)));
-}
-const diaryNav = (day: number) => `<div class="diary-nav">
-  <button class="btn small" type="button" data-action="diary-go" data-day="${day - 1}" aria-label="Previous day">${iconSvg('prev')}</button>
-  <span class="muted">${day === today() ? 'Today' : ''}</span>
-  <button class="btn small" type="button" data-action="diary-go" data-day="${day + 1}" aria-label="Next day" ${day >= today() ? 'disabled' : ''}>${iconSvg('next')}</button></div>`;
-
-// A page with text opens as read-only; an empty one, or "Edit entry", opens the form.
-function openDiary(day: number, edit = false) {
-  const e = save.diary?.[day];
-  if (diaryDraft?.photoUrl) URL.revokeObjectURL(diaryDraft.photoUrl);
-  const reading = !edit && !!e?.text.trim();
-  diaryDraft = { day, moods: [e?.mood, e?.mood2].filter((m): m is Mood => !!m), weather: e?.weather, photo: null, photoUrl: '', reading };
-  const heading = `<h3>${esc(dateOf(day).toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }))}</h3>`;
-  if (reading && e) {
-    openModal(`<div class="panel" id="diary-read"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
-      ${diaryNav(day)}${heading}
-      <div class="diary-mood">${e.mood ? `<span class="mood-now">${moodsSprite(e.mood, e.mood2)}<span>${esc(feelingText(e))}</span></span>` : '<span></span>'}<button class="btn small" type="button" data-action="diary-edit">Edit entry</button></div>
-      ${e.weather ? `<span class="mood-now">${weatherSvg(e.weather)}<span>${WEATHER[e.weather]}</span></span>` : ''}
-      <p class="diary-read">${esc(e.text)}</p>
-      <div id="diary-photo" class="diary-photo"></div>
-    </div>`);
-    if (e.photo) diaryDraft.loaded = getPhoto(day).then((b) => { if (diaryDraft?.day === day && !diaryDraft.photo) setDraftPhoto(b || null); });
-    return;
-  }
-  openModal(`<form class="panel" id="diary-form" novalidate><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
-    ${diaryNav(day)}${heading}
-    <div class="field"><span>How are you feeling? <span class="muted">(pick up to 2)</span></span>
-      <div class="moods" id="diary-moods">${MOOD_KEYS.map((k) =>
-        `<button type="button" data-action="diary-mood" data-mood="${k}" aria-pressed="false">${moodSprite(k)}<span>${esc(moodName(k))}</span></button>`).join('')}</div>
-      <input id="diary-feeling" maxlength="40" autocomplete="off" placeholder="In your own words (optional)" value="${esc(e?.feeling ?? '')}" aria-label="Your own word for this feeling"></div>
-    ${save.trackamaniac ? `<div class="field"><span>Weather</span>
-      <div class="moods" id="diary-weather">${(Object.keys(WEATHER) as Weather[]).map((k) =>
-        `<button type="button" data-action="diary-weather" data-weather="${k}" aria-pressed="false">${weatherSvg(k)}<span>${WEATHER[k]}</span></button>`).join('')}</div></div>` : ''}
-    <label class="field">Dear diary <textarea id="diary-text" class="diary-text" maxlength="5000" placeholder="What happened today?">${esc(e?.text ?? '')}</textarea></label>
-    <div class="field"><span>Photo</span><div id="diary-photo" class="diary-photo"></div>
-      <div class="btns"><button class="btn" type="button" data-action="diary-photo-add">Add photo</button></div>
-      <input type="file" id="diary-file" accept="image/*" hidden></div>
-    <p class="form-error" id="diary-error" hidden></p>
-    <div class="btns"><button class="btn" type="button" data-action="diary-clear">Clear</button><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Save</button></div>
-  </form>`);
-  markMood();
-  drawDraftPhoto();
-  if (e?.photo) showPhotoBusy('Loading photo…');
-  if (e?.photo) diaryDraft.loaded = getPhoto(day).then((b) => { if (diaryDraft?.day === day && !diaryDraft.photo) { setDraftPhoto(b || null); diaryDraft.photoLost = !b; } });
-}
-
-async function saveDiary() {
-  const dr = diaryDraft;
-  if (!dr) return;
-  await Promise.all([dr.loaded, diaryLoading]);   // don't mistake a photo that is still loading for a removed one
-  const text = ($('diary-text') as HTMLTextAreaElement).value.replace(/\s+$/, '');
-  const entries = { ...save.diary };
-  const feeling = ($('diary-feeling') as HTMLInputElement).value.replace(/\s+/g, ' ').trim();
-  const [mood, mood2] = dr.moods;
-  const weather = save.trackamaniac ? dr.weather : save.diary?.[dr.day]?.weather;   // the weather stays put while Trackamaniac is off
-  if (!text.trim() && !mood && !feeling && !weather && !dr.photo && !dr.photoLost) delete entries[dr.day];
-  else entries[dr.day] = { text, mood, ...(mood2 && { mood2 }), ...(feeling && { feeling }), ...(weather && { weather }), photo: !!dr.photo || !!dr.photoLost, updated: Date.now() };
-  const entry = entries[dr.day];
-  const stored = entry
-    ? (!dr.photo || await writePhoto(dr.day, new Uint8Array(await dr.photo.arrayBuffer()))) && await writeEntry(dr.day, entry)
-    : true;
-  if (!stored) {
-    const err = $('diary-error');
-    err.textContent = "Couldn't store this page on the device. Try again.";
-    err.hidden = false;
-    return;
-  }
-  if (!entry) { await removeFile(diaryPath(dr.day)); }
-  if (!dr.photo && !dr.photoLost) await removeFile(photoPath(dr.day));
-  save.diary = entries;
-  persist();
-  closeModal();
-  renderDiary();
-  checkAccomplishments();
-  toast(entries[dr.day] ? 'Diary page saved.' : 'Diary page cleared.');
-  if (entries[dr.day]?.text.trim()) openDiary(dr.day);   // back to the page, now read-only
 }
 
 // ===================== Feeding reminders =====================
@@ -1690,24 +1426,77 @@ async function setReminderEnabled(on: boolean) {
 }
 
 // ===================== Tabs & modal =====================
-const TABS = ['room', 'mindful', 'today', 'heat', 'diary', 'settings'];
+const TABS = ['room', 'mindful', 'today', 'heat', 'settings'];
 let tab = 'today';
-let tabBeforeSettings = 'today';   // where the settings icon takes you back to
+let tabBeforeSettings = 'today';   // where Back in Settings takes you, when you came from a Habit Kitty tab
+let settingsFrom: AppName = 'habit';   // the screen whose gear opened Settings
+
+// ---- the top navigation: Kitty / Stray / Treats / Pet sitter / Memory, and the views of the section you are in ----
+// Each place is one of the screens below (today: the cat cards, mindful: strays and treats, room: the cozy room and the garden, heat).
+// Pet sitter and Memory only show while a kitty is with the sitter, or has gone (died, ran away, gone to the shelter).
+type Main = 'kitty' | 'stray' | 'treats' | 'sitter' | 'memory';
+type Sub = 'list' | 'room' | 'heat';
+let navMain: Main = 'kitty';
+const navSub: Record<'kitty' | 'stray', Sub> = { kitty: 'list', stray: 'list' };
+let heatMode: 'cats' | 'strays' = 'cats';
+const catsIn = (v: TodayView) => save.state.cats.filter((c) => viewOf(c) === v).length;
+const sectionOk = (m: Main) => (m === 'sitter' ? catsIn('sitter') > 0 : m === 'memory' ? catsIn('memories') > 0 : true);
+const currentSub = (): Sub => (navMain === 'kitty' || navMain === 'stray' ? navSub[navMain] : 'list');
+
+// Points the screens' own switches (which cats, which list, which room, which heatmap) at the section.
+function syncViews() {
+  if (!sectionOk(navMain)) navMain = 'kitty';
+  todayView = navMain === 'sitter' ? 'sitter' : navMain === 'memory' ? 'memories' : 'home';
+  mindfulView = navMain === 'treats' ? 'task' : 'habit';
+  roomView = navMain === 'stray' && currentSub() === 'room' ? 'outdoor' : 'indoor';
+  heatMode = navMain === 'stray' ? 'strays' : 'cats';
+}
+const screenOf = (): string => {
+  const sub = currentSub();
+  if (navMain === 'kitty') return { list: 'today', room: 'room', heat: 'heat' }[sub];
+  if (navMain === 'stray') return { list: 'mindful', room: 'room', heat: 'heat' }[sub];
+  return navMain === 'treats' ? 'mindful' : 'today';
+};
+function openNav(main: Main, sub?: Sub) {
+  navMain = main;
+  if (sub && (main === 'kitty' || main === 'stray')) navSub[main] = sub;
+  syncViews();
+  showTab(screenOf());
+}
+
+function navHtml(): string {
+  syncViews();   // a section whose kitties are gone falls back to Kitty
+  const mains: [Main, string, number | null][] = [['kitty', 'Kitty', null], ['stray', 'Stray', null], ['treats', 'Treats', null]];
+  if (catsIn('sitter')) mains.push(['sitter', 'Pet sitter', catsIn('sitter')]);
+  if (catsIn('memories')) mains.push(['memory', 'Memory', catsIn('memories')]);
+  const subs: [Sub, string][] | null = navMain === 'kitty' ? [['list', 'List'], ['room', indoorName()], ['heat', 'Heatmap']]
+    : navMain === 'stray' ? [['list', 'List'], ['room', outdoorName()], ['heat', 'Heatmap']] : null;
+  return `<nav class="nav" aria-label="Sections"><div class="seg" role="tablist">${mains.map(([m, label, n]) =>
+      `<button type="button" role="tab" data-action="nav-main" data-main="${m}" aria-selected="${m === navMain}">${label}${n === null ? '' : ` <span class="num">${n}</span>`}</button>`).join('')}</div>
+    ${subs ? `<div class="seg sub" role="tablist" aria-label="Views">${subs.map(([v, label]) =>
+      `<button type="button" role="tab" data-action="nav-sub" data-sub="${v}" aria-selected="${v === currentSub()}">${esc(label)}</button>`).join('')}</div>` : ''}</nav>`;
+}
+
+// Settings: a main page (everything shared, then a button per mini-app), and one page for each mini-app's own options.
+const SETTINGS_PAGES = ['main', 'habit', 'diary', 'notes', 'achievement'] as const;
+function showSettingsApp(app: string | null) {
+  for (const p of SETTINGS_PAGES) $(`set-${p}`).hidden = p !== (app ?? 'main');
+  window.scrollTo(0, 0);
+}
 function showTab(name: string) {
   if (name !== 'settings') tabBeforeSettings = name;
+  else showSettingsApp(null);   // Settings always opens on its main page
   tab = name;
+  document.documentElement.dataset.tab = name;
   renderTop();
   renderTab(name);
   for (const t of TABS) $(`tab-${t}`).classList.toggle('on', t === name);
-  document.querySelectorAll<HTMLElement>('.tabbar [data-tab]').forEach((b) =>
-    b.setAttribute('aria-selected', String(b.dataset.tab === name)));
   window.scrollTo(0, 0);
 }
 
 function closeModal() {
   closeLayer(false);
-  if (diaryDraft?.photoUrl) URL.revokeObjectURL(diaryDraft.photoUrl);
-  diaryDraft = null; gate = null; menuCat = null; menuStray = null;
+  gate = null; menuCat = null; menuStray = null;
   $('modal').hidden = true; $('modal').innerHTML = '';
   if (save.amnesia && save.amnesiaDay !== today()) queueMicrotask(checkAmnesia);   // it waited for this dialog
 }
@@ -1743,7 +1532,7 @@ function closeLayer(refocus = true) {
   layerFrom = null;
 }
 
-// ---- month and year picker: tap a calendar's title (the diary, the heatmaps) to jump to any month up to now ----
+// ---- month and year picker: tap a calendar's title (the heatmaps) to jump to any month up to now ----
 interface Picker { key: string; y: number; m: number; year: number; first: number }   // year: the one being shown; first: earliest month allowed, as y * 12 + m
 let picker: Picker | null = null;
 const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => new Date(Date.UTC(2000, i, 1)).toLocaleString('en', { month: 'short', timeZone: 'UTC' }));
@@ -1782,12 +1571,9 @@ function pickMonth(m: number) {
   const p = picker;
   if (!p || p.year * 12 + m > nowMonth() || p.year * 12 + m < p.first) return;
   closeLayer(false);
-  if (p.key === 'diary') { diaryYM = { y: p.year, m }; renderDiary(); }
-  else {
-    viewMonth.set(p.key, Math.max(0, nowMonth() - (p.year * 12 + m)));
-    renderHeat();
-    if (menuCat === p.key) openCatMenu(p.key);
-  }
+  viewMonth.set(p.key, Math.max(0, nowMonth() - (p.year * 12 + m)));
+  renderHeat();
+  if (menuCat === p.key) openCatMenu(p.key);
   document.querySelector<HTMLElement>(`[data-action="picker-open"][data-key="${CSS.escape(p.key)}"]`)?.focus();   // the title was redrawn
 }
 
@@ -1873,7 +1659,7 @@ function openAdopt(habitId?: string) {
 }
 
 // ---- accomplishments: worked out from the save; the unlocked ones are remembered so they never disappear ----
-const diaryPageCount = () => Object.values(save.diary ?? {}).filter(hasPage).length;
+const diaryPageCount = pageCount;
 function checkAccomplishments() {
   const got = accomplishments(save.state, diaryPageCount(), today()).filter((a) => a.unlocked);
   const known = save.accomplished;
@@ -1990,7 +1776,6 @@ function renderTab(name: string) {
     case 'heat': renderHeat(); break;
     case 'room': renderRoom(); break;
     case 'mindful': renderTasks(); break;
-    case 'diary': renderDiary(); break;
     case 'settings': renderChangelog(); renderReminder(); break;
   }
 }
@@ -2045,53 +1830,24 @@ onShown('habit', 'click', (ev) => {
       if (menuStray === id) openStrayMenu(id);   // keep the open menu in step (fed)
       break;
     }
-    case 'tab':
-      showTab(btn.dataset.tab ?? 'today');
-      break;
+    case 'nav-main': openNav(btn.dataset.main as Main); break;
+    case 'nav-sub': openNav(navMain, btn.dataset.sub as Sub); break;
     case 'theme-toggle': toggleTheme(); break;
-    case 'settings-toggle': showTab(tab === 'settings' ? tabBeforeSettings : 'settings'); break;
-    case 'diary-month': {
-      const d = diaryMonth(), n = new Date(Date.UTC(d.y, d.m + Number(btn.dataset.step), 1));
-      if (n.getUTCFullYear() * 12 + n.getUTCMonth() > nowMonth()) break;   // never into a month that hasn't happened
-      diaryYM = { y: n.getUTCFullYear(), m: n.getUTCMonth() };
-      renderDiary();
+    case 'settings-open': settingsFrom = 'habit'; showTab('settings'); break;
+    case 'settings-back':
+      if (settingsFrom === 'habit') showTab(tabBeforeSettings);
+      else document.dispatchEvent(new CustomEvent(GO_EVENT, { detail: { to: settingsFrom } }));
       break;
-    }
-    case 'diary-today': diaryYM = null; renderDiary(); break;
+    case 'settings-app': showSettingsApp(btn.dataset.app ?? null); break;
+    case 'settings-up': showSettingsApp(null); break;
+    case 'ach-load': $('ach-file').click(); break;
     case 'picker-open': openPicker(btn); break;
     case 'picker-years': drawPicker('year'); break;
     case 'picker-year': if (picker) { picker.year = Number(btn.dataset.y); drawPicker('month'); } break;
     case 'picker-month': pickMonth(Number(btn.dataset.m)); break;
     case 'layer-close': if (ev.target === btn || btn.tagName === 'BUTTON') closeLayer(); break;
-    case 'diary-open': openDiary(Number(btn.dataset.day)); break;
-    case 'diary-edit': if (diaryDraft) openDiary(diaryDraft.day, true); break;
-    case 'diary-mood':
-      if (diaryDraft) {
-        const k = btn.dataset.mood as Mood, ms = diaryDraft.moods;
-        diaryDraft.moods = ms.includes(k) ? ms.filter((x) => x !== k) : [...ms, k].slice(-2);   // a third pick replaces the oldest
-        markMood();
-      }
-      break;
-    case 'diary-weather':
-      if (diaryDraft) { diaryDraft.weather = diaryDraft.weather === btn.dataset.weather ? undefined : (btn.dataset.weather as Weather); markMood(); }
-      break;
-    case 'diary-go': if (!btn.hasAttribute('disabled')) openDiary(Number(btn.dataset.day)); break;
-    case 'diary-photo-add': $('diary-file').click(); break;
-    case 'diary-photo-remove': setDraftPhoto(null); if (diaryDraft) diaryDraft.photoLost = false; break;
-    case 'diary-clear':
-      openLayer(`<h3>Clear this page?</h3>
-        <p>This empties the text, feelings, weather and photo on this diary page. Nothing is deleted until you press Save, so closing the page without saving keeps it as it was.</p>
-        <div class="btns"><button class="btn" type="button" data-action="layer-close" data-focus>Cancel</button><button class="btn primary" type="button" data-action="diary-clear-yes">Clear</button></div>`, 'Clear this page?', btn);
-      break;
-    case 'diary-clear-yes':
-      closeLayer();
-      ($('diary-text') as HTMLTextAreaElement).value = '';
-      ($('diary-feeling') as HTMLInputElement).value = '';
-      if (diaryDraft) { diaryDraft.moods = []; diaryDraft.weather = undefined; diaryDraft.photoLost = false; markMood(); setDraftPhoto(null); }
-      break;
     case 'log-close': save.logHidden = true; persist(); renderLog(); break;
     case 'adopt-open': startAdopt(); break;
-    case 'room-view': roomView = btn.dataset.view === 'outdoor' ? 'outdoor' : 'indoor'; renderRoom(); break;
     case 'habit-kitty': startAdopt(id); break;
     case 'task-del': askDeleteTask(id); break;
     case 'gate-yes': {
@@ -2103,7 +1859,7 @@ onShown('habit', 'click', (ev) => {
       g.done();
       break;
     }
-    case 'goto-habits': closeModal(); mindfulView = 'habit'; renderTasks(); showTab('mindful'); break;
+    case 'goto-habits': closeModal(); openNav('stray', 'list'); break;
     case 'menu-tab': openCatMenu(id, btn.dataset.view as MenuTab); break;
     case 'stray-tab': openStrayMenu(id, btn.dataset.view as StrayTab); break;
     case 'release-ask':
@@ -2119,8 +1875,6 @@ onShown('habit', 'click', (ev) => {
       act((s, at) => releaseToColony(s, id, uid(), at), `${name} joined the stray colony. Find them in ${outdoorName()}, or adopt them again.`, cat);
       break;
     }
-    case 'mindful-view': mindfulView = btn.dataset.view === 'habit' ? 'habit' : 'task'; renderTasks(); break;
-    case 'today-view': todayView = (btn.dataset.view as TodayView) ?? 'home'; renderCats(); break;
     case 'randomise':
       draftLook = randomLook();
       redrawLook();
@@ -2290,8 +2044,6 @@ onShown('habit', 'click', (ev) => {
       save = fresh();
       setDayStart(save.dayStart);
       lastLevel = null;
-      diaryReady = true;
-      clearDiaryFiles();
       persist();
       renderAll();
       toast('Fresh start.');
@@ -2313,13 +2065,13 @@ function validGame(d: any): Save | null {
   return { ...game, state: { ...d.state, cats }, log: Array.isArray(d.log) ? d.log : [], offsetHours: Number(d.offsetHours) || 0 };
 }
 
-// Game only: the diary and photos on this device stay as they are.
+// Game only: the diary, the achievements and the photos on this device stay as they are.
 function loadSave(raw: string) {
   const err = $('save-error');
   try {
     const g = validGame(JSON.parse(raw));
     if (!g) throw new Error();
-    save = normalize({ ...g, diary: save.diary });
+    save = normalize(g);
     lastLevel = null;
     err.hidden = true;
     persist(); settle(); renderAll();
@@ -2331,21 +2083,6 @@ $('allow-rename').addEventListener('change', (ev) => {
   save.allowRename = (ev.target as HTMLInputElement).checked;
   persist();
   toast(save.allowRename ? 'Kitties can be renamed from their long-press menu.' : 'Kitty names are locked.');
-});
-$('trackamaniac').addEventListener('change', (ev) => {
-  save.trackamaniac = (ev.target as HTMLInputElement).checked;
-  persist();
-  toast(save.trackamaniac ? 'Trackamaniac on. Diary pages now have a weather choice.' : 'Trackamaniac off. Weather you already saved is kept.');
-});
-$('mood-names').innerHTML = MOOD_KEYS.map((k) =>
-  `<label class="field">${moodSprite(k)} <input data-mood="${k}" maxlength="14" autocomplete="off" placeholder="${MOODS[k].label}" aria-label="Name for ${MOODS[k].label}"></label>`).join('');
-$('mood-names').addEventListener('change', (ev) => {
-  const i = ev.target as HTMLInputElement, k = i.dataset.mood as Mood | undefined;
-  if (!k) return;
-  const names = { ...save.moodNames }, v = i.value.trim();
-  if (v && v !== MOODS[k].label) names[k] = v; else delete names[k];
-  save.moodNames = names;
-  persist(); renderDiary();
 });
 $('show-clock').addEventListener('change', (ev) => {
   save.showClock = (ev.target as HTMLInputElement).checked;
@@ -2410,21 +2147,23 @@ onShown('habit', 'change', (ev) => {
   draftLook = { ...draftLook, [key]: sel.value } as CatLook;
   redrawLook();
 });
-// The file input lives inside the diary dialog, so listen on the document.
-onShown('habit', 'change', async (ev) => {
+// Achievements only: from a backup or an older Achievement Kitty save file.
+$('ach-file').addEventListener('change', async (ev) => {
   const input = ev.target as HTMLInputElement;
-  if (input.id !== 'diary-file') return;
   const f = input.files?.[0];
   input.value = '';
-  if (!f || !diaryDraft) return;
-  const err = $('diary-error');
+  if (!f) return;
+  const err = $('ach-error');
   try {
+    const b = unpackBackup(new Uint8Array(await f.arrayBuffer()));
+    if (!b.achievement) throw new Error('none');
     err.hidden = true;
-    showPhotoBusy('Shrinking photo…');
-    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));   // let the bar paint before the heavy work
-    setDraftPhoto(await compressPhoto(f));
-  } catch { setDraftPhoto(diaryDraft?.photo ?? null); err.textContent = "Couldn't read that photo. Try a different one."; err.hidden = false; }
+    askRestore({ game: null, diary: {}, photos: {}, achievement: b.achievement });
+  } catch { err.textContent = "That doesn't hold any achievements. Choose a .kitty backup or an .achkitty save file."; err.hidden = false; }
 });
+
+mountDiarySettings($('set-diary-body'), toast);
+mountNotesSettings($('set-notes-body'), toast);
 
 $('load-file').addEventListener('change', async (ev) => {
   const input = ev.target as HTMLInputElement;
@@ -2441,7 +2180,6 @@ $('load-file').addEventListener('change', async (ev) => {
 onShown('habit', 'submit', (ev) => {
   ev.preventDefault();
   const form = ev.target as HTMLFormElement;
-  if (form.id === 'diary-form') { saveDiary(); return; }
   if (form.id === 'adopt') {
     const name = ($('adopt-name') as HTMLInputElement).value;
     const habit = ($('adopt-habit') as HTMLInputElement).value;
@@ -2551,16 +2289,17 @@ function askDeleteTask(id: string) {
 function fireHold(el: HTMLElement) {
   endHold();
   const id = el.dataset.id ?? el.dataset.task ?? '';
-  if (el.dataset.hold === 'cat') openCatMenu(id, 'diary');
+  if (el.dataset.hold === 'cat') openCatMenu(id);
   else if (el.dataset.hold === 'stray') openStrayMenu(id);
-  else askDeleteTask(id);
+  else openTreatMenu(id);
 }
 
-// Long press on a kitty: the same card as Today on top, then Diary (the default) / Heatmap / Options tabs.
+// Long press on a kitty, a stray or a treat opens the same kind of menu: its card on top, then Heatmap (the default) / Options
+// (a kitty also has its Diary). The options come in the same order: the main action, the renames, Time travel, then the way out.
 type MenuTab = 'options' | 'heat' | 'diary';
 let menuCat: string | null = null;
-let menuTab: MenuTab = 'diary';
-const MENU_TABS: Record<MenuTab, string> = { diary: 'Diary', heat: 'Heatmap', options: 'Options' };
+let menuTab: MenuTab = 'heat';
+const MENU_TABS: Record<MenuTab, string> = { heat: 'Heatmap', diary: 'Diary', options: 'Options' };   // a stray has the same without the Diary
 
 function catDiaryHtml(cat: Cat): string {
   if (cat.status !== 'alive') return `<p class="muted">${esc(cat.name)} isn't home, so there is nothing to write about.</p>`;
@@ -2584,8 +2323,8 @@ function openCatMenu(id: string, tab?: MenuTab) {
     ? (cat.status === 'ranAway' ? `<p class="muted">${esc(cat.name)} ran away.</p>` : renderMonth(cat, today()) + HEAT_LEGEND)
     : menuTab === 'diary' ? catDiaryHtml(cat)
     : `<div style="display:grid;gap:8px">${sitterBtn}
-      <button class="btn" data-action="rename-habit" data-id="${id}">Rename habit</button>
       ${save.allowRename ? `<button class="btn" data-action="rename-cat" data-id="${id}">Rename ${esc(cat.name)}</button>` : ''}
+      <button class="btn" data-action="rename-habit" data-id="${id}">Rename habit</button>
       ${save.timeTravel ? `<button class="btn" data-action="travel" data-id="${id}">Time travel</button>` : ''}
       ${cat.status === 'alive' ? `<button class="btn" data-action="release-ask" data-id="${id}">Release to the stray colony</button>` : ''}
       <button class="btn" data-action="shelter-ask" data-id="${id}">Return to the shelter</button></div>`;
@@ -2637,6 +2376,19 @@ function openStrayMenu(id: string, tab?: StrayTab) {
     ${pane}</div>`);
 }
 
+// A treat's menu: its name, what it pays, and the same options as the others (Time travel, then delete).
+function openTreatMenu(id: string) {
+  const k = save.state.tasks.find((x) => x.id === id && x.kind === 'task');
+  if (!k) return;
+  const done = k.lastDoneDay !== null;
+  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
+    <div class="cat-head solo"><div><p class="cat-name">${esc(k.name)}<span class="mode">treat · +${k.xp} XP</span></p>
+      <span class="chip ${done ? 'fed' : 'today'}">${done ? 'Done' : 'To do'}</span></div></div>
+    <div style="display:grid;gap:8px">
+      ${save.timeTravel ? `<button class="btn" data-action="travel" data-id="${id}">Time travel</button>` : ''}
+      <button class="btn" data-action="task-del" data-id="${id}">Delete treat</button></div></div>`);
+}
+
 const holdTarget = (ev: Event) => (ev.target as HTMLElement).closest<HTMLElement>('[data-hold], li[data-task]');
 onShown('habit', 'pointerdown', (ev) => {
   const el = holdTarget(ev);
@@ -2662,19 +2414,31 @@ onShown('habit', 'contextmenu', (ev) => {
 });
 
 // Re-settle when the page comes back and at each 2am rollover.
-function tick() { settle(); renderAll(); queueReminderSync(); checkAmnesia(); }
+function tick() { settle(); renderAll(); queueReminderSync(); checkAmnesia(); checkAccomplishments(); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
 // Back from Achievement Kitty: the theme may have changed there, and the clock moved on.
-onAppShown('habit', tick);
+onAppShown('habit', () => {
+  if (tab === 'settings') showTab(tabBeforeSettings);   // coming back to Habit Kitty leaves Settings (unless Settings was asked for, below)
+  tick();
+});
+// Asked for a tab from the home page or another app (Settings), or the widget (Room).
+document.addEventListener(TAB_EVENT, (ev) => {
+  const d = (ev as CustomEvent<{ app: string; tab: string; from?: AppName }>).detail;
+  if (d.app !== 'habit') return;
+  if (d.tab === 'settings') { settingsFrom = d.from ?? 'habit'; showTab('settings'); }
+  else if (d.tab === 'room') openNav('kitty', 'room');
+  else if (d.tab === 'today') openNav('kitty', 'list');
+});
 function scheduleRollover() {
   setTimeout(() => { tick(); scheduleRollover(); }, Math.min(nextReset(now()).getTime() - now().getTime() + 1000, 60_000));
 }
 
-const diaryLoading = loadDiary();
+loadDiary();
+initNotes();
 loadMusic();
 settle();
 renderAll();
-showTab('today');
+openNav('kitty', 'list');
 openWidgetTab();
 scheduleRollover();
 showWhatsNew();

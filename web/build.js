@@ -1,4 +1,4 @@
-// Bundles both apps (src/web/shell.ts starts them) into one page, web/page.html with web/achievement.html put in, in two flavours:
+// Bundles the home page and both apps (src/web/shell.ts starts them) into one page, web/page.html with web/achievement.html, web/home.html, web/diary.html and web/notes.html put in, in two flavours:
 //   dist/habit-kitty.html  page body only, for publishing as a Claude artifact (it adds the skeleton)
 //   app-www/index.html     full offline document with bundled fonts and sounds, for the Android app (Capacitor)
 // The sounds (sounds/*.mp3) are files next to the app's page, and inlined as data URLs into the single-file website.
@@ -23,7 +23,11 @@ async function bundle(isApp) {
   return outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 }
 
-const template = readFileSync('web/page.html', 'utf8').replace('<!--__ACHIEVEMENT__-->', () => readFileSync('web/achievement.html', 'utf8'));
+const template = readFileSync('web/page.html', 'utf8')
+  .replace('<!--__ACHIEVEMENT__-->', () => readFileSync('web/achievement.html', 'utf8'))
+  .replace('<!--__HOME__-->', () => readFileSync('web/home.html', 'utf8'))
+  .replace('<!--__DIARY__-->', () => readFileSync('web/diary.html', 'utf8'))
+  .replace('<!--__NOTES__-->', () => readFileSync('web/notes.html', 'utf8'));
 
 // ---- website ----
 const siteJs = await bundle(false);

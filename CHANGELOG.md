@@ -2,6 +2,24 @@
 
 Newest first. The app bundles this file: it shows the latest entry once after an update, and the whole list under Settings → Change log.
 
+## 0.5.0 - 2026-11-05
+
+### New
+- **Diary has its own screen.** The Diary button on the home page opens it; it is no longer a tab in Habit Kitty, which now has Room, Strays, Today and Heatmap. Your pages, photos, Trackamaniac setting and emotion names carry over by themselves, and the backup holds all of it.
+- **Monthly reflection.** Under the calendar, a note for the month (what went well, what was hard, what to change), with a tally of the moods you picked.
+- **Birthdays.** Add the people whose birthdays you want to remember (the year is optional). A cake marks the day on the calendar and on that day's page, and the next three are listed in the Birthdays section at the bottom.
+- **Simple Notes.** A new screen on the home page: a list of notes with a search box, and an editor that saves as you type, with a Markdown preview. Each note is one `.md` file named after its title, and notes are part of the backup. On Android, **Settings → Notes → Sync with the notes folder** keeps them in step with the **Notes** folder inside your backup folder, so you can open it as a vault in Obsidian. A note changed on both sides keeps both versions; deleting in Obsidian does not delete in the app. Notes can also be exported (.zip) and imported (.md).
+- **A new top bar in Habit Kitty.** **Kitty**, **Stray**, **Treats**, and, only when they apply, **Pet sitter** (a kitty is with the sitter) and **Memory** (a kitty died, ran away or went to the shelter) replace the tab bar at the bottom. Kitty and Stray each have **List**, a room (the **Cosy Room** and the **Garden**) and **Heatmap**; the Heatmap of each shows only its own kitties.
+- **Home page.** The app now opens on a home page with big pixel buttons: Habit Kitty, Diary, Achievements, and Simple Notes and Shopping Lists (coming soon). The trophy and kitty buttons in the two apps are now a **home button** that brings you back here, and Android's back button goes home too.
+- **One player for every app.** Your name, picture, age, gender and player ID are the same everywhere. The **Player Stat** button on the home page opens your player card; tap the pencil there to edit it.
+- **Lv, HP and MP, the same everywhere.** Each screen has one bar on top with the same text: **HP 397** and "97/300 to lvl 3" in Habit Kitty, **MP 34** in the Diary tab, **Lv 4** in Achievement Kitty. The number is always your running total: affection, days written in the diary, and (for Lv) the achievements unlocked. Level comes from achievements, HP from affection, and MP from diary days (10 days to leave level 1, 20 for level 2, 30 for level 3 …).
+
+### Changed
+- **Kitties, strays and treats work the same way.** Their cards have the same layout, and long-pressing any of them opens the same menu (Heatmap, Options). Treats now have a menu too. **Time travel** is one rewind button in the same place on a kitty, a stray and a treat (it used to be on strays and treats only, and in the menu for kitties), and also in each menu.
+- **One Settings screen.** The gear in every screen (home, Habit Kitty, Diary, Achievement Kitty) opens the same Settings, with the shared options (Sound, Your day, Backup, Change log) first and a button for each mini-app below them: Habit Kitty (reminders, game options, how to use), Diary (Trackamaniac, emotion names) and Achievements (load achievements only). The back arrow returns to the screen you came from.
+- **Diary: Birthdays** moved to the bottom of the page and starts closed.
+- **Start over** in Habit Kitty's settings no longer deletes your diary: it only resets the kitties and progress.
+
 ## 0.4.2 - 2026-11-05
 
 ### New

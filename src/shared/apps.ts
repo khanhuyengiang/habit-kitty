@@ -4,10 +4,14 @@
 import { monoSvg } from './pixelart.ts';
 import { miniSvg } from './pixelcat.ts';
 
-export type AppName = 'habit' | 'achievement';
-export const APP_TITLE: Record<AppName, string> = { habit: 'Habit Kitty', achievement: 'Achievement Kitty' };
+// The home page, the diary, the notes and the two apps: <html data-app> says which one is showing. (Habit Kitty's styles also serve the home page, the diary and the notes.)
+export type AppName = 'home' | 'habit' | 'diary' | 'notes' | 'achievement';
+export const APP_TITLE: Record<AppName, string> = { home: 'Kitty Home', habit: 'Habit Kitty', diary: 'Kitty Diary', notes: 'Kitty Notes', achievement: 'Achievement Kitty' };
 
-export const shownApp = (): AppName => (document.documentElement.dataset.app === 'achievement' ? 'achievement' : 'habit');
+export const shownApp = (): AppName => {
+  const a = document.documentElement.dataset.app;
+  return a === 'achievement' || a === 'home' || a === 'diary' || a === 'notes' ? a : 'habit';
+};
 
 // document.addEventListener, but only while `app` is showing.
 export function onShown<K extends keyof DocumentEventMap>(app: AppName, type: K, fn: (ev: DocumentEventMap[K]) => void, opts?: AddEventListenerOptions | boolean): void;
@@ -24,12 +28,17 @@ export const onAppShown = (app: AppName, fn: () => void) =>
 // Habit Kitty's own little cat: the pink face on its Today tab, and on the button that goes back to it.
 export const habitKittySvg = () => miniSvg('happy', { fur: '#ffb3cf', pattern: 'plain' });
 
-// The button in each app's top bar that goes to the other app, drawn like the light/dark button: it shows where it goes.
+// One-colour icons for the home page and the buttons that lead there.
 const TROPHY = ['ooooooooo', 'o.ooooo.o', 'o.ooooo.o', '.ooooooo.', '..ooooo..', '...ooo...', '....o....', '...ooo...', '.ooooooo.'];
-// Habit Kitty's face as a one-colour icon like the others: solid in the text colour, the eyes cut out so the button shows
-// through (dark kitty with light eyes in light mode, the other way round in dark mode).
-const KITTY = ['o.......o', 'oo.....oo', 'ooooooooo', 'ooooooooo', 'oo.ooo.oo', 'ooooooooo', 'ooooooooo', '.ooooooo.'];
-export function switchButton(from: AppName): string {
-  const to: AppName = from === 'habit' ? 'achievement' : 'habit';
-  return `<button class="gear" type="button" data-action="switch-app" data-to="${to}" aria-label="Switch to ${APP_TITLE[to]}">${monoSvg(to === 'achievement' ? TROPHY : KITTY)}</button>`;
-}
+const HOUSE = ['....o....', '...ooo...', '..ooooo..', '.ooooooo.', '..ooooo..', '..oo.oo..', '..oo.oo..'];
+export const trophyIcon = () => monoSvg(TROPHY);
+
+// The button in each app's top bar that goes back to the home page, drawn like the light/dark button.
+export const homeButton = () =>
+  `<button class="gear" type="button" data-action="go" data-to="home" aria-label="Home">${monoSvg(HOUSE)}</button>`;
+
+// Ask the shell to show a screen (it listens for this and for clicks on [data-action="go"]).
+export const GO_EVENT = 'kitty-go';
+export const goTo = (to: AppName, tab?: string) => document.dispatchEvent(new CustomEvent(GO_EVENT, { detail: { to, tab } }));
+// The shell tells an app which tab to open when it was asked for one.
+export const TAB_EVENT = 'kitty-tab';

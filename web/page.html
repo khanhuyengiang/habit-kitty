@@ -73,7 +73,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 /* ---------- pixel boxes: one-pixel border, one-pixel notch in every corner ---------- */
 .panel, .cat, .log, .update, .distrust, .travel-note, .focus-bar, .reminder-status.bad, .week, .toast, .seg, .switch, .chip,
 .btn, .gear, .clock-btn, .x-close, .field input, .field select, .field textarea, .modes label, .chips span, .moods button,
-.catlog li, .acc li, .tabbar button.mid, .dot, .bar, .hp, .room, .checkbox-box {
+.catlog li, .acc li, .dot, .bar, .hp, .room, .checkbox-box {
   border: var(--px) solid var(--edge); clip-path: var(--notch);
 }
 
@@ -224,15 +224,6 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 
 /* tabs */
 .tab { display: none; } .tab.on { display: grid; gap: var(--s5); }
-.tabbar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: var(--px) solid var(--edge);
-  box-shadow: inset 0 var(--px) 0 var(--bevel); padding-bottom: env(safe-area-inset-bottom, 0px); z-index: 5; }
-.tabbar-in { max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; padding-inline: var(--s2); }
-.tabbar button { background: transparent; border: 0; padding: var(--s2) 0; display: grid; justify-items: center; align-content: end; gap: var(--s1); font-size: 15px; font-weight: 700; color: var(--muted); min-width: 0; }
-.tabbar button i { display: grid; place-items: end center; height: calc(10 * var(--px)); }
-.tabbar button[aria-selected="true"] { color: var(--accent-text); }
-.tabbar button:not([aria-selected="true"]) .sprite { opacity: .6; }
-.tabbar button.mid { margin-top: calc(-4 * var(--px)); padding-top: var(--s3); background: var(--accent-soft); border-bottom: 0; }
-
 /* modal: a checkerboard dither over the page */
 .scrim { position: fixed; inset: 0; background: conic-gradient(rgba(74, 58, 120, .32) 25%, transparent 0 50%, rgba(74, 58, 120, .32) 0 75%, transparent 0) 0 0 / var(--s2) var(--s2);
   display: grid; place-items: center; padding: var(--s4); z-index: 10; }
@@ -332,7 +323,6 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .room { box-sizing: content-box; position: relative; isolation: isolate; width: calc(108 * var(--px)); height: calc(150 * var(--px)); margin-inline: auto; overflow: hidden; background: var(--bg3); }
 .room svg.bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .room .pet { position: absolute; }
-#room-seg { margin: var(--s3) 0; }
 #outdoor { display: block; }
 #outdoor[hidden] { display: none; }
 .room .pet.napping { width: auto; }
@@ -470,6 +460,29 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 <style>
 /* Shared by both apps (only one app's own styles are on at a time, see src/shared/apps.ts). */
 [hidden] { display: none !important; }
+/* the line under a week row: what was done, and the rewind button on the right (the same on a kitty and a stray) */
+.cat .habit-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+/* the top navigation: Kitty / Stray / Treats / Pet sitter / Memory, and under it the views of that section */
+.nav { display: grid; gap: var(--s2); }
+.nav .seg { overflow-x: auto; scrollbar-width: none; grid-auto-columns: minmax(max-content, 1fr); }
+.nav .seg::-webkit-scrollbar { display: none; }
+.nav .seg button { padding: var(--s3) var(--s2); white-space: nowrap; font-size: 18px; }
+.nav .seg.sub button { padding: var(--s2) var(--s3); font-size: 18px; }
+.nav .seg button .num { font-size: 15px; opacity: .8; }
+/* Settings: the shared options, then one page per mini-app */
+.set-page { display: grid; gap: var(--s4); }
+.set-title { display: flex; align-items: center; gap: var(--s4); }
+.set-title h3 { font: 700 25px/1.1 var(--font); }
+.set-apps { display: grid; gap: var(--s4); }
+.set-apps .menu-btn i { display: grid; place-items: center; }
+/* the stat line at the top of every screen (src/shared/meter.ts): text over one bar, the same in each app */
+.meter { display: grid; gap: var(--s2); }
+.meter-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s4); font-size: 18px; flex-wrap: wrap; }
+.meter .stat-tag { letter-spacing: .06em; }
+.meter .bar { width: 100%; height: calc(6 * var(--px)); }
+.m-hp .bar i.on { background: var(--accent); }
+.m-lv .bar i.on { background: var(--today, #ffcf5c); }
+.m-mp .bar i.on { background: var(--habit, #7cc7f5); }
 /* the pixel grid over a dithered gradient of baby blue, lavender and pink, drawn by src/shared/backdrop.ts (until it is,
    three flat bands) */
 body {
@@ -481,8 +494,8 @@ body {
 }
 /* both titles are one size, small enough for "Achievement Kitty" to stay on one line next to the three buttons, so the
    title bars are the same height and the buttons sit in the same place in both apps */
-:root { --title-size: 32px; }
-@media (max-width: 479px) { :root { --title-size: 24px; } }
+:root { --title-size: 36px; }
+@media (max-width: 479px) { :root { --title-size: 27px; } }
 [data-app-root] { image-rendering: auto; }   /* pixelated is for the backdrop; it is inherited, so each app picks its own */
 /* a volume slider (Habit Kitty's sound settings, Achievement Kitty's music) */
 .vol { display: grid; grid-template-columns: 1fr auto; gap: var(--s1) var(--s3); align-items: center; font-size: 18px; font-weight: 600; }
@@ -501,13 +514,9 @@ body {
 <div class="wrap">
   <header class="top" id="top"></header>
 
-  <main id="tab-room" class="tab"><div class="seg" id="room-seg" role="tablist" aria-label="Room"><button type="button" role="tab" id="room-tab-indoor" data-action="room-view" data-view="indoor">Bunker</button><button type="button" role="tab" data-action="room-view" id="room-tab-outdoor" data-view="outdoor">Garden</button></div><div id="room"></div><div id="outdoor" hidden></div><div class="room-foot"><p class="muted" id="room-note"></p><button class="btn small" id="room-rename" type="button" data-action="room-rename">Rename</button></div></main>
+  <main id="tab-room" class="tab"><div id="room"></div><div id="outdoor" hidden></div><div class="room-foot"><p class="muted" id="room-note"></p><button class="btn small" id="room-rename" type="button" data-action="room-rename">Rename</button></div></main>
 
   <main id="tab-mindful" class="tab">
-    <div class="seg" id="mindful-seg" role="tablist" aria-label="Stray kitties or treats">
-      <button type="button" role="tab" data-action="mindful-view" data-view="habit">Stray kitties</button>
-      <button type="button" role="tab" data-action="mindful-view" data-view="task">Treats</button>
-    </div>
     <section class="cats" id="strays" aria-label="Your stray kitties"></section>
     <section class="panel" id="tasks-panel">
       <h3 id="mindful-title"></h3>
@@ -543,46 +552,17 @@ body {
 
   <main id="tab-today" class="tab">
     <section class="update" id="log" hidden></section>
-    <div class="seg" id="today-seg" role="tablist" aria-label="Where your cats are"></div>
     <section class="cats" id="cats" aria-label="Your cats"></section>
-    <button class="btn primary" type="button" data-action="adopt-open" style="padding:16px;font-size:18px">Adopt kitty</button>
-    <p class="muted" style="text-align:center;font-size:13px">Press and hold a cat for more options.</p>
+    <button class="btn primary" type="button" data-action="adopt-open" id="adopt-btn" style="padding:16px;font-size:18px">Adopt kitty</button>
+    <p class="muted" id="cats-hint" style="text-align:center;font-size:13px">Press and hold a cat for more options.</p>
   </main>
 
   <main id="tab-heat" class="tab">
     <section class="cats" id="heat"></section></main>
 
-  <main id="tab-diary" class="tab">
-    <article class="cat"><div class="month">
-    <div class="month-nav">
-      <button type="button" data-action="diary-month" data-step="-1" aria-label="Previous month" data-icon="prev"></button>
-      <button type="button" class="month-title" id="diary-title" data-action="picker-open" data-key="diary" aria-haspopup="dialog"></button>
-      <button type="button" id="diary-next" data-action="diary-month" data-step="1" aria-label="Next month" data-icon="next"></button>
-    </div>
-    <div class="dcal" id="diary-cal" role="group" aria-label="Diary calendar"></div>
-    <p class="stats" id="diary-stats"></p>
-    <div class="dlegend" id="diary-legend"></div>
-    <button class="btn small" type="button" data-action="diary-today" style="justify-self:start">Jump to today</button>
-    </div></article>
-  </main>
-
   <main id="tab-settings" class="tab">
-    <details class="panel fold"><summary>Feeding reminders</summary><div class="fold-body">
-      <label class="check"><input type="checkbox" id="reminder-on"><span><b>Daily reminder</b><br><span class="muted">Once a day, a kitty that still needs feeding asks for you. If everyone is fed, you get some good news instead.</span></span></label>
-      <label class="field">Time <input type="time" id="reminder-time" value="18:00"></label>
-      <label class="field">Last-call alerts
-        <select id="last-call">
-          <option value="off">Off</option>
-          <option value="gentle">Gentle: 3 hours before the day ends</option>
-          <option value="insistent">Insistent: 3 hours, 1 hour and 15 minutes before</option>
-        </select>
-      </label>
-      <p class="muted"><span id="day-end-note">The day ends at 02:00.</span> These only go out for kitties that haven't been fed yet.</p>
-      <label class="check"><input type="checkbox" id="cat-alarms-on"><span><b>Feeding alarm for each kitty</b><br><span class="muted">Give each kitty its own time to ask for a meal.</span></span></label>
-      <details class="more" id="cat-alarms-fold" hidden><summary id="cat-alarms-sum">Kitty alarms</summary><ul class="alarms" id="cat-alarms"></ul></details>
-      <p class="reminder-status" id="reminder-status" role="status"></p>
-    </div></details>
-
+    <div class="set-page" id="set-main">
+      <h2>Everything</h2>
     <details class="panel fold"><summary>Sound</summary><div class="fold-body">
       <label class="vol"><span>Music</span><input type="range" id="vol-bgm" min="0" max="100" step="5"><output id="vol-bgm-out" class="num" for="vol-bgm"></output></label>
       <p class="muted" id="music-now"></p>
@@ -626,14 +606,40 @@ body {
       <p class="form-error" id="save-error" hidden></p>
     </div></details>
 
-    <details class="panel fold"><summary>Emotion names</summary><div class="fold-body">
-      <p class="muted">Rename the five diary emotions. Leave a box empty to keep the original name.</p>
-      <div id="mood-names"></div>
+    <details class="panel fold"><summary>Change log</summary><div class="fold-body" id="changelog"></div></details>
+
+      <h2>Mini-apps</h2>
+      <div class="set-apps">
+        <button class="btn menu-btn" type="button" data-action="settings-app" data-app="habit"><i data-icon="cat"></i><span>Habit Kitty</span></button>
+        <button class="btn menu-btn" type="button" data-action="settings-app" data-app="diary"><i data-icon="diary"></i><span>Diary</span></button>
+        <button class="btn menu-btn" type="button" data-action="settings-app" data-app="notes"><i data-icon="pencil"></i><span>Notes</span></button>
+        <button class="btn menu-btn" type="button" data-action="settings-app" data-app="achievement"><i data-icon="trophy"></i><span>Achievements</span></button>
+      </div>
+      <footer class="foot">
+      <span><span id="saved">Saved on this device</span> · <span id="version"></span></span>
+      </footer>
+    </div>
+
+    <div class="set-page" id="set-habit" hidden>
+      <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Habit Kitty</h3></div>
+    <details class="panel fold"><summary>Feeding reminders</summary><div class="fold-body">
+      <label class="check"><input type="checkbox" id="reminder-on"><span><b>Daily reminder</b><br><span class="muted">Once a day, a kitty that still needs feeding asks for you. If everyone is fed, you get some good news instead.</span></span></label>
+      <label class="field">Time <input type="time" id="reminder-time" value="18:00"></label>
+      <label class="field">Last-call alerts
+        <select id="last-call">
+          <option value="off">Off</option>
+          <option value="gentle">Gentle: 3 hours before the day ends</option>
+          <option value="insistent">Insistent: 3 hours, 1 hour and 15 minutes before</option>
+        </select>
+      </label>
+      <p class="muted"><span id="day-end-note">The day ends at 02:00.</span> These only go out for kitties that haven't been fed yet.</p>
+      <label class="check"><input type="checkbox" id="cat-alarms-on"><span><b>Feeding alarm for each kitty</b><br><span class="muted">Give each kitty its own time to ask for a meal.</span></span></label>
+      <details class="more" id="cat-alarms-fold" hidden><summary id="cat-alarms-sum">Kitty alarms</summary><ul class="alarms" id="cat-alarms"></ul></details>
+      <p class="reminder-status" id="reminder-status" role="status"></p>
     </div></details>
 
     <details class="panel fold"><summary>Game options</summary><div class="fold-body">
       <label class="check"><input type="checkbox" id="allow-rename"><span><b>Allow renaming kitties</b><br><span class="muted">Adds a Rename button to the long-press menu. Off by default, so a kitty keeps the name you gave it.</span></span></label>
-      <label class="check"><input type="checkbox" id="trackamaniac"><span><b>Trackamaniac</b><br><span class="muted">Adds a weather choice (sunny, cloudy, rainy, storm, snow) to every diary page.</span></span></label>
       <label class="check"><input type="checkbox" id="show-clock"><span><b>Playtest clock</b><br><span class="muted">Shows a small clock button for skipping ahead in time, to try out how days and streaks play out.</span></span></label>
       <label class="check"><input type="checkbox" id="time-travel"><span><b>Time travel</b><br><span class="muted">Adds a rewind button to every stray kitty and treat, and a Time travel button to every kitty's long-press menu, so you can mark or unmark any past day (or today) as done or fed. Affection and your kitties' hunger are worked out again to match, as with Fix affection.</span></span></label>
       <label class="check"><input type="checkbox" id="amnesia"><span><b>Amnesia</b><br><span class="muted">The first time you open the app on a new day, it asks whether you fed a kitty yesterday and forgot to log it. Say yes and it counts as if you had.</span></span></label>
@@ -641,8 +647,6 @@ body {
         <div class="btns"><button class="btn" type="button" data-action="fix-xp">Fix affection…</button></div></div>
       <label class="check"><input type="checkbox" id="unlimited-cats"><span><b>Unlimited kitties</b><br><span class="muted">Normally you can keep 9 kitties. Turn this on to adopt more, but you will have to confirm three times for every extra kitty.</span></span></label>
     </div></details>
-
-    <details class="panel fold"><summary>Change log</summary><div class="fold-body" id="changelog"></div></details>
 
     <details class="panel fold"><summary>How to use</summary><div class="fold-body">
       <ul class="rules-list">
@@ -658,20 +662,33 @@ body {
       </ul>
     </div></details>
 
-    <footer class="foot">
-      <span><span id="saved">Saved on this device</span> · <span id="version"></span></span>
+      <footer class="foot">
       <span class="confirm" id="reset-area"><button class="linkish" type="button" data-action="reset-ask">Start over</button></span>
-    </footer>
+      </footer>
+    </div>
+
+    <div class="set-page" id="set-diary" hidden>
+      <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Diary</h3></div>
+      <div class="set-page" id="set-diary-body"></div>
+    </div>
+
+    <div class="set-page" id="set-notes" hidden>
+      <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Notes</h3></div>
+      <div class="set-page" id="set-notes-body"></div>
+    </div>
+
+    <div class="set-page" id="set-achievement" hidden>
+      <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Achievements</h3></div>
+      <details class="panel fold" open><summary>Load achievements</summary><div class="fold-body">
+        <p class="muted">Replaces only your quests and achievements with those from a backup (.kitty) or an older Achievement Kitty save file (.achkitty). Your kitties and diary stay as they are. To save everything, use Backup.</p>
+        <div class="btns"><button class="btn" type="button" data-action="ach-load">Load achievements…</button></div>
+        <input type="file" id="ach-file" hidden>
+        <p class="form-error" id="ach-error" hidden></p>
+      </div></details>
+    </div>
   </main>
 </div>
 
-<nav class="tabbar" aria-label="Tabs"><div class="tabbar-in" role="tablist">
-  <button role="tab" data-action="tab" data-tab="room"><i data-icon="room"></i><span>Room</span></button>
-  <button role="tab" data-action="tab" data-tab="mindful"><i data-icon="treats"></i><span>Strays</span></button>
-  <button role="tab" data-action="tab" data-tab="today" class="mid"><i data-icon="cat"></i><span>Today</span></button>
-  <button role="tab" data-action="tab" data-tab="heat"><i data-icon="heat"></i><span>Heatmap</span></button>
-  <button role="tab" data-action="tab" data-tab="diary"><i data-icon="diary"></i><span>Diary</span></button>
-</div></nav>
 <div class="clock-pop" id="clock-pop">
   <button type="button" class="clock-btn" data-action="clock-toggle" aria-label="Playtest clock" data-icon="clock"></button>
   <div class="clock-menu panel">
@@ -690,5 +707,8 @@ body {
 <div class="toast" id="toast" role="status" hidden></div>
 </div>
 <!--__ACHIEVEMENT__-->
+<!--__HOME__-->
+<!--__DIARY__-->
+<!--__NOTES__-->
 
 <script>/*__APP__*/</script>
