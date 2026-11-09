@@ -1,15 +1,15 @@
-// Every picture in both apps is drawn on ONE pixel grid: one art pixel is one --px in the page CSS (3px, or 2px on very
-// narrow screens). An svg's size is always its column count times --px, so no picture is ever scaled to a different
+// Every picture in every app is drawn on ONE pixel grid: one art pixel is one --px in the page CSS (1.5px; 2px on wide
+// screens, 1px on very narrow ones), the same pixel as an achievement card's. An svg's size is always its column count times --px, so no picture is ever scaled to a different
 // pixel size. This is the drawing core; each app keeps its own art next to its code. Pure functions that return SVG strings.
 
 // Pastel palette shared by all the multi-colour art. Letters are used in the art rows.
 export const PAL: Record<string, string> = {
-  o: '#5a4380', O: '#3d2c63',                       // plum outlines
-  r: '#ff8fb8', R: '#ffc4da', m: '#e8708f', M: '#ffb3c6', p: '#ffb3c6',   // pinks
-  u: '#8fd0fa', U: '#c9e9fd', g: '#7fc4ea', s: '#d6ecfb',                  // baby blues
-  v: '#b9a3f0', V: '#dcd0fa', d: '#8f78d0',                                // lavenders
-  w: '#fffafc', y: '#ffd36e', Y: '#fff0b0', e: '#ffa36b',                  // cream, sun, orange
-  b: '#c99a73', B: '#a07250', c: '#f1cfa0', C: '#f9e6c4', n: '#9be0cf',    // browns, tan, mint
+  o: '#4a4084', O: '#3d2c63',                       // plum outlines
+  r: '#ff8fb8', R: '#ffc4da', m: '#f26fa3', M: '#ffb3d0', p: '#ffb3d0',   // pinks
+  u: '#8fd0fa', U: '#bfe6fb', g: '#8fd0fa', s: '#e0f2fd',                  // baby blues
+  v: '#b9a3f0', V: '#d9ccf7', d: '#8f78d0',                                // lavenders
+  w: '#fffafd', y: '#ffd36e', Y: '#ffe9a0', e: '#e8a04c',                  // cream, sun, orange
+  b: '#c99a73', B: '#a07250', c: '#f1cfa0', C: '#fff3d1', n: '#8fe0c8',    // browns, tan, mint
 };
 
 const rect = (x: number, y: number, fill: string) => `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${fill}"/>`;

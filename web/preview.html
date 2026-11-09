@@ -5,22 +5,22 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>pixel cats preview</title>
 <style>
-  :root { --px: 3px; --bg: #fdf7ee; --surface: #fff; --line: #e4d9c8; --muted: #8a7f70; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #1d1a21; --surface: #272230; --line: #3c3447; --muted: #a79cb5; } }
+  :root { --px: 1.5px; --bg: #fffafd; --surface: #fff; --line: #f1cfa0; --muted: #a07250; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #231d44; --surface: #231d44; --line: #35244f; --muted: #a29bb8; } }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--muted); font: 14px system-ui, sans-serif; }
   .bar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
          padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
-  .bar strong { color: inherit; font-size: 15px; }
+  .bar strong { color: inherit; font-size: 16px; }
   .bar label { display: flex; gap: 6px; align-items: center; }
   .swatches { display: flex; gap: 4px; }
   .sw { width: 20px; height: 20px; border: 1px solid var(--line); cursor: pointer; padding: 0; }
   main { padding: 16px; display: grid; gap: 20px; }
-  .row h2 { margin: 0 0 8px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+  .row h2 { margin: 0 0 8px; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
   .cells { display: flex; flex-wrap: wrap; gap: 12px; }
   .cell { margin: 0; display: grid; gap: 6px; justify-items: center;
           background: var(--surface); border: 1px solid var(--line); padding: 8px; }
-  figcaption { font-size: 11px; }
+  figcaption { font-size: 12px; }
   /* one pixel size for every sprite: width = its columns x --px, so sizes compare true to how they look in the app */
   .art { width: calc(var(--cols) * var(--px)); }
   .sprite { width: 100%; height: auto; display: block; }
@@ -28,8 +28,8 @@
   .compare figure { margin: 0; display: grid; gap: 6px; justify-items: center; }
   /* pixel grid overlay: one line per sprite pixel (sprite pixels are square, so cols sets both) */
   body.show-grid .art { background-image:
-      repeating-linear-gradient(to right, #8886 0 1px, transparent 1px var(--px)),
-      repeating-linear-gradient(to bottom, #8886 0 1px, transparent 1px var(--px)); }
+      repeating-linear-gradient(to right, #7d759466 0 1px, transparent 1px var(--px)),
+      repeating-linear-gradient(to bottom, #7d759466 0 1px, transparent 1px var(--px)); }
   body.show-grid .art .sprite { mix-blend-mode: normal; }
   /* same animations as the app, so the tail swish and blink read correctly here too */
   .sprite.body .tail.b, .sprite.body .blink { visibility: hidden; }

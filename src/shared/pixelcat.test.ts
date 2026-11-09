@@ -23,9 +23,9 @@ describe('pixel cats', () => {
     expect(bodySvg('open', look)).toContain('tail a');
   });
   it('colours calico patches differently on each side', () => {
-    const svg = faceSvg('open', { fur: '#fffafc', pattern: 'calico' });
-    expect(svg).toContain('#6b4a45');
-    expect(svg).toContain('#ffb06a');
+    const svg = faceSvg('open', { fur: '#fffafd', pattern: 'calico' });
+    expect(svg).toContain('#7a4d09');
+    expect(svg).toContain('#ffb98a');
   });
   it('derives a stable personality for cats saved before looks existed', () => {
     expect(lookOf({ id: 'mochi' })).toEqual(lookOf({ id: 'mochi' }));
@@ -35,8 +35,8 @@ describe('pixel cats', () => {
   it('gives calico and point cats a base coat that suits the pattern', () => {
     for (let i = 0; i < 60; i++) {
       const l = randomLook();
-      if (l.pattern === 'calico') expect(l.fur).toBe('#fffafc');
-      if (l.pattern === 'point') expect(l.fur).toBe('#f8eadb');
+      if (l.pattern === 'calico') expect(l.fur).toBe('#fffafd');
+      if (l.pattern === 'point') expect(l.fur).toBe('#fff3d1');
     }
   });
 });

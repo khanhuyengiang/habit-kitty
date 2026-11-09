@@ -7,17 +7,17 @@ import { avatarSvg } from '../achievement/pixelart.ts';
 import { iconSvg } from '../pixelart.ts';
 import { hpLine, lvLine, mpLine, shortId } from '../player.ts';
 import { meterHtml } from '../shared/meter.ts';
-import { habitKittySvg, onAppShown, onShown, trophyIcon } from '../shared/apps.ts';
-import { paintBackdrop } from '../shared/backdrop.ts';
+import { lastApp, onAppShown } from '../shared/apps.ts';
 import { compressPhoto } from '../shared/photo.ts';
 import { avatarUrlOf, loadPlayerData, savePlayer } from '../shared/player.ts';
-import { bodySvg } from '../shared/pixelcat.ts';
-import { monoSvg } from '../shared/pixelart.ts';
+import { napSvg } from '../shared/pixelcat.ts';
+import { artSvg } from '../shared/pixelart.ts';
+import { esc } from '../shared/html.ts';
+import { appName, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
 import { habitStats, onHabitStats } from '../shared/stats.ts';
 import { VERSION } from '../version.ts';
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
 let data: Data | null = null;     // the saved player and achievements (null until read)
 let avatar = '';                  // object URL of the player's picture
@@ -61,38 +61,47 @@ function renderStat() {
 
 // ---------- header and menu ----------
 
-const isDark = () => document.documentElement.dataset.theme
-  ? document.documentElement.dataset.theme === 'dark'
-  : matchMedia('(prefers-color-scheme: dark)').matches;
-
 function renderTop() {
-  $('home-top').innerHTML = `<div class="brand"><h1>Kitty <span>Home</span></h1>
-    <div class="brand-r">
-      <button class="gear" type="button" data-action="home-theme" aria-label="${isDark() ? 'Switch to light mode' : 'Switch to dark mode'}">${iconSvg(isDark() ? 'sun' : 'moon')}</button>
-      <button class="gear" type="button" data-action="go" data-to="habit" data-tab="settings" aria-label="Settings">${iconSvg('gear')}</button></div></div>`;
+  $('home-top').innerHTML = titleBar('Kitty', 'Home', playerButton() + settingsButton());
 }
 
-const WING = ['..........o.', '......oooooo', '...oooooooo.', '.ooooooooo..', 'oooooooooo..', '.o.oooooo...', '...o.ooo....', '.....o......'];
-const PERSON = ['..ooo..', '.ooooo.', '.ooooo.', '..ooo..', 'ooooooo', 'ooooooo', 'ooooooo'];
-interface Entry { label: string; icon: string; to?: string; tab?: string; soon?: boolean; action?: string }
-const MENU: Entry[] = [
-  { label: 'Habit Kitty', icon: habitKittySvg(), to: 'habit' },
-  { label: 'Journal', icon: iconSvg('diary'), to: 'diary' },
-  { label: 'Shopping Lists', icon: iconSvg('treats'), soon: true },
-  { label: 'Achievements', icon: trophyIcon(), to: 'achievement' },
-  { label: 'Player Stat', icon: monoSvg(PERSON), action: 'player-stat' },
+// A white feathered wing, copied from inspo/menu.jpg: the tip up and out, three tiers of feathers whose tips notch the
+// outer edge, and a round joint with a curl at the bottom, next to the key. This is the left one; the right is drawn
+// mirrored. o outline, w white, s feather line.
+const WING = [
+  '.oo.........',
+  'owwoo.......',
+  'owwwwoo.....',
+  '.owwwwwoo...',
+  'osssswwwwo..',
+  'owwwwwwwwwo.',
+  '.ossswwwwwwo',
+  'owwwwwooowwo',
+  'owwwwowwwowo',
+  '.osssowswowo',
+  '..owwowwwowo',
+  '...oooooooo.',
+];
+const WING_PAL = { o: '#9a8cc8', w: '#ffffff', s: '#a29bb8' };
+// The menu (after inspo/menu.jpg): short, long keys, one per app, each name written like its title bar. Player Stat is the
+// person in the title bar.
+const SLEEPER = { fur: '#fffafd', pattern: 'plain' as const };
+const MENU: { name: [string, string]; to: string }[] = [
+  { name: ['Habit', 'Kitty'], to: 'habit' },
+  { name: ['Kitty', 'Journal'], to: 'diary' },
+  { name: ['Kitty', 'Achievement'], to: 'achievement' },
 ];
 
 function renderMenu() {
+  const chosen = lastApp();
   $('home-menu').innerHTML = MENU.map((e, i) => {
-    const btn = e.soon
-      ? `<button class="btn menu-btn" type="button" disabled>${e.icon}<span>${e.label}</span><span class="soon">soon</span></button>`
-      : e.action
-        ? `<button class="btn menu-btn" type="button" data-action="${e.action}">${e.icon}<span>${e.label}</span></button>`
-        : `<button class="btn menu-btn${i === 0 ? ' primary' : ''}" type="button" data-action="go" data-to="${e.to}"${e.tab ? ` data-tab="${e.tab}"` : ''}>${e.icon}<span>${e.label}</span></button>`;
-    return i === 0
-      ? `<div class="perch"><span class="wing l">${monoSvg(WING)}</span>${btn}<span class="wing r">${monoSvg(WING)}</span><span class="sitter">${bodySvg('happy', { fur: '#ffb98a', pattern: 'stripes' })}</span></div>`
+    const btn = `<button class="btn menu-btn" type="button" style="--mb: var(--m${i + 1})" data-action="go" data-to="${e.to}">${appName(...e.name)}</button>`;
+    // the key of the app opened last is the chosen one: a white outline that glows and a wing on each side
+    const key = e.to === chosen
+      ? `<div class="perch"><span class="wing l">${artSvg(WING, '', WING_PAL)}</span><span class="glow">${btn}</span><span class="wing r">${artSvg(WING, '', WING_PAL)}</span></div>`
       : btn;
+    // a white cat always sleeps on Habit Kitty's key, whichever key is chosen
+    return e.to === 'habit' ? `<div class="seat">${key}<span class="sitter">${napSvg(SLEEPER)}</span></div>` : key;
   }).join('');
   $('home-foot').textContent = `v${VERSION}`;
 }
@@ -102,12 +111,7 @@ function renderMenu() {
 interface Draft { name: string; gender: string; birthYear: string; picture: Blob | null; url: string; cat: boolean }
 let draft: Draft | null = null;
 
-function toast(text: string) {
-  const el = $('home-toast');
-  el.textContent = text; el.hidden = false;
-  clearTimeout((toast as unknown as { t?: number }).t);
-  (toast as unknown as { t?: number }).t = window.setTimeout(() => (el.hidden = true), 3200);
-}
+const toast = (text: string) => showToast($('home-toast'), text);
 
 function readDraftFields() {
   const f = document.getElementById('player-form') as HTMLFormElement | null;
@@ -192,18 +196,17 @@ async function pickPicture(file: File | undefined) {
 
 // ---------- events ----------
 
-onShown('home', 'click', (ev) => {
+// Player Stat is in every title bar, so it opens from any screen (its numbers are read again first); the card's own buttons
+// are inside #home-modal, which sits outside every screen.
+document.addEventListener('click', (ev) => {
+  if (!(ev.target as Element).closest?.('[data-action="player-stat"]')) return;
+  renderStat();
+  load();
+});
+$('home-modal').addEventListener('click', (ev) => {
   const btn = (ev.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!btn) return;
   switch (btn.dataset.action) {
-    case 'home-theme': {
-      const next = isDark() ? 'light' : 'dark';
-      document.documentElement.dataset.theme = next;
-      try { localStorage.setItem('hk-theme', next); } catch { /* not remembered */ }
-      paintBackdrop(); renderTop();
-      break;
-    }
-    case 'player-stat': renderStat(); break;
     case 'player-edit': openForm(); break;
     case 'player-close':
     case 'player-back': {
@@ -216,8 +219,8 @@ onShown('home', 'click', (ev) => {
     case 'player-cat': readDraftFields(); if (draft) { draft.picture = null; draft.cat = true; renderForm(); } break;
   }
 });
-onShown('home', 'submit', (ev) => { ev.preventDefault(); if ((ev.target as HTMLElement).id === 'player-form') submitForm(); });
-onShown('home', 'change', (ev) => {
+$('home-modal').addEventListener('submit', (ev) => { ev.preventDefault(); if ((ev.target as HTMLElement).id === 'player-form') submitForm(); });
+$('home-modal').addEventListener('change', (ev) => {
   const t = ev.target as HTMLInputElement;
   if (t.id === 'player-file') { pickPicture(t.files?.[0]); t.value = ''; }
 });
@@ -235,7 +238,7 @@ async function load() {
 }
 
 // The two apps change the player's numbers and may have changed the player itself: read everything again whenever home shows.
-onAppShown('home', () => { renderTop(); load(); });
+onAppShown('home', () => { renderTop(); renderMenu(); load(); });
 onHabitStats(() => { if (view === 'stat') renderStat(); });
 
 renderTop();

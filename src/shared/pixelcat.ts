@@ -2,6 +2,7 @@
 // cat with a curled tail (cozy room). Each is one hand-cleaned template made of colour slots, drawn as the
 // LEFT half and mirrored, so every coat is the same shape recoloured. Pure functions that return SVG.
 import { COAT_MINI, COAT_NAP, COAT_SIT } from './coats.ts';
+import { toPalette } from './palette.ts';
 
 export type CatPattern = 'plain' | 'stripes' | 'patch' | 'mask' | 'calico' | 'point';
 export type CatTrait = 'playful' | 'curious' | 'cuddly' | 'lazy' | 'shy' | 'grumpy';
@@ -10,7 +11,7 @@ export interface CatLook { fur: string; pattern: CatPattern; trait?: CatTrait }
 
 export type Face = 'open' | 'happy' | 'sleepy' | 'sad' | 'starving' | 'dead';
 
-export const FURS = ['#ffb98a', '#4b4560', '#c4c0d4', '#f6e0c0', '#a98a7a', '#fffafc', '#e8946a', '#8f9ab8'];
+export const FURS = ['#ffb98a', '#4b4560', '#cdc8e0', '#fff3d1', '#c99a73', '#fffafd', '#e8a04c', '#a29bb8'];
 export const PATTERNS: CatPattern[] = ['plain', 'stripes', 'mask', 'patch', 'calico', 'point'];
 export const TRAITS: CatTrait[] = ['playful', 'curious', 'cuddly', 'lazy', 'shy', 'grumpy'];
 
@@ -25,9 +26,9 @@ export const TRAIT_TEXT: Record<CatTrait, string> = {
 
 // One outline colour for every cat, a deep plum that sits with the pastel palette.
 const OUTLINE = '#3d2c63';
-const WHITE = '#fffafc';
-const CREAM = '#f8eadb';
-const EYES = ['#e8b84a', '#6fcfa8', '#6fb8f5', '#c98a3a'];
+const WHITE = '#fffafd';
+const CREAM = '#fff3d1';
+const EYES = ['#f2b705', '#5fc7a8', '#8fd0fa', '#c99a73'];
 
 const pick = <T,>(xs: T[], r: () => number) => xs[Math.min(xs.length - 1, Math.floor(r() * xs.length))];
 
@@ -52,7 +53,7 @@ export function lookOf(c: { id: string; look?: CatLook }): CatLook {
 export const NOTIFY_FACES = ['open', 'happy', 'sad', 'starving'] as const;
 export function notifyIconName(look: CatLook, face: Face): string {
   const f = (NOTIFY_FACES as readonly string[]).includes(face) ? face : face === 'dead' ? 'starving' : 'open';
-  const i = FURS.indexOf(look.fur);
+  const i = FURS.indexOf(toPalette(look.fur));
   return `notif_${i < 0 ? 5 : i}_${f}`;
 }
 
@@ -192,14 +193,14 @@ const shade = (hex: string, f: number) =>
   '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * f).toString(16).padStart(2, '0')).join('');
 
 function coatOf(look: CatLook): Coat {
-  const fur = look.fur;
+  const fur = toPalette(look.fur);   // saves from before the palette keep their old fur; draw it in the palette colour
   const base = { a: shade(fur, 0.8), b: shade(fur, 0.8) };
   switch (look.pattern) {
     case 'stripes': return { ...base, f: fur, s: shade(fur, 0.74), W: WHITE };
     case 'mask': return { ...base, f: fur, s: fur, W: WHITE };
     case 'patch': return { ...base, f: WHITE, s: WHITE, W: WHITE, a: fur, tail: 'a' };
-    case 'calico': return { ...base, f: WHITE, s: WHITE, W: WHITE, a: '#6b4a45', b: '#ffb06a', tail: 'b' };
-    case 'point': return { ...base, f: fur, s: fur, W: '#fff8f0', a: '#8a6a5a', b: '#8a6a5a', tail: 'a' };
+    case 'calico': return { ...base, f: WHITE, s: WHITE, W: WHITE, a: '#7a4d09', b: '#ffb98a', tail: 'b' };
+    case 'point': return { ...base, f: fur, s: fur, W: '#fffafd', a: '#8a6a5a', b: '#8a6a5a', tail: 'a' };
     default: return { ...base, f: fur, s: fur, W: fur };   // plain: one solid colour
   }
 }
@@ -207,9 +208,9 @@ function coatOf(look: CatLook): Coat {
 function colors(look: CatLook, coat: Coat, dead: boolean): Record<string, string> {
   const h = hashOf(look.fur + look.pattern);
   return {
-    o: OUTLINE, f: dead ? '#cdc8e0' : coat.f, s: dead ? '#bdb8d2' : coat.s, W: dead ? '#e8e5f2' : coat.W, a: coat.a, b: coat.b,
-    p: '#ffb3c6', c: '#ffa6c0', n: '#f77fa0', m: OUTLINE, t: '#8fd0fa', h: '#ffd36e',
-    e: '#2a1f4a', E: look.pattern === 'point' ? '#6fb8f5' : EYES[h % EYES.length],
+    o: OUTLINE, f: dead ? '#cdc8e0' : coat.f, s: dead ? '#b4b0c2' : coat.s, W: dead ? '#f3ecff' : coat.W, a: coat.a, b: coat.b,
+    p: '#ffb3d0', c: '#ffb3d0', n: '#ff7d9f', m: OUTLINE, t: '#8fd0fa', h: '#ffd36e',
+    e: '#2b2352', E: look.pattern === 'point' ? '#8fd0fa' : EYES[h % EYES.length],
   };
 }
 
@@ -310,7 +311,7 @@ function napColors(look: CatLook): Record<string, string> {
   const f = coat.f, calico = look.pattern === 'calico';
   return {
     ...pal, f, s: shade(f, 0.9), S: coat.s, W: coat.W,   // s is the belly shade; S is the coat's own shade (tabby stripes)
-    T: calico ? '#a58a80' : shade(f, 0.88), D: calico ? coat.a : shade(f, 0.72),
+    T: calico ? '#a07250' : shade(f, 0.88), D: calico ? coat.a : shade(f, 0.72),
   };
 }
 
@@ -351,13 +352,14 @@ const MINI_EXPR: Record<Face, [number, number, string][]> = {
   dead: mirrorMini([[2, 4, 'F'], [2, 5, 'F'], [1, 4, 'e'], [3, 4, 'e'], [2, 5, 'e'], [1, 6, 'e'], [3, 6, 'e']]),
 };
 
-export function miniSvg(face: Face, look: CatLook, faded = false): string {
+// outline: only the outline and the face's marks, in the text colour, no fill (the Journal's window cards).
+export function miniSvg(face: Face, look: CatLook, faded = false, outline = false): string {
   const coat = coatOf(look);
-  const pal = colors(look, coat, face === 'dead');
+  const pal = outline ? Object.fromEntries([...'oemnth'].map((c) => [c, 'currentColor'])) : colors(look, coat, face === 'dead');
   const grid: Grid = MINI.map((row) => [...row]);
   applyLayer(grid, COAT_MINI[look.pattern], 'F');
   for (const [c, y, ch] of MINI_EXPR[face]) grid[y][c] = ch;
-  pal.F = pal.f;
+  if (!outline) pal.F = pal.f;
   grid.splice(3, 0, [...grid[3]]);   // one row taller: a second row of forehead
   // 'F' (fur) is the default slot of the template; keep the fur colour for painted cells that kept it
   return `<svg class="sprite mini${faded ? ' faded' : ''}" style="--w:${MINI_W}" viewBox="${MINI_X0} 0 ${MINI_W} ${grid.length}" aria-hidden="true" shape-rendering="crispEdges">${draw(grid, pal)}</svg>`;
@@ -376,7 +378,7 @@ const CONE = [
   '..oyrrrrrryo.',
   '.oyyyyyyyyyyo',
 ];
-export const CONFETTI_COLORS = ['#ff8fb8', '#ffd36e', '#8fd0fa', '#9be0cf', '#b9a3f0', '#ffb3c6'];
+export const CONFETTI_COLORS = ['#ff8fb8', '#ffd36e', '#8fd0fa', '#8fe0c8', '#b9a3f0', '#ffb3d0'];
 export function popperSvg(): string {
   const pal: Record<string, string> = { o: OUTLINE, y: '#ffd36e', r: '#ff8fb8' };
   return `<svg viewBox="0 0 13 10" aria-hidden="true" shape-rendering="crispEdges">${draw(CONE.map((row) => [...row]), pal)}</svg>`;

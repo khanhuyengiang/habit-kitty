@@ -14,7 +14,9 @@ import { Capacitor } from '@capacitor/core';
 import { unpackBackup } from '../backup.ts';
 import { BACKUP_PREFIX, backupStatus, markDirty, nativeBackups, saveBackupToDevice, shareBackup } from '../../shared/backupfolder.ts';
 import { platformRepo } from './snapshot.ts';
-import { homeButton, onAppShown, onShown, shownApp } from '../../shared/apps.ts';
+import { onAppShown, onShown, shownApp } from '../../shared/apps.ts';
+import { esc, plural } from '../../shared/html.ts';
+import { homeButton, playerButton, settingsButton, showToast, titleBar } from '../../shared/ui.ts';
 import { meterHtml } from '../../shared/meter.ts';
 import { lvLine } from '../../player.ts';
 import { paintBackdrop } from '../../shared/backdrop.ts';
@@ -27,12 +29,10 @@ import {
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 // Queries stay inside this app's part of the page, so they never find Habit Kitty's elements.
 const appRoot: ParentNode = document.querySelector('[data-app-root="achievement"]') ?? document;
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const DEFAULT_COLOR = '#8f78d0';   // for cards without a side quest (or with a broken colour)
 const colorOf = (s: { color: string } | undefined) => (s && isColor(s.color) ? s.color : DEFAULT_COLOR);
 // The rarity's colour: the stars on a card, its glow and the dot in the form. Common is grey, then green, blue, purple, yellow.
-const RARITY_COLOR: Record<Rarity, string> = { normal: '#a29bb8', uncommon: '#45c27a', rare: '#4aa8f0', mythical: '#a45be0', legendary: '#ffd23f' };
+const RARITY_COLOR: Record<Rarity, string> = { normal: '#a29bb8', uncommon: '#45c27a', rare: '#4a9bea', mythical: '#a45be0', legendary: '#ffd36e' };
 
 function fmtDate(s: string | null): string {
   if (!s) return '';
@@ -95,12 +95,7 @@ function commit(next: Data, removedPhotos: string[] = []) {
   });
 }
 
-let toastTimer = 0;
-function toast(msg: string) {
-  $('ach-toast').innerHTML = `<div class="toast">${esc(msg)}</div>`;
-  clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => { $('ach-toast').innerHTML = ''; }, 3500);
-}
+const toast = (msg: string) => showToast($('ach-toast'), msg);
 
 // ---------- routing ----------
 
@@ -122,17 +117,17 @@ const pageKey = (r: Route) => (r.page === 'home' ? 'home' : r.page === 'all' ? '
 
 // ---------- pictures: cards ----------
 
-// Cards are sized from the screen: two to a row as long as that fits (down to a very narrow phone, then one), as big as
-// 1.75 CSS px per card pixel at most. The gap between the columns gives way first (down to 2 page pixels) before the
-// cards shrink. Sets --cu (the card's pixel), --cu-prev (the smaller preview card in the form), --cols and --cgap.
+// Cards are sized from the screen: two to a row as long as that fits (down to a very narrow phone, then one), with a card
+// pixel a little bigger than the page's --px at most. The gap between the columns gives way first (down to 2 layout units)
+// before the cards shrink. Sets --cu (the card's pixel), --cu-prev (the smaller preview card in the form), --cols and --cgap.
 const CARD_PX = 108, CARD_MIN = 1.15;
 function fitCards() {
   const root = document.documentElement;
   const app = $('app');
   const cs = getComputedStyle(app);
   const room = app.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-  const px = parseFloat(getComputedStyle(root).getPropertyValue('--px')) || 3;
-  const gapMin = 2 * px, gapMax = 5 * px, max = Math.max(1.3, px * 0.58);
+  const u = 2 * (parseFloat(getComputedStyle(root).getPropertyValue('--px')) || 1.5);   // --u, the layout unit
+  const gapMin = 2 * u, gapMax = 5 * u, max = Math.max(1.3, u * 0.58);
   const fit = (n: number) => Math.floor(Math.min(max, (room - (n - 1) * gapMin) / n / CARD_PX) * 16) / 16;   // sixteenths of a px: no fractions that blur
   let n = fit(2) >= CARD_MIN ? 2 : 1;
   while (n < 6 && fit(n + 1) >= max - 0.001) n++;
@@ -162,16 +157,17 @@ const shortDate = (s: string | null) => (s ? `${s.slice(8, 10)}/${s.slice(5, 7)}
 
 // One card: used in the collection, the detail view and the form preview. Drawn as a little pixel camera: a screwed
 // frame, a top bar with the icon and name, a graph-paper screen with the picture and words, and a footer with the side
-// quest's icon and the place; the rarity is the stars on the top rim. Every card of a side quest has that side quest's colour; rarity
+// quest's icon and the place; the rarity is the stars on the top rim. Big (on the card's own page), it is as wide as the page
+// and as tall as its words, with nothing cut short. Every card of a side quest has that side quest's colour; rarity
 // only changes the stars (one to five, in its colour) and the glow around the card. The main quest's name runs faintly along both long edges.
-function cardHtml(v: CardView, o: { static?: boolean; unlock?: boolean } = {}): string {
+function cardHtml(v: CardView, o: { static?: boolean; unlock?: boolean; big?: boolean } = {}): string {
   const planned = v.status === 'planned';
-  const cls = ['card', planned ? 'planned' : `rar-${v.rarity}`, o.static && 'static', o.unlock && 'unlock'].filter(Boolean).join(' ');
+  const cls = ['card', planned ? 'planned' : `rar-${v.rarity}`, o.static && 'static', o.big && 'big', o.unlock && 'unlock'].filter(Boolean).join(' ');
   const style = `--sqc:${v.color};--sqi:${inkFor(v.color)};--rar:${RARITY_COLOR[v.rarity]}`;
   const art = v.photo ? `<img src="${esc(v.photo)}" alt="">` : `${burstSvg()}${stickerSvg(v.icon)}`;
   const date = v.date ? (planned ? `Plan ${shortDate(v.date)}` : shortDate(v.date)) : (planned ? 'Someday' : '');
   const rim = v.quest ? `<span class="rim l" aria-hidden="true">${esc(v.quest)}</span><span class="rim r" aria-hidden="true">${esc(v.quest)}</span>` : '';
-  const inner = `${(['tl', 'tr', 'bl', 'br'] as const).map(cornerSvg).join('')}${rim}${starsSvg(planned ? 0 : RARITIES.indexOf(v.rarity) + 1)}<span class="card-in">
+  const inner = `${(['tl', 'tr', 'bl', 'br'] as const).map((c) => cornerSvg(c, o.big)).join('')}${rim}${starsSvg(planned ? 0 : RARITIES.indexOf(v.rarity) + 1)}<span class="card-in">
     <span class="card-head">${stickerSvg(v.icon, 1)}<span class="card-title">${esc(v.title || 'Untitled')}</span></span>
     <span class="card-screen"><span class="card-count">${esc(date)}</span>
       <span class="card-art${v.photo ? ' has-photo' : ''}">${art}<span class="card-deco">${heartSvg()}${flowerSvg()}</span>${planned ? `<span class="lockmark">${iconSvg('lock')}</span>` : ''}</span>
@@ -185,12 +181,7 @@ function cardHtml(v: CardView, o: { static?: boolean; unlock?: boolean } = {}): 
 // ---------- pages ----------
 
 function headerHtml(): string {
-  const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
-  return `<header class="top"><h1>Achievement <span>Kitty</span></h1>
-    <div class="top-r">${saver.busy ? '<span class="saving">Saving…</span>' : ''}
-    ${homeButton()}
-    <button class="gear" data-action="toggle-theme" aria-label="Switch to ${dark ? 'light' : 'dark'} mode">${iconSvg(dark ? 'sun' : 'night')}</button>
-    <button class="gear" data-action="go" data-to="habit" data-tab="settings" aria-label="Settings">${iconSvg('gear')}</button></div></header>`;
+  return `<header class="top">${titleBar('Achievement', 'Kitty', `${saver.busy ? '<span class="saving">Saving…</span>' : ''}${homeButton() + playerButton() + settingsButton()}`)}</header>`;
 }
 
 function bannerHtml(): string {
@@ -230,14 +221,14 @@ function questSection(q: Data['mainQuests'][number]): string {
   const box = (title: string, icon: string, col: string, sideId: string | null) => {
     const list = collection(data, q.id, { side: sideId ?? 'none', status: 'all' });
     const sc = counts(data, q.id, sideId);
-    return `<div class="side-box" style="--c:${col}"><h4><span style="color:${col};display:inline-flex">${iconSvg(icon)}</span>${esc(title)}<span class="n">${sc.done}/${sc.done + sc.planned}</span></h4>
+    return `<div class="side-box" style="--c:${col}"><h4><span class="side-ico" style="color:${col}">${iconSvg(icon)}</span>${esc(title)}<span class="n">${sc.done}/${sc.done + sc.planned}</span></h4>
       <div class="blocks">${list.map((a) => blockHtml(a, col)).join('')}<button class="block add" data-action="add-card" data-status="completed" data-main="${q.id}" data-side="${sideId ?? ''}" aria-label="New achievement in ${esc(title)}">${iconSvg('plus')}</button></div></div>`;
   };
   const loose = counts(data, q.id, null);
   const boxes = (loose.done + loose.planned ? box('No side quest', 'trophy', DEFAULT_COLOR, null) : '') + sides.map((s) => box(s.title, s.icon, colorOf(s), s.id)).join('');
   return `<section class="panel quest" data-quest="${q.id}" data-action="open-quest" data-id="${q.id}" aria-labelledby="q-${q.id}">
     <div class="quest-info"><div class="quest-head"><button class="quest-title" id="q-${q.id}" data-action="open-quest" data-id="${q.id}">${esc(q.title)}</button>
-      ${open ? '' : `<button class="btn small primary quick-add" data-action="add-card" data-status="completed" data-main="${q.id}" aria-label="New achievement in ${esc(q.title)}">${iconSvg('plus')}${iconSvg('trophy')}</button>`}
+      ${open ? '' : `<button class="btn small primary quick-add" data-action="add-card" data-status="completed" data-main="${q.id}" aria-label="New achievement in ${esc(q.title)}">${iconSvg('plus')} Achievement</button>`}
       <button class="toggle" data-action="toggle-quest" data-id="${q.id}" aria-expanded="${open}" aria-label="${open ? 'Collapse' : 'Expand'} ${esc(q.title)}">${iconSvg('chev')}</button></div>
     <p class="sub">${plural(sides.length, 'side quest')} · ${c.done} unlocked · ${c.planned} locked</p>
     ${open && q.description ? `<p class="sub">${esc(q.description)}</p>` : ''}</div>
@@ -360,7 +351,9 @@ function questHtml(id: string): string {
     ${body}`;
 }
 
-function detailHtml(a: Achievement): string {
+// An achievement on its own page (after a note being read): the buttons, the card drawn big with every word of it, the
+// photos to switch between, and the facts.
+function cardPageHtml(a: Achievement): string {
   const side = data.sideQuests.find((s) => s.id === a.sideQuestId);
   const main = data.mainQuests.find((q) => q.id === a.mainQuestId);
   const photos = photosOf(data, a.id);
@@ -368,23 +361,22 @@ function detailHtml(a: Achievement): string {
   const v = { ...cardView(a), photo: src(photos[i]?.imageUrl ?? null) || null };
   const planned = a.status === 'planned';
   const when = planned ? ['Target date', a.plannedDate ? fmtDate(a.plannedDate) : 'No date set'] : ['Unlocked on', a.completionDate ? fmtDate(a.completionDate) : 'No date set'];
-  return `<div class="scrim" data-scrim="detail"><div class="panel wide" role="dialog" aria-modal="true" aria-labelledby="dt">
-    <button class="x-close" data-action="close-detail" aria-label="Close">${iconSvg('x')}</button>
-    <h3 id="dt">${esc(a.title)}</h3>
-    <div class="detail">${cardHtml(v, { static: true, unlock: a.id === unlocked })}
-      <div class="facts"><dl>
-        <dt>Main quest</dt><dd>${esc(main?.title ?? '')}</dd>
-        <dt>Side quest</dt><dd>${side ? `<span style="color:${colorOf(side)};display:inline-flex">${iconSvg(side.icon)}</span>${esc(side.title)}` : 'None'}</dd>
-        <dt>Status</dt><dd>${planned ? 'Locked' : 'Unlocked'}</dd>
-        ${planned ? '' : `<dt>Rarity</dt><dd>${RARITY_LABEL[a.rarity]}</dd>`}
-        ${a.location ? `<dt>Location</dt><dd>${esc(a.location)}</dd>` : ''}
-        <dt>${when[0]}</dt><dd>${esc(when[1])}</dd>
-        ${a.tags.length ? `<dt>Tags</dt><dd class="tags">${a.tags.map((t) => `<span class="tag">#${esc(t)}</span>`).join('')}</dd>` : ''}</dl>
-        ${a.description ? `<p class="note">${esc(a.description)}</p>` : '<p class="muted">No note yet.</p>'}
-        ${photos.length > 1 ? `<div class="gallery" role="group" aria-label="Photos">${photos.map((p, n) => `<button data-action="gallery" data-i="${n}" aria-current="${n === i}" aria-label="Photo ${n + 1}"><img src="${esc(src(p.imageUrl))}" alt=""></button>`).join('')}</div>` : ''}
-        <div class="btns">${planned ? `<button class="btn primary grow" data-action="complete-card" data-id="${a.id}">${iconSvg('trophy')} Unlock it</button>` : ''}
-          <button class="btn" data-action="edit-card" data-id="${a.id}">${iconSvg('pencil')} Edit</button>
-          <button class="btn danger" data-action="delete-card" data-id="${a.id}">${iconSvg('trash')} Delete</button></div></div></div></div></div>`;
+  return `<div class="ctools">
+      <button class="btn small" data-action="close-detail">${iconSvg('prev')} Back</button><span class="grow"></span>
+      ${planned ? `<button class="btn small primary" data-action="complete-card" data-id="${a.id}">${iconSvg('trophy')} Unlock it</button>` : ''}
+      <button class="btn small" data-action="edit-card" data-id="${a.id}">${iconSvg('pencil')} Edit</button>
+      <button class="btn small danger" data-action="delete-card" data-id="${a.id}">${iconSvg('trash')} Delete</button></div>
+    <h2 class="sr">${esc(a.title)}</h2>
+    ${cardHtml(v, { static: true, big: true, unlock: a.id === unlocked })}
+    ${photos.length > 1 ? `<div class="gallery" role="group" aria-label="Photos">${photos.map((p, n) => `<button data-action="gallery" data-i="${n}" aria-current="${n === i}" aria-label="Photo ${n + 1}"><img src="${esc(src(p.imageUrl))}" alt=""></button>`).join('')}</div>` : ''}
+    <section class="panel facts" aria-label="Details"><dl>
+      <dt>Main quest</dt><dd>${esc(main?.title ?? '')}</dd>
+      <dt>Side quest</dt><dd>${side ? `<span class="side-ico" style="color:${colorOf(side)}">${iconSvg(side.icon)}</span>${esc(side.title)}` : 'None'}</dd>
+      <dt>Status</dt><dd>${planned ? 'Locked' : 'Unlocked'}</dd>
+      ${planned ? '' : `<dt>Rarity</dt><dd>${RARITY_LABEL[a.rarity]}</dd>`}
+      ${a.location ? `<dt>Location</dt><dd>${esc(a.location)}</dd>` : ''}
+      <dt>${when[0]}</dt><dd>${esc(when[1])}</dd>
+      ${a.tags.length ? `<dt>Tags</dt><dd class="tags">${a.tags.map((t) => `<span class="tag">#${esc(t)}</span>`).join('')}</dd>` : ''}</dl></section>`;
 }
 
 // ---------- modals ----------
@@ -575,7 +567,7 @@ function renderModal() {
     appRoot.querySelector<HTMLElement>(openerSel)?.focus();
   }
 }
-const syncScrollLock = () => { document.body.style.overflow = $('layer-modal').firstElementChild || $('layer-detail').firstElementChild ? 'hidden' : ''; };
+const syncScrollLock = () => { document.body.style.overflow = $('layer-modal').firstElementChild ? 'hidden' : ''; };
 
 function openModal(m: Modal) {
   if (!modals.length) {
@@ -722,14 +714,16 @@ async function submitAchievement(form: HTMLFormElement) {
 
 // ---------- rendering ----------
 
-let lastPage = '', lastDetail = '', lastKey = '';
+let lastPage = '', lastKey = '';
 
 function render() {
   if (!ready) return;
   const r = route();
-  const key = pageKey(r);
   renderStatus();
-  const html = r.page === 'home' ? homeHtml() : questHtml(r.page === 'quest' ? r.id : '');
+  // an achievement opens on its own page (its hash is its quest's page, or the all page, with /card/<id> after it)
+  const card = r.page !== 'home' && r.card ? data.achievements.find((a) => a.id === r.card && (r.page === 'all' || a.mainQuestId === r.id)) : undefined;
+  const key = card ? `card:${card.id}` : pageKey(r);
+  const html = card ? cardPageHtml(card) : r.page === 'home' ? homeHtml() : questHtml(r.page === 'quest' ? r.id : '');
   if (html !== lastPage || key !== lastKey) {
     const y = key === lastKey ? window.scrollY : 0;
     const a = document.activeElement as HTMLElement | null;
@@ -739,17 +733,13 @@ function render() {
     $('page').innerHTML = html;
     if (sel && key === lastKey) appRoot.querySelector<HTMLElement>(sel)?.focus();
     lastPage = html;
-    if (key !== lastKey) { lastKey = key; requestAnimationFrame(() => window.scrollTo(0, scrolls.get(key) ?? 0)); document.title = `${r.page === 'quest' ? data.mainQuests.find((q) => q.id === r.id)!.title + ' · ' : r.page === 'all' ? 'All achievements · ' : ''}Achievement Kitty`; }
+    if (key !== lastKey) {
+      lastKey = key;
+      requestAnimationFrame(() => window.scrollTo(0, scrolls.get(key) ?? 0));
+      if (card) $('page').querySelector<HTMLElement>('[data-action="close-detail"]')?.focus({ preventScroll: true });
+      document.title = `${card ? card.title + ' · ' : r.page === 'quest' ? data.mainQuests.find((q) => q.id === r.id)!.title + ' · ' : r.page === 'all' ? 'All achievements · ' : ''}Achievement Kitty`;
+    }
     else window.scrollTo(0, y);
-  }
-  const card = r.page !== 'home' && r.card ? data.achievements.find((a) => a.id === r.card && (r.page === 'all' || a.mainQuestId === r.id)) : undefined;
-  const dhtml = card ? detailHtml(card) : '';
-  if (dhtml !== lastDetail) {
-    const opening = !lastDetail && dhtml;
-    $('layer-detail').innerHTML = dhtml;
-    lastDetail = dhtml;
-    syncScrollLock();
-    if (opening) $('layer-detail').querySelector<HTMLElement>('.x-close')?.focus();
   }
 }
 
@@ -809,11 +799,6 @@ function onAction(el: HTMLElement) {
   if (top()?.kind === 'quest-menu' && el.dataset.action !== 'close-modal') { modals.pop(); renderModal(); }   // a menu choice closes the menu
   const m = top();
   switch (el.dataset.action) {
-    case 'toggle-theme': {
-      const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
-      document.documentElement.dataset.theme = dark ? 'light' : 'dark';
-      writeStore('hk-theme', dark ? 'light' : 'dark'); paintBackdrop(); renderStatus(); break;
-    }
     case 'open-settings': openModal({ kind: 'settings' }); break;
     case 'save-backup': exportBackup(); break;
     case 'share-backup': shareBackupFile(); break;
@@ -946,10 +931,9 @@ onShown('achievement', 'click', (e) => {
   const el = t.closest<HTMLElement>('[data-action]');
   if (el && !el.hasAttribute('disabled')) { onAction(el); return; }
   const scrim = t.closest<HTMLElement>('.scrim');
-  if (scrim && t === scrim) {   // a click outside closes viewers and dialogs, but never a form with unsaved text
+  if (scrim && t === scrim) {   // a click outside closes a dialog, but never a form with unsaved text
     const kind = scrim.dataset.scrim;
-    if (kind === 'detail' && !top()) closeDetail();
-    else if (kind === 'confirm' || kind === 'sides' || kind === 'quest-menu') closeModal();
+    if (kind === 'confirm' || kind === 'sides' || kind === 'quest-menu') closeModal();
   }
 });
 onShown('achievement', 'submit', (e) => { e.preventDefault(); onSubmit(e.target as HTMLFormElement); });
@@ -1016,7 +1000,7 @@ onShown('achievement', 'keydown', (e) => {
     return;
   }
   if (e.key !== 'Tab') return;
-  const layer = top() ? $('layer-modal') : $('layer-detail').firstElementChild ? $('layer-detail') : null;
+  const layer = top() ? $('layer-modal') : null;
   if (!layer) return;
   const f = Array.from(layer.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])'))
     .filter((x) => !(x as HTMLButtonElement).disabled && x.offsetParent !== null && !(x as HTMLInputElement).hidden && (x as HTMLInputElement).type !== 'hidden');
@@ -1113,7 +1097,7 @@ async function readBackup(file: File | undefined, input: HTMLInputElement) {
     for (const u of urls.values()) URL.revokeObjectURL(u);
     urls.clear();
     for (const [ref, blob] of b.photos) urls.set(ref, URL.createObjectURL(blob));
-    data = b.data; views.clear(); collapsed.clear(); unlocked = null; lastPage = ''; lastDetail = '';
+    data = b.data; views.clear(); collapsed.clear(); unlocked = null; lastPage = '';
     modals.length = 0; renderModal();
     goHome(); render();
     toast(shrunk ? `Save file loaded. ${plural(shrunk, 'big photo')} made smaller.` : 'Save file loaded.');

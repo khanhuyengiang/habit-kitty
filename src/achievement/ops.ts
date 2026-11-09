@@ -5,14 +5,22 @@ import {
   type Achievement, type AchievementPhoto, type Data, type MainQuest, type PlayerGender, type Rarity, type SideQuest, type Status,
 } from './model.ts';
 import { PICKER_ICON_NAMES } from './pixelart.ts';
+import { toPalette } from '../shared/palette.ts';
 
 export const LIMITS = { title: 80, location: 60, description: 2000, name: 30, quest: 60, tags: 10, tag: 24 };
 
 // Older saves predate tags (and may have been written before a field existed): fill in what is missing, so the
 // rest of the code can trust the shape. Changes nothing that is already there.
+// Side quests saved before the palette (2026-11) get their colour moved to the nearest palette colour.
 export function migrate(d: Data): Data {
-  if (d.achievements.every((a) => Array.isArray(a.tags))) return d;
-  return { ...d, achievements: d.achievements.map((a) => (Array.isArray(a.tags) ? a : { ...a, tags: [] })) };
+  const tagsOk = d.achievements.every((a) => Array.isArray(a.tags));
+  const colorsOk = d.sideQuests.every((s) => toPalette(s.color) === s.color);
+  if (tagsOk && colorsOk) return d;
+  return {
+    ...d,
+    achievements: tagsOk ? d.achievements : d.achievements.map((a) => (Array.isArray(a.tags) ? a : { ...a, tags: [] })),
+    sideQuests: colorsOk ? d.sideQuests : d.sideQuests.map((s) => (toPalette(s.color) === s.color ? s : { ...s, color: toPalette(s.color) })),
+  };
 }
 
 export function emptyData(now = Date.now()): Data {

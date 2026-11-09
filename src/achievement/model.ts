@@ -92,7 +92,7 @@ export const newId = (): string =>
 // Colours people can pick for a side quest (they can also choose any colour). Mid tones, so an icon in this colour
 // reads on both the light and the dark page.
 export const SIDE_COLORS = [
-  '#ff6fa5', '#f0584f', '#ff9a3d', '#f2b705', '#45c27a', '#2fb8b0', '#4a9bea', '#6a6de8', '#a45be0', '#b07a4f',
+  '#f26fa3', '#f0506e', '#e8a04c', '#f2b705', '#45c27a', '#2fb8b0', '#4a9bea', '#6a6de8', '#a45be0', '#a07250',
 ];
 
 export const todayStr = (d = new Date()): string =>
@@ -108,9 +108,9 @@ export function isValidDate(s: string): boolean {
 export const isColor = (s: string): boolean => /^#[0-9a-f]{6}$/i.test(s);
 
 // Black or white, whichever reads better on this colour.
-export function inkFor(color: string): '#2a2147' | '#ffffff' {
-  if (!isColor(color)) return '#2a2147';
+export function inkFor(color: string): '#231d44' | '#ffffff' {
+  if (!isColor(color)) return '#231d44';
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16) / 255)
     .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.32 ? '#2a2147' : '#ffffff';
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.32 ? '#231d44' : '#ffffff';
 }

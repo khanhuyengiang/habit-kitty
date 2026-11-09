@@ -1,16 +1,40 @@
 <style>
-/* The Diary screen. Drawn with Habit Kitty's stylesheet (calendar, moods, panels and buttons live there); these are its own parts. */
-[data-app-root="diary"] { image-rendering: auto; }
-.diary .brand h1 span { color: var(--accent-text); }
+/* The Diary screen. Drawn with the shared sheet and Habit Kitty's (calendar, moods, panels and buttons live there); these are its own parts. */
 .diary-body { display: grid; gap: var(--s5); }
 .dhead { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
-.dhead h3 { font: 700 22px/1.1 var(--font); }
+.dhead h3 { font: 700 24px/1.1 var(--font); }
+.month-title { font-size: 24px; }
 .dhead .muted { font-size: 18px; }
 .dhead .btns .btn { flex: none; }
-.dc .bday { position: absolute; right: var(--s1); top: var(--s1); width: calc(7 * var(--px)); height: calc(6 * var(--px)); color: var(--accent-text); }
-.dc .bday svg { width: 100%; height: 100%; }
-.bday-ico { display: inline-flex; vertical-align: middle; width: calc(7 * var(--px)); height: calc(6 * var(--px)); color: var(--accent-text); }
-.bday-ico svg { width: 100%; height: 100%; }
+.dc .bday { position: absolute; right: var(--s1); top: var(--s1); color: var(--accent-text); }
+.dc .bday.mid { right: auto; left: 50%; transform: translateX(-50%); }   /* with a star: the cake sits between the number and the star */
+.dc .dstar { position: absolute; right: var(--s1); top: var(--s1); display: grid; }
+.star { display: inline-flex; vertical-align: middle; }
+.star.happy { color: #f2b705; }
+.star.sad { color: #6a6de8; }
+.stars { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.stars .btn { display: inline-flex; align-items: center; gap: var(--s2); }
+.stars .btn[aria-pressed="true"], .note-chips .btn[aria-pressed="true"] { border-color: var(--accent-edge); background: var(--accent-soft); }
+.diary-notes { display: grid; gap: var(--s2); }
+.note-chips { display: flex; flex-wrap: wrap; gap: var(--s2); }
+#diary-weather { grid-template-columns: repeat(3, 1fr); }   /* six weathers: two rows of three */
+.photo-grid { display: grid; gap: var(--s2); grid-template-columns: 1fr; margin-bottom: var(--s2); }
+.photo-grid[data-n="2"], .photo-grid[data-n="3"], .photo-grid[data-n="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.photo-grid figure { position: relative; margin: 0; min-width: 0; }
+.diary-photo .photo-grid img {
+  margin: 0; display: block; width: 100%; max-height: calc(87 * var(--u)); object-fit: cover; border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-s-box); mask: var(--notch-s-m); image-rendering: pixelated; }
+.diary-photo .photo-grid:not([data-n="1"]) img { aspect-ratio: 1; max-height: none; }
+.photo-grid .btn { position: absolute; top: var(--s1); right: var(--s1); padding: var(--s1); }
+.diary-nav .diary-date { flex: 1; margin: 0; text-align: center; font: 700 24px/1.1 var(--font); }
+.diary-title { margin: 0; text-align: center; }
+.where .pin { display: inline-flex; color: var(--accent-text); }
+.mood-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); }
+.memo b { margin-right: var(--s3); }   /* the title runs on from the date and wraps like text */
+.btns.start .btn { flex: none; }   /* shared .btns .btn stretches; these two stay their own size */
+.memo-sec h4 { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s2); font: 700 20px/1.1 var(--font); }
+.memo-sec + .memo-sec { margin-top: var(--s4); }
+.memo { display: block; width: 100%; padding: 0; border: 0; background: none; font: inherit; font-size: 20px; color: var(--ink); text-align: left; cursor: pointer; }
+.bday-ico { display: inline-flex; vertical-align: middle; color: var(--accent-text); }
 .dlist { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
 .dlist li { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); font-size: 20px; }
 .dlist .who { display: grid; gap: 0; min-width: 0; overflow-wrap: anywhere; }
@@ -20,9 +44,10 @@
 .tally span { display: inline-flex; align-items: center; gap: var(--s2); }
 .reflect-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 500 20px/1.4 var(--font); }
 .dform { display: grid; gap: var(--s4); }
-.dform .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s3); }
+.dform .row { grid-template-columns: 1fr 1fr 1fr; }
 .dform .row.two { grid-template-columns: 1fr 1fr; }
-.dform .reflect-area { min-height: calc(70 * var(--px)); font: 500 20px/1.4 var(--font) !important; resize: none; }
+.dform .reflect-area { min-height: calc(70 * var(--u)); font: 500 20px/1.4 var(--font) !important; resize: none; }
+.start { justify-self: start; }
 </style>
 <div data-app-root="diary" hidden>
   <div class="wrap diary">

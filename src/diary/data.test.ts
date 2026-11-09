@@ -58,6 +58,19 @@ describe('diary data', () => {
     expect(fs.has('habit-kitty/photos/2026-10-20.jpg')).toBe(false);
   });
 
+  it('stores up to four photos and drops the extra ones when there are fewer', async () => {
+    const d = dayOf(2026, 9, 25);
+    const blobs = [1, 2, 3, 4].map((n) => new Blob([new Uint8Array([n])]));
+    expect(await data.saveEntry(d, { text: 'Four', photo: true, photos: 4, updated: 1 }, blobs)).toBe(true);
+    for (const f of ['', '-2', '-3', '-4']) expect(fs.has(`habit-kitty/photos/2026-10-25${f}.jpg`)).toBe(true);
+    expect(await data.saveEntry(d, { text: 'Two', photo: true, photos: 2, updated: 2 }, blobs.slice(0, 2))).toBe(true);
+    expect(fs.has('habit-kitty/photos/2026-10-25-2.jpg')).toBe(true);
+    expect(fs.has('habit-kitty/photos/2026-10-25-3.jpg')).toBe(false);
+    expect(fs.has('habit-kitty/photos/2026-10-25-4.jpg')).toBe(false);
+    expect(await data.saveEntry(d, null, 'none')).toBe(true);
+    expect(fs.has('habit-kitty/photos/2026-10-25-2.jpg')).toBe(false);
+  });
+
   it('keeps the stored photo when asked to', async () => {
     const d = dayOf(2026, 9, 21);
     await data.saveEntry(d, { text: 'a', photo: true, updated: 1 }, new Blob([new Uint8Array([7])]));

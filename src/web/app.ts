@@ -24,15 +24,17 @@ import {
 } from '../store.ts';
 import { CONFETTI_COLORS, TRAITS, notifyIconName, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
 import { BOOK_ART, FOODS, MARKS, ROOM_H, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, weatherSvg, heartSvg, iconSvg, markSvg, outdoorSvg, roomSvg } from '../pixelart.ts';
-import { GO_EVENT, TAB_EVENT, habitKittySvg, homeButton, onAppShown, onShown, trophyIcon, type AppName } from '../shared/apps.ts';
+import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, trophyIcon, type AppName } from '../shared/apps.ts';
 import { mountDiarySettings } from '../diary/settings.ts';
 import { collectNotes, initNotes, restoreNotes } from '../notes/data.ts';
 import { mountNotesSettings } from '../notes/settings.ts';
+import { mountLookSettings } from '../shared/look.ts';
 import { publishHabitStats } from '../shared/stats.ts';
 import { meterHtml } from '../shared/meter.ts';
 import { hpLine } from '../player.ts';
 import { collectDiary, initDiary, pageCount, restoreDiary } from '../diary/data.ts';
-import { paintBackdrop } from '../shared/backdrop.ts';
+import { esc, plural } from '../shared/html.ts';
+import { backButton, homeButton, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
 import { provideMusic } from '../shared/music.ts';
 import { compressPhoto } from '../shared/photo.ts';
 import { at, fileBytes, removeFile, toBase64, writeOk } from '../shared/files.ts';
@@ -42,7 +44,7 @@ import { dateOf, dayOf, firstDay, habitStreak, monthGrid, streak, weekRow, type 
 interface LogLine { at: number; text: string }
 interface Save {
   v: 1; state: AppState; offsetHours: number; log: LogLine[]; savedAt: number; logHidden?: boolean; unlimited?: boolean; roomName?: string; outdoorName?: string; allowRename?: boolean; showClock?: boolean;
-  trackamaniac?: boolean;              // adds a weather choice to every diary page
+  trackamaniac?: boolean;              // Meteorokinesis (kept under its old name): adds a weather choice to every diary page
   moodNames?: Partial<Record<Mood, string>>;   // the user's own names for the five emotions
   diary?: Record<string, DiaryEntry>;   // in memory only: each page lives in its own file (see "Diary files")
   reminder?: ReminderSettings;
@@ -136,10 +138,8 @@ const today = () => dayIndex(now());
 
 // ===================== Helpers =====================
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
 const catName = (id: string) => save.state.cats.find((c) => c.id === id)?.name ?? 'Your cat';
-const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const fmtDay = (day: number) =>
   dateOf(day).toLocaleDateString('en', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
 const hourText = (h: number) => `${String(h).padStart(2, '0')}:00`;
@@ -194,14 +194,7 @@ function logEvents(events: GameEvent[]) {
   save.log = save.log.slice(0, 8);
 }
 
-let toastTimer = 0;
-function toast(text: string) {
-  const el = $('toast');
-  el.textContent = text;
-  el.hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => (el.hidden = true), 3200);
-}
+const toast = (text: string) => showToast($('toast'), text);
 
 // Settle elapsed days, then apply an action; logs events and persists.
 function act(fn: (s: AppState, at: Date) => ActionResult, success: string | (() => string), cat?: Cat): boolean {
@@ -294,18 +287,6 @@ function celebrate(level: number) {
   setTimeout(() => party.remove(), 2800);
 }
 
-// ---- dark mode: follows the device until the toggle is used, then remembers the choice on this device ----
-const systemDark = () => window.matchMedia('(prefers-color-scheme: dark)').matches;
-const isDark = () => document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : systemDark();
-try { const t = localStorage.getItem('hk-theme'); if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t; } catch { /* storage blocked: follow the device */ }
-function toggleTheme() {
-  const next = isDark() ? 'light' : 'dark';
-  document.documentElement.dataset.theme = next;
-  try { localStorage.setItem('hk-theme', next); } catch { /* not remembered */ }
-  paintBackdrop();
-  renderTop();
-}
-
 // What the home page shows for HP (affection); the diary publishes its own days (MP).
 const publishStats = () => publishHabitStats({ xp: save.state.xp, offsetHours: save.offsetHours });
 
@@ -315,18 +296,10 @@ function renderTop() {
   if (lastLevel !== null && level > lastLevel) celebrate(level);
   lastLevel = level;
   if (tab === 'settings') {   // the one Settings screen, reached from every app's gear
-    $('top').innerHTML = `
-      <div class="brand"><h1>Kitty <span>Settings</span></h1>
-        <div class="brand-r"><button class="gear" type="button" data-action="settings-back" aria-label="Back">${iconSvg('prev')}</button>
-          ${homeButton()}
-          <button class="gear" type="button" data-action="theme-toggle" aria-label="${isDark() ? 'Switch to light mode' : 'Switch to dark mode'}">${iconSvg(isDark() ? 'sun' : 'moon')}</button></div></div>`;
+    $('top').innerHTML = titleBar('Kitty', 'Settings', backButton('settings-back') + homeButton());
     return;
   }
-  $('top').innerHTML = `
-    <div class="brand"><h1>Habit <span>Kitty</span></h1>
-      <div class="brand-r">${homeButton()}
-        <button class="gear" type="button" data-action="theme-toggle" aria-label="${isDark() ? 'Switch to light mode' : 'Switch to dark mode'}">${iconSvg(isDark() ? 'sun' : 'moon')}</button>
-        <button class="gear" type="button" data-action="settings-open" aria-label="Settings">${iconSvg('gear')}</button></div></div>
+  $('top').innerHTML = `${titleBar('Habit', 'Kitty', homeButton() + playerButton() + settingsButton('data-action="settings-open"'))}
     ${meterHtml('hp', 'HP', hpLine(save.state.xp))}
     ${save.state.xp < CONFIG.lowXpThreshold
       ? '<p class="distrust">Your affection is below 0. Until it recovers, you can only keep one cat.</p>' : ''}
@@ -337,8 +310,8 @@ function renderLog() {
   const el = $('log');
   el.hidden = !save.log.length || !!save.logHidden;
   el.innerHTML = `<button class="x" type="button" data-action="log-close" aria-label="Close update">${iconSvg('x')}</button>
-    <h2>Update · what happened</h2><ul style="list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px;font-size:18px">${save.log.map((l) =>
-    `<li><time class="muted num" style="font-size:15px;margin-right:8px">${new Date(l.at).toLocaleDateString('en', { day: 'numeric', month: 'short' })}</time>${esc(l.text)}</li>`).join('')}</ul>`;
+    <h2>Update · what happened</h2><ul class="log-list">${save.log.map((l) =>
+    `<li><time class="num">${new Date(l.at).toLocaleDateString('en', { day: 'numeric', month: 'short' })}</time>${esc(l.text)}</li>`).join('')}</ul>`;
 }
 
 function catStatus(c: Cat, t: number): { face: Face; faded: boolean; chip: DayKind; label: string; note?: string } {
@@ -490,7 +463,7 @@ function renderCats() {
   if (todayView === 'memories') cats.sort((a, b) => Number(b.status === 'ranAway') - Number(a.status === 'ranAway') || (b.endedDay ?? 0) - (a.endedDay ?? 0));
   if (!cats.length) {
     const msg = { home: 'Nobody is home right now.', sitter: 'No cats with the pet sitter.', memories: 'No cats have left yet.' }[todayView];
-    $('cats').innerHTML = `<p class="muted" style="text-align:center;padding:24px 0">${msg}</p>`;
+    $('cats').innerHTML = `<p class="muted hint-c">${msg}</p>`;
     return;
   }
   $('cats').innerHTML = cats.map((c) => {
@@ -544,12 +517,12 @@ function renderHeat() {
   if (heatMode === 'strays') {
     const habits = save.state.tasks.filter((k) => k.kind === 'habit');
     $('heat').innerHTML = (habits.length ? combinedHabits(habits) : '<p class="muted">No stray kitties yet.</p>') + HEAT_LEGEND +
-      '<p class="muted" style="text-align:center;font-size:15px">Press and hold a stray kitty to see just its heatmap.</p>';
+      '<p class="muted hint-c">Press and hold a stray kitty to see just its heatmap.</p>';
     return;
   }
   const cats = heatCats();
   $('heat').innerHTML = (cats.length ? combinedCats(cats, today()) : '<p class="muted">No living cats to show.</p>') + HEAT_LEGEND +
-    '<p class="muted" style="text-align:center;font-size:15px">Press and hold a kitty to see just its heatmap.</p>';
+    '<p class="muted hint-c">Press and hold a kitty to see just its heatmap.</p>';
 }
 
 // ---- cozy room: lives in real time (sky follows the clock, cats wander, sleep at night) ----
@@ -784,15 +757,15 @@ function roomPicture(phase: 'day' | 'dusk' | 'night'): string {
     const body = (nap ? napSvg(lookFor(c)) : bodySvg(catStatus(c, t).face, lookFor(c), hash(c.id)))
       .replace('<g class="tail b">', '<g display="none">').replace('<g class="blink">', '<g display="none">')   // no CSS here: show tail frame A only
       .replace('<svg ', `<svg x="${nap ? napLeft(x) : x}" y="${y - (nap ? NAP_H : PET_H)}" width="${nap ? NAP_W : PET_W}" height="${nap ? NAP_H : PET_H}" `);
-    const name = `<text x="${x + PET_W / 2}" y="${y + 7}" font-size="7" font-family="Jersey 15, monospace" text-anchor="middle" fill="#5a4380">${esc(c.name)}</text>`;
+    const name = `<text x="${x + PET_W / 2}" y="${y + 7}" font-size="7" font-family="Jersey 15, monospace" text-anchor="middle" fill="#4a4084">${esc(c.name)}</text>`;
     const about = thought?.thinker === c.id ? save.state.cats.find((k) => k.id === thought.subject) : undefined;
     let bubble = '';
     if (about && thought) {
       const v = THOUGHT_FACE[thought.kind];
       const bw = 26, bh = 14, bx = x + PET_W / 2 - bw / 2, by = y - PET_H - bh - 4;
-      const edge = '#5a4380', R = (rx: number, ry: number, w: number, h: number, f: string) => `<rect x="${rx}" y="${ry}" width="${w}" height="${h}" fill="${f}"/>`;
+      const edge = '#4a4084', R = (rx: number, ry: number, w: number, h: number, f: string) => `<rect x="${rx}" y="${ry}" width="${w}" height="${h}" fill="${f}"/>`;
       const mark = markSvg(v.mark).replace('<svg ', `<svg x="${bx + 17}" y="${by + 3}" width="${MARKS[v.mark][0].length}" height="${MARKS[v.mark].length}" `);
-      bubble = `<g>${R(bx + 1, by, bw - 2, bh, edge)}${R(bx, by + 1, bw, bh - 2, edge)}${R(bx + 1, by + 1, bw - 2, bh - 2, '#fffafc')}
+      bubble = `<g>${R(bx + 1, by, bw - 2, bh, edge)}${R(bx, by + 1, bw, bh - 2, edge)}${R(bx + 1, by + 1, bw - 2, bh - 2, '#fffafd')}
         ${R(bx + bw / 2 - 1, by + bh, 3, 1, edge)}${R(bx + bw / 2, by + bh + 1, 2, 1, edge)}
         ${miniSvg(v.face, lookFor(about), v.faded).replace('<svg ', `<svg x="${bx + 2}" y="${by + 2}" width="13" height="10" `)}${mark}</g>`;
     }
@@ -1222,7 +1195,7 @@ function renderAutoBackup() {
     ? `<p>Folder: <b>${esc(f.name || 'chosen folder')}</b>${f.ok ? '' : ' (not reachable)'}<br>Last backup: ${st.running ? 'saving…' : st.last ? ago(st.last) : 'none yet'}</p>`
     : '<p class="muted">Off. Pick a folder once (for example Documents, then make a folder called HabitKitty) and a fresh copy is saved there whenever you leave the app after changing something. The newest 7 days are kept.</p>';
   box.innerHTML = `<h4 class="sub">Auto-backup</h4>${lines}${st.error ? `<p class="form-error">${esc(st.error)}</p>` : ''}
-    <div class="btns wrap">${f.chosen
+    <div class="btns flow">${f.chosen
       ? `<button class="btn" type="button" data-action="backup-now" ${st.running ? 'disabled' : ''}>Back up now</button>
          <button class="btn" type="button" data-action="restore-folder">Restore from folder…</button>
          <button class="btn" type="button" data-action="backup-folder">Change folder</button>
@@ -1248,7 +1221,7 @@ async function pickFolderBackup(name: string) {
 let pendingBackup: Backup | null = null;
 function askRestore(b: Backup) {
   pendingBackup = b;
-  const pages = Object.keys(b.diary).length, photos = Object.keys(b.photos).length;
+  const pages = Object.keys(b.diary).length, photos = Object.keys(b.photos).length + Object.values(b.morePhotos ?? {}).reduce((n, l) => n + l.length, 0);
   const ach = b.achievement ? achievementCount(b.achievement) : 0;
   const parts = [
     b.game ? `your kitties, ${pages} diary ${pages === 1 ? 'page' : 'pages'} and ${photos} ${photos === 1 ? 'photo' : 'photos'}` : '',
@@ -1431,50 +1404,61 @@ let tab = 'today';
 let tabBeforeSettings = 'today';   // where Back in Settings takes you, when you came from a Habit Kitty tab
 let settingsFrom: AppName = 'habit';   // the screen whose gear opened Settings
 
-// ---- the top navigation: Kitty / Stray / Treats / Pet sitter / Memory, and the views of the section you are in ----
-// Each place is one of the screens below (today: the cat cards, mindful: strays and treats, room: the cozy room and the garden, heat).
-// Pet sitter and Memory only show while a kitty is with the sitter, or has gone (died, ran away, gone to the shelter).
+// ---- the navigation: a bar along the bottom (Room / Kitty / Heatmap), and above the screen a switch for that tab ----
+//   Room:    the cosy room (indoor) / the garden (outdoor)
+//   Kitty:   Kitty / Stray / Treats (and Pet sitter, Memory while a kitty is with the sitter or has gone)
+//   Heatmap: Kitty / Stray
+// Each place is one of the screens below (today: the cat cards, mindful: strays and treats, room: indoors and outdoors, heat).
+type Bottom = 'room' | 'kitty' | 'heat';
 type Main = 'kitty' | 'stray' | 'treats' | 'sitter' | 'memory';
-type Sub = 'list' | 'room' | 'heat';
-let navMain: Main = 'kitty';
-const navSub: Record<'kitty' | 'stray', Sub> = { kitty: 'list', stray: 'list' };
-let heatMode: 'cats' | 'strays' = 'cats';
+type Sub = 'list' | 'room' | 'heat';   // openNav's second argument: which tab (list = the Kitty tab)
+let bottom: Bottom = 'kitty';
+let navMain: Main = 'kitty';                      // the Kitty tab's section
+let roomSide: RoomView = 'indoor';                // the Room tab's side
+let heatMode: 'cats' | 'strays' = 'cats';         // the Heatmap tab's side
 const catsIn = (v: TodayView) => save.state.cats.filter((c) => viewOf(c) === v).length;
 const sectionOk = (m: Main) => (m === 'sitter' ? catsIn('sitter') > 0 : m === 'memory' ? catsIn('memories') > 0 : true);
-const currentSub = (): Sub => (navMain === 'kitty' || navMain === 'stray' ? navSub[navMain] : 'list');
 
-// Points the screens' own switches (which cats, which list, which room, which heatmap) at the section.
+// Points the screens' own switches (which cats, which list, which room) at the tab.
 function syncViews() {
   if (!sectionOk(navMain)) navMain = 'kitty';
   todayView = navMain === 'sitter' ? 'sitter' : navMain === 'memory' ? 'memories' : 'home';
   mindfulView = navMain === 'treats' ? 'task' : 'habit';
-  roomView = navMain === 'stray' && currentSub() === 'room' ? 'outdoor' : 'indoor';
-  heatMode = navMain === 'stray' ? 'strays' : 'cats';
+  roomView = roomSide;
 }
-const screenOf = (): string => {
-  const sub = currentSub();
-  if (navMain === 'kitty') return { list: 'today', room: 'room', heat: 'heat' }[sub];
-  if (navMain === 'stray') return { list: 'mindful', room: 'room', heat: 'heat' }[sub];
-  return navMain === 'treats' ? 'mindful' : 'today';
-};
-function openNav(main: Main, sub?: Sub) {
-  navMain = main;
-  if (sub && (main === 'kitty' || main === 'stray')) navSub[main] = sub;
+const screenOf = (): string =>
+  bottom === 'room' ? 'room' : bottom === 'heat' ? 'heat' : navMain === 'stray' || navMain === 'treats' ? 'mindful' : 'today';
+// Opens a place: a section of the Kitty tab ('list'), or the Room or Heatmap tab on the kitty's or the stray's side.
+function openNav(main: Main, sub: Sub = 'list') {
+  if (sub === 'room') { bottom = 'room'; roomSide = main === 'stray' ? 'outdoor' : 'indoor'; }
+  else if (sub === 'heat') { bottom = 'heat'; heatMode = main === 'stray' ? 'strays' : 'cats'; }
+  else { bottom = 'kitty'; navMain = main; }
+  syncViews();
+  showTab(screenOf());
+}
+function openBottom(b: Bottom) {
+  bottom = b;
   syncViews();
   showTab(screenOf());
 }
 
 function navHtml(): string {
   syncViews();   // a section whose kitties are gone falls back to Kitty
-  const mains: [Main, string, number | null][] = [['kitty', 'Kitty', null], ['stray', 'Stray', null], ['treats', 'Treats', null]];
-  if (catsIn('sitter')) mains.push(['sitter', 'Pet sitter', catsIn('sitter')]);
-  if (catsIn('memories')) mains.push(['memory', 'Memory', catsIn('memories')]);
-  const subs: [Sub, string][] | null = navMain === 'kitty' ? [['list', 'List'], ['room', indoorName()], ['heat', 'Heatmap']]
-    : navMain === 'stray' ? [['list', 'List'], ['room', outdoorName()], ['heat', 'Heatmap']] : null;
-  return `<nav class="nav" aria-label="Sections"><div class="seg" role="tablist">${mains.map(([m, label, n]) =>
-      `<button type="button" role="tab" data-action="nav-main" data-main="${m}" aria-selected="${m === navMain}">${label}${n === null ? '' : ` <span class="num">${n}</span>`}</button>`).join('')}</div>
-    ${subs ? `<div class="seg sub" role="tablist" aria-label="Views">${subs.map(([v, label]) =>
-      `<button type="button" role="tab" data-action="nav-sub" data-sub="${v}" aria-selected="${v === currentSub()}">${esc(label)}</button>`).join('')}</div>` : ''}</nav>`;
+  let items: [string, string, boolean, number | null][];
+  if (bottom === 'room') items = [['indoor', indoorName(), roomSide === 'indoor', null], ['outdoor', outdoorName(), roomSide === 'outdoor', null]];
+  else if (bottom === 'heat') items = [['cats', 'Kitty', heatMode === 'cats', null], ['strays', 'Stray', heatMode === 'strays', null]];
+  else {
+    items = [['kitty', 'Kitty', navMain === 'kitty', null], ['stray', 'Stray', navMain === 'stray', null], ['treats', 'Treats', navMain === 'treats', null]];
+    if (catsIn('sitter')) items.push(['sitter', 'Pet sitter', navMain === 'sitter', catsIn('sitter')]);
+    if (catsIn('memories')) items.push(['memory', 'Memory', navMain === 'memory', catsIn('memories')]);
+  }
+  const action = bottom === 'room' ? 'nav-room' : bottom === 'heat' ? 'nav-heat' : 'nav-main';
+  return `<nav class="nav" aria-label="Views"><div class="seg" role="tablist">${items.map(([v, label, on, n]) =>
+    `<button type="button" role="tab" data-action="${action}" data-v="${v}" aria-selected="${on}">${esc(label)}${n === null ? '' : ` <span class="num">${n}</span>`}</button>`).join('')}</div></nav>`;
+}
+// The bar along the bottom shows which tab is open (and hides in Settings).
+function renderTabbar() {
+  for (const b of document.querySelectorAll<HTMLElement>('#tabbar [data-bottom]')) b.setAttribute('aria-selected', String(tab !== 'settings' && b.dataset.bottom === bottom));
 }
 
 // Settings: a main page (everything shared, then a button per mini-app), and one page for each mini-app's own options.
@@ -1489,6 +1473,7 @@ function showTab(name: string) {
   tab = name;
   document.documentElement.dataset.tab = name;
   renderTop();
+  renderTabbar();
   renderTab(name);
   for (const t of TABS) $(`tab-${t}`).classList.toggle('on', t === name);
   window.scrollTo(0, 0);
@@ -1830,9 +1815,10 @@ onShown('habit', 'click', (ev) => {
       if (menuStray === id) openStrayMenu(id);   // keep the open menu in step (fed)
       break;
     }
-    case 'nav-main': openNav(btn.dataset.main as Main); break;
-    case 'nav-sub': openNav(navMain, btn.dataset.sub as Sub); break;
-    case 'theme-toggle': toggleTheme(); break;
+    case 'nav-bottom': openBottom(btn.dataset.bottom as Bottom); break;
+    case 'nav-main': openNav(btn.dataset.v as Main); break;
+    case 'nav-room': openNav(btn.dataset.v === 'outdoor' ? 'stray' : 'kitty', 'room'); break;
+    case 'nav-heat': openNav(btn.dataset.v === 'strays' ? 'stray' : 'kitty', 'heat'); break;
     case 'settings-open': settingsFrom = 'habit'; showTab('settings'); break;
     case 'settings-back':
       if (settingsFrom === 'habit') showTab(tabBeforeSettings);
@@ -2164,6 +2150,7 @@ $('ach-file').addEventListener('change', async (ev) => {
 
 mountDiarySettings($('set-diary-body'), toast);
 mountNotesSettings($('set-notes-body'), toast);
+mountLookSettings($('set-look'));
 
 $('load-file').addEventListener('change', async (ev) => {
   const input = ev.target as HTMLInputElement;
@@ -2322,7 +2309,7 @@ function openCatMenu(id: string, tab?: MenuTab) {
   const pane = menuTab === 'heat'
     ? (cat.status === 'ranAway' ? `<p class="muted">${esc(cat.name)} ran away.</p>` : renderMonth(cat, today()) + HEAT_LEGEND)
     : menuTab === 'diary' ? catDiaryHtml(cat)
-    : `<div style="display:grid;gap:8px">${sitterBtn}
+    : `<div class="stack">${sitterBtn}
       ${save.allowRename ? `<button class="btn" data-action="rename-cat" data-id="${id}">Rename ${esc(cat.name)}</button>` : ''}
       <button class="btn" data-action="rename-habit" data-id="${id}">Rename habit</button>
       ${save.timeTravel ? `<button class="btn" data-action="travel" data-id="${id}">Time travel</button>` : ''}
@@ -2363,7 +2350,7 @@ function openStrayMenu(id: string, tab?: StrayTab) {
   menuStray = id;
   const pane = strayTab === 'heat'
     ? renderMonth(habitSubject(k), today(), k) + HEAT_LEGEND
-    : `<div style="display:grid;gap:8px">
+    : `<div class="stack">
       ${k.cooldownDays === 1 && !k.weekdays?.length ? `<button class="btn primary" data-action="habit-kitty" data-id="${id}">Adopt the kitty</button>` : '<p class="muted">Only daily strays can be adopted.</p>'}
       <button class="btn" data-action="rename-stray" data-id="${id}">Rename ${esc(strayName(k))}</button>
       <button class="btn" data-action="rename-habit" data-id="${id}">Rename habit</button>
@@ -2384,7 +2371,7 @@ function openTreatMenu(id: string) {
   openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
     <div class="cat-head solo"><div><p class="cat-name">${esc(k.name)}<span class="mode">treat · +${k.xp} XP</span></p>
       <span class="chip ${done ? 'fed' : 'today'}">${done ? 'Done' : 'To do'}</span></div></div>
-    <div style="display:grid;gap:8px">
+    <div class="stack">
       ${save.timeTravel ? `<button class="btn" data-action="travel" data-id="${id}">Time travel</button>` : ''}
       <button class="btn" data-action="task-del" data-id="${id}">Delete treat</button></div></div>`);
 }

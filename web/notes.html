@@ -1,28 +1,128 @@
 <style>
-/* The Notes screen. Drawn with Habit Kitty's stylesheet; these are its own parts. */
-[data-app-root="notes"] { image-rendering: auto; }
-.notes .brand h1 span { color: var(--accent-text); }
+/* The Notes screen. Drawn with the shared sheet and Habit Kitty's; these are its own parts. */
 .notes-body { display: grid; gap: var(--s4); }
 .nbar { display: flex; gap: var(--s3); align-items: stretch; }
-.nbar .field { flex: 1; }
+.nbar .field { flex: 1; align-content: stretch; }
 .nbar .btn { flex: none; }
-.nlist { display: grid; gap: var(--s3); }
-.note-row { display: grid; gap: var(--s1); text-align: left; width: 100%; padding: var(--s3) var(--s4) var(--s4); font-weight: 500; }
-.note-row b { font: 700 22px/1.1 var(--font); overflow-wrap: anywhere; }
-.note-row .ex { color: var(--muted); font-size: 18px; overflow-wrap: anywhere; }
-.note-row .when { color: var(--muted); font-size: 15px; }
+/* The notes as little program windows (after inspo/simple_notes.jpg), drawn like Achievement Kitty's cards: a frame in the
+   note's colour (--nc) with a one-pixel dark outline and a lit line inside it, one pixel cut from every corner, a title bar, and an inset dotted screen with the picture and a few words. Two to a row, every
+   card the same shape: --note-ratio is width / height. */
+.ngrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s4); }
+.nwin { --nc: var(--accent); --nw-dk: color-mix(in srgb, var(--nc) 25%, #231d44); --nw-frame: color-mix(in srgb, var(--nc) 62%, var(--surface));
+  --nw-hi: color-mix(in srgb, var(--nc) 25%, #fff); --sq: var(--nc); --dk: var(--nw-dk);   /* --sq and --dk colour Achievement Kitty's icons */
+  display: flex; flex-direction: column; width: 100%; min-width: 0; margin: 0; padding: calc(4 * var(--px)); border: 0; font: inherit; color: var(--ink);
+  background: var(--nw-frame); -webkit-mask-box-image: var(--notch-s-box); mask: var(--notch-s-m);
+  box-shadow: inset 0 0 0 var(--px) var(--nw-dk), inset 0 0 0 calc(2 * var(--px)) var(--nw-hi); }
+.ncard { --note-ratio: 3 / 4; aspect-ratio: var(--note-ratio); overflow: hidden; cursor: pointer; text-align: center; }
+button.ncard:hover { --nw-frame: color-mix(in srgb, var(--nc) 75%, var(--surface)); }
+button.ncard:active { transform: translateY(var(--px)); }
+button.ncard:focus-visible { outline: none; }
+button.ncard:focus-visible .nwin-screen { box-shadow: inset 0 0 0 var(--bw) var(--accent-text); }
+.nwin-bar { display: flex; align-items: center; gap: var(--s1); min-width: 0; flex: none; padding: var(--px) var(--px) calc(3 * var(--px)); color: var(--nw-ink, var(--nw-dk)); }
+.nwin-name { flex: 1; min-width: 0; text-align: left; font: 700 20px/1.05 var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nwin-btns { display: flex; gap: var(--px); flex: none; color: var(--nw-dk); }
+/* the window buttons: three plain squares */
+.nwin-btns > span { display: grid; place-items: center; padding: calc(2 * var(--px)); background: var(--nw-hi); box-shadow: inset 0 0 0 var(--px) var(--nw-dk); }
+.nwin-screen { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s2);
+  padding: var(--s4) var(--s3); -webkit-mask-box-image: var(--notch-s-box); mask: var(--notch-s-m); box-shadow: inset 0 0 0 var(--bw) color-mix(in srgb, var(--nc) 70%, var(--nw-dk)); background: color-mix(in srgb, var(--nc) 14%, var(--surface)); }
+/* the sparkles in three corners of the screen, and the picture in the fourth */
+.ndeco { position: absolute; inset: 0; pointer-events: none; color: color-mix(in srgb, var(--nc) 70%, var(--nw-dk)); }
+.ndeco .tw { position: absolute; opacity: .75; }
+.ndeco .tw.tl { top: calc(4 * var(--px)); left: calc(4 * var(--px)); } .ndeco .tw.tr { top: calc(4 * var(--px)); right: calc(4 * var(--px)); }
+.ndeco .tw.br { bottom: calc(4 * var(--px)); right: calc(4 * var(--px)); }
+.ndoodle { position: absolute; left: calc(4 * var(--px)); bottom: calc(4 * var(--px)); }
+.nwin-screen > :not(.ndeco) { position: relative; }
+.nart { flex: none; display: block; color: var(--nc); }
+.nart .sticker { width: 100%; height: auto; }
+.nart.photo img { display: block; width: 100%; height: 100%; object-fit: cover; -webkit-mask-box-image: var(--notch-s-box); mask: var(--notch-s-m); border: var(--px) solid var(--nw-dk); box-sizing: border-box; }
+.ncard .nart { width: 50%; }
+.ncard .nart.photo { width: 100%; flex: 1 1 0; min-height: 0; }
+.ncard-text { font: 500 16px/1.15 var(--font); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; flex: none; }
+.ncard .nart.photo + .ncard-text { -webkit-line-clamp: 1; line-clamp: 1; }
+.ncard .text-only { justify-content: flex-start; }
+.ncard .text-only .ncard-text { align-self: stretch; text-align: left; white-space: pre-line; -webkit-line-clamp: 7; line-clamp: 7; flex: 0 1 auto; min-height: 0; }
+/* the date over a dotted line, at the bottom of the screen */
+.ncard-foot { flex: none; margin-top: auto; display: grid; justify-items: center; gap: var(--px); font-size: 14px; line-height: 1; color: var(--muted); }
+.ncard-foot::after { content: ""; width: calc(24 * var(--px)); height: var(--px); background: repeating-linear-gradient(90deg, var(--nw-dk) 0 var(--px), transparent 0 calc(2 * var(--px))); opacity: .6; }
+/* Reading a note: the same window, as tall as the note, drawn big with the border of inspo/simple_notes.jpg (see "The big
+   windows' borders" in page.html): a dark outline with stepped corners, lit along the top and left, and a screen outlined in a
+   deep rose of the note's colour, with a soft line inside and a sparkle on each corner. */
+.nread { --rp: calc(2 * var(--px)); --nw-rose: color-mix(in oklch, var(--nc) 55%, var(--nw-dk));
+  --o: var(--nw-dk); --hl: var(--nw-hi); --sh: color-mix(in srgb, var(--nc) 75%, var(--nw-dk)); --fill: var(--nw-frame);
+  min-height: calc(150 * var(--u)); padding: calc(3 * var(--rp)) calc(4 * var(--rp)) calc(5 * var(--rp)); box-shadow: none; -webkit-mask-box-image: none; mask: none; }
+@supports (color: oklch(from red l c h)) { .nread { --nw-rose: oklch(from var(--nc) calc(l * .6) calc(c * .95) h); } }   /* the note's own hue, deeper and stronger */
+.nread .nwin-bar { padding: 0 0 calc(4 * var(--rp)); gap: var(--s2); }   /* room for the screen's corner sparkles */
+.nread .nwin-name { font-size: 24px; }
+.nread .nwin-screen { --o: var(--nw-rose); --hl: color-mix(in srgb, var(--nc) 62%, var(--surface)); --sh: var(--hl); --out: var(--nw-frame);
+  --spk: color-mix(in srgb, var(--nc) 35%, var(--nw-rose)); --spo: color-mix(in srgb, var(--nc) 70%, var(--nw-rose)); --spc: #fffafd;
+  --fill: color-mix(in srgb, var(--nc) 14%, var(--surface));
+  align-items: stretch; justify-content: flex-start; gap: var(--s4); padding: calc(10 * var(--rp)) var(--s5) calc(7 * var(--rp)); box-shadow: none; -webkit-mask-box-image: none; mask: none; }
+.nread .ndeco .tw.tl { top: calc(6 * var(--rp)); left: calc(6 * var(--rp)); } .nread .ndeco .tw.tr { top: calc(6 * var(--rp)); right: calc(6 * var(--rp)); }
+.nread .ndeco .tw.br { bottom: calc(6 * var(--rp)); right: calc(6 * var(--rp)); }
+.nread .ndoodle { left: calc(5 * var(--rp)); bottom: calc(5 * var(--rp)); }
+.nread .nart { align-self: center; width: min(45%, calc(120 * var(--u))); }
+.nread .nart.photo { width: 100%; }
+.nread .nart.photo img { height: auto; max-height: 70vh; object-fit: contain; border-color: var(--nw-rose); }
+.nread .md { text-align: center; }
+.nread .md ul, .nread .md ol { text-align: left; justify-self: center; }
+.nread .ncard-foot { margin-top: auto; padding-top: var(--s4); }
+.nedit-fields { display: grid; gap: var(--s3); }
+/* a linked note in a diary page: just its title bar, as a small window */
+.nlink { width: 100%; box-sizing: border-box; aspect-ratio: auto; padding: calc(3 * var(--px)); justify-self: stretch; }
+.nlink .nwin-bar { padding: var(--px); }
+/* The form: the card as it will look next to the title, then what goes on it. */
+.nedit-top { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s4); align-items: end; }
+.nkinds { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.nkinds label { position: relative; display: inline-flex; cursor: pointer; }
+.nkinds input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.nkinds span { padding: var(--s1) var(--s4); font-size: 18px; border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); background: var(--surface2); color: var(--ink); }
+.nkinds label:hover span { border-color: var(--edge); }
+.nkinds input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); }
+.nkinds input:focus-visible + span { outline: var(--bw) solid var(--accent-text); outline-offset: calc(-2 * var(--bw)); }
+/* The icon list (the same as Achievement Kitty's; its sheet is off on this screen). */
+.notes .hint { margin: 0; font-size: 16px; font-weight: 400; color: var(--muted); }
+.notes .icon-fold > summary { list-style: none; display: flex; align-items: center; gap: var(--s4); padding: var(--s3) var(--s4); cursor: pointer; border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); background: var(--surface2); color: var(--edge); font-weight: 700; font-size: 18px; }
+.notes .icon-fold > summary::-webkit-details-marker { display: none; }
+.notes .icon-fold > summary:hover { border-color: var(--edge); }
+.notes .fold-name { flex: 1; color: var(--ink); }
+.notes .fold-chev { color: var(--muted); }
+.notes .icon-fold[open] .fold-chev .pxs { transform: rotate(180deg); }
+.notes .icon-pick { margin-top: var(--s4); display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(14 * var(--u)), 1fr)); gap: var(--s3); }
+.notes .icon-pick label { position: relative; display: inline-flex; cursor: pointer; }
+.notes .icon-pick input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.notes .icon-pick span { width: 100%; height: calc(14 * var(--u)); display: grid; place-items: center; border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); background: var(--surface2); color: var(--edge); }
+.notes .icon-pick label:hover span { border-color: var(--edge); }
+.notes .icon-pick input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); }
+.notes .icon-pick input:focus-visible + span { outline: var(--bw) solid var(--accent-text); outline-offset: calc(-2 * var(--bw)); }
+/* corner pixels for the two-pixel outlines (see page.html) */
+.nkinds span, .notes .icon-fold > summary, .notes .icon-pick span, .nswatches span, .ndoodles span, .md pre { position: relative; }
+.nkinds span::after, .notes .icon-fold > summary::after, .notes .icon-pick span::after, .nswatches span::after, .ndoodles span::after, .md pre::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; border: var(--bw) solid; border-color: inherit;
+  -webkit-mask-box-image: var(--patch-box); }
+/* the colour and doodle choices */
+.nswatches, .ndoodles { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.nswatches label, .ndoodles label { position: relative; display: inline-flex; cursor: pointer; }
+.nswatches input, .ndoodles input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.nswatches span { width: calc(11 * var(--u)); height: calc(11 * var(--u)); background: var(--nc); border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m);
+  box-shadow: inset 0 calc(-3 * var(--px)) 0 color-mix(in srgb, var(--nc) 70%, #231d44); }
+.nswatches input:checked + span { border-color: var(--ink); box-shadow: inset 0 0 0 var(--bw) var(--surface); }
+.ndoodles span { min-width: calc(13 * var(--u)); height: calc(13 * var(--u)); padding: 0 var(--s2); display: grid; place-items: center; font-size: 16px; color: var(--edge);
+  border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); background: var(--surface2); }
+.ndoodles input:checked + span { background: var(--accent-soft); border-color: var(--accent-edge); color: var(--ink); }
+.nswatches input:focus-visible + span, .ndoodles input:focus-visible + span { outline: var(--bw) solid var(--accent-text); outline-offset: calc(-2 * var(--bw)); }
+#note-cover { display: grid; gap: var(--s3); margin-top: var(--s3); }
 .ntools { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
 .ntools .grow { flex: 1; }
-.ntext { min-height: calc(110 * var(--px)); font: 500 20px/1.4 var(--font) !important; resize: vertical; }
-.nstate { font-size: 15px; color: var(--muted); }
+.ntext { min-height: calc(110 * var(--u)); font: 500 20px/1.4 var(--font) !important; resize: vertical; }
+.nstate { font-size: 16px; color: var(--muted); }
 .md { font: 500 20px/1.4 var(--font); overflow-wrap: anywhere; display: grid; gap: var(--s3); }
 .md > * { margin: 0; }
-.md h1, .md h2, .md h3, .md h4 { font: 700 26px/1.15 var(--font); }
-.md h2 { font-size: 23px; } .md h3, .md h4 { font-size: 20px; }
-.md ul, .md ol { padding-left: calc(6 * var(--px)); display: grid; gap: var(--s1); }
-.md li.task { list-style: none; margin-left: calc(-5 * var(--px)); }
+.md h1, .md h2, .md h3, .md h4 { font: 700 24px/1.15 var(--font); }
+.md h2 { font-size: 24px; } .md h3, .md h4 { font-size: 20px; }
+.md ul, .md ol { padding-left: calc(6 * var(--u)); display: grid; gap: var(--s1); }
+.md li.task { list-style: none; margin-left: calc(-5 * var(--u)); }
 .md code { background: var(--surface2); padding: 0 var(--s1); }
-.md pre { background: var(--surface2); border: var(--px) solid var(--line); padding: var(--s3); overflow-x: auto; white-space: pre; }
+.md pre { background: var(--surface2); border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); padding: var(--s3); overflow-x: auto; white-space: pre; }
 .md blockquote { border-left: var(--s1) solid var(--accent); padding-left: var(--s3); color: var(--muted); }
 .md hr { border: 0; border-top: var(--px) solid var(--line); width: 100%; }
 .md a { color: var(--accent-text); }

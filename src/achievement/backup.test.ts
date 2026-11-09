@@ -8,7 +8,7 @@ describe('save files', () => {
   it('round-trips the data and its photos', async () => {
     let d = emptyData();
     const m = saveMainQuest(d, { title: 'Thailand', description: '' }); d = m.data;
-    const s = saveSideQuest(d, { mainQuestId: m.id, title: 'Food', color: '#ff6fa5', icon: 'food' }); d = s.data;
+    const s = saveSideQuest(d, { mainQuestId: m.id, title: 'Food', color: '#f26fa3', icon: 'food' }); d = s.data;
     const a = saveAchievement(d, { title: 'Pad thai', description: '', location: '', icon: 'food', tags: ['street'], mainQuestId: m.id, sideQuestId: s.id, status: 'completed', rarity: 'rare', date: '2026-10-01', photos: [{ imageUrl: 'idb:abc-1' }] });
     const photos = new Map([['idb:abc-1', new Blob([new Uint8Array([1, 2, 3])])]]);
     const back = unpackBackup(await packBackup(a.data, photos));

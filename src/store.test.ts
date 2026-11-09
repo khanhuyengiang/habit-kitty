@@ -1,3 +1,4 @@
+import { dayOf } from './calendar.ts';
 import { describe, expect, it } from 'vitest';
 import { zipSync, strToU8 } from 'fflate';
 import { dayFromName, dayName, entryFromMarkdown, entryToMarkdown, isZip, monthFromKey, monthKey, packBackup, sanitizeExtras, unpackBackup, type DiaryEntry } from './store.ts';
@@ -5,6 +6,22 @@ import { dayFromName, dayName, entryFromMarkdown, entryToMarkdown, isZip, monthF
 const day = Math.round(Date.UTC(2026, 9, 12) / 86_400_000);
 
 describe('diary markdown', () => {
+  it('round-trips a title, a star and a linked note', () => {
+    const e: DiaryEntry = { text: 'x', title: 'Big: day', star: 'sad', note: 'Shopping', updated: 7 };
+    expect(entryFromMarkdown(entryToMarkdown(e))).toEqual({ ...e, mood: undefined, photo: false });
+    expect(entryFromMarkdown('---\nstar: gold\nupdated: 1\n---\nhi')?.star).toBeUndefined();
+  });
+  it('packs a page with four photos and unpacks them in order', () => {
+    const d = dayOf(2026, 9, 12);
+    const b = unpackBackup(packBackup({ game: {}, diary: { [d]: { text: 'x', photo: true, updated: 1 } }, photos: { [d]: new Uint8Array([1]) }, morePhotos: { [d]: [new Uint8Array([2]), new Uint8Array([3]), new Uint8Array([4])] } }));
+    expect(b.diary[d].photos).toBe(4);
+    expect(b.photos[d]).toEqual(new Uint8Array([1]));
+    expect(b.morePhotos?.[d].map((x) => x[0])).toEqual([2, 3, 4]);
+  });
+  it('keeps the Titles and Starry Nights options', () => {
+    expect(sanitizeExtras({ titles: true, starry: true })).toEqual({ titles: true, starry: true });
+    expect(sanitizeExtras({ titles: 'yes', starry: 1 })).toEqual({});
+  });
   it('round-trips text with newlines, quotes and dashes', () => {
     const e: DiaryEntry = { text: 'Dear diary,\n\n"Quoted" --- not a fence\n---\nlast line', mood: 'calm', photo: true, updated: 1760000000000 };
     expect(entryFromMarkdown(entryToMarkdown(e))).toEqual(e);

@@ -3,8 +3,9 @@
 // widget and music run in the background whichever screen is showing; the others start the first time they are shown.
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
-import { APP_TITLE, GO_EVENT, SHOWN_EVENT, TAB_EVENT, shownApp, type AppName } from '../shared/apps.ts';
+import { APP_TITLE, GO_EVENT, SHOWN_EVENT, TAB_EVENT, rememberApp, shownApp, type AppName } from '../shared/apps.ts';
 import { paintBackdrop } from '../shared/backdrop.ts';
+import '../shared/ui.ts';   // the saved light/dark choice, before the first paint
 
 const started = new Set<AppName>();
 
@@ -18,7 +19,7 @@ function start(app: AppName) {
   else import('../home/app.ts');
 }
 
-// Habit Kitty's stylesheet draws the home page too; Achievement Kitty has its own.
+// The shared sheet is always on; Habit Kitty's draws the home page and the Journal too, Achievement Kitty has its own.
 const styleOf = (app: AppName) => (app === 'achievement' ? 'achievement' : 'habit');
 
 function show(app: AppName, tab?: string) {
@@ -27,6 +28,7 @@ function show(app: AppName, tab?: string) {
   for (const s of document.querySelectorAll<HTMLStyleElement>('style[data-app]')) s.media = s.dataset.app === styleOf(app) ? 'all' : 'not all';
   for (const el of document.querySelectorAll<HTMLElement>('[data-app-root]')) el.hidden = el.dataset.appRoot !== app;
   document.title = APP_TITLE[app];
+  rememberApp(app);
   paintBackdrop();
   if (started.has(app)) document.dispatchEvent(new CustomEvent(SHOWN_EVENT, { detail: app }));
   else start(app);

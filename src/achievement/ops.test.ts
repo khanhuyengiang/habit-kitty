@@ -10,7 +10,7 @@ import { inkFor, isValidDate } from './model.ts';
 function world() {
   let d = emptyData();
   const m = saveMainQuest(d, { title: 'Discover Thailand', description: '' }); d = m.data;
-  const f = saveSideQuest(d, { mainQuestId: m.id, title: 'Food', color: '#ff6fa5', icon: 'food' }); d = f.data;
+  const f = saveSideQuest(d, { mainQuestId: m.id, title: 'Food', color: '#f26fa3', icon: 'food' }); d = f.data;
   const s = saveSideQuest(d, { mainQuestId: m.id, title: 'Sightseeing', color: '#4a9bea', icon: 'temple' }); d = s.data;
   return { d, main: m.id, food: f.id, sights: s.id };
 }
@@ -29,7 +29,7 @@ describe('quests', () => {
   it('rejects empty and duplicate names', () => {
     const w = world();
     expect(saveMainQuest(w.d, { title: '  ', description: '' }).errors.title).toBeTruthy();
-    expect(saveSideQuest(w.d, { mainQuestId: w.main, title: 'food', color: '#ff6fa5', icon: 'food' }).errors.title).toMatch(/already/);
+    expect(saveSideQuest(w.d, { mainQuestId: w.main, title: 'food', color: '#f26fa3', icon: 'food' }).errors.title).toMatch(/already/);
     expect(saveSideQuest(w.d, { mainQuestId: w.main, title: 'X', color: 'red', icon: 'food' }).errors.color).toBeTruthy();
   });
   it('recolouring a side quest keeps its id, so its cards follow', () => {
@@ -147,6 +147,11 @@ describe('achievements', () => {
     expect(migrate(old).achievements[0].tags).toEqual([]);
     expect(migrate(a)).toBe(a);
   });
+  it('moves side-quest colours saved before the palette to their palette colour', () => {
+    const w = world();
+    const old = { ...w.d, sideQuests: w.d.sideQuests.map((s) => ({ ...s, color: '#ff6fa5' })) };
+    expect(migrate(old).sideQuests.every((s) => s.color === '#f26fa3')).toBe(true);
+  });
   it('sorts completed first (newest first), then planned by date, and filters', () => {
     const w = world();
     let d = w.d;
@@ -216,7 +221,7 @@ describe('profile and helpers', () => {
   it('validates dates and picks a readable ink colour', () => {
     expect(isValidDate('2024-02-29')).toBe(true);
     expect(isValidDate('2026-02-29')).toBe(false);
-    expect(inkFor('#f2b705')).toBe('#2a2147');
+    expect(inkFor('#f2b705')).toBe('#231d44');
     expect(inkFor('#6a6de8')).toBe('#ffffff');
   });
 });

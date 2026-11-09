@@ -8,11 +8,8 @@ export { PICKER_ICONS, PICKER_ICON_NAMES } from './icons.ts';
 
 // Small interface icons.
 const UI_ICONS: Record<string, string[]> = {
-  loc: ['.ooo.', 'o...o', 'o.o.o', '.o.o.', '..o..'],
   plus: ['..o..', '..o..', 'ooooo', '..o..', '..o..'],
   x: ['o...o', '.o.o.', '..o..', '.o.o.', 'o...o'],
-  tick: ['....o', '...oo', 'o.oo.', '.ooo.', '..o..'],
-  check: ['........o', '.......oo', 'o.....oo.', 'oo...oo..', '.oo.oo...', '..ooo....', '...o.....'],
   prev: ['..o', '.o.', 'o..', '.o.', '..o'],
   next: ['o..', '.o.', '..o', '.o.', 'o..'],
   up: ['..o..', '.ooo.', 'ooooo'],
@@ -22,7 +19,6 @@ const UI_ICONS: Record<string, string[]> = {
   lock: ['..ooo..', '.o...o.', '.o...o.', 'ooooooo', 'ooo.ooo', 'ooo.ooo', 'ooooooo'],
   trash: ['..ooo..', 'ooooooo', '.ooooo.', '.o.o.o.', '.o.o.o.', '.o.o.o.', '.ooooo.'],
   archive: ['ooooooo', 'ooooooo', 'o.....o', 'o.ooo.o', 'o.....o', 'ooooooo'],
-  gear: ['....o....', '.o.ooo.o.', '..ooooo..', '.ooo.ooo.', 'ooo...ooo', '.ooo.ooo.', '..ooooo..', '.o.ooo.o.', '....o....'],
   filter: ['ooooooo', '.ooooo.', '..ooo..', '...o...', '...o...', '...oo..'],
 };
 
@@ -33,17 +29,17 @@ export function iconSvg(name: string, cls = ''): string {
 }
 
 // ---------- card art, on the fine grid ----------
-// The achievement card is drawn at twice the density: one fine pixel is --fpx (half a --px) in the page CSS, and these
-// pictures carry the .fine class so they are sized in it. Colours are CSS variables set on the card, so the side-quest
+// The art is drawn in --px, the page's pixel; on a card these pictures (they carry the .fine class) are sized in the card's
+// own pixel, --cu, instead. Colours are CSS variables set on the card, so the side-quest
 // colour and the rarity reach every pixel without redrawing.
 
 // Outside a card the side-quest colours fall back to the text colour, so an icon in a chip or a block takes its colour.
 const FINE: Record<string, string> = {
-  o: 'var(--dk, color-mix(in srgb, currentColor 30%, #2a1838))', s: 'var(--sq, currentColor)',
-  l: 'var(--sql, color-mix(in srgb, currentColor 40%, #fff))', d: 'var(--sqd, color-mix(in srgb, currentColor 70%, #2a1838))',
+  o: 'var(--dk, color-mix(in srgb, currentColor 30%, #231d44))', s: 'var(--sq, currentColor)',
+  l: 'var(--sql, color-mix(in srgb, currentColor 40%, #fff))', d: 'var(--sqd, color-mix(in srgb, currentColor 70%, #231d44))',
   h: 'var(--hi)', t: 'var(--dith)', S: 'var(--scr)', e: 'var(--panel)', q: 'var(--rar, #a29bb8)',
-  w: '#fffafc', y: '#ffd36e', Y: '#f0a93a', r: '#ff8fb8', R: '#f0506e', g: '#9fd88a', G: '#5fae6e', b: '#9fd0f2', B: '#5b9be0',
-  n: '#d39a68', N: '#8a5a3a', k: '#cfc8dc', K: '#7d7594', c: '#fff1d6',
+  w: '#fffafd', y: '#ffd36e', Y: '#e8a04c', r: '#ff8fb8', R: '#f0506e', g: '#8fe0c8', G: '#45c27a', b: '#8fd0fa', B: '#4a9bea',
+  n: '#c99a73', N: '#8a6a5a', k: '#cdc8e0', K: '#7d7594', c: '#fff3d1',
 };
 
 // Rows of letters to one path per colour (runs merged), so a picture is a handful of elements however dense it is.
@@ -121,15 +117,37 @@ export const burstSvg = (() => {
 })();
 
 // A corner of the card's frame: a screw (always lit from the top left) and a dithered patch along both edges.
-export function cornerSvg(corner: 'tl' | 'tr' | 'bl' | 'br'): string {
+// Big (the card on its own page), it follows inspo/achivement_card.jpg instead: a rose screw lit from the top left with its slot
+// mirrored into each corner (\ at the top left and bottom right, / at the others), and a pale-and-dark checker along both edges
+// that starts on the frame's light line and thins out in its third row.
+export function cornerSvg(corner: 'tl' | 'tr' | 'bl' | 'br', big = false): string {
   const N = 24;
   const g = Array.from({ length: N }, () => Array<string>(N).fill('.'));
   const fx = (x: number) => (corner[1] === 'r' ? N - 1 - x : x), fy = (y: number) => (corner[0] === 'b' ? N - 1 - y : y);
-  for (let y = 2; y < 6; y++) for (let x = 11; x < 23; x++) if ((x + y) % 2) { g[fy(y)][fx(x)] = 't'; g[fy(x)][fx(y)] = 't'; }
-  const screw = ['..ooo..', '.oSSSo.', 'oSSSoSo', 'oSSoSdo', 'oSoSddo', '.odddo.', '..ooo..'];
+  const both = (x: number, y: number, c: string) => { g[fy(y)][fx(x)] = c; g[fy(x)][fx(y)] = c; };
+  if (big) for (let x = 10; x < 19; x++) {
+    const k = x - 10;
+    both(x, 1, k % 2 ? 't' : 'h'); both(x, 2, k % 2 ? 'h' : 't'); if (k % 2) both(x, 3, 't');
+  }
+  else for (let y = 2; y < 6; y++) for (let x = 11; x < 23; x++) if ((x + y) % 2) both(x, y, 't');
+  const screw = big ? bigScrew(corner === 'tl' || corner === 'br')
+    : ['..ooo..', '.oSSSo.', 'oSSSoSo', 'oSSoSdo', 'oSoSddo', '.odddo.', '..ooo..'];
   const x0 = corner[1] === 'r' ? N - 9 : 2, y0 = corner[0] === 'b' ? N - 9 : 2;
   screw.forEach((row, y) => [...row].forEach((c, x) => { if (c !== '.') g[y0 + y][x0 + x] = c; }));
   return fineSvg(g.map((r) => r.join('')), `crn ${corner}`);
+}
+
+// The big card's screw: a round head in a deep shade of the side quest's colour, light along its top left, with a dark slot
+// running edge to edge (\ when `back`, else /).
+function bigScrew(back: boolean): string[] {
+  const ring = ['..ooo..', '.o...o.', 'o.....o', 'o.....o', 'o.....o', '.o...o.', '..ooo..'];
+  return ring.map((row, y) => [...row].map((c, x) => {
+    if (c === 'o') return 'o';
+    if (x === 0 || x === 6 || ((y === 0 || y === 6) && (x < 2 || x > 4)) || ((y === 1 || y === 5) && (x < 1 || x > 5))) return '.';
+    if (back ? x === y : x + y === 6) return 'o';
+    if ((y === 1 && x <= 3) || (x === 1 && y <= 3)) return 'l';
+    return 'd';
+  }).join(''));
 }
 
 // The rarity as stars on the card's top rim: one for normal up to five for legendary, none while locked. Every star

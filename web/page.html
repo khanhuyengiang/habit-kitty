@@ -2,116 +2,329 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jersey+15&display=swap">
-<style data-app="habit">
-/* ONE pixel grid. --px is the size of a single art pixel; every sprite, icon, border, gap and the room is a whole
-   number of them. Picture sizes are columns x --px (see .pxs and .sprite), so nothing is scaled to another pixel size. */
+<style>
+/* Shared by every screen: the home page, Habit Kitty, the Journal and Achievement Kitty. Each app's own sheet (style[data-app])
+   is on only while that app shows (src/web/shell.ts); everything they have in common is here, so it looks the same everywhere.
+
+   ONE pixel grid. --px is one art pixel, the same fine pixel the achievement cards are drawn in. Pictures are columns x --px
+   (see .pxs and .sprite), and borders, notches, outlines and bevels are whole --px. Layout (padding, gaps, the size of
+   buttons and boxes) counts in --u, two pixels, so the page keeps its size while its pixels stay fine.
+   Spacing uses one scale: s2 between neighbours (a label and its field), s3 between controls and list items, s4 inside a
+   box, s5 between boxes, s6 between sections. */
 :root {
-  --px: 3px;
-  --s1: var(--px); --s2: calc(2 * var(--px)); --s3: calc(3 * var(--px)); --s4: calc(4 * var(--px));
-  --s5: calc(5 * var(--px)); --s6: calc(6 * var(--px)); --s8: calc(8 * var(--px));
-  /* stepped corners: one pixel cut from each corner of a box whose border is one pixel wide */
-  --notch: polygon(0 var(--px), var(--px) var(--px), var(--px) 0, calc(100% - var(--px)) 0, calc(100% - var(--px)) var(--px), 100% var(--px),
-    100% calc(100% - var(--px)), calc(100% - var(--px)) calc(100% - var(--px)), calc(100% - var(--px)) 100%, var(--px) 100%, var(--px) calc(100% - var(--px)), 0 calc(100% - var(--px)));
+  --px: 1.5px; --u: calc(2 * var(--px));
+  --s1: var(--u); --s2: calc(2 * var(--u)); --s3: calc(3 * var(--u)); --s4: calc(4 * var(--u));
+  --s5: calc(5 * var(--u)); --s6: calc(6 * var(--u)); --s8: calc(8 * var(--u));
+  /* Every box has a two-pixel border (--bw) and rounded stepped corners (--notch): three pixels cut from the top row, one from the
+     next two, so the corner steps 3-1-1. A cut is never deeper than the border is thick, so the outline has no gaps. */
+  --bw: calc(2 * var(--px));
+  /* The corner shapes are 9-slice masks (-webkit-mask-box-image), painted like borders: the browser snaps them to screen pixels
+     the same way it snaps the border, so the steps sit exactly on the border's pixels wherever the box lands. Each corner slice is
+     whole art pixels (4, or 2 for --notch-s), so its size is whole CSS pixels too. Browsers without it (Firefox, on the website)
+     cut the corners with --notch-m, rectangles in a plain mask, which can be a screen pixel off. */
+  --notch-box: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 9 9' shape-rendering='crispEdges'%3E%3Cpath d='M3 0h1v1h-1zM4 0h1v1h-1zM5 0h1v1h-1zM1 1h1v1h-1zM2 1h1v1h-1zM3 1h1v1h-1zM4 1h1v1h-1zM5 1h1v1h-1zM6 1h1v1h-1zM7 1h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM7 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM6 3h1v1h-1zM7 3h1v1h-1zM8 3h1v1h-1zM0 4h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM5 4h1v1h-1zM6 4h1v1h-1zM7 4h1v1h-1zM8 4h1v1h-1zM0 5h1v1h-1zM1 5h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1zM4 5h1v1h-1zM5 5h1v1h-1zM6 5h1v1h-1zM7 5h1v1h-1zM8 5h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM7 6h1v1h-1zM1 7h1v1h-1zM2 7h1v1h-1zM3 7h1v1h-1zM4 7h1v1h-1zM5 7h1v1h-1zM6 7h1v1h-1zM7 7h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1z'/%3E%3C/svg%3E") 4 fill / calc(4 * var(--px));
+  --notch-s-box: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='5' height='5' viewBox='0 0 5 5' shape-rendering='crispEdges'%3E%3Cpath d='M1 0h1v1h-1zM2 0h1v1h-1zM3 0h1v1h-1zM0 1h1v1h-1zM1 1h1v1h-1zM2 1h1v1h-1zM3 1h1v1h-1zM4 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1z'/%3E%3C/svg%3E") 2 fill / calc(2 * var(--px));   /* one pixel cut, for small boxes */
+  --notch-top-box: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 9 9' shape-rendering='crispEdges'%3E%3Cpath d='M3 0h1v1h-1zM4 0h1v1h-1zM5 0h1v1h-1zM1 1h1v1h-1zM2 1h1v1h-1zM3 1h1v1h-1zM4 1h1v1h-1zM5 1h1v1h-1zM6 1h1v1h-1zM7 1h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM7 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM6 3h1v1h-1zM7 3h1v1h-1zM8 3h1v1h-1zM0 4h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM5 4h1v1h-1zM6 4h1v1h-1zM7 4h1v1h-1zM8 4h1v1h-1zM0 5h1v1h-1zM1 5h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1zM4 5h1v1h-1zM5 5h1v1h-1zM6 5h1v1h-1zM7 5h1v1h-1zM8 5h1v1h-1zM0 6h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM7 6h1v1h-1zM8 6h1v1h-1zM0 7h1v1h-1zM1 7h1v1h-1zM2 7h1v1h-1zM3 7h1v1h-1zM4 7h1v1h-1zM5 7h1v1h-1zM6 7h1v1h-1zM7 7h1v1h-1zM8 7h1v1h-1zM0 8h1v1h-1zM1 8h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1zM8 8h1v1h-1z'/%3E%3C/svg%3E") 4 fill / calc(4 * var(--px));   /* the top corners only */
+  --patch-box: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='5' height='5' viewBox='0 0 5 5' shape-rendering='crispEdges'%3E%3Cpath d='M0 0h1v1h-1zM4 0h1v1h-1zM0 4h1v1h-1zM4 4h1v1h-1z'/%3E%3C/svg%3E") 2 fill / var(--bw);                  /* the corner pixels inside a two-pixel outline: see the ::after below */
+  --notch-m: none; --notch-s-m: none;
+  --hilite: rgba(255, 255, 255, .7);   /* the light line along the top of a key */
   /* Pastel pink, baby blue and lavender. Lavender draws the lines, pink is the accent, blue and cream fill the cards. */
-  --bg: #e0f2fd; --bg2: #ece6fc; --bg3: #fde6f0; --grid: rgba(143, 120, 208, .22);
-  --surface: #fffafd; --surface2: #f3eeff; --ink: #4a3a78; --muted: #7a69a8;
-  --edge: #8f78d0; --line: #d9ccf7; --bevel: #d8cbf6;
-  --accent: #ff8fb8; --accent-ink: #4a2a5e; --accent-edge: #d9608f; --accent-shade: #f26fa3; --accent-text: #c23f7c;
+  --bg: #e0f2fd; --bg2: #f3ecff; --bg3: #ffe3ee; --grid: rgba(143, 120, 208, .22);
+  --surface: #fffafd; --surface2: #f3ecff; --ink: #4a3a78; --muted: #7d7594;
+  --edge: #8f78d0; --line: #d9ccf7; --bevel: #d9ccf7;
+  --accent: #ff8fb8; --accent-ink: #4d2f68; --accent-edge: #d9608f; --accent-shade: #f26fa3; --accent-text: #c23f7c;
   --accent-soft: #ffe3ee; --accent-pastel: #ffc4da;
   /* Heatmap: every state is a pastel, kept apart by hue AND lightness. */
-  --habit: #7cc7f5; --fed: #8fe0c8; --missed: #ff86ac; --today: #ffcf5c; --sitter: #b9a3f0; --none: #efe8fb;
-  --warn-bg: #fff3d1; --warn-ink: #7a4d09;
+  --habit: #8fd0fa; --fed: #8fe0c8; --missed: #ff8fb8; --today: #ffd36e; --sitter: #b9a3f0; --none: #f3ecff;
+  --warn-bg: #fff3d1; --warn-ink: #7a4d09; --bad: #c23f7c; --ok: #2f9e6e;
   --dot1: #ff8fb8; --dot2: #b9a3f0; --dot3: #8fd0fa;
   --font: "Jersey 15", "Courier New", monospace;
-  --font-display: var(--font); --font-body: var(--font); --font-mono: var(--font);
+  /* both titles are one size, small enough for "Achievement Kitty" to stay on one line next to its buttons, so every title bar is the same */
+  --title-size: 36px;
 }
-@media (min-width: 480px) { :root { --px: 4px; } }
-@media (max-width: 353px) { :root { --px: 2px; } }
+@media (max-width: 479px) { :root { --title-size: 27px; } }
+@media (min-width: 480px) { :root { --px: 2px; } }
+@media (max-width: 353px) { :root { --px: 1px; } }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #231d44; --bg2: #2b2352; --bg3: #35244f; --grid: rgba(165, 143, 232, .16);
-  --surface: #322a5e; --surface2: #3b3270; --ink: #f3ecff; --muted: #bdb0e6;
-  --edge: #a58fe8; --line: #4a4084; --bevel: #2a2352;
-  --accent: #ff8fb8; --accent-ink: #3a1a4e; --accent-edge: #ffb3d0; --accent-shade: #d9608f; --accent-text: #ff9ec3;
+  --bg: #231d44; --bg2: #2b2352; --bg3: #35244f; --grid: rgba(154, 140, 200, .16);
+  --surface: #322a5e; --surface2: #3d2c63; --ink: #f3ecff; --muted: #bdb0e6;
+  --edge: #9a8cc8; --line: #4a4084; --bevel: #2b2352;
+  --accent: #ff8fb8; --accent-ink: #35244f; --accent-edge: #ffb3d0; --accent-shade: #d9608f; --accent-text: #ff8fb8;
   --accent-soft: #4d2f68; --accent-pastel: #7d3f7f;
-  --habit: #5fb3e0; --fed: #5fc7a8; --missed: #e86c93; --today: #ffd36e; --sitter: #8f7ae0; --none: #3f3678;
-  --warn-bg: #4a3a1c; --warn-ink: #f5d99b; color-scheme: dark;
+  --habit: #4a9bea; --fed: #5fc7a8; --missed: #f26fa3; --today: #ffd36e; --sitter: #8f78d0; --none: #4a3a78;
+  --warn-bg: #4a3a1c; --warn-ink: #f1cfa0; --bad: #ff7d9f; --ok: #5fc7a8; --hilite: rgba(255, 255, 255, .14); color-scheme: dark;
 } }
+@supports not (-webkit-mask-box-image: none) { :root { --notch-m: linear-gradient(#000 0 0) center / calc(100% - 6 * var(--px)) 100% no-repeat, linear-gradient(#000 0 0) center / calc(100% - 2 * var(--px)) calc(100% - 2 * var(--px)) no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - 6 * var(--px)) no-repeat; --notch-s-m: linear-gradient(#000 0 0) center / calc(100% - 2 * var(--px)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - 2 * var(--px)) no-repeat; --notch-box: none; --notch-s-box: none; --notch-top-box: none; --patch-box: none; } }
+/* The big windows' borders (after inspo/): a one-pixel outline whose corners step in three pixels along a 45° diagonal, a light
+   line inside it along the top and left and a shade along the bottom and right (both following the diagonal). Drawn in --rp,
+   the window's own pixel, in the colours each window sets: --o (outline), --hl (light), --sh (shade), --hc (the inner pixel of
+   the top-right and bottom-left corners, none by default), --fill (one or more
+   background layers). The note's screen (after inspo/simple_notes.jpg) is not cut: it sits on its window, so its corner's three
+   outside pixels are painted the window's colour (--out), its outline turns the corner with a single diagonal pixel, and a
+   sparkle (--spk, with a --spc centre) sits just inside each corner. */
+.card.big::before, .card.big :is(.card-head, .card-screen, .card-foot), .nwin.nread {
+  clip-path: polygon(0 calc(3 * var(--rp)), var(--rp) calc(3 * var(--rp)), var(--rp) calc(2 * var(--rp)), calc(2 * var(--rp)) calc(2 * var(--rp)), calc(2 * var(--rp)) var(--rp), calc(3 * var(--rp)) var(--rp), calc(3 * var(--rp)) 0, calc(100% - 3 * var(--rp)) 0, calc(100% - 3 * var(--rp)) var(--rp), calc(100% - 2 * var(--rp)) var(--rp), calc(100% - 2 * var(--rp)) calc(2 * var(--rp)), calc(100% - 1 * var(--rp)) calc(2 * var(--rp)), calc(100% - 1 * var(--rp)) calc(3 * var(--rp)), 100% calc(3 * var(--rp)), 100% calc(100% - 3 * var(--rp)), calc(100% - 1 * var(--rp)) calc(100% - 3 * var(--rp)), calc(100% - 1 * var(--rp)) calc(100% - 2 * var(--rp)), calc(100% - 2 * var(--rp)) calc(100% - 2 * var(--rp)), calc(100% - 2 * var(--rp)) calc(100% - 1 * var(--rp)), calc(100% - 3 * var(--rp)) calc(100% - 1 * var(--rp)), calc(100% - 3 * var(--rp)) 100%, calc(3 * var(--rp)) 100%, calc(3 * var(--rp)) calc(100% - 1 * var(--rp)), calc(2 * var(--rp)) calc(100% - 1 * var(--rp)), calc(2 * var(--rp)) calc(100% - 2 * var(--rp)), var(--rp) calc(100% - 2 * var(--rp)), var(--rp) calc(100% - 3 * var(--rp)), 0 calc(100% - 3 * var(--rp)));
+  background:
+    linear-gradient(var(--o) 0 0) left calc(2 * var(--rp)) top var(--rp) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--o) 0 0) left var(--rp) top calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--o) 0 0) right calc(2 * var(--rp)) top var(--rp) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--o) 0 0) right var(--rp) top calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--o) 0 0) left calc(2 * var(--rp)) bottom var(--rp) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--o) 0 0) left var(--rp) bottom calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--o) 0 0) right calc(2 * var(--rp)) bottom var(--rp) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--o) 0 0) right var(--rp) bottom calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--hl) 0 0) left calc(2 * var(--rp)) top calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--sh) 0 0) right calc(2 * var(--rp)) bottom calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--hc, transparent) 0 0) right calc(2 * var(--rp)) top calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--hc, transparent) 0 0) left calc(2 * var(--rp)) bottom calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--o) 0 0) 0 0 / 100% var(--rp) no-repeat, linear-gradient(var(--o) 0 0) 0 100% / 100% var(--rp) no-repeat,
+    linear-gradient(var(--o) 0 0) 0 0 / var(--rp) 100% no-repeat, linear-gradient(var(--o) 0 0) 100% 0 / var(--rp) 100% no-repeat,
+    linear-gradient(var(--hl) 0 0) 0 0 / 100% calc(2 * var(--rp)) no-repeat, linear-gradient(var(--hl) 0 0) 0 0 / calc(2 * var(--rp)) 100% no-repeat,
+    linear-gradient(var(--sh) 0 0) 0 100% / 100% calc(2 * var(--rp)) no-repeat, linear-gradient(var(--sh) 0 0) 100% 0 / calc(2 * var(--rp)) 100% no-repeat,
+    var(--fill); }
+.nread .nwin-screen, .nwin.nread .nwin-screen {
+  background:
+    linear-gradient(var(--spc) 0 0) left calc(2 * var(--rp)) top calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--spk) 0 0) left var(--rp) top calc(2 * var(--rp)) / calc(3 * var(--rp)) var(--rp) no-repeat,
+    linear-gradient(var(--spk) 0 0) left calc(2 * var(--rp)) top var(--rp) / var(--rp) calc(3 * var(--rp)) no-repeat,
+    linear-gradient(var(--spc) 0 0) left calc(2 * var(--rp)) bottom calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--spk) 0 0) left var(--rp) bottom calc(2 * var(--rp)) / calc(3 * var(--rp)) var(--rp) no-repeat,
+    linear-gradient(var(--spk) 0 0) left calc(2 * var(--rp)) bottom var(--rp) / var(--rp) calc(3 * var(--rp)) no-repeat,
+    linear-gradient(var(--spc) 0 0) right calc(2 * var(--rp)) top calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--spk) 0 0) right var(--rp) top calc(2 * var(--rp)) / calc(3 * var(--rp)) var(--rp) no-repeat,
+    linear-gradient(var(--spk) 0 0) right calc(2 * var(--rp)) top var(--rp) / var(--rp) calc(3 * var(--rp)) no-repeat,
+    linear-gradient(var(--spc) 0 0) right calc(2 * var(--rp)) bottom calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--spk) 0 0) right var(--rp) bottom calc(2 * var(--rp)) / calc(3 * var(--rp)) var(--rp) no-repeat,
+    linear-gradient(var(--spk) 0 0) right calc(2 * var(--rp)) bottom var(--rp) / var(--rp) calc(3 * var(--rp)) no-repeat,
+    linear-gradient(var(--o) 0 0) left var(--rp) top var(--rp) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--out) 0 0) left 0 top 0 / calc(2 * var(--rp)) var(--rp) no-repeat,
+    linear-gradient(var(--out) 0 0) left 0 top 0 / var(--rp) calc(2 * var(--rp)) no-repeat,
+    linear-gradient(var(--o) 0 0) left var(--rp) bottom var(--rp) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--out) 0 0) left 0 bottom 0 / calc(2 * var(--rp)) var(--rp) no-repeat,
+    linear-gradient(var(--out) 0 0) left 0 bottom 0 / var(--rp) calc(2 * var(--rp)) no-repeat,
+    linear-gradient(var(--o) 0 0) right var(--rp) top var(--rp) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--out) 0 0) right 0 top 0 / calc(2 * var(--rp)) var(--rp) no-repeat,
+    linear-gradient(var(--out) 0 0) right 0 top 0 / var(--rp) calc(2 * var(--rp)) no-repeat,
+    linear-gradient(var(--o) 0 0) right var(--rp) bottom var(--rp) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--out) 0 0) right 0 bottom 0 / calc(2 * var(--rp)) var(--rp) no-repeat,
+    linear-gradient(var(--out) 0 0) right 0 bottom 0 / var(--rp) calc(2 * var(--rp)) no-repeat,
+    linear-gradient(var(--o) 0 0) 0 0 / 100% var(--rp) no-repeat, linear-gradient(var(--o) 0 0) 0 100% / 100% var(--rp) no-repeat,
+    linear-gradient(var(--o) 0 0) 0 0 / var(--rp) 100% no-repeat, linear-gradient(var(--o) 0 0) 100% 0 / var(--rp) 100% no-repeat,
+    linear-gradient(var(--hl) 0 0) 0 0 / 100% calc(2 * var(--rp)) no-repeat, linear-gradient(var(--hl) 0 0) 0 0 / calc(2 * var(--rp)) 100% no-repeat,
+    linear-gradient(var(--sh) 0 0) 0 100% / 100% calc(2 * var(--rp)) no-repeat, linear-gradient(var(--sh) 0 0) 100% 0 / calc(2 * var(--rp)) 100% no-repeat,
+    var(--fill); }
+/* ...and a smaller, lighter sparkle just outside each corner, on the window's frame (--spo, with the same --spc centre) */
+.nwin.nread .nwin-screen::before { content: ""; position: absolute; inset: calc(-3 * var(--rp)); pointer-events: none;
+  background:
+    linear-gradient(var(--spc) 0 0) left calc(2 * var(--rp)) top calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--spo) 0 0) left var(--rp) top calc(2 * var(--rp)) / calc(3 * var(--rp)) var(--rp) no-repeat,
+    linear-gradient(var(--spo) 0 0) left calc(2 * var(--rp)) top var(--rp) / var(--rp) calc(3 * var(--rp)) no-repeat,
+    linear-gradient(var(--spc) 0 0) left calc(2 * var(--rp)) bottom calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--spo) 0 0) left var(--rp) bottom calc(2 * var(--rp)) / calc(3 * var(--rp)) var(--rp) no-repeat,
+    linear-gradient(var(--spo) 0 0) left calc(2 * var(--rp)) bottom var(--rp) / var(--rp) calc(3 * var(--rp)) no-repeat,
+    linear-gradient(var(--spc) 0 0) right calc(2 * var(--rp)) top calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--spo) 0 0) right var(--rp) top calc(2 * var(--rp)) / calc(3 * var(--rp)) var(--rp) no-repeat,
+    linear-gradient(var(--spo) 0 0) right calc(2 * var(--rp)) top var(--rp) / var(--rp) calc(3 * var(--rp)) no-repeat,
+    linear-gradient(var(--spc) 0 0) right calc(2 * var(--rp)) bottom calc(2 * var(--rp)) / var(--rp) var(--rp) no-repeat,
+    linear-gradient(var(--spo) 0 0) right var(--rp) bottom calc(2 * var(--rp)) / calc(3 * var(--rp)) var(--rp) no-repeat,
+    linear-gradient(var(--spo) 0 0) right calc(2 * var(--rp)) bottom var(--rp) / var(--rp) calc(3 * var(--rp)) no-repeat; }
 :root[data-theme="dark"] {
-  --bg: #231d44; --bg2: #2b2352; --bg3: #35244f; --grid: rgba(165, 143, 232, .16);
-  --surface: #322a5e; --surface2: #3b3270; --ink: #f3ecff; --muted: #bdb0e6;
-  --edge: #a58fe8; --line: #4a4084; --bevel: #2a2352;
-  --accent: #ff8fb8; --accent-ink: #3a1a4e; --accent-edge: #ffb3d0; --accent-shade: #d9608f; --accent-text: #ff9ec3;
+  --bg: #231d44; --bg2: #2b2352; --bg3: #35244f; --grid: rgba(154, 140, 200, .16);
+  --surface: #322a5e; --surface2: #3d2c63; --ink: #f3ecff; --muted: #bdb0e6;
+  --edge: #9a8cc8; --line: #4a4084; --bevel: #2b2352;
+  --accent: #ff8fb8; --accent-ink: #35244f; --accent-edge: #ffb3d0; --accent-shade: #d9608f; --accent-text: #ff8fb8;
   --accent-soft: #4d2f68; --accent-pastel: #7d3f7f;
-  --habit: #5fb3e0; --fed: #5fc7a8; --missed: #e86c93; --today: #ffd36e; --sitter: #8f7ae0; --none: #3f3678;
-  --warn-bg: #4a3a1c; --warn-ink: #f5d99b; color-scheme: dark;
+  --habit: #4a9bea; --fed: #5fc7a8; --missed: #f26fa3; --today: #ffd36e; --sitter: #8f78d0; --none: #4a3a78;
+  --warn-bg: #4a3a1c; --warn-ink: #f1cfa0; --bad: #ff7d9f; --ok: #5fc7a8; --hilite: rgba(255, 255, 255, .14); color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 /* no text selection or long-press callout anywhere except where you type (inputs, textareas) */
 body { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 input, textarea, [contenteditable] { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
-body { color: var(--ink); font: 400 20px/1.35 var(--font); -webkit-font-smoothing: none; font-synthesis: none; }
-.wrap { max-width: 480px; margin: 0 auto; padding-inline: var(--s5); padding-block: var(--s6) calc(40 * var(--px)); display: grid; gap: var(--s8); }
+/* the pixel grid over a dithered gradient of baby blue, lavender and pink, drawn by src/shared/backdrop.ts (until it is, three flat bands) */
+body {
+  margin: 0; min-height: 100vh; image-rendering: pixelated;
+  color: var(--ink); font: 400 20px/1.35 var(--font); -webkit-font-smoothing: none; font-synthesis: none;
+  background:
+    linear-gradient(var(--grid) var(--px), transparent 0) 0 0 / calc(8 * var(--u)) calc(8 * var(--u)),
+    linear-gradient(90deg, var(--grid) var(--px), transparent 0) 0 0 / calc(8 * var(--u)) calc(8 * var(--u)),
+    var(--backdrop, linear-gradient(var(--bg) 0 34%, var(--bg2) 34% 67%, var(--bg3) 67%)) 0 0 / var(--backdrop-size, auto) fixed;
+}
+/* the fancy background (Settings → Look): its dots and pictures are in the backdrop itself, so the grid lines go */
+:root[data-fancy] body { background: var(--backdrop, linear-gradient(var(--bg) 0 34%, var(--bg2) 34% 67%, var(--bg3) 67%)) 0 0 / var(--backdrop-size, auto) fixed; }
+[data-app-root] { image-rendering: auto; }   /* pixelated is for the backdrop; it is inherited, so each app picks its own */
+.wrap { max-width: 480px; margin: 0 auto; padding: var(--s6) var(--s5) calc(24 * var(--u)); display: grid; gap: var(--s6); align-content: start; }
 h1, h2, h3 { margin: 0; text-wrap: balance; }
 h2 { font: 700 18px/1 var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 p { margin: 0; }
 button, input, select, textarea { font: inherit; color: inherit; border-radius: 0; }
 button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
-:focus-visible { outline: var(--px) solid var(--accent-text); outline-offset: calc(-2 * var(--px)); }
+:focus-visible { outline: var(--bw) solid var(--accent-text); outline-offset: calc(-2 * var(--bw)); }
 .muted { color: var(--muted); }
-.num { font-family: var(--font); font-variant-numeric: tabular-nums; }
+.num { font-variant-numeric: tabular-nums; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.hint-c { text-align: center; font-size: 16px; }   /* a quiet line of help under a list */
+.stack { display: grid; gap: var(--s2); }
 
 /* ---------- pictures: always columns x --px ---------- */
 .pxs { display: block; flex: none; width: calc(var(--w) * var(--px)); height: calc(var(--h) * var(--px)); }
 .pxs.ico { fill: currentColor; }
 .sprite { display: block; width: calc(var(--w, 23) * var(--px)); height: auto; }
+
+/* ---------- pixel boxes: a two-pixel border and rounded stepped corners ---------- */
+.panel, .cat, .btn, .gear, .x-close, .toast, .bar, .avatar, .banner, .field input, .field select, .field textarea, .chips span {
+  border: var(--bw) solid var(--edge); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m);
+}
+/* The corner step is cut deeper than one pixel, so on its own the outline would be one pixel thin where it turns. One more
+   pixel of the border's colour inside each corner keeps the line two pixels thick all the way round. (Fields can't have
+   ::after, so theirs is in their background, below; small boxes use --notch-s, which needs none.) */
+.panel, .cat, .btn, .gear, .x-close, .toast, .bar, .avatar, .banner, .chips span, .update, .distrust, .travel-note, .reminder-status.bad, .week, .chip, .clock-btn, .modes label, .moods button, .catlog li, .acc li, .dot, .hp, .room, .seg, .month-nav button:not(.month-title), .pick { position: relative; }
+.panel::after, .cat::after, .btn::after, .gear::after, .x-close::after, .toast::after, .bar::after, .avatar::after, .banner::after, .chips span::after, .update::after, .distrust::after, .travel-note::after, .reminder-status.bad::after, .week::after, .chip::after, .clock-btn::after, .modes label::after, .moods button::after, .catlog li::after, .acc li::after, .dot::after, .hp::after, .room::after, .seg::after, .month-nav button:not(.month-title)::after, .pick::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; border: var(--bw) solid; border-color: inherit;
+  -webkit-mask-box-image: var(--patch-box); }
+
+/* ---------- the title bar: the same on every screen, so its buttons never move ---------- */
+.top { display: grid; gap: var(--s3); }
+.brand { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); }
+.brand h1 { font: 700 var(--title-size)/1 var(--font); white-space: nowrap; letter-spacing: .02em; text-shadow: var(--px) var(--px) 0 var(--line); }
+.brand h1 .kitty { color: var(--accent-text); }
+.brand-r { display: flex; align-items: center; gap: var(--s3); }
+.gear { width: calc(13 * var(--u)); height: calc(13 * var(--u)); display: grid; place-items: center; padding: 0; background: var(--surface); color: var(--ink);
+  box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--bevel); }
+
+/* ---------- buttons: a raised pixel key with a bevel; pressing it drops onto the bevel ---------- */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--s2); padding: var(--s3) var(--s4) calc(var(--s3) + 3 * var(--px));
+  font-weight: 700; line-height: 1.2; text-decoration: none; background: var(--surface2); color: var(--ink); box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--line); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--accent-shade); }
+.btn.small { padding: var(--s2) var(--s3) calc(var(--s2) + 3 * var(--px)); font-size: 18px; }
+.btn.danger { color: var(--bad); }
+@media (hover: hover) {
+  .btn:hover:not(:disabled) { background: var(--accent-soft); }
+  .btn.primary:hover:not(:disabled) { background: var(--accent-shade); }
+}
+.btn:active:not(:disabled), .gear:active { transform: translateY(calc(3 * var(--px))); box-shadow: none; }
+.btn:disabled { background: var(--none); color: var(--muted); border-color: var(--line); box-shadow: none; cursor: default; }
+.btns { display: flex; gap: var(--s2); }
+.linkish { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; text-decoration-thickness: var(--px); text-underline-offset: var(--px); font-size: 18px; }
+
+/* ---------- tabs: a thin switch with rounder corners; the chosen tab is a pink key inside it ---------- */
+.nav { display: grid; gap: var(--s2); }
+.seg { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(max-content, 1fr); padding: var(--px); background: var(--surface);
+  border: var(--bw) solid var(--edge); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); overflow-x: auto; scrollbar-width: none; }
+.seg::-webkit-scrollbar { display: none; }
+.seg button { position: relative; border: 0; background: transparent; padding: var(--s1) var(--s3); font-size: 18px; font-weight: 700; line-height: 1.2;
+  white-space: nowrap; color: var(--muted); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); }
+.seg button[aria-selected="true"], .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.seg button .num { font-size: 16px; opacity: .8; }
+
+/* ---------- windows: three little title-bar keys in the top corner, each a coloured square in a one-pixel outline ---------- */
+.panel, .cat { --wk: calc(var(--s2) + 2 * var(--px)); background-color: var(--surface);
+  background-image: linear-gradient(var(--dot1), var(--dot1)), linear-gradient(var(--dot2), var(--dot2)), linear-gradient(var(--dot3), var(--dot3)),
+    linear-gradient(var(--edge), var(--edge)), linear-gradient(var(--edge), var(--edge)), linear-gradient(var(--edge), var(--edge));
+  background-size: var(--s2) var(--s2), var(--s2) var(--s2), var(--s2) var(--s2), var(--wk) var(--wk), var(--wk) var(--wk), var(--wk) var(--wk); background-repeat: no-repeat;
+  background-position: right calc(11 * var(--u) + var(--px)) top calc(var(--s1) + var(--px)), right calc(6.5 * var(--u) + var(--px)) top calc(var(--s1) + var(--px)), right calc(2 * var(--u) + var(--px)) top calc(var(--s1) + var(--px)),
+    right calc(11 * var(--u)) top var(--s1), right calc(6.5 * var(--u)) top var(--s1), right calc(2 * var(--u)) top var(--s1);
+  box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--bevel); }
+.panel { padding: var(--s5); display: grid; gap: var(--s4); align-content: start; min-width: 0; }
+.panel h3 { font: 700 24px/1.1 var(--font); overflow-wrap: anywhere; }
+.panel > h3, .x-close ~ h3 { padding-right: calc(12 * var(--u)); }
+
+/* ---------- dialogs: a checkerboard dither over the page ---------- */
+.scrim { position: fixed; inset: 0; background: conic-gradient(rgba(74, 58, 120, .32) 25%, transparent 0 50%, rgba(74, 58, 120, .32) 0 75%, transparent 0) 0 0 / var(--s2) var(--s2);
+  display: grid; place-items: center; padding: var(--s4); z-index: 10; overflow-y: auto; }
+.scrim .panel { background-image: none; width: min(calc(150 * var(--u)), 100%); max-height: calc(100vh - 2 * var(--s4)); overflow: auto; position: relative; }
+.x-close { position: absolute; top: var(--s2); right: var(--s2); z-index: 1; width: calc(11 * var(--u)); height: calc(11 * var(--u)); padding: 0; display: grid; place-items: center;
+  background: var(--surface2); color: var(--ink); box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--line); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--s5) + env(safe-area-inset-bottom, 0px)); z-index: 30;
+  width: max-content; max-width: min(calc(150 * var(--u)), calc(100% - 2 * var(--s4))); background: var(--surface); color: var(--ink);
+  padding: var(--s3) var(--s4); font-size: 18px; box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--bevel); }
+@media (prefers-reduced-motion: no-preference) { .toast { animation: pop .18s steps(3); } }
+@keyframes pop { from { transform: translate(-50%, var(--s2)); } }
+.banner { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; padding: var(--s3) var(--s4);
+  background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-ink); font-size: 18px; }
+
+/* ---------- forms ---------- */
+.field { display: grid; align-content: start; gap: var(--s1); font-size: 18px; font-weight: 600; min-width: 0; border: 0; padding: 0; margin: 0; }
+.field > legend { padding: 0; margin-bottom: var(--s1); }
+.field input, .field select, .field textarea { --bc: var(--line); width: 100%; padding: var(--s3); border-color: var(--bc); background: linear-gradient(var(--bc), var(--bc)) 0 0 / var(--px) var(--px) no-repeat, linear-gradient(var(--bc), var(--bc)) 100% 0 / var(--px) var(--px) no-repeat, linear-gradient(var(--bc), var(--bc)) 0 100% / var(--px) var(--px) no-repeat, linear-gradient(var(--bc), var(--bc)) 100% 100% / var(--px) var(--px) no-repeat, var(--surface2); font-weight: 500; font-size: 20px; }
+.field input { -webkit-appearance: none; appearance: none; }   /* so a type=search field is drawn like the rest, not as the browser's search box */
+.field input[type=search]::-webkit-search-decoration, .field input[type=search]::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }
+.field input:focus, .field select:focus, .field textarea:focus { --bc: var(--edge); }
+.field select { appearance: none; padding-right: calc(10 * var(--u));
+  background: linear-gradient(var(--bc), var(--bc)) 0 0 / var(--px) var(--px) no-repeat, linear-gradient(var(--bc), var(--bc)) 100% 0 / var(--px) var(--px) no-repeat, linear-gradient(var(--bc), var(--bc)) 0 100% / var(--px) var(--px) no-repeat, linear-gradient(var(--bc), var(--bc)) 100% 100% / var(--px) var(--px) no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 5 3' shape-rendering='crispEdges'%3E%3Cpath fill='%238f78d0' d='M0 0h5v1h-5zM1 1h3v1h-3zM2 2h1v1h-1z'/%3E%3C/svg%3E") right var(--s3) center / calc(5 * var(--u)) calc(3 * var(--u)) no-repeat, var(--surface2); }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
+/* checkboxes are drawn here, not by the browser */
+.check { display: flex; gap: var(--s3); align-items: flex-start; cursor: pointer; }
+.check input { appearance: none; -webkit-appearance: none; flex: none; width: calc(7 * var(--u)); height: calc(7 * var(--u)); margin: 0; border: var(--bw) solid var(--edge); -webkit-mask-box-image: var(--notch-s-box); mask: var(--notch-s-m);
+  background: var(--surface2) center / calc(5 * var(--u)) calc(5 * var(--u)) no-repeat; image-rendering: pixelated; cursor: pointer; }
+.check input:checked { background-color: var(--accent); border-color: var(--accent-edge);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 5 5' shape-rendering='crispEdges'%3E%3Cpath fill='%234a2a5e' d='M4 0h1v1h-1zM3 1h2v1h-2zM0 2h1v1h-1zM2 2h2v1h-2zM1 3h3v1h-3zM2 4h1v1h-1z'/%3E%3C/svg%3E"); }
+/* a row of choices (radio buttons drawn as keys) */
+.chips { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.chips label { position: relative; display: inline-flex; cursor: pointer; }
+.chips input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.chips span { display: inline-flex; align-items: center; gap: var(--s2); border-color: var(--line); background: var(--surface2); padding: var(--s2) var(--s3); font-weight: 700; font-size: 18px; }
+.chips input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); }
+.chips input:focus-visible + span { outline: var(--bw) solid var(--accent-text); outline-offset: calc(-2 * var(--bw)); }
+.chips input:disabled + span { opacity: .5; }
+/* a volume slider (Habit Kitty's sound settings, Achievement Kitty's music): a pixel track that fills with pink, and a square key for a thumb */
+.vol { display: grid; grid-template-columns: 1fr auto; gap: var(--s1) var(--s3); align-items: center; font-size: 18px; font-weight: 600; }
+.vol span { grid-column: 1 / -1; }
+.vol output { min-width: 4ch; text-align: right; color: var(--muted); }
+.vol input { appearance: none; -webkit-appearance: none; width: 100%; height: calc(9 * var(--u)); margin: 0; background: transparent; cursor: pointer; }
+.vol input::-webkit-slider-runnable-track { height: calc(4 * var(--u)); border: var(--bw) solid var(--edge); background: linear-gradient(var(--accent), var(--accent)) 0 0 / var(--fill, 0%) 100% no-repeat, var(--none); }
+.vol input::-moz-range-track { height: calc(4 * var(--u) - 2 * var(--bw)); border: var(--bw) solid var(--edge); background: var(--none); }
+.vol input::-moz-range-progress { height: calc(4 * var(--u) - 2 * var(--px)); background: var(--accent); }
+.vol input::-webkit-slider-thumb { -webkit-appearance: none; width: calc(6 * var(--u)); height: calc(9 * var(--u)); margin-top: calc(-2.5 * var(--u) - var(--px)); border: var(--bw) solid var(--edge); border-radius: 0;
+  background: var(--surface); box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--line); }
+.vol input::-moz-range-thumb { width: calc(6 * var(--u) - 2 * var(--bw)); height: calc(9 * var(--u) - 2 * var(--bw)); border: var(--bw) solid var(--edge); border-radius: 0; background: var(--surface); box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--line); }
+
+/* ---------- the stat line at the top of every screen (src/shared/meter.ts): text over one bar ---------- */
+.meter { display: grid; gap: var(--s2); }
+.meter-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s4); font-size: 18px; flex-wrap: wrap; }
+.meter-row b { font-weight: 700; }
+.meter .stat-tag { letter-spacing: .06em; }
+.bar { height: calc(6 * var(--u)); width: 100%; background: var(--surface); display: flex; gap: var(--px); padding: var(--px); }
+.bar i { flex: 1; background: var(--none); }
+.bar i.on, .m-hp .bar i.on { background: var(--accent); }
+.m-lv .bar i.on { background: var(--today); }
+.m-mp .bar i.on { background: var(--habit); }
+
+/* ---------- the player's picture (the home page's player card, Achievement Kitty's profile) ---------- */
+.avatar { width: calc(29 * var(--u)); height: calc(29 * var(--u)); display: grid; place-items: center; background: var(--accent-soft); overflow: hidden; }
+.avatar .sprite { margin: auto; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-row { display: flex; gap: var(--s4); align-items: center; }
+.avatar-btns { display: grid; gap: var(--s2); }
+</style>
+<style data-app="habit">
+/* Habit Kitty's own parts; it also draws the home page and the Journal. The tokens, title bar, buttons, tabs, windows,
+   fields and dialogs are in the shared sheet above. Layout counts in --u; the room and everything in it in --px. */
+.wrap { padding-bottom: calc(40 * var(--u)); }   /* room for the playtest clock in the corner */
 .sprite.mini { width: calc(var(--w, 13) * var(--px)); }
 .sprite.body { width: calc(var(--w, 28) * var(--px)); }
 .sprite.nap { width: calc(var(--w) * var(--px)); }
 .sprite.faded { opacity: .28; }
+.pixart.dim { opacity: .3; filter: grayscale(1); }
 
-/* ---------- pixel boxes: one-pixel border, one-pixel notch in every corner ---------- */
-.panel, .cat, .log, .update, .distrust, .travel-note, .focus-bar, .reminder-status.bad, .week, .toast, .seg, .switch, .chip,
-.btn, .gear, .clock-btn, .x-close, .field input, .field select, .field textarea, .modes label, .chips span, .moods button,
-.catlog li, .acc li, .dot, .bar, .hp, .room, .checkbox-box {
-  border: var(--px) solid var(--edge); clip-path: var(--notch);
+.update, .distrust, .travel-note, .reminder-status.bad, .week, .chip, .clock-btn, .modes label, .moods button,
+.catlog li, .acc li, .dot, .hp, .room {
+  border: var(--bw) solid var(--edge); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m);
 }
 
-/* header */
-.top { display: grid; gap: var(--s3); }
-/* the title bar is the same as Achievement Kitty's (title size, button size and spacing), so the buttons stay put on a switch */
-.brand { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); }
-.brand h1 { font: 700 var(--title-size)/1 var(--font); white-space: nowrap; letter-spacing: .02em; text-shadow: var(--px) var(--px) 0 var(--line); }
-.brand h1 span { color: var(--accent-text); }
-.brand-r { display: flex; align-items: center; gap: var(--s3); }
-.gear { width: calc(13 * var(--px)); height: calc(13 * var(--px)); display: grid; place-items: center; padding: 0; background: var(--surface); color: var(--ink);
-  box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--bevel); }
-.gear[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); }
 @keyframes sweep { 0%, 100% { background: var(--none); } 40% { background: var(--accent); } }
 .bar.busy i { animation: sweep 1s steps(2, end) infinite; }
 .bar.busy i:nth-child(2) { animation-delay: .1s; } .bar.busy i:nth-child(3) { animation-delay: .2s; } .bar.busy i:nth-child(4) { animation-delay: .3s; }
 .bar.busy i:nth-child(5) { animation-delay: .4s; } .bar.busy i:nth-child(6) { animation-delay: .5s; } .bar.busy i:nth-child(7) { animation-delay: .6s; } .bar.busy i:nth-child(8) { animation-delay: .7s; }
 .loading { display: grid; gap: var(--s2); margin-bottom: var(--s2); }
-.meter { display: grid; gap: var(--s2); }
-.meter-row { display: flex; justify-content: space-between; gap: var(--s4); font-size: 18px; }
-.meter-row b { font-weight: 700; }
-.bar { height: calc(6 * var(--px)); background: var(--surface); display: flex; gap: var(--px); padding: var(--px); }
-.bar i { flex: 1; background: var(--none); }
-.bar i.on { background: var(--accent); }
 .distrust { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-ink); padding: var(--s3) var(--s4); font-size: 18px; }
 
-/* event log */
-.log { display: grid; gap: var(--s2); padding: var(--s4); background: var(--surface); }
-.log ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s1); font-size: 18px; }
-.log time { font: 500 15px var(--font); color: var(--muted); margin-right: var(--s2); }
-
-/* windows (cats, panels): three little title-bar squares in the top corner */
-.cat, .panel { background-color: var(--surface);
-  background-image: linear-gradient(var(--dot1), var(--dot1)), linear-gradient(var(--dot2), var(--dot2)), linear-gradient(var(--dot3), var(--dot3));
-  background-size: var(--s2) var(--s2); background-repeat: no-repeat;
-  background-position: right calc(10 * var(--px)) top var(--s1), right calc(6 * var(--px)) top var(--s1), right calc(2 * var(--px)) top var(--s1);
-  box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--bevel); }
-.scrim .panel, .clock-menu.panel { background-image: none; }
+/* the update box: what happened since you last looked */
+.log-list { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; gap: var(--s1); font-size: 18px; }
+.log-list time { font-size: 16px; color: var(--muted); margin-right: var(--s2); }
+.clock-menu.panel { background-image: none; }
 
 /* cats */
 .cats { display: grid; gap: var(--s5); }
@@ -119,215 +332,152 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .cat.ended { opacity: .72; }
 .cat-head { display: grid; grid-template-columns: calc(var(--face-w, 23) * var(--px) + var(--s5)) 1fr; gap: var(--s4); align-items: center; }
 .cat-head.solo { grid-template-columns: 1fr; }
+.panel > .cat-head { padding-right: calc(12 * var(--u)); }
 .cat-side { display: grid; gap: var(--s2); justify-items: center; align-content: center; }
 .cat-side .sq { width: 100%; padding: var(--s2) var(--s1); }
-.sq { flex: none; display: grid; place-items: center; align-content: center; gap: var(--s1); font-size: 15px; line-height: 1; }
+.sq { flex: none; display: grid; place-items: center; align-content: center; gap: var(--s1); font-size: 16px; line-height: 1; }
 .sq .food { margin: 0; }
-.sq b { display: grid; place-items: center; height: calc(8 * var(--px)); }
-.cat-name { font: 700 25px/1.1 var(--font); overflow-wrap: anywhere; }
+.sq b { display: grid; place-items: center; height: calc(8 * var(--u)); }
+.cat-name { font: 700 24px/1.1 var(--font); overflow-wrap: anywhere; }
 .cat-habit { font-size: 18px; color: var(--muted); overflow-wrap: anywhere; }
+.cat .habit-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
 .chip { display: inline-flex; align-items: center; gap: var(--s2); margin-top: var(--s2); font-size: 18px; font-weight: 600; padding: 0 var(--s2); background: var(--surface2); border-color: var(--line); }
 .chip::before { content: ""; width: var(--s3); height: var(--s3); background: var(--chip, var(--muted)); }
 .chip.fed { --chip: var(--fed); } .chip.missed { --chip: var(--missed); } .chip.today { --chip: var(--today); }
 .chip.sitter { --chip: var(--sitter); } .chip.none { --chip: var(--muted); }
-.mode { display: block; font: 500 15px/1.3 var(--font); color: var(--muted); margin-top: var(--s1); }
-.actions { display: flex; gap: var(--s2); flex-wrap: wrap; }
+.mode { display: block; font: 500 16px/1.3 var(--font); color: var(--muted); margin-top: var(--s1); }
+.food { margin-right: var(--s2); vertical-align: middle; }
 
-/* buttons: a raised pixel key with a bevel; pressing it drops one pixel */
-.btn { padding: var(--s3) var(--s4) var(--s4); font-weight: 700; background: var(--surface2); color: var(--ink); border-color: var(--edge);
-  box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--line); line-height: 1.2; }
-.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--accent-shade); flex: 1 1 auto; }
-.btn:active:not(:disabled), .gear:active, .clock-btn:active { transform: translateY(var(--s2)); box-shadow: none; }
-.btn:disabled { background: var(--none); color: var(--muted); border-color: var(--line); box-shadow: none; cursor: default; }
-.btn.small { padding: var(--s2) var(--s3) var(--s3); font-size: 18px; }
-.btn.icon, .btn.travel { padding: var(--s2) var(--s3); display: grid; place-items: center; }
-.btn .pxs, .btn svg { display: inline-block; vertical-align: middle; }
-.note { font-size: 18px; color: var(--missed); }
+/* Habit Kitty's buttons stretch to share their row */
+.btn.primary { flex: 1 1 auto; }
+.btns .btn { flex: 1; }
+.btns.col { flex-direction: column; } .btns.flow { flex-wrap: wrap; } .btns.flow .btn { flex: 1 1 42%; }
+.btn.icon, .btn.travel { padding: var(--s2) var(--s3); }
+.btn.del { padding: var(--s2) var(--s3); color: var(--missed); }
+.note, .form-error { font-size: 18px; color: var(--missed); }
 
 /* pixel month */
 .month { display: grid; gap: var(--s3); }
 .month-nav { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
 .month-nav strong { font: 700 20px/1 var(--font); }
 /* the arrows; an id here would outrank :disabled below and leave a disabled arrow looking pressable */
-.month-nav button:not(.month-title) { border: var(--px) solid var(--edge); clip-path: var(--notch); background: var(--surface2); color: var(--ink);
-  width: calc(11 * var(--px)); height: calc(9 * var(--px)); display: grid; place-items: center; padding: 0; box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--line); }
+.month-nav button:not(.month-title) { border: var(--bw) solid var(--edge); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); background: var(--surface2); color: var(--ink);
+  width: calc(11 * var(--u)); height: calc(9 * var(--u)); display: grid; place-items: center; padding: 0; box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--line); }
 .month-nav button:disabled { background: var(--none); color: var(--muted); border-color: var(--line); box-shadow: none; cursor: default; }
 /* the month title opens the month and year picker */
 .month-title { font: 700 20px/1 var(--font); background: none; border: 0; padding: var(--s1) var(--s2); color: var(--ink);
   text-decoration: underline; text-decoration-thickness: var(--px); text-underline-offset: var(--s1); text-decoration-color: var(--line); }
 .month-title:hover { background: var(--surface2); }
-.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--px); }
-.grid .dow { font: 600 15px/1 var(--font); color: var(--muted); text-align: center; padding-bottom: var(--s1); }
+.grid, .dcal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--px); }
+.grid .dow, .dcal .dow { font: 600 16px/1 var(--font); color: var(--muted); text-align: center; padding-bottom: var(--s1); }
 /* one calendar look, shared by the heatmaps (.px, .cell) and the diary (.dc) */
 .px, .cell, .dc { aspect-ratio: 1; max-width: 100%; position: relative; border: var(--px) solid var(--line); background: var(--surface); }
 .px { background: var(--none); }
 .px.fed { background: var(--fed); border-color: var(--fed); } .px.missed { background: var(--missed); border-color: var(--missed); }
-.px.sitter { background: var(--sitter); border-color: var(--sitter); } .px.blank { background: transparent; border: 0; }
+.px.sitter { background: var(--sitter); border-color: var(--sitter); } .px.habit { background: var(--habit); border-color: var(--habit); }
+.px.blank { background: transparent; border: 0; }
 .cell.now { outline: var(--px) solid var(--today); outline-offset: calc(-1 * var(--px)); z-index: 1; }
-.px span, .cell span, .dc .dn { position: absolute; left: var(--s1); top: var(--s1); font: 600 15px/1 var(--font); color: var(--ink); }
+.px.now, .dc.now { box-shadow: inset 0 0 0 var(--px) var(--today); }
+.px span, .cell span, .dc .dn { position: absolute; left: var(--s1); top: var(--s1); font: 600 16px/1 var(--font); color: var(--ink); }
 .stats { font-size: 18px; color: var(--muted); }
-.chips { border: 0; padding: 0; margin: 0; min-width: 0; }
-.chips > div { display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s2) 0; }
-.chips label { position: relative; display: inline-flex; }
-.chips input { position: absolute; inset: 0; opacity: 0; margin: 0; }
-.chips span { border-color: var(--line); background: var(--surface2); padding: var(--s2) var(--s3); font-weight: 700; font-size: 18px; }
-.chips input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); }
-.chips input:focus-visible + span { outline: var(--px) solid var(--accent-text); outline-offset: calc(-2 * var(--px)); }
-.legend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); font-size: 18px; color: var(--muted); }
-.legend span { display: inline-flex; align-items: center; gap: var(--s2); }
+.legend, .dlegend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); font-size: 18px; color: var(--muted); }
+.legend span, .dlegend span { display: inline-flex; align-items: center; gap: var(--s2); }
 .legend i { width: var(--s4); height: var(--s4); display: inline-block; background: var(--none); }
-.legend i.fed { background: var(--fed); } .legend i.missed { background: var(--missed); }
+.legend i.fed { background: var(--fed); } .legend i.missed { background: var(--missed); } .legend i.habit { background: var(--habit); }
 .legend i.today { background: transparent; box-shadow: inset 0 0 0 var(--px) var(--today); } .legend i.sitter { background: var(--sitter); }
+.legend i.now { background: var(--fed); box-shadow: inset 0 0 0 var(--px) var(--today); }
+
+/* combined heatmap */
+.cell { display: grid; gap: 1px; }
+.cell .s { background: var(--none); min-width: 0; min-height: 0; }
+.cell .s.fed { background: var(--fed); } .cell .s.missed { background: var(--missed); } .cell .s.sitter { background: var(--sitter); } .cell .s.habit { background: var(--habit); }
+.cell span { paint-order: stroke fill; -webkit-text-stroke: 3px var(--surface); }
+.slice-key { display: grid; gap: var(--s2) var(--s4); font-size: 18px; justify-content: start; min-width: 0; }
+.slice-key span { display: inline-flex; align-items: center; gap: var(--s2); min-width: 0; overflow-wrap: anywhere; }
+
+/* all-time heatmap (memories) */
+.life { display: flex; gap: var(--s4); overflow-x: auto; padding-bottom: var(--s1); }
+.lm { flex: none; display: grid; gap: var(--s1); align-content: start; }
+.lm > span { font: 600 16px/1 var(--font); color: var(--muted); white-space: nowrap; }
+.lg { display: grid; grid-template-rows: repeat(7, calc(5 * var(--u))); grid-auto-flow: column; grid-auto-columns: calc(5 * var(--u)); gap: var(--px); }
+.lc { background: var(--none); }
+.lc.fed { background: var(--fed); } .lc.missed { background: var(--missed); } .lc.sitter { background: var(--sitter); } .lc.habit { background: var(--habit); }
+.lc.blank { background: transparent; }
 
 /* forms */
-.panel { padding: var(--s5); display: grid; gap: var(--s4); }
-.panel h3 { font: 700 25px/1.1 var(--font); }
-.field { display: grid; gap: var(--s1); font-size: 18px; font-weight: 600; min-width: 0; }
-.field input, .field select, .field textarea { width: 100%; padding: var(--s3) var(--s3); border-color: var(--line); background: var(--surface2); font-weight: 500; font-size: 20px;
-  box-shadow: inset 0 var(--px) 0 var(--bevel); }
-.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--edge); }
-.field select { appearance: none; padding-right: calc(10 * var(--px)); background-repeat: no-repeat; background-position: right var(--s3) center; background-size: calc(5 * var(--px)) calc(3 * var(--px));
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 5 3' shape-rendering='crispEdges'%3E%3Cpath fill='%238f78d0' d='M0 0h5v1h-5zM1 1h3v1h-3zM2 2h1v1h-1z'/%3E%3C/svg%3E"); }
-.row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
 .modes { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); border: 0; padding: 0; margin: 0; }
 .modes legend { font-size: 18px; font-weight: 600; margin-bottom: var(--s1); padding: 0; }
 .modes label { border-color: var(--line); background: var(--surface2); padding: var(--s3); display: grid; gap: var(--s1); font-size: 18px; color: var(--muted); cursor: pointer; }
 .modes label b { color: var(--ink); font-size: 20px; }
 .modes input { position: absolute; opacity: 0; pointer-events: none; }
 .modes label:has(input:checked) { border-color: var(--accent-edge); background: var(--accent-soft); }
-.modes label:has(input:focus-visible) { outline: var(--px) solid var(--accent-text); outline-offset: calc(-2 * var(--px)); }
-.form-error { color: var(--missed); font-size: 18px; }
+.modes label:has(input:focus-visible) { outline: var(--bw) solid var(--accent-text); outline-offset: calc(-2 * var(--bw)); }
 .tasks { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s3); }
-.tasks li { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.tasks li { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); padding: var(--s2) 0; }
 .tasks li > span { min-width: 0; overflow-wrap: anywhere; }
+.tasks li.pressing { background: var(--accent-soft); }
+.tasks li.habit { flex-wrap: wrap; }
+.tasks li.habit .week { flex: 1 0 100%; }
+.tasks li .habit-foot { flex: 1 1 auto; font-size: 18px; }
+.tasks .done { text-decoration: line-through; text-decoration-thickness: var(--px); color: var(--muted); }
+.row-btns { display: flex; gap: var(--s2); flex: none; }
 
 details.rules { font-size: 18px; }
 details.rules summary { cursor: pointer; font-weight: 700; }
 details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; display: grid; gap: var(--s1); list-style: square; }
 .foot { display: flex; justify-content: space-between; align-items: center; gap: var(--s4); flex-wrap: wrap; font-size: 18px; color: var(--muted); }
-.linkish { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; text-decoration-thickness: var(--px); text-underline-offset: var(--px); font-size: 18px; }
 .confirm { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
 
 /* weekly squares */
 .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--s2); padding: var(--s2) var(--s3); border-color: var(--line); background: var(--surface2); }
-.week div { display: grid; justify-items: center; gap: var(--s1); font: 600 15px/1 var(--font); color: var(--muted); }
-.dot { width: calc(6 * var(--px)); height: calc(6 * var(--px)); border-color: var(--line); background: transparent; }
+.week div { display: grid; justify-items: center; gap: var(--s1); font: 600 16px/1 var(--font); color: var(--muted); }
+.dot { width: calc(6 * var(--u)); height: calc(6 * var(--u)); border-color: var(--line); background: transparent; }
 .dot.fed { background: var(--fed); border-color: var(--fed); } .dot.missed { background: var(--missed); border-color: var(--missed); }
-.dot.sitter { background: var(--sitter); border-color: var(--sitter); } .dot.today { border-color: var(--today); }
+.dot.sitter { background: var(--sitter); border-color: var(--sitter); } .dot.habit { background: var(--habit); border-color: var(--habit); }
+.dot.today { border-color: var(--today); }
 .dot.now { border-color: var(--today); box-shadow: inset 0 0 0 var(--px) var(--surface); }
-.hp { display: flex; gap: var(--px); height: calc(5 * var(--px)); width: calc(40 * var(--px)); max-width: 100%; margin-top: var(--s2); padding: var(--px); border-color: var(--line); background: var(--surface2); }
+.hp { display: flex; gap: var(--px); height: calc(5 * var(--u)); width: calc(40 * var(--u)); max-width: 100%; margin-top: var(--s2); padding: var(--px); border-color: var(--line); background: var(--surface2); }
 .hp i { flex: 1; background: var(--none); } .hp i.on { background: var(--fed); } .hp.low i.on { background: var(--missed); }
 
 /* update box */
-.update { position: relative; padding: var(--s3) calc(12 * var(--px)) var(--s3) var(--s4); background: var(--surface); }
-.update .x { position: absolute; right: var(--s2); top: var(--s2); width: calc(10 * var(--px)); height: calc(10 * var(--px)); border: 0; background: transparent; color: var(--ink); display: grid; place-items: center; padding: 0; }
+.update { position: relative; padding: var(--s3) calc(12 * var(--u)) var(--s3) var(--s4); background: var(--surface); }
+.update .x { position: absolute; right: var(--s2); top: var(--s2); width: calc(10 * var(--u)); height: calc(10 * var(--u)); border: 0; background: transparent; color: var(--ink); display: grid; place-items: center; padding: 0; }
 
 /* tabs */
 .tab { display: none; } .tab.on { display: grid; gap: var(--s5); }
-/* modal: a checkerboard dither over the page */
-.scrim { position: fixed; inset: 0; background: conic-gradient(rgba(74, 58, 120, .32) 25%, transparent 0 50%, rgba(74, 58, 120, .32) 0 75%, transparent 0) 0 0 / var(--s2) var(--s2);
-  display: grid; place-items: center; padding: var(--s4); z-index: 10; }
-.scrim .panel { width: min(calc(147 * var(--px)), 100%); max-height: 90vh; overflow: auto; position: relative; }
-.x-close { position: absolute; top: var(--s2); right: var(--s2); z-index: 1; width: calc(11 * var(--px)); height: calc(11 * var(--px)); padding: 0; display: grid; place-items: center;
-  background: var(--surface2); color: var(--ink); box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--line); }
-.panel > .cat-head { padding-right: calc(12 * var(--px)); }
+.scrim.layer { z-index: 15; }   /* a small dialog over another one (the month picker, the diary's Clear check) */
 .catlog { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
 .catlog li { padding: var(--s2) var(--s3); background: var(--surface2); border-color: var(--line); }
 .catlog .num { color: var(--muted); margin-right: var(--s2); }
-.btns { display: flex; gap: var(--s2); } .btns .btn { flex: 1; }
-.btns.col { flex-direction: column; } .btns.wrap { flex-wrap: wrap; } .btns.wrap .btn { flex: 1 1 42%; }
-
-.food { margin-right: var(--s2); vertical-align: middle; }
-
-.room .pet { touch-action: manipulation; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; outline: none; }
-.ripple { position: absolute; width: calc(14 * var(--px)); height: calc(14 * var(--px)); margin: calc(-7 * var(--px)) 0 0 calc(-7 * var(--px)); background: transparent; border: var(--px) solid var(--surface); pointer-events: none; animation: ripple .5s steps(4) forwards; }
-@keyframes ripple { from { transform: scale(.2); opacity: 1; } to { transform: scale(1.3); opacity: 0; } }
-.pencil { background: none; border: 0; padding: 0 var(--s1); margin-left: var(--s1); color: var(--accent-text); cursor: pointer; font-size: 15px; text-decoration: underline; text-decoration-thickness: var(--px); text-underline-offset: var(--px); }
-.heart { position: absolute; left: 50%; top: -4%; margin-left: calc(-4 * var(--px)); pointer-events: none; animation: heart 1.2s steps(8) forwards; }
-.heart .pxs { display: block; }
-@keyframes heart { 0% { opacity: 0; transform: translateY(var(--s2)); } 15% { opacity: 1; transform: translateY(calc(-1 * var(--s1))); }
-  70% { opacity: 1; } 100% { opacity: 0; transform: translateY(calc(-14 * var(--px))); } }
-
-/* all-time heatmap (memories) */
-.life { display: flex; gap: var(--s4); overflow-x: auto; padding-bottom: var(--s1); }
-.lm { flex: none; display: grid; gap: var(--s1); align-content: start; }
-.lm > span { font: 600 15px/1 var(--font); color: var(--muted); white-space: nowrap; }
-.lg { display: grid; grid-template-rows: repeat(7, calc(5 * var(--px))); grid-auto-flow: column; grid-auto-columns: calc(5 * var(--px)); gap: var(--px); }
-.lc { background: var(--none); }
-.lc.fed { background: var(--fed); } .lc.missed { background: var(--missed); } .lc.sitter { background: var(--sitter); } .lc.habit { background: var(--habit); }
-.lc.blank { background: transparent; }
-.focus-bar { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); background: var(--accent-soft); }
-
-/* switches */
-.seg[hidden] { display: none; }
-.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--surface); }
-.seg button { border: 0; background: transparent; padding: var(--s4); font-weight: 700; color: var(--muted); }
-.seg button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
-.switch { position: relative; display: grid; grid-template-columns: 1fr 1fr; height: calc(15 * var(--px)); padding: 0; background: var(--surface); }
-.switch span { position: relative; z-index: 1; display: grid; place-items: center; font-weight: 700; color: var(--muted); }
-.switch .thumb { position: absolute; top: 0; bottom: 0; left: 0; width: 50%; background: var(--accent); }
-.switch[aria-checked="false"] .thumb { transform: translateX(100%); }
-.switch[aria-checked="true"] [data-side="combined"], .switch[aria-checked="false"] [data-side="individual"] { color: var(--accent-ink); }
-@media (prefers-reduced-motion: no-preference) { .switch .thumb { transition: transform .18s steps(4); } }
-.dot.habit { background: var(--habit); border-color: var(--habit); }
-.px.habit { background: var(--habit); border-color: var(--habit); }
-.cell .s.habit { background: var(--habit); }
-.legend i.habit { background: var(--habit); }
-.tasks li.habit { flex-wrap: wrap; }
-.tasks li.habit .week { flex: 1 0 100%; }
-.tasks li .habit-foot { flex: 1 1 auto; font-size: 18px; }
-.row-btns { display: flex; gap: var(--s2); flex: none; }
-.btn.del { padding: var(--s2) var(--s3); color: var(--missed); }
-.tasks .done { text-decoration: line-through; text-decoration-thickness: var(--px); color: var(--muted); }
-
-/* combined heatmap */
-.cell { display: grid; gap: 1px; }
-.cell .s { background: var(--none); min-width: 0; min-height: 0; }
-.cell .s.fed { background: var(--fed); } .cell .s.missed { background: var(--missed); } .cell .s.sitter { background: var(--sitter); }
-.cell span { paint-order: stroke fill; -webkit-text-stroke: 3px var(--surface); }
-.slice-key { display: grid; gap: var(--s2) var(--s4); font-size: 18px; justify-content: start; min-width: 0; }
-.slice-key span { display: inline-flex; align-items: center; gap: var(--s2); min-width: 0; overflow-wrap: anywhere; }
-/* checkboxes are drawn here, not by the browser */
-.check { display: flex; gap: var(--s4); align-items: flex-start; cursor: pointer; }
-.check input { appearance: none; -webkit-appearance: none; flex: none; width: calc(8 * var(--px)); height: calc(8 * var(--px)); margin: var(--s1) 0 0; border: var(--px) solid var(--edge); clip-path: var(--notch);
-  background: var(--surface2) center / calc(5 * var(--px)) calc(5 * var(--px)) no-repeat; image-rendering: pixelated; }
-.check input:checked { background-color: var(--accent); border-color: var(--accent-edge);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 5 5' shape-rendering='crispEdges'%3E%3Cpath fill='%234a2a5e' d='M4 0h1v1h-1zM3 1h2v1h-2zM0 2h1v1h-1zM2 2h2v1h-2zM1 3h3v1h-3zM2 4h1v1h-1z'/%3E%3C/svg%3E"); }
 
 /* hold targets */
 [data-hold] { touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .cat-head.pressing { background: var(--accent-soft); outline: var(--s2) solid var(--accent-soft); }
 .preview { display: flex; align-items: center; gap: var(--s4); }
 .preview .btn { flex: 1; }
-.room .pet { transition: left 2.6s steps(13), top 2.6s steps(13); }
-.room.night .pet { transition: none; }
-.room .pet.zooming, .room.night .pet.zooming { transition: left .4s steps(5), top .4s steps(5); }
-.room .zz { position: absolute; right: calc(-3 * var(--px)); top: calc(-3 * var(--px)); font: 700 15px/1 var(--font); color: #fffafd; text-shadow: var(--px) var(--px) 0 var(--edge); }
+.pencil { background: none; border: 0; padding: 0 var(--s1); margin-left: var(--s1); color: var(--accent-text); cursor: pointer; font-size: 16px; text-decoration: underline; text-decoration-thickness: var(--px); text-underline-offset: var(--px); }
 
-/* tasks */
-.tasks li { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; padding: var(--s2) 0; }
-.tasks li.pressing { background: var(--accent-soft); }
-
-/* cozy room: 108 x 150 pixels, the same pixels as the cats in it */
+/* cozy room: 108 x 150 pixels, the same pixels as the cats in it; everything in the room counts in --px */
 .room, .room * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.room { box-sizing: content-box; position: relative; isolation: isolate; width: calc(108 * var(--px)); height: calc(150 * var(--px)); margin-inline: auto; overflow: hidden; background: var(--bg3); }
+.room svg.bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .room-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); }
-.room-foot p { margin: 0; }
+#outdoor { display: block; }
 /* the diary book and the trophy sit on the shelf in the room; these buttons are their click areas */
 .room .prop { position: absolute; z-index: 200; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .room .prop:hover, .room .prop:focus-visible { box-shadow: 0 0 0 var(--px) var(--today); }
-.clock-pop { position: fixed; right: var(--s4); bottom: calc(26 * var(--px) + env(safe-area-inset-bottom, 0px)); z-index: 6; display: grid; justify-items: end; gap: var(--s2); }
-.clock-btn { width: calc(13 * var(--px)); height: calc(13 * var(--px)); display: grid; place-items: center; padding: 0; background: var(--surface); color: var(--ink); box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--bevel); }
-.clock-menu { display: none; order: -1; width: min(calc(100 * var(--px)), calc(100vw - 24px)); }
-.clock-pop.open .clock-menu { display: grid; }
-@media (hover: hover) { .clock-pop:hover .clock-menu { display: grid; } }
-.room { box-sizing: content-box; position: relative; isolation: isolate; width: calc(108 * var(--px)); height: calc(150 * var(--px)); margin-inline: auto; overflow: hidden; background: var(--bg3); }
-.room svg.bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.room .pet { position: absolute; }
-#outdoor { display: block; }
-#outdoor[hidden] { display: none; }
+.room .pet { position: absolute; touch-action: manipulation; cursor: pointer; -webkit-tap-highlight-color: transparent; outline: none; transition: left 2.6s steps(13), top 2.6s steps(13); }
+.room.night .pet { transition: none; }
+.room .pet.zooming, .room.night .pet.zooming { transition: left .4s steps(5), top .4s steps(5); }
 .room .pet.napping { width: auto; }
-.room .pet em { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); font: 700 15px/1 var(--font); white-space: nowrap; color: #4a3a78; font-style: normal;
+.room .pet em { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); font: 700 16px/1 var(--font); white-space: nowrap; color: #4a3a78; font-style: normal;
   paint-order: stroke fill; -webkit-text-stroke: 4px #fffafd; }
+.room .zz { position: absolute; right: calc(-3 * var(--px)); top: calc(-3 * var(--px)); font: 700 16px/1 var(--font); color: #fffafd; text-shadow: var(--px) var(--px) 0 var(--edge); }
+.ripple { position: absolute; width: calc(14 * var(--px)); height: calc(14 * var(--px)); margin: calc(-7 * var(--px)) 0 0 calc(-7 * var(--px)); background: transparent; border: var(--px) solid var(--surface); pointer-events: none; animation: ripple .5s steps(4) forwards; }
+@keyframes ripple { from { transform: scale(.2); opacity: 1; } to { transform: scale(1.3); opacity: 0; } }
+.heart { position: absolute; left: 50%; top: -4%; margin-left: calc(-4 * var(--px)); pointer-events: none; animation: heart 1.2s steps(8) forwards; }
+@keyframes heart { 0% { opacity: 0; transform: translateY(calc(2 * var(--px))); } 15% { opacity: 1; transform: translateY(calc(-1 * var(--px))); }
+  70% { opacity: 1; } 100% { opacity: 0; transform: translateY(calc(-14 * var(--px))); } }
 @media (prefers-reduced-motion: no-preference) { .room .pet { animation: bob 2.4s steps(2) infinite; } .room .pet.napping { animation: none; } .room .pet.b { animation-delay: 1.2s; } }
 @keyframes bob { 50% { transform: translateY(calc(-1 * var(--px))); } }
 /* full-body kitties: the tail swishes, eyes blink, and they hop while walking to a new spot */
@@ -345,95 +495,121 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 @keyframes blink { 0%, 93% { visibility: hidden; } 93.1%, 100% { visibility: visible; } }
 @keyframes hop { 50% { transform: translateY(calc(-2 * var(--px))); } }
 @keyframes breathe { 50% { transform: translateY(var(--px)); } }
+/* thought bubbles over a cat's head: a pixel box (corners cut with shadows, so the tail is not clipped) */
+.room .pet .thought { position: absolute; left: 50%; bottom: calc(100% + 3 * var(--px)); transform: translateX(-50%); display: flex; align-items: center; gap: calc(2 * var(--px));
+  padding: var(--px) calc(2 * var(--px)); background: #fffafd; pointer-events: none; animation: thought 5s steps(10) forwards;
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--edge), 0 var(--px) 0 0 var(--edge), calc(-1 * var(--px)) 0 0 0 var(--edge), var(--px) 0 0 0 var(--edge); }
+.room .pet .thought::before, .room .pet .thought::after { content: ""; position: absolute; left: 50%; background: var(--edge); }
+.room .pet .thought::before { width: calc(2 * var(--px)); height: calc(2 * var(--px)); bottom: calc(-3 * var(--px)); }
+.room .pet .thought::after { width: var(--px); height: var(--px); bottom: calc(-5 * var(--px)); margin-left: var(--px); }
+.room .pet .thought .sprite.faded { opacity: .6; }
+.room .pet .thought .mark { color: var(--accent-text); }
+@keyframes thought { 0% { opacity: 0; transform: translate(-50%, calc(2 * var(--px))); } 10%, 85% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, calc(-1 * var(--px))); } }
 
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(28 * var(--px) + env(safe-area-inset-bottom, 0px)); z-index: 20;
-  max-width: min(calc(147 * var(--px)), calc(100% - 32px)); background: var(--surface); color: var(--ink);
-  padding: var(--s3) var(--s4); font-size: 18px; box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--bevel); }
-@media (prefers-reduced-motion: no-preference) { .toast { animation: pop .18s steps(3); } }
-@keyframes pop { from { transform: translate(-50%, var(--s2)); } }
-.px.now, .dc.now { box-shadow: inset 0 0 0 var(--px) var(--today); }
+/* the playtest clock, floating in the corner */
+/* the bar along the bottom: Room / Kitty / Heatmap; Kitty is the raised key in the middle. Settings has none. */
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--surface); border-top: var(--bw) solid var(--edge);
+  box-shadow: inset 0 var(--px) 0 var(--hilite); padding-bottom: env(safe-area-inset-bottom, 0px); }
+[data-tab="settings"] .tabbar { display: none; }
+.tabbar-in { max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: 1fr calc(40 * var(--u)) 1fr; align-items: end; padding-inline: var(--s4); }
+.tabbar button { background: transparent; border: 0; padding: var(--s2) 0; display: grid; justify-items: center; align-content: end; gap: var(--s1);
+  font-size: 16px; font-weight: 700; color: var(--muted); min-width: 0; }
+.tabbar button i { display: grid; place-items: end center; height: calc(12 * var(--px)); }
+.tabbar button[aria-selected="true"] { color: var(--accent-text); }
+.tabbar button:not([aria-selected="true"]) i { opacity: .6; }
+.tabbar button.mid { position: relative; margin-top: calc(-6 * var(--px)); padding-top: var(--s3); background: var(--accent-soft);
+  border: var(--bw) solid var(--edge); border-bottom: 0; -webkit-mask-box-image: var(--notch-top-box); }
+.tabbar button.mid::after { content: ""; position: absolute; inset: 0 0 calc(-1 * var(--bw)) 0; pointer-events: none; border: var(--bw) solid; border-color: inherit; border-bottom: 0; -webkit-mask-box-image: var(--patch-box); }
+.tabbar button.mid[aria-selected="true"] { background: var(--accent-pastel); }
+.clock-pop { position: fixed; right: var(--s4); bottom: calc(26 * var(--u) + env(safe-area-inset-bottom, 0px)); z-index: 6; display: grid; justify-items: end; gap: var(--s2); }
+.clock-btn { width: calc(13 * var(--u)); height: calc(13 * var(--u)); display: grid; place-items: center; padding: 0; background: var(--surface); color: var(--ink); box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--bevel); }
+.clock-btn:active { transform: translateY(calc(3 * var(--px))); box-shadow: none; }
+.clock-menu { display: none; order: -1; width: min(calc(100 * var(--u)), calc(100vw - 24px)); }
+.clock-pop.open .clock-menu { display: grid; }
+@media (hover: hover) { .clock-pop:hover .clock-menu { display: grid; } }
+.toast { bottom: calc(28 * var(--u) + env(safe-area-inset-bottom, 0px)); }   /* above the clock */
 
 /* diary */
-.dcal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--px); }
-.dcal .dow { font: 600 15px/1 var(--font); color: var(--muted); text-align: center; padding-bottom: var(--s1); }
-.dc { padding: 0; color: var(--ink); display: grid; place-items: center; aspect-ratio: auto; height: calc(18 * var(--px)); }   /* the height fits the number plus a kitty, whatever the width */
+.dc { padding: 0; color: var(--ink); display: grid; place-items: center; }   /* square, like every calendar day (see above) */
 .dc.blank { border: 0; background: transparent; }
 .dc:disabled { opacity: .4; cursor: default; }
-.dc .mood { align-self: end; margin-bottom: var(--s1); }
+/* the kitty fills the day below its number: as wide as the room under the number allows (the day is square, and the kitty is
+   11 pixels wide by 10 tall), and no wider than most of the day. Where the browser can round, its width is a whole number of
+   half-pixels (5.5 px for its 11), so its pixels stay even. */
+.dc .mood { align-self: end; margin-bottom: var(--s1); width: min(80%, (100% - 18px) * 1.1); width: round(down, min(80%, (100% - 18px) * 1.1), 5.5px); height: auto; }
+.dc .mood-split > .sprite { width: 100%; height: auto; }
 .dc.has { background: var(--accent-pastel); border-width: 0; }   /* no border: the kitty needs the room */
-.dlegend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); font-size: 18px; color: var(--muted); }
-.dlegend span { display: inline-flex; align-items: center; gap: var(--s2); }
+.dc .tick { position: absolute; right: var(--s1); bottom: var(--s1); color: var(--accent-text); display: grid; }
 .dlegend i { width: var(--s4); height: var(--s4); background: var(--surface); border: var(--px) solid var(--line); }
 .dlegend i.has { background: var(--accent-pastel); border-color: var(--accent-pastel); }
 .dlegend i.now { box-shadow: inset 0 0 0 var(--px) var(--today); }
 .moods { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--s2); }
-.moods button { display: grid; justify-items: center; gap: var(--s1); padding: var(--s2) var(--s1); font-size: 15px; font-weight: 700; border-color: var(--line); background: var(--surface2); color: var(--muted); }
+.moods button { display: grid; justify-items: center; gap: var(--s1); padding: var(--s2) var(--s1); font-size: 16px; font-weight: 700; border-color: var(--line); background: var(--surface2); color: var(--muted); }
 .moods button[aria-pressed="true"] { border-color: var(--accent-edge); background: var(--accent-soft); color: var(--ink); }
-.diary-nav { display: flex; align-items: center; justify-content: space-between; padding-right: calc(13 * var(--px)); }   /* leave room for the close button in the corner */
+.moods .weather { width: calc(var(--w) * var(--px)); height: auto; }
+.diary-nav { display: flex; align-items: center; justify-content: space-between; padding-right: calc(13 * var(--u)); }   /* leave room for the close button in the corner */
 .mood-split { display: grid; }
 .mood-split > .sprite { grid-area: 1 / 1; }
 .mood-split > .sprite:first-child { clip-path: inset(0 50% 0 0); }
 .mood-split > .sprite:last-child { clip-path: inset(0 0 0 50%); }
-.moods:has([data-weather]), #diary-weather { grid-template-columns: repeat(5, 1fr); }
-.moods .weather { width: calc(var(--w) * var(--px)); height: auto; }
 #mood-names .field { display: flex; align-items: center; gap: var(--s2); }
 #mood-names .field input { flex: 1; }
-.diary-text { min-height: calc(55 * var(--px)); font: 500 20px/1.4 var(--font) !important; resize: none; }
+.diary-text { min-height: calc(55 * var(--u)); font: 500 20px/1.4 var(--font) !important; resize: none; }
 .diary-mood { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
 .mood-now { display: inline-flex; align-items: center; gap: var(--s2); font-size: 18px; font-weight: 700; }
 .diary-read { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 500 20px/1.4 var(--font); }
-.diary-photo img { display: block; width: 100%; max-height: calc(87 * var(--px)); object-fit: cover; border: var(--px) solid var(--line); margin-bottom: var(--s2); image-rendering: pixelated; }
+.diary-photo img { display: block; width: 100%; max-height: calc(87 * var(--u)); object-fit: cover; border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-s-box); mask: var(--notch-s-m); margin-bottom: var(--s2); image-rendering: pixelated; }
 .look-pick { display: grid; gap: var(--s1); }
+
+/* level up: a party popper and confetti */
 .party { position: fixed; inset: 0; pointer-events: none; z-index: 30; overflow: hidden; }
 .party .popper { position: absolute; left: 50%; bottom: 20%; width: calc(13 * var(--px)); margin-left: calc(-6 * var(--px)); }
 .party .popper svg { width: 100%; height: auto; display: block; }
-.party i { position: absolute; left: 50%; bottom: calc(20% + 13 * var(--px)); width: var(--s2); height: var(--s2); background: var(--c); opacity: 0; }
+.party i { position: absolute; left: 50%; bottom: calc(20% + 13 * var(--px)); width: calc(2 * var(--px)); height: calc(2 * var(--px)); background: var(--c); opacity: 0; }
 @media (prefers-reduced-motion: no-preference) {
   .party .popper { animation: pop-shake .5s steps(4) 1; }
   .party i { animation: burst 1.9s steps(14) forwards; animation-delay: var(--w); }
 }
-@keyframes pop-shake { 30% { transform: translateY(var(--s1)); } 60% { transform: translateY(calc(-1 * var(--s1))); } }
+@keyframes pop-shake { 30% { transform: translateY(var(--px)); } 60% { transform: translateY(calc(-1 * var(--px))); } }
 @keyframes burst {
   0% { opacity: 1; transform: translate(0, 0); }
   55% { opacity: 1; transform: translate(var(--x), var(--y)); }
   100% { opacity: 0; transform: translate(calc(var(--x) * 1.15), calc(var(--y) + 190px)); }
 }
+
+/* settings */
+.set-page { display: grid; gap: var(--s4); }
+.set-title { display: flex; align-items: center; gap: var(--s4); }
+.set-title h3 { font: 700 24px/1.1 var(--font); }
+.set-apps { display: grid; gap: var(--s4); }
+.set-apps .menu-btn { width: 100%; gap: var(--s3); font-size: 24px; padding: var(--s4) var(--s4) calc(var(--s4) + 3 * var(--px)); white-space: nowrap; }
+.set-apps .menu-btn i { display: grid; place-items: center; }
 .fold { padding: 0; display: block; }
-.fold > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; padding: var(--s5); font: 700 25px/1.1 var(--font); }
+.fold > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; padding: var(--s5); font: 700 24px/1.1 var(--font); }
 .fold > summary::-webkit-details-marker { display: none; }
 .fold > summary::after { content: "+"; color: var(--muted); }
 .fold[open] > summary::after { content: "-"; }
 .fold-body { display: grid; gap: var(--s4); padding: 0 var(--s5) var(--s5); }
-.clock-pop[hidden] { display: none; }
+.fold-body a { color: var(--accent-text); text-decoration-thickness: var(--px); text-underline-offset: var(--px); overflow-wrap: anywhere; }
+#auto-backup { display: grid; gap: var(--s2); }
+#auto-backup h4 { margin: 0; font: 700 20px/1.2 var(--font); }
 .alarms { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; gap: var(--s2); }
 .alarms li { display: flex; align-items: center; gap: var(--s2); justify-content: space-between; }
 .alarms .nm { overflow-wrap: anywhere; font-weight: 700; }
 .alarms .when { display: flex; align-items: center; gap: var(--s2); flex: none; }
 .reminder-status { font-size: 18px; color: var(--muted); }
 .reminder-status.bad { color: var(--warn-ink); background: var(--warn-bg); border-color: var(--warn-ink); padding: var(--s2) var(--s3); }
-
-/* thought bubbles over a cat's head: a pixel box (corners cut with shadows, so the tail is not clipped) */
-.room .pet .thought { position: absolute; left: 50%; bottom: calc(100% + 3 * var(--px)); transform: translateX(-50%); display: flex; align-items: center; gap: var(--s2);
-  padding: var(--s1) var(--s2); background: #fffafd; pointer-events: none; animation: thought 5s steps(10) forwards;
-  box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--edge), 0 var(--px) 0 0 var(--edge), calc(-1 * var(--px)) 0 0 0 var(--edge), var(--px) 0 0 0 var(--edge); }
-.room .pet .thought::before, .room .pet .thought::after { content: ""; position: absolute; left: 50%; background: var(--edge); }
-.room .pet .thought::before { width: var(--s2); height: var(--s2); bottom: calc(-3 * var(--px)); }
-.room .pet .thought::after { width: var(--s1); height: var(--s1); bottom: calc(-5 * var(--px)); margin-left: var(--s1); }
-.room .pet .thought .sprite.faded { opacity: .6; }
-.room .pet .thought .mark { color: var(--accent-text); }
-@keyframes thought { 0% { opacity: 0; transform: translate(-50%, var(--s2)); } 10%, 85% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, calc(-1 * var(--s1))); } }
-.legend i.now { background: var(--fed); box-shadow: inset 0 0 0 var(--px) var(--today); }
-
-.pixart.dim { opacity: .3; filter: grayscale(1); }
 .travel-note { background: var(--accent-pastel); border-color: var(--accent-edge); padding: var(--s2) var(--s3); font-size: 18px; }
-.dc .tick { position: absolute; right: var(--s1); bottom: var(--s1); color: var(--accent-text); display: grid; }
-.x-close ~ h3 { padding-right: calc(12 * var(--px)); }
+
+/* accomplishments */
 .acc-group { margin: var(--s2) 0 0; font: 700 18px/1 var(--font); color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
 .acc { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
 .acc li { display: flex; gap: var(--s3); align-items: center; padding: var(--s2) var(--s3); background: var(--surface2); border-color: var(--line); }
 .acc li.got { background: var(--accent-pastel); border-color: var(--accent-edge); }
-.acc-bar { display: block; height: calc(2 * var(--px)); margin-top: var(--s2); background: var(--line); }
+.acc-bar { display: block; height: calc(2 * var(--u)); margin-top: var(--s2); background: var(--line); }
 .acc-bar i { display: block; height: 100%; background: var(--accent); }
+
+/* the change log */
 .change h4 { margin: 0 0 var(--s1); font: 700 20px/1.2 var(--font); }
 .change summary { cursor: pointer; font: 700 20px/1.2 var(--font); padding: var(--s1) 0; }
 .change summary .muted { font: 500 18px/1 var(--font); }
@@ -441,73 +617,16 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .change-title { margin: var(--s2) 0 var(--px); font-weight: 700; font-size: 18px; }
 .change ul { margin: 0; padding-left: var(--s6); display: grid; gap: var(--s1); font-size: 18px; list-style: square; }
 
-/* volume sliders: a pixel track that fills with pink, and a square key for a thumb */
-.fold-body a { color: var(--accent-text); text-decoration-thickness: var(--px); text-underline-offset: var(--px); overflow-wrap: anywhere; }
-
-/* a small dialog over the page or over another dialog (the month picker, the diary's Clear check) */
-.scrim.layer { z-index: 15; }
-.picker-head { display: flex; align-items: center; gap: var(--s3); min-height: calc(11 * var(--px)); padding-right: calc(12 * var(--px)); }
-.picker-head strong { font: 700 25px/1.1 var(--font); }
-.picker-head .btn { display: inline-flex; align-items: center; gap: var(--s2); }
+/* the month and year picker */
+.picker-head { display: flex; align-items: center; gap: var(--s3); min-height: calc(11 * var(--u)); padding-right: calc(12 * var(--u)); }
+.picker-head strong { font: 700 24px/1.1 var(--font); }
 .pick-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s2); }
-.pick { border: var(--px) solid var(--line); clip-path: var(--notch); background: var(--surface2); color: var(--ink); padding: var(--s3) 0 var(--s4); font-weight: 700;
-  box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--line); }
-.pick.now { box-shadow: inset 0 0 0 var(--px) var(--today), inset 0 calc(-2 * var(--px)) 0 var(--line); }
-.pick[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--accent-shade); }
-.pick:active:not(:disabled) { transform: translateY(var(--s1)); box-shadow: none; }
+.pick { border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); background: var(--surface2); color: var(--ink); padding: var(--s3) 0 var(--s4); font-weight: 700;
+  box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--line); }
+.pick.now { box-shadow: inset 0 0 0 var(--px) var(--today), inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--line); }
+.pick[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--accent-shade); }
+.pick:active:not(:disabled) { transform: translateY(calc(3 * var(--px))); box-shadow: none; }
 .pick:disabled { background: var(--none); color: var(--muted); border-color: var(--line); box-shadow: none; opacity: .55; cursor: default; }
-</style>
-<style>
-/* Shared by both apps (only one app's own styles are on at a time, see src/shared/apps.ts). */
-[hidden] { display: none !important; }
-/* the line under a week row: what was done, and the rewind button on the right (the same on a kitty and a stray) */
-.cat .habit-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
-/* the top navigation: Kitty / Stray / Treats / Pet sitter / Memory, and under it the views of that section */
-.nav { display: grid; gap: var(--s2); }
-.nav .seg { overflow-x: auto; scrollbar-width: none; grid-auto-columns: minmax(max-content, 1fr); }
-.nav .seg::-webkit-scrollbar { display: none; }
-.nav .seg button { padding: var(--s3) var(--s2); white-space: nowrap; font-size: 18px; }
-.nav .seg.sub button { padding: var(--s2) var(--s3); font-size: 18px; }
-.nav .seg button .num { font-size: 15px; opacity: .8; }
-/* Settings: the shared options, then one page per mini-app */
-.set-page { display: grid; gap: var(--s4); }
-.set-title { display: flex; align-items: center; gap: var(--s4); }
-.set-title h3 { font: 700 25px/1.1 var(--font); }
-.set-apps { display: grid; gap: var(--s4); }
-.set-apps .menu-btn i { display: grid; place-items: center; }
-/* the stat line at the top of every screen (src/shared/meter.ts): text over one bar, the same in each app */
-.meter { display: grid; gap: var(--s2); }
-.meter-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s4); font-size: 18px; flex-wrap: wrap; }
-.meter .stat-tag { letter-spacing: .06em; }
-.meter .bar { width: 100%; height: calc(6 * var(--px)); }
-.m-hp .bar i.on { background: var(--accent); }
-.m-lv .bar i.on { background: var(--today, #ffcf5c); }
-.m-mp .bar i.on { background: var(--habit, #7cc7f5); }
-/* the pixel grid over a dithered gradient of baby blue, lavender and pink, drawn by src/shared/backdrop.ts (until it is,
-   three flat bands) */
-body {
-  margin: 0; min-height: 100vh; image-rendering: pixelated;
-  background:
-    linear-gradient(var(--grid) var(--px), transparent 0) 0 0 / calc(8 * var(--px)) calc(8 * var(--px)),
-    linear-gradient(90deg, var(--grid) var(--px), transparent 0) 0 0 / calc(8 * var(--px)) calc(8 * var(--px)),
-    var(--backdrop, linear-gradient(var(--bg) 0 34%, var(--bg2) 34% 67%, var(--bg3) 67%)) 0 0 / var(--backdrop-size, auto) fixed;
-}
-/* both titles are one size, small enough for "Achievement Kitty" to stay on one line next to the three buttons, so the
-   title bars are the same height and the buttons sit in the same place in both apps */
-:root { --title-size: 36px; }
-@media (max-width: 479px) { :root { --title-size: 27px; } }
-[data-app-root] { image-rendering: auto; }   /* pixelated is for the backdrop; it is inherited, so each app picks its own */
-/* a volume slider (Habit Kitty's sound settings, Achievement Kitty's music) */
-.vol { display: grid; grid-template-columns: 1fr auto; gap: var(--s1) var(--s3); align-items: center; font-size: 18px; font-weight: 600; }
-.vol span { grid-column: 1 / -1; }
-.vol output { min-width: 4ch; text-align: right; color: var(--muted); }
-.vol input { appearance: none; -webkit-appearance: none; width: 100%; height: calc(9 * var(--px)); margin: 0; background: transparent; cursor: pointer; }
-.vol input::-webkit-slider-runnable-track { height: calc(4 * var(--px)); border: var(--px) solid var(--edge); background: linear-gradient(var(--accent), var(--accent)) 0 0 / var(--fill, 0%) 100% no-repeat, var(--none); }
-.vol input::-moz-range-track { height: calc(2 * var(--px)); border: var(--px) solid var(--edge); background: var(--none); }
-.vol input::-moz-range-progress { height: calc(2 * var(--px)); background: var(--accent); }
-.vol input::-webkit-slider-thumb { -webkit-appearance: none; width: calc(6 * var(--px)); height: calc(9 * var(--px)); margin-top: calc(-3.5 * var(--px)); border: var(--px) solid var(--edge); border-radius: 0;
-  background: var(--surface); box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--line); }
-.vol input::-moz-range-thumb { width: calc(4 * var(--px)); height: calc(7 * var(--px)); border: var(--px) solid var(--edge); border-radius: 0; background: var(--surface); box-shadow: inset 0 calc(-2 * var(--px)) 0 var(--line); }
 </style>
 <div data-app-root="habit">
 
@@ -526,7 +645,7 @@ body {
       <ul class="tasks" id="tasks"></ul>
       <div id="tasks-done"></div>
     </section>
-    <p class="muted" id="strays-note" style="text-align:center;font-size:13px"></p>
+    <p class="muted hint-c" id="strays-note"></p>
     <form class="panel" id="task-form" novalidate>
       <h3 id="form-title"></h3>
       <label class="field" id="nick-wrap">Kitty's name <input id="task-nick" maxlength="24" autocomplete="off" placeholder="Leave empty for a surprise"></label>
@@ -553,8 +672,8 @@ body {
   <main id="tab-today" class="tab">
     <section class="update" id="log" hidden></section>
     <section class="cats" id="cats" aria-label="Your cats"></section>
-    <button class="btn primary" type="button" data-action="adopt-open" id="adopt-btn" style="padding:16px;font-size:18px">Adopt kitty</button>
-    <p class="muted" id="cats-hint" style="text-align:center;font-size:13px">Press and hold a cat for more options.</p>
+    <button class="btn primary" type="button" data-action="adopt-open" id="adopt-btn">Adopt kitty</button>
+    <p class="muted hint-c" id="cats-hint">Press and hold a cat for more options.</p>
   </main>
 
   <main id="tab-heat" class="tab">
@@ -563,6 +682,8 @@ body {
   <main id="tab-settings" class="tab">
     <div class="set-page" id="set-main">
       <h2>Everything</h2>
+    <details class="panel fold"><summary>Look</summary><div class="fold-body" id="set-look"></div></details>
+
     <details class="panel fold"><summary>Sound</summary><div class="fold-body">
       <label class="vol"><span>Music</span><input type="range" id="vol-bgm" min="0" max="100" step="5"><output id="vol-bgm-out" class="num" for="vol-bgm"></output></label>
       <p class="muted" id="music-now"></p>
@@ -588,7 +709,7 @@ body {
 
     <details class="panel fold"><summary>Backup</summary><div class="fold-body">
       <p class="muted">One <b>.kitty</b> file holds <b>both apps</b>: your kitties, every diary page and photo, and your Achievement Kitty quests and achievements (photos are scaled down so the file stays small). Save it on this device, or share it to Drive or by mail.</p>
-      <div class="btns wrap">
+      <div class="btns flow">
         <button class="btn primary" type="button" data-action="save-file">Save to device…</button>
         <button class="btn" type="button" data-action="share-file" data-native-only>Share…</button>
         <button class="btn" type="button" data-action="load-file">Restore…</button>
@@ -688,6 +809,11 @@ body {
     </div>
   </main>
 </div>
+<nav class="tabbar" id="tabbar" aria-label="Habit Kitty"><div class="tabbar-in" role="tablist">
+  <button type="button" role="tab" data-action="nav-bottom" data-bottom="room"><i data-icon="room"></i><span>Room</span></button>
+  <button type="button" role="tab" data-action="nav-bottom" data-bottom="kitty" class="mid"><i data-icon="cat"></i><span>Kitty</span></button>
+  <button type="button" role="tab" data-action="nav-bottom" data-bottom="heat"><i data-icon="heat"></i><span>Heatmap</span></button>
+</div></nav>
 
 <div class="clock-pop" id="clock-pop">
   <button type="button" class="clock-btn" data-action="clock-toggle" aria-label="Playtest clock" data-icon="clock"></button>

@@ -54,7 +54,7 @@ const appBody = template
   .replace('/*__APP__*/', () => appJs);
 writeFileSync('app-www/index.html',
   '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
-  '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">' +
+  '<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,viewport-fit=cover">' +
   '<style>[hidden]{display:none!important}html,body{margin:0}:root{padding-top:env(safe-area-inset-top,0px)}</style>' +
   '</head><body>' + appBody + '</body></html>');
 

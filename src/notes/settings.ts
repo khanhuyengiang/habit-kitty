@@ -4,8 +4,8 @@ import { strToU8, zipSync } from 'fflate';
 import { saveToDevice } from '../shared/backupfolder.ts';
 import { allNotes, importNotes, notesInitialised, notesReady, onNotes } from './data.ts';
 import { notesSyncStatus, onNotesSyncStatus, setNotesSync, syncNotes } from './folder.ts';
+import { esc } from '../shared/html.ts';
 
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const ago = (t: number) => {
   const m = Math.round((Date.now() - t) / 60_000);
   if (m < 1) return 'just now';

@@ -2,7 +2,7 @@
 // and diary.json for the diary's settings and the people. All in the app's private storage, next to Habit Kitty's save:
 //
 //   habit-kitty/diary/2026-10-12.md        frontmatter (mood, feeling, weather...) + the text
-//   habit-kitty/photos/2026-10-12.jpg
+//   habit-kitty/photos/2026-10-12.jpg      (a page with more photos: 2026-10-12-2.jpg, -3.jpg, -4.jpg)
 //   habit-kitty/reflections/2026-10.md     the month's reflection (same frontmatter: just `updated`)
 //   habit-kitty/diary.json                 { trackamaniac, moodNames, people }
 //
@@ -11,7 +11,7 @@
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { ROOT, at, fileBytes, fileNames, removeFile, toBase64, writeOk } from '../shared/files.ts';
 import {
-  EXTRAS_FILE, dayFromName, diaryPath, entryFromMarkdown, entryToMarkdown, monthFromKey, photoPath, reflectionPath, sanitizeExtras,
+  EXTRAS_FILE, MAX_PHOTOS, dayFromName, diaryPath, entryFromMarkdown, entryToMarkdown, monthFromKey, photoPath, reflectionPath, sanitizeExtras,
   type DiaryEntry, type DiaryExtras, type Reflection,
 } from '../store.ts';
 import { compressPhoto } from '../shared/photo.ts';
@@ -26,7 +26,7 @@ const writeBytes = (path: string, bytes: Uint8Array, root = ROOT) =>
 const clearFiles = (root = ROOT) => writeOk(() => Filesystem.rmdir({ ...at('', root), recursive: true }));
 
 const writeEntry = (day: number, e: DiaryEntry, root = ROOT) => writeText(diaryPath(day), entryToMarkdown(e), root);
-const writePhoto = (day: number, bytes: Uint8Array, root = ROOT) => writeBytes(photoPath(day), bytes, root);
+const writePhoto = (day: number, bytes: Uint8Array, root = ROOT, i = 0) => writeBytes(photoPath(day, i), bytes, root);
 const writeReflection = (key: string, r: Reflection, root = ROOT) => writeText(reflectionPath(key), entryToMarkdown({ text: r.text, updated: r.updated }), root);
 const writeExtras = (x: DiaryExtras, root = ROOT) => writeText(EXTRAS_FILE, JSON.stringify(x), root);
 
@@ -37,7 +37,12 @@ async function readEntries(): Promise<Record<number, DiaryEntry>> {
     const day = dayFromName(name.replace(/\.md$/, ''));
     const bytes = day === null ? undefined : await fileBytes(`diary/${name}`);
     const e = bytes && entryFromMarkdown(new TextDecoder().decode(bytes));
-    if (day !== null && e) out[day] = { ...e, photo: photos.has(photoPath(day).slice('photos/'.length)) };
+    if (day === null || !e) return;
+    const has = (i: number) => photos.has(photoPath(day, i).slice('photos/'.length));
+    let n = has(0) ? 1 : 0;
+    while (n && n < MAX_PHOTOS && has(n)) n++;   // the files are the truth
+    const { photos: _count, ...rest } = e;
+    out[day] = { ...rest, photo: n > 0, ...(n > 1 && { photos: n }) };
   }));
   return out;
 }
@@ -152,18 +157,20 @@ export function initDiary(legacy: Legacy = {}): Promise<boolean> {
 }
 
 // ---- pages ----
-export const getPhoto = async (day: number) => {
-  const b = await fileBytes(photoPath(day));
+export const getPhoto = async (day: number, i = 0) => {
+  const b = await fileBytes(photoPath(day, i));
   return b && new Blob([b as BlobPart], { type: 'image/jpeg' });
 };
 
-// Stores a page (or removes it when `entry` is null). `photo`: a new picture, 'keep' the stored one, or 'none' to drop it.
-export async function saveEntry(day: number, entry: DiaryEntry | null, photo: Blob | 'keep' | 'none'): Promise<boolean> {
+// Stores a page (or removes it when `entry` is null). `photo`: new pictures (one, or up to four in order), 'keep' the stored ones, or 'none' to drop them.
+export async function saveEntry(day: number, entry: DiaryEntry | null, photo: Blob | Blob[] | 'keep' | 'none'): Promise<boolean> {
+  const blobs = Array.isArray(photo) ? photo.slice(0, MAX_PHOTOS) : photo instanceof Blob ? [photo] : null;
   if (entry) {
-    if (photo instanceof Blob && !await writePhoto(day, new Uint8Array(await photo.arrayBuffer()))) return false;
+    for (const [i, b] of (blobs ?? []).entries()) if (!await writePhoto(day, new Uint8Array(await b.arrayBuffer()), ROOT, i)) return false;
     if (!await writeEntry(day, entry)) return false;
   } else await removeFile(diaryPath(day));
-  if (photo === 'none' || !entry) await removeFile(photoPath(day));
+  const kept = !entry ? 0 : blobs ? blobs.length : photo === 'keep' ? MAX_PHOTOS : 0;
+  for (let i = kept; i < MAX_PHOTOS; i++) await removeFile(photoPath(day, i));
   const next = { ...entries };
   if (entry) next[day] = entry; else delete next[day];
   entries = next;
@@ -200,15 +207,21 @@ export async function updateExtras(patch: Partial<DiaryExtras>): Promise<boolean
 export async function collectDiary() {
   const diary: Record<number, DiaryEntry> = {};
   const photos: Record<number, Uint8Array> = {};
+  const morePhotos: Record<number, Uint8Array[]> = {};
   for (const [k, e] of Object.entries(entries)) {
-    diary[Number(k)] = e;
-    if (e.photo) { const b = await fileBytes(photoPath(Number(k))); if (b) photos[Number(k)] = b; }
+    const day = Number(k);
+    diary[day] = e;
+    if (!e.photo) continue;
+    const b = await fileBytes(photoPath(day));
+    if (!b) continue;
+    photos[day] = b;
+    for (let i = 1; i < (e.photos ?? 1); i++) { const more = await fileBytes(photoPath(day, i)); if (more) (morePhotos[day] ??= []).push(more); }
   }
-  return { diary, photos, reflections, extras };
+  return { diary, photos, morePhotos, reflections, extras };
 }
 
 // Replaces everything on disk with a backup's diary. `fallback`: settings from an older backup that kept them in the game.
-export async function restoreDiary(b: { diary: Record<number, DiaryEntry>; photos: Record<number, Uint8Array>; reflections?: Record<string, Reflection>; extras?: DiaryExtras }, fallback: Legacy = {}): Promise<boolean> {
+export async function restoreDiary(b: { diary: Record<number, DiaryEntry>; photos: Record<number, Uint8Array>; morePhotos?: Record<number, Uint8Array[]>; reflections?: Record<string, Reflection>; extras?: DiaryExtras }, fallback: Legacy = {}): Promise<boolean> {
   const x = b.extras && Object.keys(b.extras).length ? b.extras : sanitizeExtras({ trackamaniac: fallback.trackamaniac, moodNames: fallback.moodNames });
   // Written next to the live folder and swapped in only when complete, so a failure leaves the old diary untouched.
   await clearFiles(STAGE);
@@ -218,6 +231,7 @@ export async function restoreDiary(b: { diary: Record<number, DiaryEntry>; photo
       const day = Number(k);
       if (!await writeEntry(day, e, STAGE)) throw new Error('write');
       if (b.photos[day] && !await writePhoto(day, b.photos[day], STAGE)) throw new Error('write');
+      for (const [i, more] of (b.photos[day] ? b.morePhotos?.[day] ?? [] : []).slice(0, MAX_PHOTOS - 1).entries()) if (!await writePhoto(day, more, STAGE, i + 1)) throw new Error('write');
     }
     for (const [key, r] of Object.entries(b.reflections ?? {})) if (!await writeReflection(key, r, STAGE)) throw new Error('write');
     if (Object.keys(x).length && !await writeExtras(x, STAGE)) throw new Error('write');

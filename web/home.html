@@ -1,44 +1,57 @@
 <style>
-/* The home page. It is drawn with Habit Kitty's stylesheet (same colours, buttons, panels and pixel grid); these are only its own parts. */
-[data-app-root="home"] { image-rendering: auto; }
-.home .brand h1 span { color: var(--accent-text); }
-
+/* The home page. It is drawn with the shared sheet and Habit Kitty's (web/page.html); these are only its own parts. */
 /* the player card (Player Stat dialog) */
 .player { display: grid; gap: var(--s4); }
 .player-head { display: grid; grid-template-columns: auto 1fr auto; gap: var(--s4); align-items: center; }
-.avatar { width: calc(29 * var(--px)); height: calc(29 * var(--px)); display: grid; place-items: center; background: var(--accent-soft);
-  border: var(--px) solid var(--edge); clip-path: var(--notch); overflow: hidden; }
-.avatar .sprite { margin: auto; }
-.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .p-info { display: grid; gap: var(--s1); min-width: 0; }
-.p-name { font: 700 25px/1.1 var(--font); overflow-wrap: anywhere; }
+.p-name { font: 700 24px/1.1 var(--font); overflow-wrap: anywhere; }
 .p-info .muted { font-size: 18px; }
 .pstats { display: grid; gap: var(--s4); }
 .title-line { color: var(--accent-text); font-weight: 700; font-size: 18px; }
 
-/* the menu: stacked pixel keys like the other apps' buttons, with a cat perched on the first one */
-.menu { display: grid; gap: var(--s5); padding: calc(26 * var(--px)) calc(12 * var(--px)) 0; }
+/* The menu, after inspo/menu.jpg: short, long keys in a column, each with a dark two-pixel outline, a lit top edge and a shaded
+   bottom band. The colours fade from lavender (the first key) to periwinkle. The key of the app opened last is the chosen one: a
+   white outline that glows and a wing on each side. A white cat always sleeps on Habit Kitty's key.
+   Each name is written like its app's title bar: the word in the title colour, "Kitty" in pink. */
+.home-menu { --m1: #e6dafc; --m2: #d9ccf7; --m3: #cdc8e0; --menu-dk: #6b4f9e;
+  --wing: calc(12 * 2 * var(--px)); --wing-gap: calc(2 * var(--px));
+  /* every key is as wide as the longest name, and the keys plus both wings always fit the screen */
+  display: grid; gap: var(--s4); justify-items: stretch; width: max-content; margin-inline: auto;
+  max-width: calc(100% - 2 * (var(--wing) + var(--wing-gap))); }
+/* The page fills the screen and the keys sit in its middle, however many there are: the title bar is in the top row and the
+   version in the bottom one, both as tall as each other, so neither pushes the keys off centre. The version sits just under the
+   last key. The cat sleeping on the first key lies in the top row, above the key. */
+.wrap.home { overflow-x: clip; min-height: 100vh; min-height: 100dvh; grid-template-rows: 1fr auto 1fr; padding-bottom: var(--s6); padding-top: var(--s6); }
+.wrap.home > .top { align-self: start; }
+.wrap.home > .home-foot { align-self: start; margin: 0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .home-menu { --m1: #6b4f9e; --m2: #4a4084; --m3: #4a4084; --menu-dk: #231d44; } }
+:root[data-theme="dark"] .home-menu { --m1: #6b4f9e; --m2: #4a4084; --m3: #4a4084; --menu-dk: #231d44; }
+.home-menu .menu-btn { padding: var(--s2) var(--s5) calc(var(--s2) + 3 * var(--px)); font-size: 20px; letter-spacing: .06em; white-space: nowrap; min-width: 0;
+  background: var(--mb); border-color: var(--menu-dk); text-shadow: var(--px) var(--px) 0 var(--hilite);
+  box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 color-mix(in srgb, var(--mb) 70%, var(--menu-dk)); }
+.home-menu .menu-btn .kitty { color: var(--accent-text); }
+@media (hover: hover) { .home-menu .menu-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--mb) 80%, #fff); } }
 .perch { position: relative; }
-.menu-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: var(--s3); font-size: 24px; padding: var(--s4) var(--s4) var(--s5); text-align: center; white-space: nowrap; }
-.menu-btn .soon { font-size: 15px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-.menu-btn:disabled { opacity: .85; }
-.perch .sitter { position: absolute; right: calc(7 * var(--px)); bottom: calc(100% - var(--px)); pointer-events: none; }
-.perch .wing { position: absolute; top: 50%; margin-top: calc(-3.5 * var(--px)); color: var(--surface); pointer-events: none;
-  filter: drop-shadow(var(--px) 0 0 var(--edge)) drop-shadow(calc(-1 * var(--px)) 0 0 var(--edge)) drop-shadow(0 var(--px) 0 var(--edge)) drop-shadow(0 calc(-1 * var(--px)) 0 var(--edge)); }
-.perch .wing.l { right: calc(100% + var(--s2)); }
-.perch .wing.r { left: calc(100% + var(--s2)); transform: scaleX(-1); }
-.home-foot { text-align: center; font-size: 15px; }
+.perch .glow { display: block; filter: drop-shadow(0 0 calc(3 * var(--px)) rgba(255, 255, 255, .9)); }
+/* the chosen key keeps the same dark two-pixel outline as the others, with its white line just inside it */
+.perch .menu-btn { width: 100%;
+  box-shadow: inset 0 0 0 var(--bw) #fff, inset 0 calc(-3 * var(--px) - var(--bw)) 0 color-mix(in srgb, var(--mb) 70%, var(--menu-dk)); }
+.seat { position: relative; display: grid; }
+.seat .sitter { position: absolute; right: calc(5 * var(--u)); bottom: calc(100% - var(--px)); pointer-events: none; }
+.perch .wing { position: absolute; top: 50%; transform: translateY(-62%); pointer-events: none; }
+.perch .wing .pxs { width: calc(var(--w) * 2 * var(--px)); height: calc(var(--h) * 2 * var(--px)); }
+.perch .wing.l { right: calc(100% + var(--wing-gap)); }
+.perch .wing.r { left: calc(100% + var(--wing-gap)); transform: translateY(-62%) scaleX(-1); }
+.home-foot { text-align: center; font-size: 16px; }
 .pform { display: grid; gap: var(--s4); }
-.avatar-row { display: flex; gap: var(--s4); align-items: center; }
-.avatar-btns { display: grid; gap: var(--s2); }
-.pform .row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
 </style>
 <div data-app-root="home" hidden>
   <div class="wrap home">
     <header class="top" id="home-top"></header>
-    <nav class="menu" id="home-menu" aria-label="Menu"></nav>
+    <nav class="home-menu" id="home-menu" aria-label="Menu"></nav>
     <p class="home-foot muted" id="home-foot"></p>
   </div>
-  <div id="home-modal" hidden></div>
-  <div class="toast" id="home-toast" role="status" hidden></div>
 </div>
+<!-- The player card opens from every screen (the person in each title bar), so it is outside the home page. -->
+<div id="home-modal" hidden></div>
+<div class="toast" id="home-toast" role="status" hidden></div>

@@ -3,8 +3,8 @@
 //   [■■■■■■■■□□]
 // The look is in web/page.html (.meter); the numbers come from player.ts.
 import type { StatLine } from '../player.ts';
+import { esc } from './html.ts';
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
 
 // `line` is null while the number is not known yet.
 export function meterHtml(kind: 'lv' | 'hp' | 'mp', tag: string, line: StatLine | null): string {

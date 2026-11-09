@@ -39,7 +39,7 @@ document.body.append(el(`<header class="bar">
   <label>fur <input id="fur" type="color" value="${DEFAULT_FUR}"></label>
   <span class="swatches">${FURS.map((f) => `<button class="sw" data-fur="${f}" style="background:${f}" title="${f}"></button>`).join('')}</span>
   <label><input id="grid" type="checkbox"> pixel grid</label>
-  <label>pixel size <input id="px" type="range" min="2" max="10" value="3"> <span id="pxv">3</span>px</label>
+  <label>pixel size <input id="px" type="range" min="1" max="10" step="0.5" value="1.5"> <span id="pxv">1.5</span>px</label>
 </header>`));
 document.body.append(el('<main id="sheet"></main>'));
 

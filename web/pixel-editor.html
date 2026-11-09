@@ -6,15 +6,15 @@
 <title>Kitty pixel editor</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jersey+15&display=swap">
 <style>
-  :root { --ink: #4a3a78; --edge: #8f78d0; --line: #d9ccf7; --surface: #fffafd; --soft: #f3eeff; --pink: #ff8fb8; --pink-edge: #d9608f; }
+  :root { --ink: #4a3a78; --edge: #8f78d0; --line: #d9ccf7; --surface: #fffafd; --soft: #f3ecff; --pink: #ff8fb8; --pink-edge: #d9608f; }
   * { box-sizing: border-box; }
-  body { margin: 0; color: var(--ink); font: 20px/1.3 "Jersey 15", ui-monospace, monospace; background: #e8f2fd; }
+  body { margin: 0; color: var(--ink); font: 20px/1.3 "Jersey 15", ui-monospace, monospace; background: #e0f2fd; }
   header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 16px; background: var(--surface); border-bottom: 3px solid var(--edge); }
   header h1 { margin: 0; font-size: 28px; font-weight: 400; }
   main { display: grid; grid-template-columns: 210px minmax(0, 1fr) 360px; gap: 14px; padding: 14px; align-items: start; }
   @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
   .box { background: var(--surface); border: 3px solid var(--edge); padding: 10px; display: grid; gap: 8px; }
-  .box h2 { margin: 0; font-size: 20px; font-weight: 400; letter-spacing: .08em; text-transform: uppercase; color: #7a69a8; }
+  .box h2 { margin: 0; font-size: 20px; font-weight: 400; letter-spacing: .08em; text-transform: uppercase; color: #7d7594; }
   button, select, input, textarea { font: inherit; color: inherit; }
   button { background: var(--soft); border: 3px solid var(--edge); padding: 2px 10px; cursor: pointer; box-shadow: inset 0 -4px 0 var(--line); }
   button:active { transform: translateY(2px); }
@@ -24,24 +24,24 @@
   .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .slots { display: grid; gap: 4px; }
   .slot { display: grid; grid-template-columns: 28px 26px 1fr; gap: 6px; align-items: center; text-align: left; padding: 2px 6px; box-shadow: none; }
-  .slot b { font-weight: 400; font-size: 22px; text-align: center; }
+  .slot b { font-weight: 400; font-size: 24px; text-align: center; }
   .slot i { width: 26px; height: 26px; border: 3px solid var(--ink); display: block; }
-  .slot small { font-size: 16px; color: #7a69a8; }
+  .slot small { font-size: 16px; color: #7d7594; }
   .slot.on small { color: var(--ink); }
-  #stage { overflow: auto; max-height: calc(100vh - 110px); background: repeating-conic-gradient(#fff 0 25%, #eef0fb 0 50%) 0 0 / 16px 16px; border: 3px solid var(--edge); padding: 0; }
+  #stage { overflow: auto; max-height: calc(100vh - 110px); background: repeating-conic-gradient(#fff 0 25%, #f3ecff 0 50%) 0 0 / 16px 16px; border: 3px solid var(--edge); padding: 0; }
   canvas { display: block; image-rendering: pixelated; touch-action: none; cursor: crosshair; }
   #code { width: 100%; height: 360px; font: 14px/1.25 ui-monospace, monospace; border: 3px solid var(--line); background: var(--soft); padding: 6px; white-space: pre; resize: vertical; }
-  #prev, #prevFace { background: #ffe3ef; border: 3px solid var(--line); image-rendering: pixelated; max-width: 100%; }
+  #prev, #prevFace { background: #ffe3ee; border: 3px solid var(--line); image-rendering: pixelated; max-width: 100%; }
   label { display: inline-flex; gap: 4px; align-items: center; }
-  .hint { font-size: 16px; color: #7a69a8; }
+  .hint { font-size: 16px; color: #7d7594; }
   .free-row { display: grid; grid-template-columns: 34px 34px 1fr 28px; gap: 4px; align-items: center; }
   .free-row input[type=text] { width: 100%; min-width: 0; }
   .free-row input[type=color] { width: 34px; height: 30px; padding: 0; border: 3px solid var(--line); background: var(--soft); }
-  .free-row .letter { text-align: center; font-size: 22px; padding: 0; }
+  .free-row .letter { text-align: center; font-size: 24px; padding: 0; }
   .free-row.on .letter { background: var(--pink); border-color: var(--pink-edge); }
   .free-row button { padding: 0; box-shadow: none; }
   .free-row input.bad { border-color: #c23f7c; }
-  #status { font-size: 16px; color: #3a9d7d; min-height: 1.3em; }
+  #status { font-size: 16px; color: #2f9e6e; min-height: 1.3em; }
 </style>
 </head>
 <body>
@@ -100,11 +100,11 @@ const PATTERNS = ['stripes', 'mask', 'patch', 'calico', 'point', 'plain'];
 const PARTS = { free: { art: 'ART' }, sit: { art: 'SIT_HALF', coat: 'sit' }, tailA: { art: 'TAIL_A' }, tailB: { art: 'TAIL_B' }, nap: { art: 'NAP', coat: 'nap' }, mini: { art: 'MINI', coat: 'mini' } };
 const DIMS = { sit: [14, 26], tailA: [28, 26], tailB: [28, 26], nap: [43, 28], mini: [13, 9], free: [16, 16] };
 // Free drawing: you make the palette. Each entry is a letter and any CSS colour (a #hex or a name like "hotpink").
-const free = { grid: null, pal: [{ k: 'o', v: '#5a4380' }, { k: 'r', v: '#ff8fb8' }, { k: 'y', v: '#ffd36e' }, { k: 'u', v: '#8fd0fa' }, { k: 'w', v: '#fffafc' }] };
+const free = { grid: null, pal: [{ k: 'o', v: '#4a4084' }, { k: 'r', v: '#ff8fb8' }, { k: 'y', v: '#ffd36e' }, { k: 'u', v: '#8fd0fa' }, { k: 'w', v: '#fffafd' }] };
 const validColour = (v) => CSS.supports('color', v);
 const toHex = (v) => { const c = document.createElement('canvas').getContext('2d'); c.fillStyle = '#000'; c.fillStyle = v; return c.fillStyle.startsWith('#') ? c.fillStyle : '#000000'; };
 const slotKeys = () => (part === 'free' ? free.pal.map((e) => e.k) : SLOTS.map((x) => x[0]));
-const WHITE = '#fffafc';
+const WHITE = '#fffafd';
 const $ = (id) => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d'), prev = $('prev'), pctx = prev.getContext('2d');
 let part = 'nap', coat = 'base', baseRows = null, ghost = null, W = 43, H = 28, grid = blank(W, H), cur = 'o', tool = 'pencil',
@@ -127,10 +127,10 @@ function colours() {
     stripes: { f: fur, s: shade(fur, .74), W: WHITE, a: shade(fur, .8), b: shade(fur, .8) },
     mask: { f: fur, s: fur, W: WHITE, a: shade(fur, .8), b: shade(fur, .8) },
     patch: { f: WHITE, s: WHITE, W: WHITE, a: fur, b: shade(fur, .8) },
-    calico: { f: WHITE, s: WHITE, W: WHITE, a: '#6b4a45', b: '#ffb06a' },
-    point: { f: fur, s: fur, W: '#fff8f0', a: '#8a6a5a', b: '#8a6a5a' } }[pat];
-  const m = { o: '#3d2c63', m: '#3d2c63', p: '#ffb3c6', c: '#ffa6c0', n: '#f77fa0', e: '#2a1f4a', t: '#8fd0fa', h: '#ffd36e', ...c, F: c.f };
-  if (part === 'nap') { m.S = c.s; m.s = shade(c.f, .9); m.T = pat === 'calico' ? '#a58a80' : shade(c.f, .88); m.D = pat === 'calico' ? c.a : shade(c.f, .72); }
+    calico: { f: WHITE, s: WHITE, W: WHITE, a: '#7a4d09', b: '#ffb98a' },
+    point: { f: fur, s: fur, W: '#fffafd', a: '#8a6a5a', b: '#8a6a5a' } }[pat];
+  const m = { o: '#3d2c63', m: '#3d2c63', p: '#ffb3d0', c: '#ffb3d0', n: '#ff7d9f', e: '#2b2352', t: '#8fd0fa', h: '#ffd36e', ...c, F: c.f };
+  if (part === 'nap') { m.S = c.s; m.s = shade(c.f, .9); m.T = pat === 'calico' ? '#a07250' : shade(c.f, .88); m.D = pat === 'calico' ? c.a : shade(c.f, .72); }
   else { m.S = c.s; m.T = m.D = c.f; }
   return m;
 }
@@ -200,7 +200,7 @@ function slotsPanel() {
   SLOTS.forEach(([k, name], i) => {
     const b = document.createElement('button');
     b.className = 'slot' + (cur === k ? ' on' : '');
-    b.innerHTML = `<b>${k}</b><i style="background:${col[k] ?? '#ccc'}"></i><small>${i < 9 ? i + 1 + ' ' : ''}${name}</small>`;
+    b.innerHTML = `<b>${k}</b><i style="background:${col[k] ?? '#cdc8e0'}"></i><small>${i < 9 ? i + 1 + ' ' : ''}${name}</small>`;
     b.onclick = () => { cur = k; if (tool === 'erase' || tool === 'pick') setTool('pencil'); slotsPanel(); };
     $('slots').append(b);
   });
@@ -238,7 +238,7 @@ function render() {
     ctx.stroke();
   }
   if (sel) {   // the selection box
-    ctx.strokeStyle = '#ff5c9a'; ctx.lineWidth = 2; ctx.setLineDash([5, 3]);
+    ctx.strokeStyle = '#f26fa3'; ctx.lineWidth = 2; ctx.setLineDash([5, 3]);
     ctx.strokeRect(sel.x * z + 1, sel.y * z + 1, sel.w * z - 2, sel.h * z - 2);
     if (mirrored()) ctx.strokeRect((DW - sel.x - sel.w) * z + 1, sel.y * z + 1, sel.w * z - 2, sel.h * z - 2);
     ctx.setLineDash([]);
@@ -293,7 +293,7 @@ function fromCode(text) {
   const w = Math.max(...rows.map((r) => r.length));
   grid = rows.map((r) => [...r.padEnd(w, '.')]);
   if (part === 'free') {   // a letter with no colour yet gets a grey one, so nothing vanishes
-    for (const ch of new Set(grid.flat())) if (ch !== '.' && ch !== ' ' && !free.pal.some((e) => e.k === ch)) free.pal.push({ k: ch, v: '#999999' });
+    for (const ch of new Set(grid.flat())) if (ch !== '.' && ch !== ' ' && !free.pal.some((e) => e.k === ch)) free.pal.push({ k: ch, v: '#a29bb8' });
     slotsPanel();
   }
 }
@@ -417,7 +417,7 @@ document.querySelectorAll('[data-move]').forEach((b) => (b.onclick = () => {
   grid = g; render();
 }));
 ['zoom', 'gridOn', 'fur'].forEach((id) => $(id).addEventListener('input', () => { render(); slotsPanel(); }));
-const say = (t, bad) => { $('status').style.color = bad ? '#c23f7c' : '#3a9d7d'; $('status').textContent = t; };
+const say = (t, bad) => { $('status').style.color = bad ? '#c23f7c' : '#2f9e6e'; $('status').textContent = t; };
 $('copy').onclick = async () => { try { await navigator.clipboard.writeText(toCode()); say('Copied.'); } catch { $('code').select(); say('Press ctrl+C to copy.', true); } };
 $('load').onclick = () => { try { push(); fromCode($('code').value); render(); say('Loaded.'); } catch (e) { undoS.pop(); say(String(e.message), true); } };
 

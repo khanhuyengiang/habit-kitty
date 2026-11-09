@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { excerpt, renderMarkdown, titleFromText, safeName, searchNotes, sortNotes, uniqueName, type Note } from './model.ts';
+import { composeNote, continueList, excerpt, noteDate, parseNote, renderMarkdown, titleFromText, safeName, searchNotes, sortNotes, uniqueName, type Note } from './model.ts';
 import { planSync } from './sync.ts';
 
 describe('file names', () => {
@@ -82,5 +82,54 @@ describe('planSync', () => {
   });
   it('calls a note that exists on both sides but was never synced a conflict (the texts decide)', () => {
     expect(planSync([{ name: 'a', mtime: 1 }], [{ name: 'a', modified: 1 }], {})).toEqual([{ type: 'conflict', name: 'a' }]);
+  });
+});
+
+describe('the card picture in the frontmatter', () => {
+  it('reads an icon or an image, and keeps the other frontmatter', () => {
+    expect(parseNote('just text')).toEqual({ front: [], cover: null, color: 'pink', doodle: 'heart', face: 'happy', body: 'just text' });
+    expect(parseNote('---\ntags: [a]\nkitty-icon: cat\n---\n# Hi')).toEqual({ front: ['tags: [a]'], cover: { kind: 'icon', name: 'cat' }, color: 'pink', doodle: 'heart', face: 'happy', body: '# Hi' });
+    expect(parseNote('---\nkitty-image: "data:image/jpeg;base64,AAAA"\n---\nx').cover).toEqual({ kind: 'image', src: 'data:image/jpeg;base64,AAAA' });
+    expect(parseNote('---\nkitty-image: javascript:alert(1)\n---\nx').cover).toBeNull();
+  });
+  it('writes it back, and drops an empty frontmatter', () => {
+    const p = parseNote('---\ntags: [a]\nkitty-icon: cat\n---\nbody');
+    expect(composeNote({ ...p, cover: { kind: 'icon', name: 'star' } })).toBe('---\ntags: [a]\nkitty-icon: star\n---\nbody');
+    expect(composeNote({ ...p, cover: null })).toBe('---\ntags: [a]\n---\nbody');
+    expect(composeNote({ ...parseNote('---\nkitty-icon: cat\n---\nbody'), cover: null })).toBe('body');
+    expect(composeNote({ front: [], cover: { kind: 'icon', name: 'cat' }, color: 'pink', doodle: 'heart', face: 'happy', body: 'b' })).toBe('---\nkitty-icon: cat\n---\nb');
+  });
+  it('keeps the colour and the doodle, writing only what is not the default', () => {
+    const p = parseNote('---\nkitty-color: blue\nkitty-doodle: paw\nkitty-face: sleepy\n---\nx');
+    expect([p.color, p.doodle, p.face]).toEqual(['blue', 'paw', 'sleepy']);
+    expect(composeNote(p)).toBe('---\nkitty-color: blue\nkitty-doodle: paw\nkitty-face: sleepy\n---\nx');
+    expect(composeNote({ ...p, color: 'pink', doodle: 'heart', face: 'happy' })).toBe('x');
+    expect(parseNote('---\nkitty-color: <b>\nkitty-doodle: bomb\n---\nx')).toMatchObject({ color: 'pink', doodle: 'heart' });
+  });
+  it('is ignored by titles and search', () => {
+    expect(titleFromText('---\nkitty-icon: cat\n---\nGroceries')).toBe('Groceries');
+    expect(searchNotes([{ name: 'A', text: '---\nkitty-image: data:image/jpeg;base64,QUJD\n---\nhello', mtime: 1 }], 'QUJD')).toEqual([]);
+  });
+});
+
+describe('continuing a list', () => {
+  it('starts the next item', () => {
+    expect(continueList('- milk', 6)).toEqual({ text: '- milk\n- ', caret: 9 });
+    expect(continueList('1. a\n2. b', 9)).toEqual({ text: '1. a\n2. b\n3. ', caret: 13 });
+    expect(continueList('- [x] done', 10)?.text).toBe('- [x] done\n- [ ] ');
+  });
+  it('ends the list on an empty item, and leaves other lines alone', () => {
+    expect(continueList('- milk\n- ', 9)).toEqual({ text: '- milk\n', caret: 7 });
+    expect(continueList('plain', 5)).toBeNull();
+  });
+});
+
+describe('a note\'s date', () => {
+  it('is kept in the frontmatter and written back', () => {
+    const t = '---\nkitty-date: 2026-11-06\n---\nhi';
+    expect(parseNote(t).date).toBe('2026-11-06');
+    expect(composeNote(parseNote(t))).toBe(t);
+    expect(parseNote('---\nkitty-date: 2026-02-30\n---\nhi').date).toBeUndefined();
+    expect(noteDate({ text: t, mtime: 0 })).toBe('2026-11-06');
   });
 });

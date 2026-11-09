@@ -5,32 +5,26 @@ node_modules/
 dist/
 app-www/
 
-# Android: generated or machine-specific
-android/.gradle/
-android/build/
-android/app/build/
-android/capacitor-cordova-android-plugins/build/
-android/local.properties
-android/.idea/
-android/app/src/main/assets/public/
-android/app/src/main/assets/capacitor.config.json
-android/app/src/main/assets/capacitor.plugins.json
+# Dev preview server output (`npm run preview`)
+.preview/
+
+# Android build output and machine-specific files are ignored in android/.gitignore
 *.apk
 *.aab
 *.keystore
 *.jks
 
-# Local state and tooling
+# Local state and personal data
 save.json
+*.kitty
+*.achkitty
+
+# Editor and OS files
 .history/
 .vscode/
 .idea/
 *.log
 .DS_Store
 
-# Dev preview server output
-.preview/
-
 # Others
-achievement-kitty/
 inspo/
