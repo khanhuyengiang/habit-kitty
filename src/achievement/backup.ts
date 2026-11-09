@@ -29,7 +29,7 @@ export async function packBackup(d: Data, photos: Map<string, Blob>, exportedAt 
 
 const looksValid = (d: any): d is Data => !!d && d.version === 1 && !!d.user && [d.mainQuests, d.sideQuests, d.achievements, d.photos].every(Array.isArray);
 
-// Throws when the bytes are not an Achievement Kitty save file.
+// Throws when the bytes are not an Kitty Achievement save file.
 export function unpackBackup(bytes: Uint8Array): { data: Data; photos: Map<string, Blob> } {
   if (!isZip(bytes)) throw new Error('not a backup');
   // A combined .kitty backup carries this app's save as one entry: use that.

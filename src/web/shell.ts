@@ -1,4 +1,4 @@
-// The page's entry: a small router. The home page, the diary and the two apps (Habit Kitty, Achievement Kitty) are all in one page and
+// The page's entry: a small router. The home page, the diary and the two apps (Habit Kitty, Kitty Achievement) are all in one page and
 // one shows at a time (see shared/apps.ts). The page opens on the home page. Habit Kitty always starts, since its reminders,
 // widget and music run in the background whichever screen is showing; the others start the first time they are shown.
 import { App } from '@capacitor/app';
@@ -16,10 +16,11 @@ function start(app: AppName) {
   else if (app === 'achievement') import('../achievement/web/app.ts');
   else if (app === 'diary') import('../diary/app.ts');
   else if (app === 'notes') import('../notes/app.ts');
+  else if (app === 'shopping') import('../shopping/app.ts');
   else import('../home/app.ts');
 }
 
-// The shared sheet is always on; Habit Kitty's draws the home page and the Journal too, Achievement Kitty has its own.
+// The shared sheet is always on; Habit Kitty's draws the home page and the Journal too, Kitty Achievement has its own.
 const styleOf = (app: AppName) => (app === 'achievement' ? 'achievement' : 'habit');
 
 function show(app: AppName, tab?: string) {
@@ -36,7 +37,7 @@ function show(app: AppName, tab?: string) {
   window.scrollTo(0, 0);
 }
 
-const asApp = (s: string | undefined): AppName => (s === 'achievement' || s === 'habit' || s === 'diary' || s === 'notes' ? s : 'home');
+const asApp = (s: string | undefined): AppName => (s === 'achievement' || s === 'habit' || s === 'diary' || s === 'notes' || s === 'shopping' ? s : 'home');
 
 // Capture, so a "go" is handled here and never reaches the screen that is being hidden.
 document.addEventListener('click', (ev) => {
@@ -52,7 +53,7 @@ document.addEventListener(GO_EVENT, (ev) => {
   show(asApp(to), tab);
 });
 
-// Android's back button. Achievement Kitty keeps its pages in the page's history, so there it steps back a page; anywhere
+// Android's back button. Kitty Achievement keeps its pages in the page's history, so there it steps back a page; anywhere
 // else in an app it goes to the home page; on the home page it leaves the app as Android does by default.
 if (Capacitor.isNativePlatform()) App.addListener('backButton', ({ canGoBack }) => {
   const app = shownApp();

@@ -1,6 +1,6 @@
 {
   "appId": "local.habitkitty.app",
-  "appName": "Habit Kitty",
+  "appName": "Itty Bitty Kitty",
   "webDir": "app-www",
   "plugins": {
     "LocalNotifications": {

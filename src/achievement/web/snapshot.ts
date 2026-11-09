@@ -1,4 +1,4 @@
-// Achievement Kitty's save, read and written without the app being open: Habit Kitty's combined backup needs it
+// Kitty Achievement's save, read and written without the app being open: Habit Kitty's combined backup needs it
 // (the app itself only starts the first time it is shown).
 import { Capacitor } from '@capacitor/core';
 import { packBackup, unpackBackup } from '../backup.ts';
@@ -8,7 +8,7 @@ import { FileRepo } from './filerepo.ts';
 
 export const platformRepo = (): Repo => (Capacitor.isNativePlatform() ? new FileRepo() : new IndexedDbRepo());
 
-// The save as an Achievement Kitty save file, or undefined when there is nothing saved yet or it can't be read.
+// The save as an Kitty Achievement save file, or undefined when there is nothing saved yet or it can't be read.
 export async function snapshotAchievement(): Promise<Uint8Array | undefined> {
   try {
     const { data, photos } = await platformRepo().load();

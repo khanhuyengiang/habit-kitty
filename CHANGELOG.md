@@ -13,19 +13,19 @@ Newest first. The app bundles this file: it shows the latest entry once after an
 - **A new top bar in Habit Kitty.** **Kitty**, **Stray**, **Treats**, and, only when they apply, **Pet sitter** (a kitty is with the sitter) and **Memory** (a kitty died, ran away or went to the shelter) replace the tab bar at the bottom. Kitty and Stray each have **List**, a room (the **Cosy Room** and the **Garden**) and **Heatmap**; the Heatmap of each shows only its own kitties.
 - **Home page.** The app now opens on a home page with big pixel buttons: Habit Kitty, Diary, Achievements, and Simple Notes and Shopping Lists (coming soon). The trophy and kitty buttons in the two apps are now a **home button** that brings you back here, and Android's back button goes home too.
 - **One player for every app.** Your name, picture, age, gender and player ID are the same everywhere. The **Player Stat** button on the home page opens your player card; tap the pencil there to edit it.
-- **Lv, HP and MP, the same everywhere.** Each screen has one bar on top with the same text: **HP 397** and "97/300 to lvl 3" in Habit Kitty, **MP 34** in the Diary tab, **Lv 4** in Achievement Kitty. The number is always your running total: affection, days written in the diary, and (for Lv) the achievements unlocked. Level comes from achievements, HP from affection, and MP from diary days (10 days to leave level 1, 20 for level 2, 30 for level 3 …).
+- **Lv, HP and MP, the same everywhere.** Each screen has one bar on top with the same text: **HP 397** and "97/300 to lvl 3" in Habit Kitty, **MP 34** in the Diary tab, **Lv 4** in Kitty Achievement. The number is always your running total: affection, days written in the diary, and (for Lv) the achievements unlocked. Level comes from achievements, HP from affection, and MP from diary days (10 days to leave level 1, 20 for level 2, 30 for level 3 …).
 
 ### Changed
 - **Kitties, strays and treats work the same way.** Their cards have the same layout, and long-pressing any of them opens the same menu (Heatmap, Options). Treats now have a menu too. **Time travel** is one rewind button in the same place on a kitty, a stray and a treat (it used to be on strays and treats only, and in the menu for kitties), and also in each menu.
-- **One Settings screen.** The gear in every screen (home, Habit Kitty, Diary, Achievement Kitty) opens the same Settings, with the shared options (Sound, Your day, Backup, Change log) first and a button for each mini-app below them: Habit Kitty (reminders, game options, how to use), Diary (Trackamaniac, emotion names) and Achievements (load achievements only). The back arrow returns to the screen you came from.
+- **One Settings screen.** The gear in every screen (home, Habit Kitty, Diary, Kitty Achievement) opens the same Settings, with the shared options (Sound, Your day, Backup, Change log) first and a button for each mini-app below them: Habit Kitty (reminders, game options, how to use), Diary (Trackamaniac, emotion names) and Achievements (load achievements only). The back arrow returns to the screen you came from.
 - **Diary: Birthdays** moved to the bottom of the page and starts closed.
 - **Start over** in Habit Kitty's settings no longer deletes your diary: it only resets the kitties and progress.
 
 ## 0.4.2 - 2026-11-05
 
 ### New
-- **One backup for both apps.** The .kitty file now also holds Achievement Kitty's quests, achievements and photos. Restoring it brings both back (the app reloads once). Older Habit Kitty files and Achievement Kitty save files still load.
-- **Save to device.** Settings → Backup → **Save to device…** (in both Habit Kitty and Achievement Kitty) opens the phone's own save dialog, so you choose the folder (Downloads, Documents, an SD card…). **Share…** is still there for Drive, Bluetooth and mail.
+- **One backup for both apps.** The .kitty file now also holds Kitty Achievement's quests, achievements and photos. Restoring it brings both back (the app reloads once). Older Habit Kitty files and Kitty Achievement save files still load.
+- **Save to device.** Settings → Backup → **Save to device…** (in both Habit Kitty and Kitty Achievement) opens the phone's own save dialog, so you choose the folder (Downloads, Documents, an SD card…). **Share…** is still there for Drive, Bluetooth and mail.
 - **Auto-backup.** Pick a backup folder once (Settings → Backup → **Choose backup folder**) and one fresh dated file is saved there whenever you leave the app after changing something, plus once when the app opens if the last one is a day old. The newest 7 days are kept. **Back up now** and **Restore from folder…** are next to it.
 - If the folder can't be reached (deleted, or the card is out), the app tells you instead of failing quietly.
 

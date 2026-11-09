@@ -4,12 +4,12 @@
 .nbar { display: flex; gap: var(--s3); align-items: stretch; }
 .nbar .field { flex: 1; align-content: stretch; }
 .nbar .btn { flex: none; }
-/* The notes as little program windows (after inspo/simple_notes.jpg), drawn like Achievement Kitty's cards: a frame in the
+/* The notes as little program windows (after inspo/simple_notes.jpg), drawn like Kitty Achievement's cards: a frame in the
    note's colour (--nc) with a one-pixel dark outline and a lit line inside it, one pixel cut from every corner, a title bar, and an inset dotted screen with the picture and a few words. Two to a row, every
    card the same shape: --note-ratio is width / height. */
 .ngrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s4); }
 .nwin { --nc: var(--accent); --nw-dk: color-mix(in srgb, var(--nc) 25%, #231d44); --nw-frame: color-mix(in srgb, var(--nc) 62%, var(--surface));
-  --nw-hi: color-mix(in srgb, var(--nc) 25%, #fff); --sq: var(--nc); --dk: var(--nw-dk);   /* --sq and --dk colour Achievement Kitty's icons */
+  --nw-hi: color-mix(in srgb, var(--nc) 25%, #fff); --sq: var(--nc); --dk: var(--nw-dk);   /* --sq and --dk colour Kitty Achievement's icons */
   display: flex; flex-direction: column; width: 100%; min-width: 0; margin: 0; padding: calc(4 * var(--px)); border: 0; font: inherit; color: var(--ink);
   background: var(--nw-frame); -webkit-mask-box-image: var(--notch-s-box); mask: var(--notch-s-m);
   box-shadow: inset 0 0 0 var(--px) var(--nw-dk), inset 0 0 0 calc(2 * var(--px)) var(--nw-hi); }
@@ -79,7 +79,7 @@ button.ncard:focus-visible .nwin-screen { box-shadow: inset 0 0 0 var(--bw) var(
 .nkinds label:hover span { border-color: var(--edge); }
 .nkinds input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); }
 .nkinds input:focus-visible + span { outline: var(--bw) solid var(--accent-text); outline-offset: calc(-2 * var(--bw)); }
-/* The icon list (the same as Achievement Kitty's; its sheet is off on this screen). */
+/* The icon list (the same as Kitty Achievement's; its sheet is off on this screen). */
 .notes .hint { margin: 0; font-size: 16px; font-weight: 400; color: var(--muted); }
 .notes .icon-fold > summary { list-style: none; display: flex; align-items: center; gap: var(--s4); padding: var(--s3) var(--s4); cursor: pointer; border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); background: var(--surface2); color: var(--edge); font-weight: 700; font-size: 18px; }
 .notes .icon-fold > summary::-webkit-details-marker { display: none; }

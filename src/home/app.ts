@@ -1,5 +1,5 @@
 // The home page: the menu to everything else, including Player Stat, which opens the player card (name, picture, ID and the three levels).
-// The levels come from the three apps: Level from Achievement Kitty, HP from Habit Kitty's affection, MP from diary days
+// The levels come from the three apps: Level from Kitty Achievement, HP from Habit Kitty's affection, MP from diary days
 // (see ../player.ts). Moving between screens is the shell's job (src/web/shell.ts): the menu buttons are data-action="go".
 import { PLAYER_GENDERS, PLAYER_GENDER_LABEL, type Data, type PlayerGender } from '../achievement/model.ts';
 import { LIMITS, ageOf, levelOf, titleFor } from '../achievement/ops.ts';
@@ -90,6 +90,7 @@ const MENU: { name: [string, string]; to: string }[] = [
   { name: ['Habit', 'Kitty'], to: 'habit' },
   { name: ['Kitty', 'Journal'], to: 'diary' },
   { name: ['Kitty', 'Achievement'], to: 'achievement' },
+  { name: ['Kitty', 'Mart'], to: 'shopping' },
 ];
 
 function renderMenu() {

@@ -1,6 +1,8 @@
-# Habit Kitty
+# Itty Bitty Kitty
 
-A habit tracker where every habit is a pixel cat. Do the habit, feed the cat. Skip it and the cat goes hungry.
+A cozy pixel-cat app with a few mini-apps: Habit Kitty, Kitty Journal, Kitty Achievement and Kitty Mart.
+
+**Habit Kitty** is a habit tracker where every habit is a pixel cat. Do the habit, feed the cat. Skip it and the cat goes hungry.
 It lives in a cozy pastel pixel world (pink, baby blue and lavender, with a pixel grid behind everything) and runs as a
 single web page and as an offline Android app (via Capacitor).
 
@@ -105,8 +107,8 @@ falls back to a JDK path on the author's machine, so set `JAVA_HOME` to your JDK
 
 ```sh
 npm run app:sync        # build the page and copy it into the Android project
-npm run app:apk         # clean build, then copy the debug APK to dist/HabitKitty.apk
-adb install -r dist/HabitKitty.apk
+npm run app:apk         # clean build, then copy the debug APK to dist/IttyBittyKitty.apk
+adb install -r dist/IttyBittyKitty.apk
 ```
 
 You can also open the `android/` folder in Android Studio and press Run after `npm run app:sync`.
@@ -127,8 +129,8 @@ You can also open the `android/` folder in Android Studio and press Run after `n
 | `src/pixelart.ts` | Icons, weather, food and room art (pure, returns SVG). |
 | `src/shared/pixelart.ts` | Shared by both apps: the pixel grid and pastel palette that every picture is drawn with. |
 | `src/shared/pixelcat.ts`, `src/shared/coats.ts` | Shared by both apps: the pixel cats and the per-coat pattern layers (edit them with `npm run editor`). |
-| `src/achievement/` | Achievement Kitty: its data model, rules (`ops.ts`), storage, backup, card art and UI. |
-| `src/web/shell.ts` | The page's entry, a small router: opens on the home page and shows one screen at a time (home, Habit Kitty, Achievement Kitty). |
+| `src/achievement/` | Kitty Achievement: its data model, rules (`ops.ts`), storage, backup, card art and UI. |
+| `src/web/shell.ts` | The page's entry, a small router: opens on the home page and shows one screen at a time (home, Habit Kitty, Kitty Achievement). |
 | `src/home/app.ts`, `web/home.html` | The home page: the pinned player card (name, picture, ID, Level / HP / MP) and the menu. |
 | `src/player.ts`, `src/shared/player.ts`, `src/shared/stats.ts` | The player's levels (pure, tested); reading and saving the shared player; what Habit Kitty tells the home page (affection, diary days). |
 | `src/shared/apps.ts`, `src/shared/backdrop.ts`, `src/shared/music.ts` | Shared by the screens: the home button and navigation events, the dithered pixel background, and the music volume. |
@@ -136,7 +138,7 @@ You can also open the `android/` folder in Android Studio and press Run after `n
 | `src/web/app.ts` | The UI: tabs, pixel sprites, room, dialogs, save and load. |
 | `web/page.html` | Page markup and styles. |
 | `web/build.js` | Bundles the page, font and sounds for the web and for the Android app. |
-| `web/achievement.html` | Achievement Kitty's part of the page (its markup and styles); the build puts it into `web/page.html`. |
+| `web/achievement.html` | Kitty Achievement's part of the page (its markup and styles); the build puts it into `web/page.html`. |
 | `web/editor.js`, `web/pixel-editor.html` | The pixel editor for the cat art. |
 | `web/preview.js`, `src/web/preview.ts` | Live sprite sheet for `npm run preview` (dev only). |
 | `scripts/notify-icons.ts` | Draws the Android notification icons (`npm run icons`). |

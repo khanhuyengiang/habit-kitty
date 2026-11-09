@@ -3,7 +3,7 @@
 //   auto-backup      one folder, picked once; a fresh dated file per app lands there whenever you leave the app after changes,
 //                    and the newest few are kept (rules in ../backup-schedule.ts)
 // Android only (the BackupFolder plugin). There is one backup file for both apps: Habit Kitty registers it (registerBackupSource)
-// and builds it, with Achievement Kitty's save inside.
+// and builds it, with Kitty Achievement's save inside.
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';

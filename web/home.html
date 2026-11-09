@@ -10,22 +10,24 @@
 .title-line { color: var(--accent-text); font-weight: 700; font-size: 18px; }
 
 /* The menu, after inspo/menu.jpg: short, long keys in a column, each with a dark two-pixel outline, a lit top edge and a shaded
-   bottom band. The colours fade from lavender (the first key) to periwinkle. The key of the app opened last is the chosen one: a
+   bottom band. The colours fade from lavender (the first key) to periwinkle; the in-between keys mix their neighbours. The key of the app opened last is the chosen one: a
    white outline that glows and a wing on each side. A white cat always sleeps on Habit Kitty's key.
    Each name is written like its app's title bar: the word in the title colour, "Kitty" in pink. */
-.home-menu { --m1: #e6dafc; --m2: #d9ccf7; --m3: #cdc8e0; --menu-dk: #6b4f9e;
+.home-menu { --m1: #e6dafc; --m2: #d9ccf7; --m3: color-mix(in srgb, #d9ccf7, #bdb0e6); --m4: #bdb0e6; --menu-dk: #6b4f9e;
   --wing: calc(12 * 2 * var(--px)); --wing-gap: calc(2 * var(--px));
   /* every key is as wide as the longest name, and the keys plus both wings always fit the screen */
   display: grid; gap: var(--s4); justify-items: stretch; width: max-content; margin-inline: auto;
   max-width: calc(100% - 2 * (var(--wing) + var(--wing-gap))); }
 /* The page fills the screen and the keys sit in its middle, however many there are: the title bar is in the top row and the
    version in the bottom one, both as tall as each other, so neither pushes the keys off centre. The version sits just under the
-   last key. The cat sleeping on the first key lies in the top row, above the key. */
-.wrap.home { overflow-x: clip; min-height: 100vh; min-height: 100dvh; grid-template-rows: 1fr auto 1fr; padding-bottom: var(--s6); padding-top: var(--s6); }
+   last key. The cat sleeping on the first key lies in the top row, above the key.
+   In the Android app the page starts below the status bar (web/build.js pads :root by the safe-area inset), so the page is
+   that much shorter than the screen; otherwise it would scroll by the status bar's height and the keys would be off centre. */
+.wrap.home { overflow-x: clip; min-height: calc(100vh - env(safe-area-inset-top, 0px)); min-height: calc(100dvh - env(safe-area-inset-top, 0px)); grid-template-rows: 1fr auto 1fr; padding-bottom: var(--s6); padding-top: var(--s6); }
 .wrap.home > .top { align-self: start; }
 .wrap.home > .home-foot { align-self: start; margin: 0; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .home-menu { --m1: #6b4f9e; --m2: #4a4084; --m3: #4a4084; --menu-dk: #231d44; } }
-:root[data-theme="dark"] .home-menu { --m1: #6b4f9e; --m2: #4a4084; --m3: #4a4084; --menu-dk: #231d44; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .home-menu { --m1: #6b4f9e; --m2: #4a4084; --m3: color-mix(in srgb, #4a4084, #4a3a78); --m4: #4a3a78; --menu-dk: #231d44; } }
+:root[data-theme="dark"] .home-menu { --m1: #6b4f9e; --m2: #4a4084; --m3: color-mix(in srgb, #4a4084, #4a3a78); --m4: #4a3a78; --menu-dk: #231d44; }
 .home-menu .menu-btn { padding: var(--s2) var(--s5) calc(var(--s2) + 3 * var(--px)); font-size: 20px; letter-spacing: .06em; white-space: nowrap; min-width: 0;
   background: var(--mb); border-color: var(--menu-dk); text-shadow: var(--px) var(--px) 0 var(--hilite);
   box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 color-mix(in srgb, var(--mb) 70%, var(--menu-dk)); }

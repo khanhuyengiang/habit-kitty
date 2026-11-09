@@ -1,7 +1,7 @@
-// The player: one person across the apps. The record is the one Achievement Kitty always had (its `user`: id, name, gender,
+// The player: one person across the apps. The record is the one Kitty Achievement always had (its `user`: id, name, gender,
 // birth year, avatar), kept with its data, so nothing moves and backups carry it. These functions read and write it
-// straight from storage, so the home page can show and edit the player while Achievement Kitty is not running.
-// Achievement Kitty re-reads it whenever it is shown again.
+// straight from storage, so the home page can show and edit the player while Kitty Achievement is not running.
+// Kitty Achievement re-reads it whenever it is shown again.
 import { IDB_PREFIX, isLocalRef } from '../achievement/storage.ts';
 import { newId, type Data, type PlayerGender } from '../achievement/model.ts';
 import { emptyData, updateProfile, type Errors } from '../achievement/ops.ts';

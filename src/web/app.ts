@@ -28,6 +28,7 @@ import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, trophyIcon, ty
 import { mountDiarySettings } from '../diary/settings.ts';
 import { collectNotes, initNotes, restoreNotes } from '../notes/data.ts';
 import { mountNotesSettings } from '../notes/settings.ts';
+import { collectShopping, initShopping, restoreShopping } from '../shopping/data.ts';
 import { mountLookSettings } from '../shared/look.ts';
 import { publishHabitStats } from '../shared/stats.ts';
 import { meterHtml } from '../shared/meter.ts';
@@ -1157,7 +1158,7 @@ async function loadDiary() {
 
 // ---- Backup: one .kitty file (a zip) holding the game, every diary page and every photo ----
 async function collectBackup(): Promise<Backup> {
-  return { game: gameOnly(), ...await collectDiary(), notes: collectNotes(), achievement: await snapshotAchievement() };
+  return { game: gameOnly(), ...await collectDiary(), notes: collectNotes(), shopping: collectShopping(), achievement: await snapshotAchievement() };
 }
 
 registerBackupSource({ prefix: BACKUP_PREFIX, ext: BACKUP_EXT, pack: async () => packBackup(await collectBackup()) });
@@ -1193,7 +1194,7 @@ function renderAutoBackup() {
   const f = st.folder;
   const lines = f.chosen
     ? `<p>Folder: <b>${esc(f.name || 'chosen folder')}</b>${f.ok ? '' : ' (not reachable)'}<br>Last backup: ${st.running ? 'saving…' : st.last ? ago(st.last) : 'none yet'}</p>`
-    : '<p class="muted">Off. Pick a folder once (for example Documents, then make a folder called HabitKitty) and a fresh copy is saved there whenever you leave the app after changing something. The newest 7 days are kept.</p>';
+    : '<p class="muted">Off. Pick a folder once (for example Documents, then make a folder called IttyBittyKitty) and a fresh copy is saved there whenever you leave the app after changing something. The newest 7 days are kept.</p>';
   box.innerHTML = `<h4 class="sub">Auto-backup</h4>${lines}${st.error ? `<p class="form-error">${esc(st.error)}</p>` : ''}
     <div class="btns flow">${f.chosen
       ? `<button class="btn" type="button" data-action="backup-now" ${st.running ? 'disabled' : ''}>Back up now</button>
@@ -1226,11 +1227,12 @@ function askRestore(b: Backup) {
   const parts = [
     b.game ? `your kitties, ${pages} diary ${pages === 1 ? 'page' : 'pages'} and ${photos} ${photos === 1 ? 'photo' : 'photos'}` : '',
     b.notes && Object.keys(b.notes).length ? `${plural(Object.keys(b.notes).length, 'note')}` : '',
-    b.achievement ? `${ach} ${ach === 1 ? 'achievement' : 'achievements'} (Achievement Kitty)` : '',
+    b.shopping ? 'your shopping lists' : '',
+    b.achievement ? `${ach} ${ach === 1 ? 'achievement' : 'achievements'} (Kitty Achievement)` : '',
   ].filter(Boolean);
   openModal(`<div class="panel"><h3>Restore this backup?</h3>
     <p>It holds ${parts.join(' and ')}.</p>
-    <p class="muted">${b.game && b.achievement ? 'Everything in both apps' : b.game ? 'Everything in Habit Kitty' : 'Everything in Achievement Kitty'} on this device will be replaced.${b.notes && Object.keys(b.notes).length ? ' So will your notes.' : ''}</p>
+    <p class="muted">${b.game && b.achievement ? 'Everything in both apps' : b.game ? 'Everything in Habit Kitty' : 'Everything in Kitty Achievement'} on this device will be replaced.${b.notes && Object.keys(b.notes).length ? ' So will your notes.' : ''}${b.shopping ? ' So will your shopping lists, recipes and pantry.' : ''}</p>
     <div class="btns"><button class="btn" data-action="modal-close">Cancel</button>
     <button class="btn primary" data-action="restore-yes">Restore</button></div></div>`);
 }
@@ -1241,13 +1243,14 @@ async function restoreBackup() {
   if (!b) return;
   const g = b.game === null ? null : validGame(b.game);
   if (b.game !== null && !g) { closeModal(); toast("Couldn't restore that backup."); return; }
-  // Achievement Kitty first: if it fails nothing has been touched yet.
+  // Kitty Achievement first: if it fails nothing has been touched yet.
   if (b.achievement) {
     try { await restoreAchievement(b.achievement); } catch { closeModal(); toast("Couldn't restore that backup."); return; }
   }
   if (g) {
     if (!await restoreDiary(b, g)) { closeModal(); toast("Couldn't restore the kitties and diary. Achievements were restored."); return; }
     if (b.notes && Object.keys(b.notes).length && !await restoreNotes(b.notes)) toast("Couldn't restore the notes. Everything else was restored.");   // a backup from before notes leaves yours alone
+    if (b.shopping && !await restoreShopping(b.shopping)) toast("Couldn't restore the shopping lists. Everything else was restored.");   // likewise for one from before Kitty Mart
     const { trackamaniac, moodNames, ...rest } = g;   // older backups kept the diary settings here (restoreDiary took them)
     save = normalize(rest);
     lastLevel = null;
@@ -2133,7 +2136,7 @@ onShown('habit', 'change', (ev) => {
   draftLook = { ...draftLook, [key]: sel.value } as CatLook;
   redrawLook();
 });
-// Achievements only: from a backup or an older Achievement Kitty save file.
+// Achievements only: from a backup or an older Kitty Achievement save file.
 $('ach-file').addEventListener('change', async (ev) => {
   const input = ev.target as HTMLInputElement;
   const f = input.files?.[0];
@@ -2403,7 +2406,7 @@ onShown('habit', 'contextmenu', (ev) => {
 // Re-settle when the page comes back and at each 2am rollover.
 function tick() { settle(); renderAll(); queueReminderSync(); checkAmnesia(); checkAccomplishments(); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
-// Back from Achievement Kitty: the theme may have changed there, and the clock moved on.
+// Back from Kitty Achievement: the theme may have changed there, and the clock moved on.
 onAppShown('habit', () => {
   if (tab === 'settings') showTab(tabBeforeSettings);   // coming back to Habit Kitty leaves Settings (unless Settings was asked for, below)
   tick();
@@ -2422,6 +2425,7 @@ function scheduleRollover() {
 
 loadDiary();
 initNotes();
+initShopping();
 loadMusic();
 settle();
 renderAll();

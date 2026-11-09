@@ -1,16 +1,16 @@
-// Habit Kitty and Achievement Kitty share one page: both are in it, and the shell (web/shell.ts) shows one at a time.
+// Habit Kitty and Kitty Achievement share one page: both are in it, and the shell (web/shell.ts) shows one at a time.
 // <html data-app> says which one is showing. Each app's own styles are switched off while it is hidden, and its
 // listeners on the document ignore events while it is hidden, so the two never act on each other's buttons.
 import { monoSvg } from './pixelart.ts';
 import { miniSvg } from './pixelcat.ts';
 
-// The home page, the diary and the notes (the Journal's two tabs) and the two apps: <html data-app> says which one is showing. (Habit Kitty's styles also serve the home page, the diary and the notes.)
-export type AppName = 'home' | 'habit' | 'diary' | 'notes' | 'achievement';
-export const APP_TITLE: Record<AppName, string> = { home: 'Kitty Home', habit: 'Habit Kitty', diary: 'Kitty Journal', notes: 'Kitty Journal', achievement: 'Achievement Kitty' };
+// The home page, the diary and the notes (the Journal's two tabs), Kitty Mart and the two apps: <html data-app> says which one is showing. (Habit Kitty's styles also serve the home page, the diary and the notes.)
+export type AppName = 'home' | 'habit' | 'diary' | 'notes' | 'achievement' | 'shopping';
+export const APP_TITLE: Record<AppName, string> = { home: 'Kitty Home', habit: 'Habit Kitty', diary: 'Kitty Journal', notes: 'Kitty Journal', achievement: 'Kitty Achievement', shopping: 'Kitty Mart' };
 
 export const shownApp = (): AppName => {
   const a = document.documentElement.dataset.app;
-  return a === 'achievement' || a === 'home' || a === 'diary' || a === 'notes' ? a : 'habit';
+  return a === 'achievement' || a === 'home' || a === 'diary' || a === 'notes' || a === 'shopping' ? a : 'habit';
 };
 
 // The app opened last (the Journal's two tabs count as one), kept on this device: the home page marks its key. Habit Kitty
@@ -23,7 +23,7 @@ export const rememberApp = (app: AppName) => {
 export const lastApp = (): AppName => {
   let a: string | null = null;
   try { a = localStorage.getItem(LAST_KEY); } catch { /* storage blocked */ }
-  return a === 'diary' || a === 'achievement' ? a : 'habit';
+  return a === 'diary' || a === 'achievement' || a === 'shopping' ? a : 'habit';
 };
 
 // document.addEventListener, but only while `app` is showing.
@@ -41,7 +41,7 @@ export const onAppShown = (app: AppName, fn: () => void) =>
 // Habit Kitty's own little cat: the pink face on its Today tab, and on the button that goes back to it.
 export const habitKittySvg = () => miniSvg('happy', { fur: '#ffb3d0', pattern: 'plain' });
 
-// The trophy: Achievement Kitty's icon on the home page and in the room.
+// The trophy: Kitty Achievement's icon on the home page and in the room.
 const TROPHY = ['ooooooooo', 'o.ooooo.o', 'o.ooooo.o', '.ooooooo.', '..ooooo..', '...ooo...', '....o....', '...ooo...', '.ooooooo.'];
 export const trophyIcon = () => monoSvg(TROPHY);
 

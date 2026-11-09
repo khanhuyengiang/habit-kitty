@@ -2,7 +2,7 @@ import { faceSvg } from '../shared/pixelcat.ts';
 import { PICKER_ICONS } from './icons.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 
-// Achievement Kitty's pictures, drawn on the shared grid (shared/pixelart.ts). Pure functions that return SVG strings.
+// Kitty Achievement's pictures, drawn on the shared grid (shared/pixelart.ts). Pure functions that return SVG strings.
 
 export { PICKER_ICONS, PICKER_ICON_NAMES } from './icons.ts';
 

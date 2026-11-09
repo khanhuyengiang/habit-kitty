@@ -26,7 +26,7 @@ export type Star = typeof STAR_KEYS[number];
 export const MAX_PHOTOS = 4;
 export interface DiaryEntry { text: string; title?: string; location?: string; photos?: number; mood?: Mood; mood2?: Mood; feeling?: string; weather?: Weather; star?: Star; note?: string; photo?: boolean; updated: number }
 
-// Format 2 can carry Achievement Kitty's whole save as one more entry (achievement.achkitty, itself a zip, see achievement/backup.ts),
+// Format 2 can carry Kitty Achievement's whole save as one more entry (achievement.achkitty, itself a zip, see achievement/backup.ts),
 // so one file backs up both apps. Format 1 files (Habit Kitty only) still load.
 // A person whose birthday the diary reminds you of. `year` is optional (the age is only shown when it is known).
 export interface Person { id: string; name: string; month: number; day: number; year?: number; note?: string }
@@ -118,14 +118,15 @@ export function entryFromMarkdown(md: string): DiaryEntry | null {
 }
 
 export interface Backup {
-  game: unknown;                     // null in a file that only holds Achievement Kitty (an old .achkitty save)
+  game: unknown;                     // null in a file that only holds Kitty Achievement (an old .achkitty save)
   diary: Record<number, DiaryEntry>;
   photos: Record<number, Uint8Array>;
   morePhotos?: Record<number, Uint8Array[]>;   // a page's second, third and fourth photos
-  achievement?: Uint8Array;          // Achievement Kitty's save file, as is
+  achievement?: Uint8Array;          // Kitty Achievement's save file, as is
   reflections?: Record<string, Reflection>;   // by month, 'YYYY-MM'
   extras?: DiaryExtras;
   notes?: Record<string, string>;     // the notes, by name (notes/<name>.md in the file)
+  shopping?: string;                  // Kitty Mart's data, as JSON (shopping.json in the file)
 }
 
 export function packBackup(b: Backup, exportedAt = Date.now()): Uint8Array {
@@ -137,6 +138,7 @@ export function packBackup(b: Backup, exportedAt = Date.now()): Uint8Array {
     if (monthFromKey(key) && r.text.trim()) files[reflectionPath(key)] = strToU8(entryToMarkdown({ text: r.text, updated: r.updated }));
   }
   for (const [name, text] of Object.entries(b.notes ?? {})) if (name === safeName(name) && text.length <= MAX_TEXT) files[`notes/${name}.md`] = strToU8(text);
+  if (b.shopping) files['shopping.json'] = strToU8(b.shopping);
   const extras = sanitizeExtras(b.extras);
   if (Object.keys(extras).length) files[EXTRAS_FILE] = strToU8(JSON.stringify(extras));
   if (b.achievement) files[ACHIEVEMENT_ENTRY] = [b.achievement, { level: 0 }];   // photos inside are JPEGs already
@@ -164,7 +166,7 @@ export function unpackBackup(bytes: Uint8Array): Backup {
   } });
   if (!files['manifest.json']) throw new Error('not a backup');
   const manifest = JSON.parse(strFromU8(files['manifest.json']));
-  // An Achievement Kitty save on its own (the older separate file): there is no game in it.
+  // An Kitty Achievement save on its own (the older separate file): there is no game in it.
   if (manifest?.app === 'achievement-kitty') return { game: null, diary: {}, photos: {}, achievement: bytes };
   if (!files['game.json'] || manifest?.app !== 'habit-kitty' || ![1, BACKUP_FORMAT].includes(manifest.format)) throw new Error('unsupported backup');
   const diary: Record<number, DiaryEntry> = {};
@@ -204,5 +206,5 @@ export function unpackBackup(bytes: Uint8Array): Backup {
   }
   let extras: DiaryExtras = {};
   try { if (files[EXTRAS_FILE]) extras = sanitizeExtras(JSON.parse(strFromU8(files[EXTRAS_FILE]))); } catch { /* ignore a damaged settings file */ }
-  return { game: JSON.parse(strFromU8(files['game.json'])), diary, photos, morePhotos, reflections, extras, notes, ...(files[ACHIEVEMENT_ENTRY] && { achievement: files[ACHIEVEMENT_ENTRY] }) };
+  return { game: JSON.parse(strFromU8(files['game.json'])), diary, photos, morePhotos, reflections, extras, notes, ...(files['shopping.json'] && { shopping: strFromU8(files['shopping.json']) }), ...(files[ACHIEVEMENT_ENTRY] && { achievement: files[ACHIEVEMENT_ENTRY] }) };
 }

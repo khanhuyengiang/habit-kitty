@@ -59,7 +59,7 @@ function openNote(n: Note | null, editing: boolean): Open {
 // A title bar with a cat, the name and three little window keys; under it a dotted screen with the picture and a few words
 // (or, with no picture, the start of the text), sparkles in its corners, the note's doodle in the bottom one and a dotted
 // line with the date. The note's colour (--nc) tints all of it. In the list every card is the same size (.ncard in web/notes.html).
-// The bottom-left picture is one of Achievement Kitty's icons (a sticker at the note's own pixel) and the title bar's cat (./window.ts) is the
+// The bottom-left picture is one of Kitty Achievement's icons (a sticker at the note's own pixel) and the title bar's cat (./window.ts) is the
 // outline of one of Habit Kitty's mini moods, so everything on the card is drawn on the same grid.
 const doodleSvg = (d: NoteDoodle) => (PICKER_ICONS[d] ? stickerSvg(d, 1) : '');
 const FACE_LABEL: Record<NoteFace, string> = { happy: 'Happy', open: 'Awake', sleepy: 'Sleepy', sad: 'Sad', starving: 'Hungry' };
@@ -151,7 +151,7 @@ function coverFieldHtml(): string {
     <input type="file" id="note-file" accept="image/*" hidden>
     <p class="hint">The picture is scaled down and kept inside the note's file.</p>`;
 }
-// The icon list (Achievement Kitty's), folded to the chosen one; `none` adds a "None" choice.
+// The icon list (Kitty Achievement's), folded to the chosen one; `none` adds a "None" choice.
 function iconFold(id: string, name: string, sel: string, open: boolean, none: boolean): string {
   const label = PICKER_ICONS[sel]?.label ?? 'None';
   const pick = (n: string, text: string, art: string) => `<label title="${text}"><input type="radio" name="${name}" value="${n}" ${n === sel ? 'checked' : ''} aria-label="${text}"><span>${art}</span></label>`;

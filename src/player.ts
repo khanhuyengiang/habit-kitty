@@ -1,5 +1,5 @@
 // The player's three levels, pure so they can be tested. The player is one person across the apps:
-//   Level  from Achievement Kitty (levelOf in achievement/ops.ts: unlocked achievements)
+//   Level  from Kitty Achievement (levelOf in achievement/ops.ts: unlocked achievements)
 //   HP     from Habit Kitty's affection (levelProgress in rules.ts)
 //   MP     from filling the diary: 10 days to leave level 1, 20 to leave level 2, 30 to leave level 3, and so on
 import { levelProgress } from './rules.ts';

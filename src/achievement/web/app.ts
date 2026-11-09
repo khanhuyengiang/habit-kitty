@@ -1,4 +1,4 @@
-// The Achievement Kitty page: renders from the data (see ops.ts for the rules, storage.ts for saving).
+// The Kitty Achievement page: renders from the data (see ops.ts for the rules, storage.ts for saving).
 // Every change goes through commit(): it shows at once, then is saved, and a failed save says so and can be retried.
 import {
   PLAYER_GENDERS, PLAYER_GENDER_LABEL, RARITIES, RARITY_LABEL, SIDE_COLORS, inkFor, isColor, newId, todayStr,
@@ -181,7 +181,7 @@ function cardHtml(v: CardView, o: { static?: boolean; unlock?: boolean; big?: bo
 // ---------- pages ----------
 
 function headerHtml(): string {
-  return `<header class="top">${titleBar('Achievement', 'Kitty', `${saver.busy ? '<span class="saving">Saving…</span>' : ''}${homeButton() + playerButton() + settingsButton()}`)}</header>`;
+  return `<header class="top">${titleBar('Kitty', 'Achievement', `${saver.busy ? '<span class="saving">Saving…</span>' : ''}${homeButton() + playerButton() + settingsButton()}`)}</header>`;
 }
 
 function bannerHtml(): string {
@@ -531,7 +531,7 @@ case 'achievement': case 'complete': return `<div class="panel wide form-panel" 
       ${Capacitor.isNativePlatform() ? '<button class="btn grow" data-action="share-backup">Share…</button>' : ''}
       <label class="btn grow">Load achievements<input class="sr" type="file" data-upload="backup"></label></div>
       ${nativeBackups ? `<p class="hint">${backupStatus().folder.chosen ? 'It is also backed up automatically to your backup folder.' : 'To back up automatically, choose a backup folder in Habit Kitty → Settings → Backup.'}</p>` : ''}
-      <p class="hint">Loading here only replaces your achievements, from a backup or an older Achievement Kitty save file. To restore everything, use Habit Kitty → Settings → Backup → Restore.</p></div>`;
+      <p class="hint">Loading here only replaces your achievements, from a backup or an older Kitty Achievement save file. To restore everything, use Habit Kitty → Settings → Backup → Restore.</p></div>`;
     case 'confirm': return `<div class="panel" role="alertdialog" aria-modal="true" aria-labelledby="mt" aria-describedby="mb"><h3 id="mt">${esc(m.title)}</h3><p id="mb">${esc(m.body)}</p>
       <div class="btns end"><button class="btn" data-action="close-modal" autofocus>Cancel</button><button class="btn danger" data-action="confirm-yes">${esc(m.label)}</button></div></div>`;
   }
@@ -737,7 +737,7 @@ function render() {
       lastKey = key;
       requestAnimationFrame(() => window.scrollTo(0, scrolls.get(key) ?? 0));
       if (card) $('page').querySelector<HTMLElement>('[data-action="close-detail"]')?.focus({ preventScroll: true });
-      document.title = `${card ? card.title + ' · ' : r.page === 'quest' ? data.mainQuests.find((q) => q.id === r.id)!.title + ' · ' : r.page === 'all' ? 'All achievements · ' : ''}Achievement Kitty`;
+      document.title = `${card ? card.title + ' · ' : r.page === 'quest' ? data.mainQuests.find((q) => q.id === r.id)!.title + ' · ' : r.page === 'all' ? 'All achievements · ' : ''}Kitty Achievement`;
     }
     else window.scrollTo(0, y);
   }
@@ -1085,7 +1085,7 @@ async function readBackup(file: File | undefined, input: HTMLInputElement) {
   if (!file) return;
   let b: ReturnType<typeof unpackBackup>;
   try { b = unpackBackup(new Uint8Array(await file.arrayBuffer())); }
-  catch { input.value = ''; backupError("That isn't a Habit Kitty backup or an Achievement Kitty save file."); return; }
+  catch { input.value = ''; backupError("That isn't a Habit Kitty backup or an Kitty Achievement save file."); return; }
   input.value = '';
   const n = b.data.achievements.length;
   confirmDialog('Replace everything?', `This file has ${plural(b.data.mainQuests.length, 'main quest')} and ${plural(n, 'achievement')}. Loading it deletes what is in the app now.`, 'Replace everything', async () => {

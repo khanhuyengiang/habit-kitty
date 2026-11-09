@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jersey+15&display=swap">
 <style>
-/* Shared by every screen: the home page, Habit Kitty, the Journal and Achievement Kitty. Each app's own sheet (style[data-app])
+/* Shared by every screen: the home page, Habit Kitty, the Journal and Kitty Achievement. Each app's own sheet (style[data-app])
    is on only while that app shows (src/web/shell.ts); everything they have in common is here, so it looks the same everywhere.
 
    ONE pixel grid. --px is one art pixel, the same fine pixel the achievement cards are drawn in. Pictures are columns x --px
@@ -39,7 +39,7 @@
   --warn-bg: #fff3d1; --warn-ink: #7a4d09; --bad: #c23f7c; --ok: #2f9e6e;
   --dot1: #ff8fb8; --dot2: #b9a3f0; --dot3: #8fd0fa;
   --font: "Jersey 15", "Courier New", monospace;
-  /* both titles are one size, small enough for "Achievement Kitty" to stay on one line next to its buttons, so every title bar is the same */
+  /* both titles are one size, small enough for "Kitty Achievement" to stay on one line next to its buttons, so every title bar is the same */
   --title-size: 36px;
 }
 @media (max-width: 479px) { :root { --title-size: 27px; } }
@@ -144,8 +144,9 @@
 body { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 input, textarea, [contenteditable] { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
 /* the pixel grid over a dithered gradient of baby blue, lavender and pink, drawn by src/shared/backdrop.ts (until it is, three flat bands) */
+/* In the Android app :root is padded by the status bar (web/build.js), so the body is that much shorter than the screen: no scrolling. */
 body {
-  margin: 0; min-height: 100vh; image-rendering: pixelated;
+  margin: 0; min-height: calc(100vh - env(safe-area-inset-top, 0px)); image-rendering: pixelated;
   color: var(--ink); font: 400 20px/1.35 var(--font); -webkit-font-smoothing: none; font-synthesis: none;
   background:
     linear-gradient(var(--grid) var(--px), transparent 0) 0 0 / calc(8 * var(--u)) calc(8 * var(--u)),
@@ -269,7 +270,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .chips input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); }
 .chips input:focus-visible + span { outline: var(--bw) solid var(--accent-text); outline-offset: calc(-2 * var(--bw)); }
 .chips input:disabled + span { opacity: .5; }
-/* a volume slider (Habit Kitty's sound settings, Achievement Kitty's music): a pixel track that fills with pink, and a square key for a thumb */
+/* a volume slider (Habit Kitty's sound settings, Kitty Achievement's music): a pixel track that fills with pink, and a square key for a thumb */
 .vol { display: grid; grid-template-columns: 1fr auto; gap: var(--s1) var(--s3); align-items: center; font-size: 18px; font-weight: 600; }
 .vol span { grid-column: 1 / -1; }
 .vol output { min-width: 4ch; text-align: right; color: var(--muted); }
@@ -292,7 +293,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .m-lv .bar i.on { background: var(--today); }
 .m-mp .bar i.on { background: var(--habit); }
 
-/* ---------- the player's picture (the home page's player card, Achievement Kitty's profile) ---------- */
+/* ---------- the player's picture (the home page's player card, Kitty Achievement's profile) ---------- */
 .avatar { width: calc(29 * var(--u)); height: calc(29 * var(--u)); display: grid; place-items: center; background: var(--accent-soft); overflow: hidden; }
 .avatar .sprite { margin: auto; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -708,7 +709,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
     </div></details>
 
     <details class="panel fold"><summary>Backup</summary><div class="fold-body">
-      <p class="muted">One <b>.kitty</b> file holds <b>both apps</b>: your kitties, every diary page and photo, and your Achievement Kitty quests and achievements (photos are scaled down so the file stays small). Save it on this device, or share it to Drive or by mail.</p>
+      <p class="muted">One <b>.kitty</b> file holds <b>both apps</b>: your kitties, every diary page and photo, and your Kitty Achievement quests and achievements (photos are scaled down so the file stays small). Save it on this device, or share it to Drive or by mail.</p>
       <div class="btns flow">
         <button class="btn primary" type="button" data-action="save-file">Save to device…</button>
         <button class="btn" type="button" data-action="share-file" data-native-only>Share…</button>
@@ -801,7 +802,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
     <div class="set-page" id="set-achievement" hidden>
       <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Achievements</h3></div>
       <details class="panel fold" open><summary>Load achievements</summary><div class="fold-body">
-        <p class="muted">Replaces only your quests and achievements with those from a backup (.kitty) or an older Achievement Kitty save file (.achkitty). Your kitties and diary stay as they are. To save everything, use Backup.</p>
+        <p class="muted">Replaces only your quests and achievements with those from a backup (.kitty) or an older Kitty Achievement save file (.achkitty). Your kitties and diary stay as they are. To save everything, use Backup.</p>
         <div class="btns"><button class="btn" type="button" data-action="ach-load">Load achievements…</button></div>
         <input type="file" id="ach-file" hidden>
         <p class="form-error" id="ach-error" hidden></p>
@@ -836,5 +837,6 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 <!--__HOME__-->
 <!--__DIARY__-->
 <!--__NOTES__-->
+<!--__SHOPPING__-->
 
 <script>/*__APP__*/</script>
