@@ -1,7 +1,7 @@
 // Phone playtest build of Habit Kitty. Bundled into one HTML page by `npm run build:web`.
 import {
   CONFIG, newState, adoptCat, feedCat, startSitter, resumeCat, settleAll, addMindfulTask,
-  doMindfulTask, setTaskDay, setCatDay, replay, rewind, genderOf, daysUntilReady, removeMindfulTask, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, idHash, dayIndex, dayStartHour, setDayStart, nextReset, levelProgress, hunger, sitterCooldownLeft,
+  doMindfulTask, setTaskDay, setCatDay, replay, rewind, genderOf, daysUntilReady, removeMindfulTask, setHabitSchedule, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, idHash, dayIndex, dayStartHour, setDayStart, nextReset, levelProgress, hunger, sitterCooldownLeft,
   type ActionResult, type AppState, type Cat, type CatMode, type CatGender, type CatLook, type CatTrait, type GameEvent, type MindfulTask, type Reason, type TaskKind,
 } from '../rules.ts';
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -56,6 +56,7 @@ interface Save {
   accomplished?: Record<string, number>;   // accomplishment id -> day it was unlocked
   seenVersion?: string;                // last app version whose change log was shown
   sound?: Partial<Record<SoundKind, number>>;   // volume per sound, 0..100 (see SOUND_DEFAULTS)
+  muted?: boolean;                    // every sound off, the volumes kept for when it is turned back on
   strayLeft?: Record<string, number>;  // stray id -> garden window it wandered off in after being fed
   dayStart?: number;                   // hour the day starts (and the one before ends), 0..CONFIG.dayStartMax; CONFIG.resetHour when unset
 }
@@ -859,7 +860,8 @@ type SoundKind = 'bgm' | 'meow' | 'purr';
 const SOUND_DEFAULTS: Record<SoundKind, number> = { bgm: 40, meow: 70, purr: 70 };
 const PET_MEOW = 0.1, PET_PURR = 0.4;                  // chances when petted: a meow, else a purr, else quiet
 const MEOW_EVERY_MS = 15_000, MEOW_CHANCE = 0.12;      // a random meow about every two minutes in the room
-const volumeOf = (k: SoundKind) => Math.min(100, Math.max(0, save.sound?.[k] ?? SOUND_DEFAULTS[k]));
+const levelOf = (k: SoundKind) => Math.min(100, Math.max(0, save.sound?.[k] ?? SOUND_DEFAULTS[k]));   // the slider
+const volumeOf = (k: SoundKind) => (save.muted ? 0 : levelOf(k));                                     // what plays
 let soundOk = false;
 let music: HTMLAudioElement | null = null;
 let purring: HTMLAudioElement | null = null;
@@ -952,11 +954,14 @@ setInterval(() => {
 
 function renderSound() {
   for (const k of ['bgm', 'meow', 'purr'] as const) {
-    const v = volumeOf(k), input = $<HTMLInputElement>(`vol-${k}`);
+    const v = levelOf(k), input = $<HTMLInputElement>(`vol-${k}`);
     input.value = String(v);
-    input.style.setProperty('--fill', `${v}%`);
-    $(`vol-${k}-out`).textContent = v ? `${v}%` : 'Off';
+    input.style.setProperty('--fill', `${save.muted ? 0 : v}%`);
+    $(`vol-${k}-out`).textContent = save.muted ? 'Muted' : v ? `${v}%` : 'Off';
   }
+  const mute = $('mute-all');
+  mute.textContent = save.muted ? 'Unmute all' : 'Mute all';
+  mute.setAttribute('aria-pressed', String(!!save.muted));
   $('music-now').textContent = `Playing: ${ownMusic ? ownMusic.name : 'Strawberry Walk'}`;
   $('music-reset').hidden = !ownMusic;
 }
@@ -970,14 +975,21 @@ for (const k of ['bgm', 'meow', 'purr'] as const) {
   const input = $<HTMLInputElement>(`vol-${k}`);
   input.addEventListener('input', () => {
     save.sound = { ...save.sound, [k]: Number(input.value) };
+    save.muted = false;   // moving a slider means you want to hear it
     renderSound();
     if (k === 'bgm') syncMusic();
   });
   input.addEventListener('change', () => { persist(); if (k !== 'bgm') playSound(k); });   // let go of a slider: hear how loud it is
 }
+function toggleMute() {
+  save.muted = !save.muted;
+  persist(); renderSound(); syncMusic();
+  if (save.muted) purring?.pause();
+  toast(save.muted ? 'Every sound is off.' : 'Sound is back on.');
+}
 provideMusic({
   volume: () => volumeOf('bgm'),
-  setVolume: (v, keep) => { save.sound = { ...save.sound, bgm: v }; renderSound(); syncMusic(); if (keep) persist(); },
+  setVolume: (v, keep) => { save.sound = { ...save.sound, bgm: v }; save.muted = false; renderSound(); syncMusic(); if (keep) persist(); },
   playing: () => (ownMusic ? ownMusic.name : 'Strawberry Walk'),
 });
 
@@ -1012,6 +1024,27 @@ for (const roomEl of [$('room'), $('outdoor')]) roomEl.addEventListener('click',
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const scheduleText = (k: MindfulTask) => k.weekdays?.length ? `on ${k.weekdays.map((d) => DAY_NAMES[d]).join(', ')}` : repeatText(k.cooldownDays);
 const repeatText = (d: number) => d === 1 ? 'daily' : d === 7 ? 'weekly' : d === 14 ? 'every 2 weeks' : d === 30 ? 'monthly' : `every ${d} days`;
+
+// Change how often a stray comes back: the same choices as the form that adds one.
+const REPEAT_CHOICES: [string, string][] = [['1', 'Every day'], ['2', 'Every 2 days'], ['7', 'Every week'], ['14', 'Every 2 weeks'], ['30', 'Every month'],
+  ['weekdays', 'On certain weekdays…'], ['custom', 'Every N days…']];
+function openScheduleForm(k: MindfulTask) {
+  const cur = k.weekdays?.length ? 'weekdays' : REPEAT_CHOICES.some(([v]) => v === String(k.cooldownDays)) ? String(k.cooldownDays) : 'custom';
+  openModal(`<form class="panel" id="stray-schedule" data-id="${k.id}" novalidate><h3>How often ${esc(strayName(k))} comes</h3>
+    <p class="muted">${esc(k.name)}. Its history stays as it is.</p>
+    <label class="field">Repeat <select id="sched-repeat">${REPEAT_CHOICES.map(([v, l]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    <label class="field" id="sched-days-wrap" ${cur === 'custom' ? '' : 'hidden'}>Repeat every (days) <input id="sched-days" type="number" inputmode="numeric" min="1" max="365" value="${k.weekdays?.length ? 3 : k.cooldownDays}"></label>
+    <fieldset class="field chips" id="sched-weekdays-wrap" ${cur === 'weekdays' ? '' : 'hidden'}><legend>Repeat on</legend>
+      <div>${DAY_NAMES.map((n, i) => `<label><input type="checkbox" name="sched-day" value="${i}" ${k.weekdays?.includes(i) ? 'checked' : ''}><span>${n}</span></label>`).join('')}</div></fieldset>
+    <p class="muted">Only a stray that comes every day can be adopted as a kitty.</p>
+    <div class="btns"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`);
+}
+document.addEventListener('change', (ev) => {
+  const t = ev.target as HTMLSelectElement;
+  if (t.id !== 'sched-repeat') return;
+  ($('sched-days-wrap') as HTMLElement).hidden = t.value !== 'custom';
+  ($('sched-weekdays-wrap') as HTMLElement).hidden = t.value !== 'weekdays';
+});
 
 let mindfulView: TaskKind = 'habit';
 const TRAVEL = (id: string) => save.timeTravel ? `<button class="btn small travel" data-action="travel" data-id="${id}" aria-label="Time travel: edit the days this was done">${iconSvg('rewind')}</button>` : '';
@@ -1905,6 +1938,13 @@ onShown('habit', 'click', (ev) => {
         <div class="btns"><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`);
       break;
     }
+    case 'stray-schedule': {
+      const k = save.state.tasks.find((x) => x.id === id && x.kind === 'habit');
+      if (!k) break;
+      closeModal();
+      openScheduleForm(k);
+      break;
+    }
     case 'rename-habit': {
       const cur = cat ? cat.habit : save.state.tasks.find((k) => k.id === id)?.name;
       if (cur === undefined) break;
@@ -2008,6 +2048,7 @@ onShown('habit', 'click', (ev) => {
     case 'load-text': loadSave(($('save-text') as HTMLTextAreaElement).value); break;
     case 'load-file': $('load-file').click(); break;
     case 'music-pick': $('music-file').click(); break;
+    case 'mute-all': toggleMute(); break;
     case 'music-reset': useDefaultMusic(); break;
     case 'month':
       viewMonth.set(id, Math.max(0, (viewMonth.get(id) ?? 0) + Number(btn.dataset.step)));
@@ -2196,6 +2237,16 @@ onShown('habit', 'submit', (ev) => {
     if (!nickname) return;
     save.state = { ...save.state, tasks: save.state.tasks.map((k) => (k.id === id ? { ...k, nickname } : k)) };
     persist(); closeModal(); renderAll(); toast('Stray kitty renamed.');
+  } else if (form.id === 'stray-schedule') {
+    const id = form.dataset.id ?? '';
+    const rep = ($('sched-repeat') as HTMLSelectElement).value;
+    const weekdays = rep === 'weekdays' ? [...form.querySelectorAll<HTMLInputElement>('input[name="sched-day"]:checked')].map((c) => Number(c.value)) : [];
+    if (rep === 'weekdays' && !weekdays.length) { toast('Pick at least one weekday.'); return; }
+    const days = rep === 'custom' ? Number(($('sched-days') as HTMLInputElement).value) : Number(rep);
+    if (rep !== 'weekdays' && !(days >= 1)) { toast('Pick how many days.'); return; }
+    save.state = setHabitSchedule(save.state, id, { cooldownDays: days, weekdays });
+    const k = save.state.tasks.find((x) => x.id === id);
+    persist(); closeModal(); renderAll(); toast(k ? `${strayName(k)} now comes ${scheduleText(k)}.` : 'Saved.');
   } else if (form.id === 'rename') {
     const id = form.dataset.id ?? '';
     const name = ($('rename-input') as HTMLInputElement).value.trim();
@@ -2357,6 +2408,7 @@ function openStrayMenu(id: string, tab?: StrayTab) {
       ${k.cooldownDays === 1 && !k.weekdays?.length ? `<button class="btn primary" data-action="habit-kitty" data-id="${id}">Adopt the kitty</button>` : '<p class="muted">Only daily strays can be adopted.</p>'}
       <button class="btn" data-action="rename-stray" data-id="${id}">Rename ${esc(strayName(k))}</button>
       <button class="btn" data-action="rename-habit" data-id="${id}">Rename habit</button>
+      <button class="btn" data-action="stray-schedule" data-id="${id}">Change how often</button>
       ${save.timeTravel ? `<button class="btn" data-action="travel" data-id="${id}">Time travel</button>` : ''}
       <button class="btn" data-action="task-del" data-id="${id}">Delete stray kitty</button></div>`;
   openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>

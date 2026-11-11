@@ -22,6 +22,7 @@ import { lvLine } from '../../player.ts';
 import { paintBackdrop } from '../../shared/backdrop.ts';
 import { music } from '../../shared/music.ts';
 import { PHOTO_MAX_BYTES, compressPhoto } from '../../shared/photo.ts';
+import { sharePicture } from '../../shared/snapshot.ts';
 import {
   PICKER_ICONS, PICKER_ICON_NAMES, avatarSvg, burstSvg, cornerSvg, flowerSvg, heartSvg, iconSvg, starsSvg, stickerSvg,
 } from '../pixelart.ts';
@@ -364,6 +365,7 @@ function cardPageHtml(a: Achievement): string {
   return `<div class="ctools">
       <button class="btn small" data-action="close-detail">${iconSvg('prev')} Back</button><span class="grow"></span>
       ${planned ? `<button class="btn small primary" data-action="complete-card" data-id="${a.id}">${iconSvg('trophy')} Unlock it</button>` : ''}
+      <button class="btn small" data-action="share-card" data-id="${a.id}">Share</button>
       <button class="btn small" data-action="edit-card" data-id="${a.id}">${iconSvg('pencil')} Edit</button>
       <button class="btn small danger" data-action="delete-card" data-id="${a.id}">${iconSvg('trash')} Delete</button></div>
     <h2 class="sr">${esc(a.title)}</h2>
@@ -862,6 +864,11 @@ function onAction(el: HTMLElement) {
     case 'open-card': scrolls.set(lastKey, window.scrollY); openedInApp = true; detailPhoto = 0; location.hash = r.page === 'all' ? `${ALL_HASH}/card/${id}` : `${questHash(el.dataset.main || questId)}/card/${id}`; break;
     case 'close-detail': closeDetail(); break;
     case 'gallery': detailPhoto = Number(el.dataset.i); render(); break;
+    case 'share-card': {
+      const a = data.achievements.find((x) => x.id === id), card = document.querySelector<HTMLElement>('.card.big');
+      if (a && card) sharePicture(card, a.title || 'Achievement').then((r) => { if (r === 'saved') toast('Picture saved.'); }, () => toast("Couldn't make the picture."));
+      break;
+    }
     case 'edit-card': { const a = data.achievements.find((x) => x.id === id)!; openModal({ kind: 'achievement', id, v: valuesOf(a), photos: formPhotos(id) }); break; }
     case 'complete-card': {
       const a = data.achievements.find((x) => x.id === id)!;

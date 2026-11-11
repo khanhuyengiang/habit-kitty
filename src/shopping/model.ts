@@ -2,14 +2,26 @@
 // the regulars (what you buy, how often, reminders), the recipes and the pantry (stuff you have). ./data.ts keeps it on
 // the device, ./app.ts draws it.
 
-export const CATEGORIES = ['produce', 'dairy', 'bakery', 'meat', 'frozen', 'pantry', 'drinks', 'snacks', 'household', 'care', 'other'] as const;
-export type Category = (typeof CATEGORIES)[number];
-export const CATEGORY_LABEL: Record<Category, string> = {
-  produce: 'Fruit & veg', dairy: 'Dairy & eggs', bakery: 'Bakery', meat: 'Meat & fish', frozen: 'Frozen', pantry: 'Cupboard',
-  drinks: 'Drinks', snacks: 'Snacks', household: 'Household', care: 'Personal care', other: 'Other',
-};
+// ---- categories: the user's own, each with sub-categories (used to sort the pantry), a picture and a colour ----
+// A category is known by its id everywhere. The starting ones keep the ids they always had, so older data fits them.
+// "Other" is always there: whatever loses its category goes into it.
+export const CAT_COLORS = ['pink', 'lavender', 'blue', 'mint', 'lemon', 'peach'] as const;   // the notes' window colours
+export type CatColor = (typeof CAT_COLORS)[number];
+export type Category = string;
+export interface Sub { id: string; name: string }
+export interface Cat { id: string; name: string; icon: string; color: CatColor; subs: Sub[] }
+export const OTHER = 'other';
+const DEFAULT_CATS: [string, string, string, CatColor][] = [
+  ['produce', 'Fruit & veg', 'apple', 'mint'], ['dairy', 'Dairy & eggs', 'chick', 'lemon'], ['bakery', 'Bakery', 'food', 'peach'],
+  ['meat', 'Meat & fish', 'fish', 'pink'], ['frozen', 'Frozen', 'snow', 'blue'], ['pantry', 'Cupboard', 'home', 'peach'],
+  ['drinks', 'Drinks', 'coffee', 'blue'], ['snacks', 'Snacks', 'cake', 'pink'], ['household', 'Household', 'bulb', 'lavender'],
+  ['care', 'Personal care', 'sparkle', 'mint'], [OTHER, 'Other', 'bag', 'lavender'],
+];
+export const defaultCats = (): Cat[] => DEFAULT_CATS.map(([id, name, icon, color]) => ({ id, name, icon, color, subs: [] }));
 
-export interface Item { id: string; name: string; qty: string; unit: string; cat: Category; done: boolean; dupOk?: boolean }
+// from: the recipes that put it on the list (shown next to it, greyed out)
+export interface Item { id: string; name: string; qty: string; unit: string; cat: Category; done: boolean; dupOk?: boolean; from?: string[] }
+const FROM_KEPT = 5;
 export interface List { id: string; name: string; items: Item[] }
 // How a regular comes back: only when you add it, on every trip, or every so many days.
 export type Rule = 'none' | 'always' | 'every';
@@ -22,19 +34,30 @@ export interface Regular {
 }
 export interface Ingredient { name: string; qty: string; unit: string; cat: Category }
 export interface Recipe { id: string; name: string; items: Ingredient[]; notes: string }
-export interface Have { id: string; name: string; qty: string; unit: string; cat: Category; low: boolean }
-export interface Options { sink: boolean; learn: boolean; toPantry: boolean }
+// sub: a sub-category's id ('' none). full: the amount it came in with, when − has counted it down since (that is what goes back in).
+export interface Have { id: string; name: string; qty: string; unit: string; cat: Category; sub: string; low: boolean; full?: string }
+// Something that was in the pantry and was used up: kept, so it can go back in with one tap.
+export interface Had { name: string; qty: string; unit: string; cat: Category; sub: string; gone: number; times: number }
+// Where an item goes, once you have put it somewhere yourself ("maple syrup is in the cupboard"). It wins over the guess.
+export interface Place { cat: Category; sub: string }
+// showEmpty: the pantry shows the categories with nothing in them too
+export interface Options { sink: boolean; learn: boolean; toPantry: boolean; showEmpty: boolean }
 export interface ShopData {
-  v: 1; lists: List[]; regulars: Record<string, Regular>; recipes: Recipe[]; pantry: Have[];
+  v: 2; lists: List[]; regulars: Record<string, Regular>; recipes: Recipe[]; pantry: Have[];
+  cats: Cat[];
+  places: Record<string, Place>;        // an item's key → where it goes
+  had: Record<string, Had>;             // an item's key → when it was last used up
   dismissed: Record<string, string>;    // a dismissed suggestion's key → the turn it was dismissed for
   opts: Options;
 }
 
-export const LIMITS = { lists: 30, items: 300, regulars: 1000, recipes: 300, pantry: 500, name: 60, notes: 4000 };
+export const LIMITS = { lists: 30, items: 300, regulars: 1000, recipes: 300, pantry: 500, name: 60, notes: 4000, cats: 40, subs: 30, places: 2000, had: 1000 };
 const BOUGHT_KEPT = 12;
 const DAY = 86_400_000;
 
-export const emptyData = (): ShopData => ({ v: 1, lists: [], regulars: {}, recipes: [], pantry: [], dismissed: {}, opts: { sink: true, learn: true, toPantry: false } });
+export const emptyData = (): ShopData => ({
+  v: 2, lists: [], regulars: {}, recipes: [], pantry: [], cats: defaultCats(), places: {}, had: {}, dismissed: {}, opts: { sink: true, learn: true, toPantry: false, showEmpty: true },
+});
 export const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 // ---- names ----
@@ -62,7 +85,7 @@ export function parseQuick(text: string): { name: string; qty: string; unit: str
 export const qtyText = (x: { qty: string; unit: string }) => [x.qty, x.unit].filter(Boolean).join(x.unit.length > 2 ? ' ' : '');
 export const itemText = (x: { name: string; qty: string; unit: string }) => [qtyText(x), x.name].filter(Boolean).join(' ');
 
-// ---- categories: guessed from the name, unless the item is known ----
+// ---- categories: where you put it before, else guessed from the name ----
 const GUESS: [Category, RegExp][] = [
   ['dairy', /milk|cheese|yog(h)?urt|butter|cream|quark|egg|feta|mozzarella|parmesan|kefir|skyr/],
   ['produce', /apple|banana|orange|lemon|lime|pear|grape|berr|tomato|potato|onion|garlic|carrot|lettuce|salad|spinach|cucumber|pepper|zucchini|courgette|avocado|mushroom|herb|basil|parsley|ginger|fruit|veg|broccoli|cabbage|leek|celery|kiwi|mango|melon/],
@@ -75,11 +98,99 @@ const GUESS: [Category, RegExp][] = [
   ['care', /shampoo|conditioner|toothpaste|toothbrush|deodorant|razor|lotion|cream|plaster|floss|tampon|pad|vitamin|medicine/],
   ['pantry', /flour|sugar|salt|rice|pasta|noodle|oil|vinegar|sauce|spice|cereal|oat|bean|lentil|can|jam|honey|stock|broth|yeast|baking|ketchup|mustard|mayo/],
 ];
-export function guessCategory(name: string, regulars: Record<string, Regular> = {}): Category {
-  const known = regulars[keyOf(name)];
-  if (known) return known.cat;
+type Known = Partial<Pick<ShopData, 'regulars' | 'places' | 'had' | 'cats'>>;
+export function guessCategory(name: string, d: Known = {}): Category {
+  const k = keyOf(name);
+  const known = d.places?.[k]?.cat ?? d.regulars?.[k]?.cat ?? d.had?.[k]?.cat;
+  if (known) return known;
   const n = name.toLowerCase();
-  return GUESS.find(([, re]) => re.test(n))?.[0] ?? 'other';
+  const c = GUESS.find(([, re]) => re.test(n))?.[0] ?? OTHER;
+  return !d.cats || d.cats.some((x) => x.id === c) ? c : OTHER;   // a guess into a category that was deleted goes to Other
+}
+export const catOf = (d: Pick<ShopData, 'cats'>, id: string) => d.cats.find((c) => c.id === id);
+export const catName = (d: Pick<ShopData, 'cats'>, id: string) => catOf(d, id)?.name ?? 'Other';
+const subIn = (d: Pick<ShopData, 'cats'>, cat: string, sub: string) => (sub && catOf(d, cat)?.subs.some((s) => s.id === sub) ? sub : '');
+// Where an item goes: where you put it yourself, else the guess (with no sub-category).
+export function placeOf(d: ShopData, name: string): Place {
+  const k = keyOf(name), p = d.places[k];
+  if (p) return p;
+  const cat = guessCategory(name, d);
+  const h = d.pantry.find((x) => keyOf(x.name) === k) ?? d.had[k];
+  return { cat, sub: h && h.cat === cat ? h.sub : '' };
+}
+
+// You put an item somewhere: it goes there everywhere (on the lists, in the pantry, the regulars and the recipes) and
+// from now on. With no `sub`, it keeps its sub-category if it stays in the same category.
+export function learnPlace(d: ShopData, name: string, cat: Category, sub?: string): ShopData {
+  if (!catOf(d, cat)) return d;
+  const k = keyOf(name), was = placeOf(d, name);
+  const s = subIn(d, cat, sub ?? (was.cat === cat ? was.sub : ''));
+  const x = clone(d);
+  if (x.places[k] || Object.keys(x.places).length < LIMITS.places) x.places[k] = { cat, sub: s };
+  for (const l of x.lists) for (const i of l.items) if (keyOf(i.name) === k) i.cat = cat;
+  for (const h of x.pantry) if (keyOf(h.name) === k) { h.cat = cat; h.sub = s; }
+  if (x.had[k]) { x.had[k].cat = cat; x.had[k].sub = s; }
+  if (x.regulars[k]) x.regulars[k].cat = cat;
+  for (const r of x.recipes) for (const i of r.items) if (keyOf(i.name) === k) i.cat = cat;
+  return x;
+}
+
+// ---- making and changing categories ----
+export interface CatEdit { name: string; icon: string; color: CatColor; subs: { id: string; name: string }[] }   // a new sub has id ''
+export const catNameTaken = (d: ShopData, name: string, id: string | null) => d.cats.some((c) => c.id !== id && c.name.toLowerCase() === cleanName(name).toLowerCase());
+// Makes a category (id null; it goes before Other) or changes one. Sub-categories missing from `subs` are deleted: what was in them stays in the category.
+export function saveCat(d: ShopData, id: string | null, e: CatEdit): { data: ShopData; id: string } | null {
+  const name = cleanName(e.name);
+  if (!name || catNameTaken(d, name, id) || (!id && d.cats.length >= LIMITS.cats)) return null;
+  const x = clone(d);
+  let c = id ? catOf(x, id) : undefined;
+  if (id && !c) return null;
+  if (!c) {
+    c = { id: newId(), name, icon: '', color: 'lavender', subs: [] };
+    const at = x.cats.findIndex((y) => y.id === OTHER);
+    x.cats.splice(at < 0 ? x.cats.length : at, 0, c);
+  }
+  c.name = name;
+  c.icon = /^[a-z0-9-]{1,20}$/.test(e.icon) ? e.icon : 'bag';
+  c.color = (CAT_COLORS as readonly string[]).includes(e.color) ? e.color : 'lavender';
+  const subs: Sub[] = [], seen = new Set<string>();
+  for (const s of e.subs) {
+    const n = cleanName(s.name);
+    if (!n || seen.has(n.toLowerCase()) || subs.length >= LIMITS.subs) continue;
+    seen.add(n.toLowerCase());
+    subs.push({ id: c.subs.some((y) => y.id === s.id) ? s.id : newId(), name: n });
+  }
+  const gone = new Set(c.subs.map((s) => s.id).filter((s) => !subs.some((y) => y.id === s)));
+  c.subs = subs;
+  if (gone.size) for (const h of [...x.pantry, ...Object.values(x.had), ...Object.values(x.places)]) if (h.cat === c.id && gone.has(h.sub)) h.sub = '';
+  return { data: x, id: c.id };
+}
+export function addSub(d: ShopData, catId: string, name: string): { data: ShopData; id: string } | null {
+  const c = catOf(d, catId), n = cleanName(name);
+  if (!c || !n) return null;
+  const same = c.subs.find((s) => s.name.toLowerCase() === n.toLowerCase());
+  if (same) return { data: d, id: same.id };
+  const r = saveCat(d, catId, { ...c, subs: [...c.subs, { id: '', name: n }] });
+  return r && { data: r.data, id: catOf(r.data, catId)!.subs.at(-1)!.id };
+}
+// Deletes a category (not Other): everything in it goes into Other.
+export function deleteCat(d: ShopData, id: string): ShopData {
+  if (id === OTHER || !catOf(d, id)) return d;
+  const x = clone(d);
+  x.cats = x.cats.filter((c) => c.id !== id);
+  const move = (o: { cat: Category; sub?: string }) => { if (o.cat === id) { o.cat = OTHER; if (o.sub !== undefined) o.sub = ''; } };
+  for (const l of x.lists) l.items.forEach(move);
+  for (const r of x.recipes) r.items.forEach(move);
+  [...x.pantry, ...Object.values(x.had), ...Object.values(x.places), ...Object.values(x.regulars)].forEach(move);
+  return x;
+}
+// Moves a category one place earlier (-1) or later (1): the lists are sorted in this order too (the way through the shop).
+export function moveCat(d: ShopData, id: string, by: -1 | 1): ShopData {
+  const i = d.cats.findIndex((c) => c.id === id), j = i + by;
+  if (i < 0 || j < 0 || j >= d.cats.length) return d;
+  const x = clone(d);
+  [x.cats[i], x.cats[j]] = [x.cats[j], x.cats[i]];
+  return x;
 }
 
 // ---- days ----
@@ -91,19 +202,35 @@ export const daysSince = (t: number, now: number) => Math.round((dayTime(dayKey(
 
 // ---- loading: anything damaged or missing becomes its default ----
 const str = (v: unknown, max = LIMITS.name) => (typeof v === 'string' ? v.slice(0, max) : '');
-const cat = (v: unknown): Category => ((CATEGORIES as readonly string[]).includes(v as string) ? (v as Category) : 'other');
 const num = (v: unknown, max: number) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.min(Math.round(v), max) : 0);
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 
 export function sanitize(raw: unknown): ShopData {
   const r = obj(raw), d = emptyData();
+  // the categories first (older data has none: it gets the starting ones, whose ids it already uses)
+  const ids = new Set<string>();
+  const cats: Cat[] = [];
+  for (const c of arr(r.cats).slice(0, LIMITS.cats).map((x) => obj(x))) {
+    const id = str(c.id, 20), name = cleanName(str(c.name));
+    if (!id || !name || ids.has(id)) continue;
+    ids.add(id);
+    const subIds = new Set<string>();
+    const subs = arr(c.subs).slice(0, LIMITS.subs).map((s) => obj(s)).map((s) => ({ id: str(s.id, 20), name: cleanName(str(s.name)) }))
+      .filter((s) => s.id && s.name && !subIds.has(s.id) && subIds.add(s.id));
+    cats.push({ id, name, icon: /^[a-z0-9-]{1,20}$/.test(str(c.icon)) ? str(c.icon) : 'bag', color: (CAT_COLORS as readonly string[]).includes(str(c.color)) ? (str(c.color) as CatColor) : 'lavender', subs });
+  }
+  if (cats.length) d.cats = cats;
+  if (!d.cats.some((c) => c.id === OTHER)) d.cats.push(defaultCats().find((c) => c.id === OTHER)!);
+  const cat = (v: unknown): Category => (typeof v === 'string' && d.cats.some((c) => c.id === v) ? v : OTHER);
+  const sub = (c: Category, v: unknown) => subIn(d, c, str(v, 20));
   const o = obj(r.opts);
-  d.opts = { sink: o.sink !== false, learn: o.learn !== false, toPantry: o.toPantry === true };
+  d.opts = { sink: o.sink !== false, learn: o.learn !== false, toPantry: o.toPantry === true, showEmpty: o.showEmpty !== false };
   d.lists = arr(r.lists).slice(0, LIMITS.lists).map((l) => obj(l)).filter((l) => str(l.name).trim()).map((l) => ({
     id: str(l.id) || newId(), name: cleanName(str(l.name)),
     items: arr(l.items).slice(0, LIMITS.items).map((i) => obj(i)).filter((i) => str(i.name).trim()).map((i) => ({
       id: str(i.id) || newId(), name: cleanName(str(i.name)), qty: str(i.qty, 12), unit: str(i.unit, 12), cat: cat(i.cat), done: i.done === true, ...(i.dupOk === true && { dupOk: true }),
+      ...(arr(i.from).length && { from: [...new Set(arr(i.from).map((f) => cleanName(str(f))).filter(Boolean))].slice(0, FROM_KEPT) }),
     })),
   }));
   for (const v of Object.values(obj(r.regulars)).slice(0, LIMITS.regulars)) {
@@ -121,9 +248,20 @@ export function sanitize(raw: unknown): ShopData {
     id: str(x.id) || newId(), name: cleanName(str(x.name)), notes: str(x.notes, LIMITS.notes),
     items: arr(x.items).slice(0, 100).map((i) => ing(obj(i))).filter((i) => i.name),
   }));
-  d.pantry = arr(r.pantry).slice(0, LIMITS.pantry).map((x) => obj(x)).filter((x) => str(x.name).trim()).map((x) => ({
-    id: str(x.id) || newId(), name: cleanName(str(x.name)), qty: str(x.qty, 12), unit: str(x.unit, 12), cat: cat(x.cat), low: x.low === true,
-  }));
+  d.pantry = arr(r.pantry).slice(0, LIMITS.pantry).map((x) => obj(x)).filter((x) => str(x.name).trim()).map((x) => {
+    const c = cat(x.cat);
+    return { id: str(x.id) || newId(), name: cleanName(str(x.name)), qty: str(x.qty, 12), unit: str(x.unit, 12), cat: c, sub: sub(c, x.sub), low: x.low === true, ...(str(x.full, 12) && { full: str(x.full, 12) }) };
+  });
+  for (const [k, v] of Object.entries(obj(r.places)).slice(0, LIMITS.places)) {
+    const p = obj(v), c = cat(p.cat);
+    if (k && d.cats.some((x) => x.id === p.cat)) d.places[k.slice(0, LIMITS.name)] = { cat: c, sub: sub(c, p.sub) };
+  }
+  for (const v of Object.values(obj(r.had)).slice(0, LIMITS.had)) {
+    const h = obj(v), name = cleanName(str(h.name));
+    if (!name) continue;
+    const c = cat(h.cat);
+    d.had[keyOf(name)] = { name, qty: str(h.qty, 12), unit: str(h.unit, 12), cat: c, sub: sub(c, h.sub), gone: num(h.gone, 8.64e15), times: Math.max(1, num(h.times, 100000)) };
+  }
   for (const [k, v] of Object.entries(obj(r.dismissed))) if (typeof v === 'string') d.dismissed[k] = v.slice(0, 20);
   return d;
 }
@@ -147,7 +285,7 @@ export function addList(d: ShopData, name: string): { data: ShopData; id: string
 }
 
 // Adds an item to a list. One that is already on it (not crossed out) is left alone, so nothing is added twice.
-export function addItem(d: ShopData, listId: string, it: { name: string; qty?: string; unit?: string; cat?: Category }): { data: ShopData; added: boolean } {
+export function addItem(d: ShopData, listId: string, it: { name: string; qty?: string; unit?: string; cat?: Category; from?: string[] }): { data: ShopData; added: boolean } {
   const name = cleanName(it.name);
   const l = listOf(d, listId);
   if (!name || !l || l.items.length >= LIMITS.items) return { data: d, added: false };
@@ -156,7 +294,8 @@ export function addItem(d: ShopData, listId: string, it: { name: string; qty?: s
   const known = x.regulars[keyOf(name)];
   const qty = it.qty ?? known?.qty ?? '', unit = it.qty ? it.unit ?? '' : it.unit ?? known?.unit ?? '';
   xl.items = xl.items.filter((i) => keyOf(i.name) !== keyOf(name));   // a crossed-out copy goes: it is back on the list
-  xl.items.push({ id: newId(), name, qty, unit, cat: it.cat ?? guessCategory(name, x.regulars), done: false });
+  const from = it.from?.filter(Boolean).slice(0, FROM_KEPT);
+  xl.items.push({ id: newId(), name, qty, unit, cat: it.cat ?? guessCategory(name, x), done: false, ...(from?.length && { from }) });
   return { data: x, added: true };
 }
 
@@ -184,12 +323,22 @@ export const alsoIn = (d: ShopData, listId: string, item: Item): string[] =>
   item.done || item.dupOk ? [] : d.lists.filter((l) => l.id !== listId && onList(l, item.name)).map((l) => l.name);
 
 // The items in the order they are shown: by category, and with `sink` the crossed-out ones last.
-export function shownItems(l: List, sink: boolean): { cat: Category | 'done'; items: Item[] }[] {
-  const groups: { cat: Category | 'done'; items: Item[] }[] = [];
+// Within a category, `subOf` (an item's sub-category, '' none) sorts them into its sub-categories: `shelves` has what has
+// no sub-category first (name ''), then one shelf per sub-category that has something, in the category's order.
+export interface ListGroup { cat: Category | 'done'; items: Item[]; shelves: { sub: string; name: string; items: Item[] }[] }
+export function shownItems(l: List, sink: boolean, cats: Cat[] = defaultCats(), subOf: (name: string) => string = () => ''): ListGroup[] {
+  const groups: ListGroup[] = [];
   const open = sink ? l.items.filter((i) => !i.done) : l.items;
-  for (const c of CATEGORIES) { const items = open.filter((i) => i.cat === c); if (items.length) groups.push({ cat: c, items }); }
+  for (const c of cats) {
+    const items = open.filter((i) => i.cat === c.id || (c.id === OTHER && !cats.some((x) => x.id === i.cat)));
+    if (!items.length) continue;
+    const sub = (i: Item) => { const s = subOf(i.name); return c.subs.some((x) => x.id === s) ? s : ''; };
+    const shelves = [{ sub: '', name: '' }, ...c.subs.map((s) => ({ sub: s.id, name: s.name }))]
+      .map((s) => ({ ...s, items: items.filter((i) => sub(i) === s.sub) })).filter((s) => s.items.length);
+    groups.push({ cat: c.id, items: shelves.flatMap((s) => s.items), shelves });
+  }
   const done = sink ? l.items.filter((i) => i.done) : [];
-  if (done.length) groups.push({ cat: 'done', items: done });
+  if (done.length) groups.push({ cat: 'done', items: done, shelves: [{ sub: '', name: '', items: done }] });
   return groups;
 }
 
@@ -244,7 +393,7 @@ export function setRegular(d: ShopData, name: string, patch: Partial<Regular>): 
   const n = cleanName(patch.name ?? name);
   if (!n) return d;
   const x = clone(d), k = keyOf(name);
-  const old = x.regulars[k] ?? { name: n, store: '', qty: '', unit: '', cat: guessCategory(n), pinned: false, rule: 'none' as Rule, every: 0, remind: '', repeat: 0, bought: [] };
+  const old = x.regulars[k] ?? { name: n, store: '', qty: '', unit: '', cat: guessCategory(n, x), pinned: false, rule: 'none' as Rule, every: 0, remind: '', repeat: 0, bought: [] };
   if (!x.regulars[k] && Object.keys(x.regulars).length >= LIMITS.regulars) return d;
   delete x.regulars[k];
   const g = { ...old, ...patch, name: n };
@@ -323,23 +472,110 @@ export function takeSuggestion(d: ShopData, s: Suggestion, listId: string, now: 
   return settleSuggestion(addItem(d, listId, { name: s.name, qty: s.qty, unit: s.unit, cat: s.cat }).data, s, now);
 }
 
-// ---- pantry ----
-export function putInPantry(d: ShopData, it: { name: string; qty: string; unit: string; cat: Category }): ShopData {
-  const x = d;   // changed in place: the callers pass a copy
-  const h = x.pantry.find((p) => keyOf(p.name) === keyOf(it.name));
-  if (h) { h.low = false; if (it.qty) { h.qty = it.qty; h.unit = it.unit; } }
-  else if (x.pantry.length < LIMITS.pantry) x.pantry.push({ id: newId(), name: cleanName(it.name), qty: it.qty, unit: it.unit, cat: it.cat, low: false });
+// ---- pantry: the stuff you have, sorted into categories and their sub-categories ----
+// Puts something in (the callers pass a copy, which is changed). Something already in stays one thing: it is no longer low,
+// and takes the new amount. Something new goes where it went before, in the category it comes with.
+export function putInPantry(x: ShopData, it: { name: string; qty: string; unit: string; cat: Category; sub?: string }): ShopData {
+  const h = inPantry(x, it.name);
+  if (h) { h.low = false; if (it.qty) { h.qty = it.qty; h.unit = it.unit; delete h.full; } return x; }
+  if (x.pantry.length >= LIMITS.pantry) return x;
+  const p = placeOf(x, it.name), was = x.had[keyOf(it.name)];
+  const name = was && it.name === it.name.toLowerCase() ? was.name : cleanName(it.name);   // "flour" keeps the way it was written ("Flour")
+  x.pantry.push({ id: newId(), name, qty: it.qty, unit: it.unit, cat: it.cat, sub: subIn(x, it.cat, it.sub ?? (p.cat === it.cat ? p.sub : '')), low: false });
   return x;
 }
-export const addToPantry = (d: ShopData, it: { name: string; qty: string; unit: string; cat?: Category }) =>
-  cleanName(it.name) ? putInPantry(clone(d), { ...it, cat: it.cat ?? guessCategory(it.name, d.regulars) }) : d;
+// Adds to the pantry from its add box. With a category (added from that category's page) it goes there, and from now on
+// everywhere; with none, wherever it went before.
+export function addToPantry(d: ShopData, it: { name: string; qty: string; unit: string; cat?: Category; sub?: string }): ShopData {
+  if (!cleanName(it.name)) return d;
+  const x = it.cat && catOf(d, it.cat) ? learnPlace(d, it.name, it.cat, it.sub) : clone(d);
+  const p = placeOf(x, it.name);
+  return putInPantry(x === d ? clone(d) : x, { name: it.name, qty: it.qty, unit: it.unit, cat: p.cat, sub: p.sub });
+}
 export const inPantry = (d: ShopData, name: string) => d.pantry.find((p) => keyOf(p.name) === keyOf(name));
+
+// Changes something in the pantry. A new category or sub-category is remembered for that item everywhere.
+export function updateHave(d: ShopData, id: string, patch: Partial<Pick<Have, 'name' | 'qty' | 'unit' | 'low' | 'cat' | 'sub'>>): ShopData {
+  let x = clone(d);
+  const h = x.pantry.find((p) => p.id === id);
+  if (!h) return d;
+  if (patch.name !== undefined) h.name = cleanName(patch.name) || h.name;
+  if (patch.qty !== undefined && patch.qty.trim().slice(0, 12) !== h.qty) { h.qty = patch.qty.trim().slice(0, 12); delete h.full; }
+  if (patch.unit !== undefined) h.unit = patch.unit.trim().slice(0, 12);
+  if (patch.low !== undefined) h.low = patch.low;
+  const cat = patch.cat ?? h.cat, sub = subIn(x, cat, patch.sub ?? (cat === h.cat ? h.sub : ''));
+  if (cat !== h.cat || sub !== h.sub || (patch.cat !== undefined && x.places[keyOf(h.name)]?.cat !== cat)) x = learnPlace(x, h.name, cat, sub);
+  return x;
+}
+
+// Used up: it leaves the pantry and is remembered under "Had before".
+export function useUp(d: ShopData, id: string, now: number): ShopData {
+  const h = d.pantry.find((p) => p.id === id);
+  if (!h) return d;
+  const x = clone(d), k = keyOf(h.name), old = x.had[k];
+  x.pantry = x.pantry.filter((p) => p.id !== id);
+  if (old || Object.keys(x.had).length < LIMITS.had) x.had[k] = { name: h.name, qty: h.full ?? h.qty, unit: h.unit, cat: h.cat, sub: h.sub, gone: now, times: (old?.times ?? 0) + 1 };
+  return x;
+}
+// Back in the pantry, as it was.
+export function restock(d: ShopData, key: string): ShopData {
+  const g = d.had[key];
+  return g ? addToPantry(d, { name: g.name, qty: g.qty, unit: g.unit, cat: g.cat, sub: g.sub }) : d;
+}
+export function forgetHad(d: ShopData, key: string): ShopData {
+  if (!d.had[key]) return d;
+  const x = clone(d);
+  delete x.had[key];
+  return x;
+}
+
+// Things you count (6 eggs, 2 cans) get a − and a + key; taking the last one away uses it up.
+const COUNTED = /^(|pcs?|packs?|cans?|bottles?|bags?|box(es)?|jars?|bunch|slices|rolls?|tins?)$/i;
+export const canStep = (h: Have) => /^\d{1,4}$/.test(h.qty) && COUNTED.test(h.unit);
+export function stepHave(d: ShopData, id: string, by: number, now: number): { data: ShopData; usedUp: boolean } {
+  const h = d.pantry.find((p) => p.id === id);
+  if (!h || !canStep(h)) return { data: d, usedUp: false };
+  const n = Number(h.qty) + by;
+  if (n <= 0) return { data: useUp(d, id, now), usedUp: true };
+  const x = clone(d), y = x.pantry.find((p) => p.id === id)!;
+  y.full ??= y.qty;
+  y.qty = String(Math.min(n, 9999));
+  if (y.qty === y.full) delete y.full;
+  return { data: x, usedUp: false };
+}
+
+// A category's page: one shelf per sub-category (in their order, empty ones too), then what has no sub-category.
+export interface Shelf { sub: string; name: string; items: Have[] }
+export function shelves(d: ShopData, catId: string): Shelf[] {
+  const c = catOf(d, catId);
+  if (!c) return [];
+  const mine = d.pantry.filter((h) => h.cat === catId).sort((a, b) => a.name.localeCompare(b.name));
+  const out: Shelf[] = c.subs.map((s) => ({ sub: s.id, name: s.name, items: mine.filter((h) => h.sub === s.id) }));
+  const loose = mine.filter((h) => !c.subs.some((s) => s.id === h.sub));
+  if (loose.length || !out.length) out.push({ sub: '', name: c.subs.length ? 'Not sorted' : '', items: loose });
+  return out;
+}
+// What was in the pantry before and isn't now, the most recent first (of one category, or of all).
+export const hadBefore = (d: ShopData, catId?: string): (Had & { key: string })[] =>
+  Object.entries(d.had).filter(([k, h]) => (!catId || h.cat === catId) && !d.pantry.some((p) => keyOf(p.name) === k))
+    .map(([key, h]) => ({ key, ...h })).sort((a, b) => b.gone - a.gone);
+export const pantryCount = (d: ShopData, catId: string) => {
+  const items = d.pantry.filter((h) => h.cat === catId);
+  return { n: items.length, low: items.filter((h) => h.low).length };
+};
+// The pantry search: what you have and what you had, whose name has the words typed.
+export function findInPantry(d: ShopData, typed: string): { have: Have[]; had: (Had & { key: string })[] } {
+  const q = parseQuick(typed).name.toLowerCase();
+  if (!q) return { have: [], had: [] };
+  const hit = (n: string) => n.toLowerCase().includes(q);
+  return { have: d.pantry.filter((h) => hit(h.name)).sort((a, b) => a.name.localeCompare(b.name)), had: hadBefore(d).filter((h) => hit(h.name)) };
+}
 
 // ---- recipes ----
 // Recipe ingredients are written one per line, like the quick add: "200 g flour".
-export const parseIngredients = (text: string, regulars: Record<string, Regular> = {}): Ingredient[] =>
+export const parseIngredients = (text: string, known: Known = {}): Ingredient[] =>
   text.split('\n').map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '').trim()).filter(Boolean).slice(0, 100)
-    .map((l) => { const p = parseQuick(l); return { ...p, cat: guessCategory(p.name, regulars) }; }).filter((i) => i.name);
+    .map((l) => { const p = parseQuick(l); return { ...p, cat: guessCategory(p.name, known) }; }).filter((i) => i.name);
 export const ingredientsText = (items: Ingredient[]) => items.map(itemText).join('\n');
 
 export type Need = 'have' | 'listed' | 'need';
@@ -349,12 +585,18 @@ export const recipeNeeds = (d: ShopData, r: Recipe, listId: string): { ing: Ingr
     const h = inPantry(d, ing.name);
     return { ing, need: h && !h.low ? 'have' : onList(listOf(d, listId), ing.name) ? 'listed' : 'need' };
   });
+// Adds what is missing, marked with the recipe's name; what is already on the list gets the name too ("Broccoli (Stir fry, Soup)").
 export function addRecipe(d: ShopData, r: Recipe, listId: string): { data: ShopData; added: number } {
   let x = d, added = 0;
   for (const { ing, need } of recipeNeeds(d, r, listId)) {
-    if (need !== 'need') continue;
-    const res = addItem(x, listId, ing);
-    x = res.data; if (res.added) added++;
+    if (need === 'need') {
+      const res = addItem(x, listId, { ...ing, from: [r.name] });
+      x = res.data; if (res.added) added++;
+    } else if (need === 'listed') {
+      const it = listOf(x, listId)?.items.find((i) => !i.done && keyOf(i.name) === keyOf(ing.name));
+      if (!it || it.from?.includes(r.name) || (it.from?.length ?? 0) >= FROM_KEPT) continue;
+      x = updateItem(x, listId, it.id, { from: [...(it.from ?? []), r.name] });
+    }
   }
   return { data: x, added };
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addItem, addList, addRecipe, addToPantry, alsoIn, complete, dayKey, emptyData, finishTrip, guessCategory, itemText, keyOf, listOf,
+  addItem, addList, addRecipe, addSub, addToPantry, alsoIn, deleteCat, findInPantry, hadBefore, learnPlace, moveCat, placeOf, restock, saveCat,
+  shelves, stepHave, updateHave, useUp, complete, dayKey, emptyData, finishTrip, guessCategory, itemText, keyOf, listOf,
   listToText, moveItem, parseIngredients, parseQuick, recipeNeeds, sanitize, setRegular, settleSuggestion, shownItems, suggestions,
   takeSuggestion, textToList, updateItem, usualGap, type ShopData,
 } from './model.ts';
@@ -46,7 +47,7 @@ describe('names and categories', () => {
     expect(guessCategory('Bananas')).toBe('produce');
     expect(guessCategory('Mystery')).toBe('other');
     const d = setRegular(emptyData(), 'Milk', { cat: 'drinks' });
-    expect(guessCategory('milk', d.regulars)).toBe('drinks');
+    expect(guessCategory('milk', d)).toBe('drinks');
   });
 });
 
@@ -163,6 +164,9 @@ describe('recipes', () => {
     const res = addRecipe(d, r, ids[0]);
     expect(res.added).toBe(2);
     expect(listOf(res.data, ids[0])!.items.map(itemText)).toEqual(['Milk', '200g flour', '2 eggs']);
+    expect(listOf(res.data, ids[0])!.items.map((i) => i.from)).toEqual([['Pancakes'], ['Pancakes'], ['Pancakes']]);
+    const again = addRecipe(res.data, { ...r, name: 'Crêpes' }, ids[0]);
+    expect(listOf(again.data, ids[0])!.items[1].from).toEqual(['Pancakes', 'Crêpes']);
   });
 });
 
@@ -193,5 +197,85 @@ describe('autocomplete and loading', () => {
     const d = sanitize({ lists: [{ name: 'Aldi', items: [{ name: 'Milk', cat: 'nope', done: 'yes' }, { qty: '2' }] }], regulars: { x: { name: 'Tea', rule: 'weird', bought: [3, 'a', 1] } } });
     expect(d.lists[0].items).toMatchObject([{ name: 'Milk', cat: 'other', done: false }]);
     expect(d.regulars.tea).toMatchObject({ rule: 'none', bought: [1, 3] });
+  });
+  it('shows empty pantry categories unless told not to', () => {
+    expect(sanitize({}).opts.showEmpty).toBe(true);
+    expect(sanitize({ opts: { showEmpty: false } }).opts.showEmpty).toBe(false);
+  });
+});
+
+describe('categories and where things go', () => {
+  it('remembers where you put an item, everywhere and from then on', () => {
+    let { d, ids } = withLists('Aldi');
+    d = addItem(d, ids[0], { name: 'Maple syrup' }).data;
+    d = addToPantry(d, { name: 'Maple syrup', qty: '', unit: '' });
+    expect(listOf(d, ids[0])!.items[0].cat).toBe('other');
+    d = updateHave(d, d.pantry[0].id, { cat: 'pantry' });
+    expect(listOf(d, ids[0])!.items[0].cat).toBe('pantry');
+    expect(placeOf(d, 'maple syrup').cat).toBe('pantry');
+    d = useUp(d, d.pantry[0].id, NOW);
+    d = addItem(d, ids[0], { name: 'Maple Syrup' }).data;   // already on it: left alone
+    const items = parseIngredients('maple syrup');
+    expect(guessCategory('maple syrup', d)).toBe('pantry');
+    expect(items[0].cat).toBe('other');
+    expect(parseIngredients('maple syrup', d)[0].cat).toBe('pantry');
+  });
+  it('adds into the category (and sub-category) it was added from', () => {
+    let d = emptyData();
+    const s = addSub(d, 'pantry', 'Baking')!;
+    d = addToPantry(s.data, { name: 'Flour', qty: '1', unit: 'kg', cat: 'pantry', sub: s.id });
+    expect(d.pantry[0]).toMatchObject({ cat: 'pantry', sub: s.id });
+    d = useUp(d, d.pantry[0].id, NOW);
+    expect(hadBefore(d, 'pantry').map((h) => [h.name, h.times])).toEqual([['Flour', 1]]);
+    d = addToPantry(d, { name: 'flour', qty: '', unit: '' });   // from the top: where it was before
+    expect(d.pantry[0]).toMatchObject({ cat: 'pantry', sub: s.id });
+    expect(hadBefore(d)).toEqual([]);
+    expect(shelves(d, 'pantry').map((x) => [x.name, x.items.map((i) => i.name)])).toEqual([['Baking', ['Flour']]]);
+  });
+  it('sorts a list by sub-category inside each category', () => {
+    let { d, ids } = withLists('Aldi');
+    const a = addSub(d, 'pantry', 'Baking')!; d = a.data;
+    const b = addSub(d, 'pantry', 'Tins')!; d = b.data;
+    for (const n of ['Beans', 'Flour', 'Rice']) d = addItem(d, ids[0], { name: n, cat: 'pantry' }).data;
+    d = learnPlace(d, 'Beans', 'pantry', b.id);
+    d = learnPlace(d, 'Flour', 'pantry', a.id);
+    const g = shownItems(listOf(d, ids[0])!, true, d.cats, (n) => placeOf(d, n).sub);
+    expect(g[0].shelves.map((s) => [s.name, s.items.map((i) => i.name)])).toEqual([['', ['Rice']], ['Baking', ['Flour']], ['Tins', ['Beans']]]);
+    expect(g[0].items.map((i) => i.name)).toEqual(['Rice', 'Flour', 'Beans']);
+  });
+  it('makes, changes, orders and deletes categories', () => {
+    let d = emptyData();
+    const r = saveCat(d, null, { name: 'Baby', icon: 'chick', color: 'pink', subs: [{ id: '', name: 'Nappies' }, { id: '', name: 'nappies' }] })!;
+    d = r.data;
+    expect(d.cats.at(-2)).toMatchObject({ name: 'Baby', subs: [{ name: 'Nappies' }] });
+    expect(d.cats.at(-1)!.id).toBe('other');
+    expect(saveCat(d, null, { name: 'baby', icon: 'x', color: 'pink', subs: [] })).toBeNull();
+    d = addToPantry(d, { name: 'Wipes', qty: '', unit: '', cat: r.id, sub: d.cats.at(-2)!.subs[0].id });
+    d = saveCat(d, r.id, { name: 'Baby stuff', icon: 'chick', color: 'pink', subs: [] })!.data;   // the sub-category went: its things stay
+    expect(d.pantry[0]).toMatchObject({ cat: r.id, sub: '' });
+    d = moveCat(d, r.id, -1);
+    expect(d.cats.at(-3)!.id).toBe(r.id);
+    d = deleteCat(d, r.id);
+    expect(d.pantry[0].cat).toBe('other');
+    expect(placeOf(d, 'wipes').cat).toBe('other');
+    expect(deleteCat(d, 'other')).toBe(d);
+  });
+  it('counts things down and uses up the last one', () => {
+    let d = addToPantry(emptyData(), { name: 'Eggs', qty: '2', unit: '' });
+    d = stepHave(d, d.pantry[0].id, -1, NOW).data;
+    expect(d.pantry[0].qty).toBe('1');
+    const r = stepHave(d, d.pantry[0].id, -1, NOW);
+    expect(r.usedUp).toBe(true);
+    expect(r.data.pantry).toEqual([]);
+    d = restock(r.data, 'egg');
+    expect(d.pantry[0]).toMatchObject({ name: 'Eggs', qty: '2' });   // back in with what it came in with
+    expect(findInPantry(d, 'eg').have.map((h) => h.name)).toEqual(['Eggs']);
+  });
+  it('keeps old data, and drops places in unknown categories', () => {
+    const d = sanitize({ pantry: [{ name: 'Rice', cat: 'pantry' }], places: { rice: { cat: 'pantry', sub: 'nope' }, x: { cat: 'gone' } } });
+    expect(d.cats.map((c) => c.id)).toContain('pantry');
+    expect(d.pantry[0]).toMatchObject({ cat: 'pantry', sub: '' });
+    expect(d.places).toEqual({ rice: { cat: 'pantry', sub: '' } });
+    expect(learnPlace(d, 'rice', 'nope')).toBe(d);
   });
 });

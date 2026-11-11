@@ -2,6 +2,28 @@
 
 Newest first. The app bundles this file: it shows the latest entry once after an update, and the whole list under Settings → Change log.
 
+## 0.5.1 - 2026-11-11
+
+### New
+- **Kitty Mart.** Shopping Lists is here, on the home page, with four tabs: Lists, Recipes, Pantry and Regulars.
+- **Kitty Mart: Lists**: one shopping list per supermarket. Type "2 milk" or "500 g flour" to add something; items are sorted by category, in the order you walk through the shop. Tick what goes in the basket, then **Shopping trip done** clears it (and keeps or deletes what you didn't buy). Each row has a **×** to delete it outright. An item on two lists is flagged. **List… → Share list** sends a list as text, and **Paste a shared list** reads one back.
+- **Kitty Mart: Suggestions** on top of the lists: what you mark as running low, reminders, "always buy" items, and things you buy every so often.
+- **Kitty Mart: Recipes**: save the ingredients, then add only what you don't have and isn't on the list yet, in one tap.
+- **Kitty Mart: Pantry**: what you have at home, as a card per category. Make your own categories and sub-categories, with a picture and a colour. **−** and **+** count things down, **Low?** puts them in the suggestions, and what you used up waits under **Had before** to go back in. Switch to **List** to see everything at home on one page. Untick **Show empty categories** to hide the empty cards. **Fill from shopping trips** puts what you bought in here. Wherever you put an item, Kitty Mart remembers it for that item everywhere.
+- **Kitty Mart: Regulars**: everything you've bought, with favourites, "always buy", "every 2 weeks" and reminders.
+- **Share as a picture.** An open note and an achievement's big card each have a **Share** button that saves the card as an image, to send or keep.
+- **Mute all.** Settings → Sound → **Mute all** turns every sound off at once and keeps your volumes for when you turn it back on.
+- **Change how often a stray comes.** Press and hold a stray kitty → **Change how often**: every day, every few days, or on certain weekdays. Its history stays as it is.
+- **Notes as little windows.** Each note is a window card with its own colour, an icon or picture, a kitty in the title bar, a doodle in the corner and a date. The card's look is stored in the note's `.md` file, so it travels with folder sync and backups.
+- **Diary options** (Settings → Diary): **Teleportation** adds a location to each page, **Photographer** lets a page hold 1, 2 or 4 photos, **Titles** adds a title, and **Starry Nights** lets you star a day (yellow for an exceptionally good one, blue for a bad one), with the starred days listed under Memorable days. A diary page can also link to notes.
+- **Settings → Look.** Light or dark (or follow the device), and a fancy background with sparkles, clouds and hearts.
+
+### Changed
+- **New home menu** with long pixel keys; the app you used last is highlighted.
+- **Kitty Achievement cards** open on their own page, drawn big with every word on them, and the collection fits two cards to a row on most phones. Side quest colours moved to the app's palette.
+- **Trackamaniac is now Meteorokinesis**, and the weather has a windy choice.
+- **Achievement Kitty is now Kitty Achievement** everywhere.
+
 ## 0.5.0 - 2026-11-05
 
 ### New

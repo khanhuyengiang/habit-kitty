@@ -377,8 +377,7 @@ export function addMindfulTask(
   now: Date = new Date(),
 ): AppState {
   const kind = input.kind ?? 'habit';
-  const picked = [...new Set((input.weekdays ?? []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort();
-  const days = kind === 'habit' && picked.length > 0 && picked.length < 7 ? picked : undefined;   // all seven is just "every day"
+  const days = kind === 'habit' ? pickWeekdays(input.weekdays) : undefined;
   const max = kind === 'task' ? CONFIG.taskMaxXp : CONFIG.habitMaxXp;
   const task: MindfulTask = {
     id: input.id,
@@ -393,6 +392,24 @@ export function addMindfulTask(
     createdDay: dayIndex(now),
   };
   return { ...state, tasks: [...state.tasks, task] };
+}
+
+// The weekdays a habit repeats on: only real ones, each once, in order. None, or all seven, means it repeats every cooldownDays.
+const pickWeekdays = (w: number[] | undefined) => {
+  const picked = [...new Set((w ?? []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort();
+  return picked.length > 0 && picked.length < 7 ? picked : undefined;   // all seven is just "every day"
+};
+
+// Change how often a stray kitty (a habit) comes back: every so many days, or on some weekdays. Its history stays.
+export function setHabitSchedule(state: AppState, taskId: string, input: { cooldownDays?: number; weekdays?: number[] }): AppState {
+  const t = state.tasks.find((x) => x.id === taskId);
+  if (!t || t.kind !== 'habit') return state;
+  const days = pickWeekdays(input.weekdays);
+  const { weekdays: _old, ...rest } = t;
+  const next: MindfulTask = days
+    ? { ...rest, weekdays: days, cooldownDays: 7 }
+    : { ...rest, cooldownDays: Math.min(365, Math.max(1, Math.round(input.cooldownDays ?? t.cooldownDays) || 1)) };
+  return { ...state, tasks: state.tasks.map((x) => (x.id === taskId ? next : x)) };
 }
 
 // Monday = 0 ... Sunday = 6 (day 0 of the day index, 1 Jan 1970, was a Thursday).

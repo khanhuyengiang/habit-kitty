@@ -686,6 +686,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
     <details class="panel fold"><summary>Look</summary><div class="fold-body" id="set-look"></div></details>
 
     <details class="panel fold"><summary>Sound</summary><div class="fold-body">
+      <div class="btns"><button class="btn" type="button" data-action="mute-all" id="mute-all" aria-pressed="false">Mute all</button></div>
       <label class="vol"><span>Music</span><input type="range" id="vol-bgm" min="0" max="100" step="5"><output id="vol-bgm-out" class="num" for="vol-bgm"></output></label>
       <p class="muted" id="music-now"></p>
       <div class="btns">
@@ -695,7 +696,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
       <input type="file" id="music-file" accept="audio/*" hidden>
       <label class="vol"><span>Meows</span><input type="range" id="vol-meow" min="0" max="100" step="5"><output id="vol-meow-out" class="num" for="vol-meow"></output></label>
       <label class="vol"><span>Purrs</span><input type="range" id="vol-purr" min="0" max="100" step="5"><output id="vol-purr-out" class="num" for="vol-purr"></output></label>
-      <p class="muted">Kitties indoors (and strays outdoors) meow now and then, and may purr or meow when you pet them. Slide a sound all the way down to turn it off.</p>
+      <p class="muted">Kitties indoors (and strays outdoors) meow now and then, and may purr or meow when you pet them. Slide a sound all the way down to turn it off, or mute them all at once.</p>
       <p class="muted">Music: Strawberry Walk 【BGM： IchinoseSound】 <a href="https://www.youtube.com/@IchinoseSound" target="_blank" rel="noopener">youtube.com/@IchinoseSound</a></p>
     </div></details>
 

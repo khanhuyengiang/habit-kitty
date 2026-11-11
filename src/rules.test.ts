@@ -1,7 +1,7 @@
 import { afterEach, describe, it, expect } from 'vitest';
 import {
   newState, adoptCat, feedCat, startSitter, resumeCat, settleAll,
-  addMindfulTask, doMindfulTask, removeMindfulTask, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, STRAY_NAMES, dayIndex, setDayStart, levelFor, levelProgress,
+  addMindfulTask, setHabitSchedule, doMindfulTask, removeMindfulTask, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, STRAY_NAMES, dayIndex, setDayStart, levelFor, levelProgress,
   graveyard, runaways, hunger, setTaskDay, setCatDay, replay, rewind, genderOf, type ActionResult, type AppState, type CatMode,
 } from './rules';
 
@@ -257,6 +257,21 @@ describe('mindful habits', () => {
     s = ok(doMindfulTask(s, 'h1', at(7)));
     expect(s.xp).toBe(20);
     expect(s.tasks[0].doneDays).toHaveLength(2);
+  });
+
+  it('changes how often a stray comes back, keeping its history', () => {
+    let s = addMindfulTask(newState(), { id: 'h1', name: 'Stretch', xp: 2, kind: 'habit', cooldownDays: 1 }, at(0));
+    s = ok(doMindfulTask(s, 'h1', at(0)));
+    s = setHabitSchedule(s, 'h1', { cooldownDays: 3 });
+    expect(s.tasks[0]).toMatchObject({ cooldownDays: 3, doneDays: [dayIndex(at(0))] });
+    expect(doMindfulTask(s, 'h1', at(2)).ok).toBe(false);
+    s = setHabitSchedule(s, 'h1', { weekdays: [4, 0, 4, 9] });
+    expect(s.tasks[0]).toMatchObject({ weekdays: [0, 4], cooldownDays: 7 });
+    s = setHabitSchedule(s, 'h1', { cooldownDays: 1, weekdays: [0, 1, 2, 3, 4, 5, 6] });   // all seven: every day
+    expect(s.tasks[0].weekdays).toBeUndefined();
+    expect(s.tasks[0].cooldownDays).toBe(1);
+    const t = addMindfulTask(s, { id: 't1', name: 'Dentist', xp: 2, kind: 'task' });
+    expect(setHabitSchedule(t, 't1', { cooldownDays: 5 })).toBe(t);   // a treat has no schedule
   });
 
   it('pays at most 10 xp a day across habits but still lets them be done', () => {

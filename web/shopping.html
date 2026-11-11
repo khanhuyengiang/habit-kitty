@@ -24,9 +24,14 @@
 .shop-item { display: grid; grid-template-columns: 1fr auto; gap: var(--s1) var(--s3); align-items: center; }
 .shop-item .check { align-items: center; font-size: 20px; }
 .shop-item .iname { overflow-wrap: anywhere; }
+.shop-item .ikeys { display: flex; gap: var(--s1); }
 .shop-item .qty { color: var(--accent-text); }
 .shop-item.done .iname { text-decoration: line-through; text-decoration-thickness: calc(2 * var(--px)); color: var(--muted); }
 .shop-item.done .qty { color: inherit; }
+/* the recipe it is for, greyed out: "Broccoli (Veg stir fry)" */
+.shop-item .from { color: var(--muted); font-size: 16px; }
+/* a sub-category inside a category */
+.shop-group h5 { margin: var(--s1) 0 0; font: 700 16px/1.2 var(--font); color: var(--muted); }
 .shopping .gear.sm { width: calc(10 * var(--u)); height: calc(10 * var(--u)); }
 /* "Also in Aldi shopping list." */
 .dup { grid-column: 1 / -1; color: var(--bad); font-size: 16px; font-weight: 700; }
@@ -56,6 +61,43 @@
 .recipe-to { display: flex; gap: var(--s3); align-items: end; flex-wrap: wrap; }
 .recipe-to .field { flex: 1 1 calc(40 * var(--u)); }
 .recipe-notes { white-space: pre-line; font-size: 18px; overflow-wrap: anywhere; border-top: var(--px) dashed var(--line); padding-top: var(--s3); }
+/* pantry: the categories as the notes' window cards (web/notes.html), two to a row but square */
+.pcard { --note-ratio: 6 / 5; }
+/* the pantry as one list: a panel per category */
+#pantry-main { display: grid; gap: var(--s4); }
+.pcard .nart { width: 34%; }
+.pcard .ncard-text { font-size: 18px; }
+.pcard .ncard-foot { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.pcard .ncard-foot::after { display: none; }
+/* a sticker in the category's colour, outside a window: the title of its page, the picture choices */
+.pcat-title, .pick-fold { --nc: var(--accent); --sq: var(--nc); --dk: color-mix(in srgb, var(--nc) 25%, #231d44); }
+.pcat-title { display: flex; align-items: center; gap: var(--s3); min-width: 0; overflow-wrap: anywhere; }
+.pcat-title .nart, .pick-fold .nart { width: calc(10 * var(--u)); flex: none; }
+.shopping .nart .sticker, .shop-dialog .nart .sticker { display: block; }
+/* a thing in the pantry: its name (tap to change it), then − + and Low */
+.prow { display: flex; align-items: center; gap: var(--s2); }
+.pname { flex: 1; min-width: 0; display: grid; gap: var(--px); padding: var(--s1) 0; text-align: left; background: none; border: 0; font: inherit; font-size: 20px; color: var(--ink); cursor: pointer; }
+.pname .iname { overflow-wrap: anywhere; }
+.pname .qty { color: var(--accent-text); }
+.pname .muted { font-size: 16px; }
+.pname:hover .iname { text-decoration: underline; text-decoration-thickness: var(--px); }
+.pkeys { display: flex; gap: var(--s1); flex: none; align-items: center; }
+.btn.step { min-width: calc(10 * var(--u)); padding-inline: 0; font-size: 20px; }
+.pshelf-add .field { min-width: 0; }
+.pshelf-add .field + .field { flex: 0 1 40%; }
+.pshelf-add select { width: 100%; }
+/* the category dialog: sub-categories to rename or delete, and the picture choices */
+.subrows { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.subrows:empty { display: none; }
+.subrows li { display: flex; gap: var(--s2); align-items: center; }
+.subrows .field { flex: 1; }
+.subrows .up .pxs, .subrows .down .pxs { transform: rotate(90deg); }
+.subrows li:first-child .up, .subrows li:last-child .down { visibility: hidden; }
+.pick-fold > summary { display: flex; align-items: center; gap: var(--s3); cursor: pointer; list-style: none; font-weight: 700; }
+.pick-fold > summary::-webkit-details-marker { display: none; }
+.pick-fold > summary::after { content: "+"; margin-left: auto; color: var(--muted); }
+.pick-fold[open] > summary::after { content: "-"; }
+.picons { margin-top: var(--s3); }
 /* pantry: the Low key */
 .btn.low[aria-pressed="true"] { background: var(--warn-bg); color: var(--warn-ink); }
 /* regulars */

@@ -1,24 +1,29 @@
 // The Kitty Mart screen: four tabs.
 //   Lists     suggestions on top (grouped by supermarket), then one shopping list per supermarket
 //   Recipes   ingredients that go onto a list, only the ones you don't have and that aren't on it already
-//   Pantry    the stuff you have; tick something when it is used up, mark it low to get it suggested
+//   Pantry    the stuff you have: a card per category (yours to make), each opening a page sorted by sub-category, with
+//             what was used up under "Had before"; mark something low to get it suggested. Where you put an item is
+//             remembered, for that item everywhere
 //   Regulars  everything you have bought: pin favourites, "always buy", "every 2 weeks", reminders (all optional)
 // The data and its rules are in ./model.ts, kept on the device by ./data.ts (Habit Kitty starts it). Drawn with Habit
 // Kitty's stylesheet and its own, in web/shopping.html.
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { iconSvg } from '../pixelart.ts';
+import { PICKER_ICONS, PICKER_ICON_NAMES, stickerSvg } from '../achievement/pixelart.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { onAppShown, onShown } from '../shared/apps.ts';
 import { esc, plural } from '../shared/html.ts';
 import { homeButton, playerButton, settingsButton, titleBar } from '../shared/ui.ts';
+import { COLOR, tint, winBar } from '../notes/window.ts';
 import { change, onShop, shopData, shopInitialised, shopReady, undo, undoLabel } from './data.ts';
 import {
-  CATEGORIES, CATEGORY_LABEL, LIMITS, addItem, addList, addRecipe, addToPantry, agoText, alsoIn, clone, complete, dayTime, finishTrip,
-  forgetRegular, guessCategory, ingredientsText, isDay, itemText, keyOf, lastBought, listOf, listToText, moveItem, newId, onList,
-  parseIngredients, parseQuick, qtyText, recipeNeeds, regularOf, removeItems, ruleText, setRegular, settleSuggestion, shownItems,
-  suggestions, takeSuggestion, textToList, updateItem, usualGap, type Category, type Item, type Recipe, type Regular, type Rule,
-  type Suggestion,
+  CAT_COLORS, LIMITS, OTHER, addItem, addList, addRecipe, addSub, addToPantry, agoText, alsoIn, canStep, catName, catNameTaken, catOf,
+  clone, complete, dayTime, deleteCat, findInPantry, finishTrip, forgetHad, forgetRegular, guessCategory, hadBefore, inPantry,
+  ingredientsText, isDay, itemText, lastBought, learnPlace, listOf, listToText, moveCat, moveItem, newId, onList, pantryCount,
+  parseIngredients, parseQuick, placeOf, qtyText, recipeNeeds, regularOf, removeItems, restock, ruleText, saveCat, setRegular,
+  settleSuggestion, shelves, shownItems, stepHave, suggestions, takeSuggestion, textToList, updateHave, updateItem, useUp, usualGap,
+  type Cat, type CatColor, type Category, type Had, type Have, type Item, type Recipe, type Regular, type Rule, type Suggestion,
 } from './model.ts';
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
@@ -33,6 +38,11 @@ let typed = '';                  // what is in the list's add box
 let suggOpen = true;             // the suggestions fold
 let recipeId: string | null = null, recipeEditing = false, recipeTo = '';
 let tripFor = '';                // the list whose trip-done dialog is open
+let pantryCat: string | null = null;   // the category page that is open (null: the cards)
+let pantryQuery = '';            // what is in the pantry's find-or-add box
+let shelfSub = '';               // the sub-category picked in a category page's add box
+let hadOpen = false;             // the "Had before" fold
+let pantryView: 'cards' | 'list' = 'cards';   // the pantry's home: a card per category, or everything in one list
 
 // ---- the toast, with Undo when the change can be undone ----
 let toastTimer = 0;
@@ -68,7 +78,12 @@ function render() {
   }
 }
 
-const catOptions = (sel: Category) => CATEGORIES.map((c) => `<option value="${c}" ${c === sel ? 'selected' : ''}>${CATEGORY_LABEL[c]}</option>`).join('');
+const catOptions = (sel: Category) => shopData().cats.map((c) => `<option value="${c.id}" ${c.id === sel ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+const subOptions = (cat: Category, sel: string) => `<option value="">No sub-category</option>${(catOf(shopData(), cat)?.subs ?? [])
+  .map((s) => `<option value="${s.id}" ${s.id === sel ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}`;
+const catIcon = (c: Cat | undefined, size: 1 | 2 = 2) => stickerSvg(c && PICKER_ICONS[c.icon] ? c.icon : 'bag', size);
+// "Cupboard · Baking"
+const whereText = (x: { cat: Category; sub: string }) => { const c = catOf(shopData(), x.cat); return [c?.name ?? 'Other', c?.subs.find((s) => s.id === x.sub)?.name].filter(Boolean).join(' · '); };
 const listOptions = (sel: string, any?: string) => (any !== undefined ? `<option value="">${esc(any)}</option>` : '')
   + shopData().lists.map((l) => `<option value="${l.id}" ${l.id === sel ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
 const dayText = (k: string) => new Date(dayTime(k)).toLocaleDateString('en', { day: 'numeric', month: 'short' });
@@ -115,8 +130,9 @@ function itemHtml(it: Item): string {
   const d = shopData();
   const also = alsoIn(d, listId, it);
   return `<li class="shop-item${it.done ? ' done' : ''}">
-    <label class="check"><input type="checkbox" data-item="${it.id}" ${it.done ? 'checked' : ''}><span class="iname">${it.qty || it.unit ? `<b class="qty">${esc(qtyText(it))}</b> ` : ''}${esc(it.name)}</span></label>
-    <button class="gear sm" type="button" data-action="item-edit" data-id="${it.id}" aria-label="Change ${esc(it.name)}">${iconSvg('pencil')}</button>
+    <label class="check"><input type="checkbox" data-item="${it.id}" ${it.done ? 'checked' : ''}><span class="iname">${it.qty || it.unit ? `<b class="qty">${esc(qtyText(it))}</b> ` : ''}${esc(it.name)}${it.from?.length ? ` <span class="from">(${esc(it.from.join(', '))})</span>` : ''}</span></label>
+    <span class="ikeys"><button class="gear sm" type="button" data-action="item-edit" data-id="${it.id}" aria-label="Change ${esc(it.name)}">${iconSvg('pencil')}</button>
+      <button class="gear sm" type="button" data-action="item-delete" data-id="${it.id}" aria-label="Delete ${esc(it.name)}">${iconSvg('x')}</button></span>
     ${also.length ? `<p class="dup">Also in ${esc(also.join(' and '))} shopping list. <button class="linkish" type="button" data-action="dup-ok" data-id="${it.id}">Ignore</button></p>` : ''}</li>`;
 }
 
@@ -124,7 +140,7 @@ function listHtml(): string {
   const d = shopData();
   const l = listOf(d, listId)!;
   const pins = Object.values(d.regulars).filter((g) => g.pinned && (!g.store || g.store === l.id) && !onList(l, g.name)).sort((a, b) => a.name.localeCompare(b.name));
-  const groups = shownItems(l, d.opts.sink);
+  const groups = shownItems(l, d.opts.sink, d.cats, (n) => placeOf(d, n).sub);
   const anyDone = l.items.some((i) => i.done);
   return `<section class="panel shop-list" aria-label="${esc(l.name)} shopping list">
     <div class="shop-head"><h3>${esc(l.name)}</h3><button class="btn small" type="button" data-action="list-menu">List…</button></div>
@@ -132,7 +148,8 @@ function listHtml(): string {
       <button class="btn primary" type="submit">Add</button></form>
     <div class="shop-complete" id="shop-complete">${completeHtml()}</div>
     ${pins.length ? `<div class="shop-pins" aria-label="Favourites">${pins.map((g) => `<button class="btn small" type="button" data-action="pin-add" data-name="${esc(g.name)}">${star()} ${esc(g.name)}</button>`).join('')}</div>` : ''}
-    ${groups.length ? groups.map((g) => `<div class="shop-group"><h4>${g.cat === 'done' ? 'In the basket' : CATEGORY_LABEL[g.cat]}</h4><ul class="shop-items">${g.items.map(itemHtml).join('')}</ul></div>`).join('')
+    ${groups.length ? groups.map((g) => `<div class="shop-group"><h4>${g.cat === 'done' ? 'In the basket' : esc(catName(d, g.cat))}</h4>${g.shelves.map((s) =>
+      `${s.name ? `<h5>${esc(s.name)}</h5>` : ''}<ul class="shop-items">${s.items.map(itemHtml).join('')}</ul>`).join('')}</div>`).join('')
       : '<p class="muted">Nothing on this list. Type above to add something.</p>'}
     <div class="shop-foot">
       <div class="seg" role="radiogroup" aria-label="Ticked items"><button type="button" role="radio" data-action="mode" data-sink="0" aria-checked="${!d.opts.sink}" aria-selected="${!d.opts.sink}">Cross out</button><button type="button" role="radio" data-action="mode" data-sink="1" aria-checked="${d.opts.sink}" aria-selected="${d.opts.sink}">Move to bottom</button></div>
@@ -153,7 +170,7 @@ function addTyped(text: string) {
   const known = regularOf(d, p.name);
   // typed in lower case, a known item keeps the way it was written before ("milk" → "Milk")
   const name = known && p.name === p.name.toLowerCase() ? known.name : p.name;
-  const r = addItem(d, listId, { name, ...(p.qty ? { qty: p.qty, unit: p.unit } : {}), cat: guessCategory(p.name, d.regulars) });
+  const r = addItem(d, listId, { name, ...(p.qty ? { qty: p.qty, unit: p.unit } : {}), cat: guessCategory(p.name, d) });
   if (!r.added) { toast(onList(listOf(d, listId), p.name) ? `${p.name} is already on the list.` : `This list is full (${LIMITS.items} items).`); return; }
   typed = '';
   change(r.data);
@@ -221,7 +238,9 @@ function openItem(id: string) {
       <label class="field">Name <input name="name" maxlength="${LIMITS.name}" value="${esc(it.name)}" autocomplete="off"></label>
       <div class="row"><label class="field">Amount <input name="qty" maxlength="12" inputmode="decimal" value="${esc(it.qty)}" autocomplete="off"></label>
         <label class="field">Unit <input name="unit" maxlength="12" value="${esc(it.unit)}" placeholder="g, l, pack…" autocomplete="off"></label></div>
-      <label class="field">Category <select name="cat">${catOptions(it.cat)}</select></label>
+      <div class="row"><label class="field">Category <select name="cat" id="item-cat">${catOptions(it.cat)}</select></label>
+        <label class="field">Sub-category <select name="sub" id="item-sub">${subOptions(it.cat, placeOf(d, it.name).sub)}</select></label></div>
+      ${it.from?.length ? `<p class="muted">For ${esc(it.from.join(', '))}.</p>` : ''}
       ${shopData().lists.length > 1 ? `<label class="field">On the list for <select name="list">${listOptions(listId)}</select></label>` : ''}
       <label class="check"><input type="checkbox" name="pinned" ${g?.pinned ? 'checked' : ''}><span><b>Favourite</b><br><span class="muted">Pinned under the add box, for one tap.</span></span></label>
       <div class="btns"><button class="btn danger" type="button" data-action="item-delete" data-id="${it.id}">Delete</button><span class="grow"></span>
@@ -236,6 +255,8 @@ function saveItem(f: HTMLFormElement) {
   if (!it) return closeLayer();
   const name = v('name').trim() || it.name;
   d = updateItem(d, listId, id, { name, qty: v('qty').trim(), unit: v('unit').trim(), cat: v('cat') as Category });
+  // put somewhere else: it goes there everywhere from now on
+  if (v('cat') !== it.cat || v('sub') !== placeOf(d, name).sub) d = learnPlace(d, name, v('cat'), v('sub'));
   const pinned = (f.elements.namedItem('pinned') as HTMLInputElement).checked;
   if (pinned !== !!regularOf(d, name)?.pinned) d = setRegular(d, name, { pinned, ...(regularOf(d, name) ? {} : { cat: v('cat') as Category, store: listId }) });
   const to = v('list');
@@ -317,7 +338,7 @@ function saveRecipe(f: HTMLFormElement) {
   const name = v('name').trim().slice(0, LIMITS.name);
   if (!name) { toast('Give the recipe a name.'); return; }
   const d = clone(shopData());
-  const items = parseIngredients(v('items'), d.regulars), notes = v('notes').slice(0, LIMITS.notes);
+  const items = parseIngredients(v('items'), d), notes = v('notes').slice(0, LIMITS.notes);
   const old = recipeId ? d.recipes.find((x) => x.id === recipeId) : undefined;
   if (old) Object.assign(old, { name, items, notes });
   else { recipeId = newId(); d.recipes.push({ id: recipeId, name, items, notes }); }
@@ -326,19 +347,201 @@ function saveRecipe(f: HTMLFormElement) {
 }
 
 // =================== Pantry ===================
+// The categories as cards, two to a row (the notes' little windows); a card opens the category's page, with what is in it
+// sorted by sub-category and what was in it before. The box on top finds something, or adds it where it went last time.
 function pantryHtml(): string {
   const d = shopData();
-  const groups = CATEGORIES.map((c) => ({ c, items: d.pantry.filter((h) => h.cat === c).sort((a, b) => a.name.localeCompare(b.name)) })).filter((g) => g.items.length);
-  return `<section class="panel shop-list"><h3>Stuff you have</h3>
-    <form class="shop-add" id="pantry-form"><label class="field"><input id="pantry-input" maxlength="80" placeholder="Add: rice, 6 eggs" autocomplete="off" enterkeyhint="done" aria-label="Add to the pantry"></label>
+  const c = pantryCat ? catOf(d, pantryCat) : undefined;
+  if (!c) pantryCat = null;
+  return c ? catPageHtml(c) : pantryHomeHtml();
+}
+
+function pantryHomeHtml(): string {
+  const d = shopData();
+  const low = d.pantry.filter((h) => h.low).length;
+  return `<form class="shop-add" id="pantry-form"><label class="field"><input id="pantry-input" maxlength="80" placeholder="Find or add: rice, 6 eggs" autocomplete="off" enterkeyhint="done" aria-label="Find or add to the pantry" value="${esc(pantryQuery)}"></label>
       <button class="btn primary" type="submit">Add</button></form>
-    ${groups.length ? groups.map((g) => `<div class="shop-group"><h4>${CATEGORY_LABEL[g.c]}</h4><ul class="shop-items">${g.items.map((h) => `<li class="shop-item">
-      <label class="check"><input type="checkbox" data-used="${h.id}"><span class="iname">${h.qty || h.unit ? `<b class="qty">${esc(qtyText(h))}</b> ` : ''}${esc(h.name)}</span></label>
-      <button class="btn small low" type="button" data-action="pantry-low" data-id="${h.id}" aria-pressed="${h.low}">${h.low ? 'Low' : 'Low?'}</button></li>`).join('')}</ul></div>`).join('')
-      : '<p class="muted">Nothing here yet.</p>'}
-    <p class="muted">Tick something when it's used up. Mark it <b>Low</b> and it shows up in the suggestions.</p>
-    <label class="check"><input type="checkbox" id="opt-topantry" ${d.opts.toPantry ? 'checked' : ''}><span><b>Fill from shopping trips</b><br><span class="muted">When a trip is done, what you bought is put in here.</span></span></label>
-  </section>`;
+    <div class="seg pview" role="radiogroup" aria-label="Show the pantry as">${(['cards', 'list'] as const).map((v) =>
+      `<button type="button" role="radio" data-action="pantry-view" data-view="${v}" aria-checked="${pantryView === v}" aria-selected="${pantryView === v}">${v === 'cards' ? 'Cards' : 'List'}</button>`).join('')}</div>
+    <div id="pantry-main">${pantryMainHtml()}</div>
+    <div class="shop-bar"><span class="muted">${plural(d.pantry.length, 'thing')} at home${low ? ` · ${low} running low` : ''}</span><span class="grow"></span>
+      <button class="btn small" type="button" data-action="cat-new" ${d.cats.length >= LIMITS.cats ? 'disabled' : ''}>+ Category</button></div>
+    <label class="check"><input type="checkbox" id="opt-showempty" ${d.opts.showEmpty ? 'checked' : ''}><span><b>Show empty categories</b><br><span class="muted">The cards of categories with nothing in them.</span></span></label>
+    <label class="check"><input type="checkbox" id="opt-topantry" ${d.opts.toPantry ? 'checked' : ''}><span><b>Fill from shopping trips</b><br><span class="muted">When a trip is done, what you bought is put in here, where it went before.</span></span></label>`;
+}
+
+function pantryMainHtml(): string {
+  const d = shopData();
+  const name = parseQuick(pantryQuery).name;
+  if (!name) {
+    if (pantryView === 'list') return pantryListHtml();
+    const cats = d.opts.showEmpty ? d.cats : d.cats.filter((c) => pantryCount(d, c.id).n);
+    return cats.length ? `<div class="ngrid pgrid">${cats.map(catCardHtml).join('')}</div>`
+      : '<div class="panel"><p class="muted">The pantry is empty. Type above to add something, or tick <b>Show empty categories</b> below.</p></div>';
+  }
+  const f = findInPantry(d, pantryQuery);
+  const add = inPantry(d, name) ? '' : `<p class="muted">Tap <b>Add</b> to put ${esc(name)} in ${esc(whereText(placeOf(d, name)))}.</p>`;
+  return `<section class="panel shop-list">
+    ${f.have.length ? `<div class="shop-group"><h4>You have</h4><ul class="shop-items">${f.have.map((h) => haveRowHtml(h, true)).join('')}</ul></div>` : ''}
+    ${f.had.length ? `<div class="shop-group"><h4>Had before</h4><ul class="srows">${f.had.map((h) => hadRowHtml(h, true)).join('')}</ul></div>` : ''}
+    ${!f.have.length && !f.had.length ? '<p class="muted">Nothing called that yet.</p>' : ''}${add}</section>`;
+}
+
+// Everything at home on one page: a section per category that has something in it (in the categories' order), sorted
+// into its sub-categories like the category's own page.
+function pantryListHtml(): string {
+  const d = shopData();
+  const cats = d.cats.filter((c) => pantryCount(d, c.id).n);
+  if (!cats.length) return '<div class="panel"><p class="muted">The pantry is empty. Type above to add something.</p></div>';
+  return cats.map((c) => `<section class="panel shop-list" aria-label="${esc(c.name)}">
+      <div class="shop-head"><h3 class="pcat-title" style="${tint(c.color)}"><span class="nart">${catIcon(c, 1)}</span>${esc(c.name)}</h3>
+        <button class="btn small" type="button" data-action="cat-open" data-id="${c.id}" aria-label="Open ${esc(c.name)}">Open</button></div>
+      ${shelves(d, c.id).filter((s) => s.items.length).map((s) => `<div class="shop-group">${s.name ? `<h4>${esc(s.name)}</h4>` : ''}
+        <ul class="shop-items">${s.items.map((h) => haveRowHtml(h)).join('')}</ul></div>`).join('')}</section>`).join('');
+}
+
+function catCardHtml(c: Cat): string {
+  const { n, low } = pantryCount(shopData(), c.id);
+  const face = low ? 'starving' : n ? 'happy' : 'sleepy';
+  return `<button type="button" class="nwin ncard pcard" style="${tint(c.color)}" data-action="cat-open" data-id="${c.id}" aria-label="${esc(c.name)}: ${plural(n, 'thing')}${low ? `, ${low} running low` : ''}">${winBar(c.name, face)}
+    <span class="nwin-screen"><span class="nart">${catIcon(c)}</span>
+      <span class="ncard-text">${n ? plural(n, 'thing') : '<span class="muted">Empty</span>'}</span>
+      <span class="ncard-foot">${low ? `${low} running low` : c.subs.length ? esc(c.subs.slice(0, 3).map((s) => s.name).join(', ') + (c.subs.length > 3 ? '…' : '')) : ''}</span></span></button>`;
+}
+
+function catPageHtml(c: Cat): string {
+  const d = shopData();
+  const had = hadBefore(d, c.id);
+  if (!c.subs.some((s) => s.id === shelfSub)) shelfSub = '';
+  return `<div class="shop-bar"><button class="btn small" type="button" data-action="cat-back">${iconSvg('prev')} Pantry</button><span class="grow"></span>
+      <button class="btn small" type="button" data-action="cat-edit">${iconSvg('pencil')} Edit</button></div>
+    <section class="panel shop-list" aria-label="${esc(c.name)}">
+      <div class="shop-head"><h3 class="pcat-title" style="${tint(c.color)}"><span class="nart">${catIcon(c, 1)}</span>${esc(c.name)}</h3></div>
+      <form class="shop-add pshelf-add" id="shelf-form"><label class="field"><input id="shelf-input" maxlength="80" placeholder="Add: 2 beans" autocomplete="off" enterkeyhint="done" aria-label="Add to ${esc(c.name)}"></label>
+        ${c.subs.length ? `<label class="field"><select id="shelf-sub" aria-label="Sub-category">${subOptions(c.id, shelfSub)}</select></label>` : ''}
+        <button class="btn primary" type="submit">Add</button></form>
+      ${shelves(d, c.id).map((s) => `<div class="shop-group">${s.name ? `<h4>${esc(s.name)}</h4>` : ''}
+        ${s.items.length ? `<ul class="shop-items">${s.items.map((h) => haveRowHtml(h)).join('')}</ul>` : `<p class="muted">${s.sub ? 'Nothing here.' : 'Nothing here yet.'}</p>`}</div>`).join('')}
+      <div class="btns"><button class="btn small" type="button" data-action="sub-new" ${c.subs.length >= LIMITS.subs ? 'disabled' : ''}>+ Sub-category</button></div>
+    </section>
+    ${had.length ? `<details class="panel fold" id="shop-had" ${hadOpen ? 'open' : ''}><summary>Had before <span class="num muted">${had.length}</span></summary><div class="fold-body">
+      <p class="muted">What was in ${esc(c.name)} and got used up. Put it back in, or on a shopping list.</p>
+      <ul class="srows">${had.map((h) => hadRowHtml(h)).join('')}</ul></div></details>` : ''}`;
+}
+
+function haveRowHtml(h: Have, where = false): string {
+  return `<li class="prow">
+    <button class="pname" type="button" data-action="have-edit" data-id="${h.id}" aria-label="Change ${esc(h.name)}"><span class="iname">${h.qty || h.unit ? `<b class="qty">${esc(qtyText(h))}</b> ` : ''}${esc(h.name)}</span>${where ? `<span class="muted">${esc(whereText(h))}</span>` : ''}</button>
+    <span class="pkeys">${canStep(h) ? `<button class="btn small step" type="button" data-action="have-step" data-by="-1" data-id="${h.id}" aria-label="One ${esc(h.name)} less">−</button><button class="btn small step" type="button" data-action="have-step" data-by="1" data-id="${h.id}" aria-label="One ${esc(h.name)} more">+</button>` : ''}
+      <button class="btn small low" type="button" data-action="pantry-low" data-id="${h.id}" aria-pressed="${h.low}">${h.low ? 'Low' : 'Low?'}</button></span></li>`;
+}
+
+function hadRowHtml(h: Had & { key: string }, where = false): string {
+  const lists = shopData().lists.length > 0;
+  const when = [where ? whereText(h) : '', `used up ${agoText(h.gone, Date.now())}`, h.times > 1 ? `had ${h.times}×` : ''].filter(Boolean).join(' · ');
+  return `<li><span class="sname"><b>${esc(itemText(h))}</b><span class="muted">${esc(when)}</span></span>
+    <button class="btn small" type="button" data-action="had-back" data-key="${esc(h.key)}" aria-label="Put ${esc(h.name)} back in">Back in</button>
+    ${lists ? `<button class="btn small" type="button" data-action="had-list" data-key="${esc(h.key)}" aria-label="Put ${esc(h.name)} on the shopping list">+ List</button>` : ''}
+    <button class="gear sm" type="button" data-action="had-forget" data-key="${esc(h.key)}" aria-label="Forget ${esc(h.name)}">${iconSvg('x')}</button></li>`;
+}
+
+// The list something from the pantry goes onto: the open one, else the one it is usually bought at, else the first.
+const listFor = (name: string) => { const d = shopData(); return listOf(d, listId) ?? listOf(d, regularOf(d, name)?.store ?? '') ?? d.lists[0]; };
+function toList(name: string, it: { qty: string; unit: string; cat: Category }) {
+  const d = shopData(), l = listFor(name);
+  if (!l) return;
+  const r = addItem(d, l.id, { name, qty: it.qty, unit: it.unit, cat: it.cat });
+  if (r.added) commit(r.data, `Added ${name} to ${l.name}`, `Added ${name} to ${l.name}.`);
+  else toast(onList(l, name) ? `${name} is already on the ${l.name} list.` : `The ${l.name} list is full.`);
+}
+
+// ---- a thing in the pantry ----
+function openHave(id: string) {
+  const d = shopData(), h = d.pantry.find((p) => p.id === id);
+  if (!h) return;
+  const l = d.lists.length ? listFor(h.name) : undefined;
+  openLayer(`<button class="x-close" type="button" data-action="layer-close" aria-label="Close">${iconSvg('x')}</button><h3>${esc(h.name)}</h3>
+    <form class="stack" id="have-form" data-id="${h.id}">
+      <label class="field">Name <input name="name" maxlength="${LIMITS.name}" value="${esc(h.name)}" autocomplete="off"></label>
+      <div class="row"><label class="field">Amount <input name="qty" maxlength="12" inputmode="decimal" value="${esc(h.qty)}" autocomplete="off"></label>
+        <label class="field">Unit <input name="unit" maxlength="12" value="${esc(h.unit)}" placeholder="g, l, pack…" autocomplete="off"></label></div>
+      <div class="row"><label class="field">Category <select name="cat" id="have-cat">${catOptions(h.cat)}</select></label>
+        <label class="field">Sub-category <select name="sub" id="have-sub">${subOptions(h.cat, h.sub)}</select></label></div>
+      <p class="muted">Kitty Mart remembers where you put it: on your shopping lists too, and next time.</p>
+      <label class="check"><input type="checkbox" name="low" ${h.low ? 'checked' : ''}><span><b>Running low</b><br><span class="muted">Shows up in the suggestions.</span></span></label>
+      <div class="btns flow"><button class="btn" type="button" data-action="have-used" data-id="${h.id}">Used up</button>
+        ${l ? `<button class="btn" type="button" data-action="have-list" data-id="${h.id}">+ ${esc(l.name)} list</button>` : ''}</div>
+      <div class="btns"><span class="grow"></span><button class="btn" type="button" data-action="layer-close">Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`, `Change ${h.name}`);
+}
+function saveHave(f: HTMLFormElement) {
+  const v = (n: string) => (f.elements.namedItem(n) as HTMLInputElement | null)?.value ?? '';
+  const h = shopData().pantry.find((p) => p.id === f.dataset.id);
+  if (!h) return closeLayer();
+  const next = updateHave(shopData(), h.id, { name: v('name'), qty: v('qty'), unit: v('unit'), cat: v('cat'), sub: v('sub'), low: (f.elements.namedItem('low') as HTMLInputElement).checked });
+  const moved = v('cat') !== h.cat;
+  closeLayer();
+  commit(next, `Changed ${h.name}`, moved ? `${h.name} is in ${whereText({ cat: v('cat'), sub: v('sub') })} now.` : `Changed ${h.name}`);
+}
+
+// ---- making and changing a category ----
+const subRowHtml = (id: string, name: string) => `<li><label class="field"><input data-sub="${id}" maxlength="${LIMITS.name}" value="${esc(name)}" autocomplete="off" aria-label="Sub-category"></label>
+  <button class="gear sm up" type="button" data-action="cat-sub-move" data-by="-1" aria-label="Move ${esc(name)} up">${iconSvg('prev')}</button>
+  <button class="gear sm down" type="button" data-action="cat-sub-move" data-by="1" aria-label="Move ${esc(name)} down">${iconSvg('next')}</button>
+  <button class="gear sm" type="button" data-action="cat-sub-del" aria-label="Delete ${esc(name)}">${iconSvg('x')}</button></li>`;
+function openCat(id: string | null) {
+  const d = shopData(), c = id ? catOf(d, id) : undefined;
+  if (id && !c) return;
+  const icon = c && PICKER_ICONS[c.icon] ? c.icon : 'bag', color = c?.color ?? CAT_COLORS[d.cats.length % CAT_COLORS.length];
+  const at = c ? d.cats.indexOf(c) : -1;
+  openLayer(`<button class="x-close" type="button" data-action="layer-close" aria-label="Close">${iconSvg('x')}</button><h3>${c ? `Change ${esc(c.name)}` : 'New category'}</h3>
+    <form class="stack" id="cat-form" data-id="${c?.id ?? ''}">
+      <label class="field">Name <input name="name" maxlength="${LIMITS.name}" value="${esc(c?.name ?? '')}" placeholder="Baby, Pets, Garden…" autocomplete="off" data-focus></label>
+      <fieldset class="field"><legend>Colour</legend><div class="nswatches">${CAT_COLORS.map((k) =>
+        `<label title="${COLOR[k][1]}"><input type="radio" name="color" value="${k}" ${k === color ? 'checked' : ''} aria-label="${COLOR[k][1]}"><span style="${tint(k)}"></span></label>`).join('')}</div></fieldset>
+      <details class="pick-fold" id="cat-pick" style="${tint(color)}"><summary><span class="nart">${stickerSvg(icon, 1)}</span> Picture</summary>
+        <div class="ndoodles picons">${PICKER_ICON_NAMES.map((n) =>
+          `<label title="${esc(PICKER_ICONS[n].label)}"><input type="radio" name="icon" value="${n}" ${n === icon ? 'checked' : ''} aria-label="${esc(PICKER_ICONS[n].label)}"><span>${stickerSvg(n, 1)}</span></label>`).join('')}</div></details>
+      <fieldset class="field"><legend>Sub-categories</legend><div class="stack">
+        <ul class="subrows" id="cat-subs">${(c?.subs ?? []).map((s) => subRowHtml(s.id, s.name)).join('')}</ul>
+        <div class="shop-add"><label class="field"><input id="cat-sub-new" maxlength="${LIMITS.name}" placeholder="Baking, Spices, Tins…" autocomplete="off" aria-label="New sub-category"></label>
+          <button class="btn" type="button" data-action="cat-sub-add">+ Add</button></div>
+        <p class="muted">The pantry page and your shopping lists are sorted by these, in this order. Deleting one keeps what was in it.</p></div></fieldset>
+      ${c ? `<fieldset class="field"><legend>Order</legend><div class="btns flow">
+          <button class="btn small" type="button" data-action="cat-move" data-by="-1" ${at <= 0 ? 'disabled' : ''}>${iconSvg('prev')} Earlier</button>
+          <button class="btn small" type="button" data-action="cat-move" data-by="1" ${at >= d.cats.length - 1 ? 'disabled' : ''}>Later ${iconSvg('next')}</button></div>
+        <p class="muted">The cards and your shopping lists follow this order: put it the way you walk through the shop.</p></fieldset>` : ''}
+      <div class="btns">${c && c.id !== OTHER ? `<button class="btn danger" type="button" data-action="cat-delete">Delete</button>` : ''}<span class="grow"></span>
+        <button class="btn" type="button" data-action="layer-close">Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`, c ? c.name : 'New category');
+}
+function addSubRow() {
+  const box = document.getElementById('cat-sub-new') as HTMLInputElement | null, ul = document.getElementById('cat-subs');
+  if (!box || !ul || !box.value.trim()) return;
+  if (ul.children.length >= LIMITS.subs) { toast(`A category can have up to ${LIMITS.subs} sub-categories.`); return; }
+  ul.insertAdjacentHTML('beforeend', subRowHtml('', box.value.trim()));
+  box.value = '';
+  box.focus();
+}
+function saveCatForm(f: HTMLFormElement) {
+  const d = shopData(), id = f.dataset.id || null;
+  const name = (f.elements.namedItem('name') as HTMLInputElement).value;
+  if (!name.trim()) { toast('Give the category a name.'); return; }
+  if (catNameTaken(d, name, id)) { toast(`There is already a ${name.trim()} category.`); return; }
+  const pick = (n: string) => f.querySelector<HTMLInputElement>(`input[name="${n}"]:checked`)?.value ?? '';
+  const subs = [...f.querySelectorAll<HTMLInputElement>('#cat-subs input[data-sub]')].map((i) => ({ id: i.dataset.sub ?? '', name: i.value }));
+  const extra = (document.getElementById('cat-sub-new') as HTMLInputElement | null)?.value.trim();
+  if (extra) subs.push({ id: '', name: extra });
+  const r = saveCat(d, id, { name, icon: pick('icon') || catOf(d, id ?? '')?.icon || 'bag', color: (pick('color') || 'lavender') as CatColor, subs });
+  if (!r) { toast(`You can have up to ${LIMITS.cats} categories.`); return; }
+  closeLayer();
+  if (!id) { pantryCat = r.id; pantryQuery = ''; }
+  change(r.data, id ? `Changed ${name.trim()}` : `Added ${name.trim()}`);
+}
+function openNewSub() {
+  const c = catOf(shopData(), pantryCat ?? '');
+  if (!c) return;
+  openLayer(`<h3>New sub-category</h3><form class="stack" id="sub-new-form">
+    <label class="field">In ${esc(c.name)} <input id="sub-new-name" maxlength="${LIMITS.name}" placeholder="Baking, Spices, Tins…" autocomplete="off" data-focus></label>
+    <div class="btns"><button class="btn" type="button" data-action="layer-close">Cancel</button><button class="btn primary" type="submit">Add</button></div></form>`, 'New sub-category');
 }
 
 // =================== Regulars ===================
@@ -397,10 +600,13 @@ function saveRegular(f: HTMLFormElement) {
   const every = Math.min(3650, Math.max(1, Math.round(Number(v('every')) || 14)));
   const remind = isDay(v('remind')) ? v('remind') : '';
   const store = f.elements.namedItem('store') ? v('store') : regularOf(shopData(), name)?.store ?? '';
-  change(setRegular(shopData(), name, {
+  const oldCat = regularOf(shopData(), name)?.cat;
+  let d = setRegular(shopData(), name, {
     store, qty: v('qty').trim(), unit: v('unit').trim(), cat: v('cat') as Category, pinned: (f.elements.namedItem('pinned') as HTMLInputElement).checked,
     rule, every: rule === 'every' ? every : 0, remind, repeat: remind ? Number(v('repeat')) || 0 : 0,
-  }), `Changed ${name}`);
+  });
+  if (v('cat') !== oldCat) d = learnPlace(d, name, v('cat'));
+  change(d, `Changed ${name}`);
   closeLayer();
 }
 
@@ -412,7 +618,7 @@ onShown('shopping', 'click', (ev) => {
   if (!btn || (btn as HTMLButtonElement).disabled) return;
   const d = shopData();
   switch (btn.dataset.action) {
-    case 'shop-tab': tab = btn.dataset.tab as Tab; recipeEditing = false; renderTop(); render(); window.scrollTo(0, 0); break;
+    case 'shop-tab': tab = btn.dataset.tab as Tab; recipeEditing = false; pantryCat = null; renderTop(); render(); window.scrollTo(0, 0); break;
     case 'undo': { const l = undo(); toast(l ? `Undone: ${l}.` : 'Nothing to undo.'); break; }
     case 'layer-close': if (ev.target === btn || btn.tagName === 'BUTTON') closeLayer(); break;
     // lists
@@ -481,11 +687,59 @@ onShown('shopping', 'click', (ev) => {
       break;
     }
     // pantry
-    case 'pantry-low': {
-      const x = clone(d), h = x.pantry.find((p) => p.id === btn.dataset.id);
-      if (h) { h.low = !h.low; change(x); }
+    case 'pantry-low': { const h = d.pantry.find((p) => p.id === btn.dataset.id); if (h) change(updateHave(d, h.id, { low: !h.low })); break; }
+    case 'pantry-view': pantryView = btn.dataset.view === 'list' ? 'list' : 'cards'; render(); break;
+    case 'cat-open': pantryCat = btn.dataset.id!; pantryQuery = ''; render(); window.scrollTo(0, 0); break;
+    case 'cat-back': pantryCat = null; render(); window.scrollTo(0, 0); break;
+    case 'cat-new': openCat(null); break;
+    case 'cat-edit': openCat(pantryCat); break;
+    case 'cat-sub-add': addSubRow(); break;
+    case 'cat-sub-del': btn.closest('li')?.remove(); break;
+    case 'cat-sub-move': {   // only the rows move: the order is saved with Save
+      const li = btn.closest('li'), to = btn.dataset.by === '1' ? li?.nextElementSibling?.nextElementSibling ?? null : li?.previousElementSibling;
+      if (!li || (btn.dataset.by !== '1' && !to) || (btn.dataset.by === '1' && !li.nextElementSibling)) break;
+      li.parentElement!.insertBefore(li, to ?? null);
+      btn.focus();
       break;
     }
+    case 'cat-move': {
+      // moved at once (the rest of the form is saved with Save); the two keys follow
+      const id = ($('shop-layer').querySelector('#cat-form') as HTMLFormElement | null)?.dataset.id ?? '';
+      const x = moveCat(d, id, btn.dataset.by === '1' ? 1 : -1);
+      if (x === d) break;
+      change(x);
+      const at = x.cats.findIndex((c) => c.id === id);
+      $('shop-layer').querySelectorAll<HTMLButtonElement>('[data-action="cat-move"]').forEach((b) => { b.disabled = b.dataset.by === '1' ? at >= x.cats.length - 1 : at <= 0; });
+      break;
+    }
+    case 'cat-delete': {
+      const c = catOf(d, ($('shop-layer').querySelector('#cat-form') as HTMLFormElement | null)?.dataset.id ?? '');
+      if (!c) break;
+      closeLayer();
+      pantryCat = null;
+      commit(deleteCat(d, c.id), `Deleted ${c.name}`, `Deleted ${c.name}. What was in it is in ${catName(d, OTHER)} now.`);
+      break;
+    }
+    case 'sub-new': openNewSub(); break;
+    case 'have-edit': openHave(btn.dataset.id!); break;
+    case 'have-step': {
+      const h = d.pantry.find((p) => p.id === btn.dataset.id);
+      if (!h) break;
+      const r = stepHave(d, h.id, Number(btn.dataset.by) || 0, Date.now());
+      if (r.usedUp) commit(r.data, `Used up ${h.name}`); else change(r.data);
+      break;
+    }
+    case 'have-used': { const h = d.pantry.find((p) => p.id === btn.dataset.id); closeLayer(); if (h) commit(useUp(d, h.id, Date.now()), `Used up ${h.name}`); break; }
+    case 'have-list': { const h = d.pantry.find((p) => p.id === btn.dataset.id); closeLayer(); if (h) toList(h.name, h); break; }
+    case 'had-back': {
+      const h = d.had[btn.dataset.key ?? ''];
+      if (!h) break;
+      if (d.pantry.length >= LIMITS.pantry) { toast(`The pantry holds up to ${LIMITS.pantry} things.`); break; }
+      commit(restock(d, btn.dataset.key!), `Put ${h.name} back`, `${h.name} is back in ${whereText(h)}.`);
+      break;
+    }
+    case 'had-list': { const h = d.had[btn.dataset.key ?? '']; if (h) toList(h.name, h); break; }
+    case 'had-forget': { const h = d.had[btn.dataset.key ?? '']; if (h) commit(forgetHad(d, btn.dataset.key!), `Forgot ${h.name}`); break; }
     // regulars
     case 'reg-open': openRegular(btn.dataset.name ?? ''); break;
     case 'reg-forget': { const n = btn.dataset.name ?? ''; closeLayer(); commit(forgetRegular(d, n), `Forgot ${n}`); break; }
@@ -525,12 +779,32 @@ onShown('shopping', 'submit', (ev) => {
     case 'shop-add-form': addTyped(typed); break;
     case 'item-form': saveItem(f); break;
     case 'recipe-form': saveRecipe(f); break;
-    case 'pantry-form': {
-      const p = parseQuick(val('pantry-input'));
+    case 'pantry-form':
+    case 'shelf-form': {
+      const shelf = f.id === 'shelf-form';
+      const p = parseQuick(val(shelf ? 'shelf-input' : 'pantry-input'));
       if (!p.name) break;
-      if (d.pantry.length >= LIMITS.pantry) { toast(`The pantry holds up to ${LIMITS.pantry} things.`); break; }
-      (document.getElementById('pantry-input') as HTMLInputElement).value = '';
-      change(addToPantry(d, p));
+      const already = inPantry(d, p.name);
+      if (!already && d.pantry.length >= LIMITS.pantry) { toast(`The pantry holds up to ${LIMITS.pantry} things.`); break; }
+      const next = addToPantry(d, shelf && pantryCat ? { ...p, cat: pantryCat, sub: shelfSub || undefined } : p);
+      const h = inPantry(next, p.name)!;
+      if (!shelf) pantryQuery = '';
+      change(next);
+      // from the cards it goes where it went before (or the guess): say where, so a wrong guess is seen
+      if (!shelf) toast(already ? `${h.name} is in ${whereText(h)}.` : `Added ${h.name} to ${whereText(h)}.`);
+      break;
+    }
+    case 'have-form': saveHave(f); break;
+    case 'cat-form':
+      if ((document.activeElement as HTMLElement | null)?.id === 'cat-sub-new' && val('cat-sub-new').trim()) { addSubRow(); break; }   // Enter in the new sub-category box adds it
+      saveCatForm(f);
+      break;
+    case 'sub-new-form': {
+      const r = pantryCat ? addSub(d, pantryCat, val('sub-new-name')) : null;
+      if (!r) { toast('Type a name for it.'); break; }
+      closeLayer();
+      shelfSub = r.id;
+      change(r.data, 'Added a sub-category');
       break;
     }
     case 'reg-form-add': {
@@ -549,12 +823,12 @@ onShown('shopping', 'change', (ev) => {
   const t = ev.target as HTMLInputElement;
   const d = shopData();
   if (t.dataset.item) { change(updateItem(d, listId, t.dataset.item, { done: t.checked })); return; }
-  if (t.dataset.used) {
-    const h = d.pantry.find((p) => p.id === t.dataset.used);
-    if (h) commit({ ...clone(d), pantry: d.pantry.filter((p) => p.id !== h.id) }, `Used up ${h.name}`);
-    return;
-  }
+  if (t.id === 'have-cat' || t.id === 'item-cat') { const s = document.getElementById(t.id === 'have-cat' ? 'have-sub' : 'item-sub'); if (s) s.innerHTML = subOptions(t.value, ''); return; }
+  if (t.id === 'shelf-sub') { shelfSub = t.value; return; }
+  if (t.name === 'color' && t.closest('#cat-form')) { document.getElementById('cat-pick')?.setAttribute('style', tint(t.value as CatColor)); return; }
+  if (t.name === 'icon' && t.closest('#cat-form')) { const n = document.querySelector('#cat-pick > summary .nart'); if (n) n.innerHTML = stickerSvg(t.value, 1); return; }
   if (t.id === 'recipe-to') { recipeTo = t.value; render(); return; }
+  if (t.id === 'opt-showempty') { change({ ...clone(d), opts: { ...d.opts, showEmpty: t.checked } }); return; }
   if (t.id === 'opt-topantry') { change({ ...clone(d), opts: { ...d.opts, toPantry: t.checked } }); return; }
   if (t.id === 'opt-learn') { change({ ...clone(d), opts: { ...d.opts, learn: t.checked } }); return; }
   if (t.name === 'every') { const r = t.closest('form')?.querySelector<HTMLInputElement>('input[name="rule"][value="every"]'); if (r) r.checked = true; }
@@ -563,11 +837,16 @@ onShown('shopping', 'change', (ev) => {
 onShown('shopping', 'input', (ev) => {
   const t = ev.target as HTMLInputElement;
   if (t.id === 'shop-add-input') { typed = t.value; const c = document.getElementById('shop-complete'); if (c) c.innerHTML = completeHtml(); }
+  if (t.id === 'pantry-input') { pantryQuery = t.value; const m = document.getElementById('pantry-main'); if (m) m.innerHTML = pantryMainHtml(); }
   if (t.name === 'every') { const r = t.closest('form')?.querySelector<HTMLInputElement>('input[name="rule"][value="every"]'); if (r) r.checked = true; }
 });
 
 // remember whether the suggestions are folded, so a redraw keeps them that way
-onShown('shopping', 'toggle', (ev) => { if ((ev.target as HTMLElement).id === 'shop-sugg') suggOpen = (ev.target as HTMLDetailsElement).open; }, true);
+onShown('shopping', 'toggle', (ev) => {
+  const el = ev.target as HTMLDetailsElement;
+  if (el.id === 'shop-sugg') suggOpen = el.open;
+  if (el.id === 'shop-had') hadOpen = el.open;
+}, true);
 
 // ---- start ----
 onShop(render);

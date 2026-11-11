@@ -7,6 +7,7 @@ import { monoSvg } from '../shared/pixelart.ts';
 import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
 import { esc } from '../shared/html.ts';
 import { compressPhoto } from '../shared/photo.ts';
+import { sharePicture } from '../shared/snapshot.ts';
 import { homeButton, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
 import { COLOR, faceSvg, tint, winBar } from './window.ts';
 import { allNotes, deleteNote, noteOf, notesInitialised, notesReady, onNotes, saveNote } from './data.ts';
@@ -102,7 +103,8 @@ function renderRead() {
   $('notes-body').innerHTML = `<div class="ntools">
       <button class="btn small" type="button" data-action="note-back">${iconSvg('prev')} Notes</button>
       <span class="grow"></span>
-      <button class="btn small" type="button" data-action="note-copy">Copy notes</button>
+      <button class="btn small" type="button" data-action="note-copy">Copy</button>
+      <button class="btn small" type="button" data-action="note-share">Share</button>
       <button class="btn small primary" type="button" data-action="note-edit">${uiIcon('pencil')} Edit</button>
       <button class="btn small" type="button" data-action="note-delete" ${cur.name === null ? 'disabled' : ''}>Delete</button></div>
     <article class="nwin nread" style="${tint(cur.color)}">${winBar(nameOf(cur), cur.face)}<div class="nwin-screen">${decoHtml(cur.doodle)}${coverHtml(c)}
@@ -229,6 +231,11 @@ onShown('notes', 'click', async (ev) => {
     case 'note-copy':
       if (cur) navigator.clipboard?.writeText(cur.body).then(() => toast('Copied.'), () => toast("Couldn't copy. Open Edit and select the text."));
       break;
+    case 'note-share': {
+      const el = document.querySelector<HTMLElement>('#notes-body .nread');
+      if (cur && el) sharePicture(el, nameOf(cur) || 'Note').then((r) => { if (r === 'saved') toast('Picture saved.'); }, () => toast("Couldn't make the picture."));
+      break;
+    }
     case 'note-image': document.getElementById('note-file')?.click(); break;
     case 'note-image-remove': if (cur) { cur.image = ''; $('note-cover').innerHTML = coverFieldHtml(); edited(); } break;
     case 'note-delete': openConfirm(); break;
