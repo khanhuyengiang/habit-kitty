@@ -1,13 +1,18 @@
 import { faceSvg } from '../shared/pixelcat.ts';
-import { PICKER_ICONS } from './icons.ts';
 import { monoSvg } from '../shared/pixelart.ts';
+import { PALETTE, type PaletteName } from '../shared/palette.ts';
 
 // Kitty Achievement's pictures, drawn on the shared grid (shared/pixelart.ts). Pure functions that return SVG strings.
 
-export { PICKER_ICONS, PICKER_ICON_NAMES } from './icons.ts';
+export { PICKER_ICONS, PICKER_ICON_NAMES, PICKER_ICON_GROUPS } from './icons.ts';
+import { PICKER_ICONS, PICKER_ICON_GROUPS } from './icons.ts';
+
+// A picker's choices with a heading over each group (the heading spans the picker's grid or row), so a long list is easy to look through.
+export const groupedPicks = (pick: (name: string) => string): string => PICKER_ICON_GROUPS.map(([g, names]) =>
+  `<p class="pick-group">${g} <span class="num">${names.length}</span></p>${names.map(pick).join('')}`).join('');
 
 // Small interface icons.
-const UI_ICONS: Record<string, string[]> = {
+export const UI_ICONS: Record<string, string[]> = {
   plus: ['..o..', '..o..', 'ooooo', '..o..', '..o..'],
   x: ['o...o', '.o.o.', '..o..', '.o.o.', 'o...o'],
   prev: ['..o', '.o.', 'o..', '.o.', '..o'],
@@ -33,17 +38,41 @@ export function iconSvg(name: string, cls = ''): string {
 // own pixel, --cu, instead. Colours are CSS variables set on the card, so the side-quest
 // colour and the rarity reach every pixel without redrawing.
 
+// Every other palette colour, so any colour of the app can be drawn (Kitty Gallery's "Choose a colour"). Saved in drawings: never
+// change a sign, only add (a new palette colour takes a new sign).
+export const PALETTE_INKS: Record<string, PaletteName> = {
+  'C': 'lavender50', 'D': 'lavender100', 'E': 'lavender200', 'F': 'lavender250', 'H': 'lavender400', 'L': 'lavender500',
+  'O': 'lavender600', 'Q': 'dusk700', 'T': 'plum700', 'V': 'plum800', 'W': 'night800', 'X': 'night850', '0': 'night900',
+  '1': 'night950', '2': 'pink50', '3': 'pink100', '4': 'pink200', '5': 'pink400', '6': 'mauve', '7': 'pink500', '8': 'pink600',
+  '9': 'pink700', '!': 'berry800', '|': 'berry900', '$': 'blue50', '%': 'blue100', '*': 'violet', '+': 'slateBlue',
+  '-': 'indigo', '/': 'green100', ':': 'mint400', ';': 'teal', '=': 'green700', '?': 'pine', '@': 'butter200', '^': 'gold500',
+  '_': 'tan', '~': 'brown', '(': 'umber', ')': 'umberDark', '[': 'white', ']': 'grey300', '{': 'grey400', '}': 'charcoal',
+};
+
 // Outside a card the side-quest colours fall back to the text colour, so an icon in a chip or a block takes its colour.
-const FINE: Record<string, string> = {
+export const FINE: Record<string, string> = {
   o: 'var(--dk, color-mix(in srgb, currentColor 30%, #231d44))', s: 'var(--sq, currentColor)',
   l: 'var(--sql, color-mix(in srgb, currentColor 40%, #fff))', d: 'var(--sqd, color-mix(in srgb, currentColor 70%, #231d44))',
   h: 'var(--hi)', t: 'var(--dith)', S: 'var(--scr)', e: 'var(--panel)', q: 'var(--rar, #a29bb8)',
   w: '#fffafd', y: '#ffd36e', Y: '#e8a04c', r: '#ff8fb8', R: '#f0506e', g: '#8fe0c8', G: '#45c27a', b: '#8fd0fa', B: '#4a9bea',
   n: '#c99a73', N: '#8a6a5a', k: '#cdc8e0', K: '#7d7594', c: '#fff3d1',
+  v: '#b9a3f0', f: '#ffb98a', x: '#b8e35f',
+  ...Object.fromEntries(Object.entries(PALETTE_INKS).map(([ch, k]) => [ch, PALETTE[k]])),
+  // every note colour (and lime), lit and shaded the way `l` and `d` light and shade the base colour
+  ...litShaded({ p: 'P', a: 'A', i: 'I', m: 'M', j: 'J', u: 'U', z: 'Z' },
+    { p: '#ff8fb8', a: '#b9a3f0', i: '#8fd0fa', m: '#8fe0c8', j: '#ffd36e', u: '#ffb98a', z: '#b8e35f' }),
 };
+function litShaded(pairs: Record<string, string>, base: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [lit, shaded] of Object.entries(pairs)) {
+    out[lit] = `color-mix(in srgb, ${base[lit]} 40%, #fff)`;
+    out[shaded] = `color-mix(in srgb, ${base[lit]} 70%, #231d44)`;
+  }
+  return out;
+}
 
 // Rows of letters to one path per colour (runs merged), so a picture is a handful of elements however dense it is.
-function fineSvg(art: string[], cls = ''): string {
+export function fineSvg(art: string[], cls = ''): string {
   const w = Math.max(...art.map((r) => r.length));
   const paths: Record<string, string> = {};
   art.forEach((row, y) => {
@@ -76,11 +105,12 @@ function scale2x(art: string[]): string[] {
 
 // An achievement icon as a sticker: drawn at 1 fine pixel per icon pixel (s = 1), or enlarged with Scale2x (s = 2);
 // the side-quest colour is lit on its top-left edges and shaded on its bottom-right ones, and a one-fine-pixel dark
-// outline goes around it all.
-export const stickerSvg = (name: string, s: 1 | 2 = 2, cls = ''): string => fineSvg(stickerRows(name, s), `sticker ${cls}`);
+// outline goes around it all (touching it side-on only, so its outer corners stay empty).
+export const stickerSvg = (name: string, s: 1 | 2 = 2, cls = ''): string => stickerArtSvg((PICKER_ICONS[name] ?? PICKER_ICONS.star).art, s, cls);
+// The same from the rows themselves (Kitty Gallery draws one that is not saved yet).
+export const stickerArtSvg = (icon: string[], s: 1 | 2 = 2, cls = ''): string => fineSvg(stickerRows(icon, s), `sticker ${cls}`);
 
-function stickerRows(name: string, s: 1 | 2): string[] {
-  const icon = (PICKER_ICONS[name] ?? PICKER_ICONS.star).art;
+function stickerRows(icon: string[], s: 1 | 2): string[] {
   const art = s === 2 ? scale2x(icon) : icon;
   const at = (x: number, y: number) => art[y]?.[x] ?? '.', on = (x: number, y: number) => at(x, y) !== '.';
   const rows: string[] = [];
@@ -90,7 +120,7 @@ function stickerRows(name: string, s: 1 | 2): string[] {
       const c = at(x, y);
       if (c === 's') row += !on(x, y - 1) || !on(x - 1, y) ? 'l' : !on(x, y + 1) || !on(x + 1, y) ? 'd' : 's';
       else if (c !== '.') row += c;
-      else row += [-1, 0, 1].some((dy) => [-1, 0, 1].some((dx) => on(x + dx, y + dy))) ? 'o' : '.';
+      else row += on(x, y - 1) || on(x, y + 1) || on(x - 1, y) || on(x + 1, y) ? 'o' : '.';
     }
     rows.push(row);
   }
@@ -157,8 +187,12 @@ export const starsSvg = (n: number) => n > 0
   ? `<span class="stars" aria-hidden="true">${Array.from({ length: n }, () => fineSvg(STAR, 'star')).join('')}</span>` : '';
 
 // Small friends for the card: a heart and a flower in the corner of the screen.
-export const heartSvg = () => fineSvg(['.ooo.ooo.', 'owrrorrro', 'owrrrrrro', 'orrrrrrro', '.orrrrro.', '..orrro..', '...oro...', '....o....']);
-export const flowerSvg = () => fineSvg(['...ooo...', '..orrro..', '.oorrroo.', 'orrooorro', 'orroyorro', 'orrooorro', '.oorrroo.', '..orrro..', '...ooo...']);
+export const CARD_FRIENDS: Record<string, { label: string; art: string[] }> = {
+  heart: { label: 'Heart', art: ['.ooo.ooo.', 'owrrorrro', 'owrrrrrro', 'orrrrrrro', '.orrrrro.', '..orrro..', '...oro...', '....o....'] },
+  flower: { label: 'Flower', art: ['...ooo...', '..orrro..', '.oorrroo.', 'orrooorro', 'orroyorro', 'orrooorro', '.oorrroo.', '..orrro..', '...ooo...'] },
+};
+export const heartSvg = () => fineSvg(CARD_FRIENDS.heart.art);
+export const flowerSvg = () => fineSvg(CARD_FRIENDS.flower.art);
 
 // The default avatar: a Habit Kitty face.
 export const avatarSvg = () => faceSvg('happy', { fur: '#ffb98a', pattern: 'stripes' });

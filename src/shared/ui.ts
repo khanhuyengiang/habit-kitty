@@ -5,6 +5,7 @@ import { paintBackdrop } from './backdrop.ts';
 
 // ---- the look: light or dark (follows the device until one is chosen), and the fancy background. Kept on this device. ----
 // Chosen in Settings → Look (src/shared/look.ts); read here first, so the first paint is already right.
+// The fancy background is on until it is turned off (stored as '0').
 const THEME_KEY = 'hk-theme', FANCY_KEY = 'hk-fancy';
 export type ThemeMode = 'device' | 'light' | 'dark';
 const stored = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };   // storage blocked: the defaults
@@ -12,7 +13,7 @@ const store = (k: string, v: string | null) => { try { if (v === null) localStor
 {
   const t = stored(THEME_KEY);
   if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
-  if (stored(FANCY_KEY) === '1') document.documentElement.dataset.fancy = '';
+  if (stored(FANCY_KEY) !== '0') document.documentElement.dataset.fancy = '';
 }
 
 export const isDark = () => document.documentElement.dataset.theme
@@ -27,7 +28,7 @@ export function setThemeMode(m: ThemeMode) {
 export const fancyOn = () => 'fancy' in document.documentElement.dataset;
 export function setFancy(on: boolean) {
   if (on) document.documentElement.dataset.fancy = ''; else delete document.documentElement.dataset.fancy;
-  store(FANCY_KEY, on ? '1' : null);
+  store(FANCY_KEY, on ? null : '0');
   paintBackdrop();
 }
 

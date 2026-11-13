@@ -2,7 +2,7 @@
 // Edit turns it into the form (title, the card's picture, the text), which saves as you type.
 // The data is in ./data.ts (Habit Kitty starts it), the pure parts in ./model.ts. Drawn with Habit Kitty's stylesheet, in web/notes.html.
 import { iconSvg } from '../pixelart.ts';
-import { PICKER_ICONS, PICKER_ICON_NAMES, iconSvg as uiIcon, stickerSvg } from '../achievement/pixelart.ts';
+import { PICKER_ICONS, groupedPicks, iconSvg as uiIcon, stickerSvg } from '../achievement/pixelart.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
 import { esc } from '../shared/html.ts';
@@ -67,7 +67,7 @@ const FACE_LABEL: Record<NoteFace, string> = { happy: 'Happy', open: 'Awake', sl
 const TWINKLE = ['..o..', '..o..', 'oo.oo', '..o..', '..o..'];
 const decoHtml = (d: NoteDoodle) => `<span class="ndeco" aria-hidden="true">${['tl', 'tr', 'br'].map((c) => `<span class="tw ${c}">${monoSvg(TWINKLE)}</span>`).join('')}${
   !doodleSvg(d) ? '' : `<span class="ndoodle">${doodleSvg(d)}</span>`}</span>`;
-const coverHtml = (c: Cover) => c?.kind === 'icon' ? `<span class="nart">${stickerSvg(c.name)}</span>`
+const coverHtml = (c: Cover) => c?.kind === 'icon' ? `<span class="nart">${stickerSvg(c.name, 1)}</span>`
   : c?.kind === 'image' ? `<span class="nart photo"><img src="${esc(c.src)}" alt=""></span>` : '';
 
 function cardHtml(name: string, text: string, mtime: number | null, o: { preview?: boolean } = {}): string {
@@ -158,7 +158,7 @@ function iconFold(id: string, name: string, sel: string, open: boolean, none: bo
   const label = PICKER_ICONS[sel]?.label ?? 'None';
   const pick = (n: string, text: string, art: string) => `<label title="${text}"><input type="radio" name="${name}" value="${n}" ${n === sel ? 'checked' : ''} aria-label="${text}"><span>${art}</span></label>`;
   return `<details class="icon-fold" id="${id}" ${open ? 'open' : ''}><summary class="fold-sum" aria-label="${esc(label)}. Change">${PICKER_ICONS[sel] ? stickerSvg(sel, 1) : ''}<span class="fold-name">${esc(label)}</span><span class="fold-chev">${uiIcon('chev')}</span></summary>
-    <div class="icon-pick">${none ? pick('none', 'None', 'None') : ''}${PICKER_ICON_NAMES.map((n) => pick(n, PICKER_ICONS[n].label, stickerSvg(n, 1))).join('')}</div></details>`;
+    <div class="icon-pick">${none ? pick('none', 'None', 'None') : ''}${groupedPicks((n) => pick(n, PICKER_ICONS[n].label, stickerSvg(n, 1)))}</div></details>`;
 }
 const doodleFieldHtml = () => (cur ? iconFold('note-doodle-fold', 'note-doodle', cur.doodle, cur.doodleOpen, true) : '');
 const redrawPreview = () => { const el = document.getElementById('note-preview'); if (el) el.innerHTML = previewHtml(); };

@@ -45,6 +45,7 @@ export const PALETTE = {
   green100: '#b6e6c0',
   mint200: '#8fe0c8',
   mint400: '#5fc7a8',
+  lime: '#b8e35f',
   green500: '#45c27a',
   teal: '#2fb8b0',
   green700: '#2f9e6e',
@@ -74,6 +75,21 @@ export const PALETTE = {
 } as const;
 
 export const PALETTE_HEXES: ReadonlySet<string> = new Set(Object.values(PALETTE));
+export type PaletteName = keyof typeof PALETTE;
+
+// The palette's families, in the order above (Kitty Gallery lists the colours this way). palette.test.ts checks every colour is in one.
+export const PALETTE_GROUPS: [string, PaletteName[]][] = [
+  ['Lavender', ['cream', 'lavender50', 'lavender100', 'lavender200', 'lavender250', 'lavender300', 'lavender400', 'lavender500', 'lavender600',
+    'dusk700', 'plum700', 'plum800', 'night800', 'night850', 'night900', 'night950']],
+  ['Pink', ['pink50', 'pink100', 'pink200', 'pink300', 'pink400', 'mauve', 'pink500', 'pink600', 'pink700', 'berry800', 'berry900']],
+  ['Red', ['red']],
+  ['Blue', ['blue50', 'blue100', 'blue300', 'blue500', 'violet', 'slateBlue', 'indigo']],
+  ['Green', ['green100', 'mint200', 'mint400', 'lime', 'green500', 'teal', 'green700', 'pine']],
+  ['Yellow', ['butter50', 'butter200', 'sun300', 'gold500']],
+  ['Orange', ['peach', 'orange']],
+  ['Brown', ['tan', 'wood', 'brown', 'umber', 'umberDark']],
+  ['Neutral', ['white', 'grey200', 'grey300', 'grey400', 'grey600', 'taupe', 'charcoal']],
+];
 
 // Colours used before the palette (2026-11), mapped to their palette colour. Saved data can still hold them: a cat's
 // fur, a side quest's colour.

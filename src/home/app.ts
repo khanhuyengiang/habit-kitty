@@ -91,6 +91,7 @@ const MENU: { name: [string, string]; to: string }[] = [
   { name: ['Kitty', 'Journal'], to: 'diary' },
   { name: ['Kitty', 'Achievement'], to: 'achievement' },
   { name: ['Kitty', 'Mart'], to: 'shopping' },
+  { name: ['Kitty', 'Gallery'], to: 'pixel' },
 ];
 
 function renderMenu() {

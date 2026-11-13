@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { PALETTE, PALETTE_HEXES, toPalette } from './palette.ts';
+import { PALETTE, PALETTE_GROUPS, PALETTE_HEXES, toPalette } from './palette.ts';
 
 // Black is only used where its colour never shows: CSS masks (only the alpha counts) and colour parsing in the editor.
 const ALLOWED = new Set(['#000000']);
@@ -13,9 +13,14 @@ const full = (h: string) => (h.length <= 5 ? '#' + [...h.slice(1)].map((c) => c 
 const hex = (n: string) => (+n).toString(16).padStart(2, '0');
 
 describe('palette', () => {
-  it('has 60 distinct colours', () => {
-    expect(Object.keys(PALETTE)).toHaveLength(60);
-    expect(PALETTE_HEXES.size).toBe(60);
+  it('has 61 distinct colours', () => {
+    expect(Object.keys(PALETTE)).toHaveLength(61);
+    expect(PALETTE_HEXES.size).toBe(61);
+  });
+
+  it('puts every colour in exactly one family', () => {
+    const named = PALETTE_GROUPS.flatMap(([, names]) => names);
+    expect([...named].sort()).toEqual(Object.keys(PALETTE).sort());
   });
 
   it('is the only source of colours in src/ and web/', () => {

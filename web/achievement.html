@@ -236,6 +236,9 @@ details.panel .manage { margin-top: var(--s4); }
 .card.big .card-title { font-size: 24px; line-height: 1.05; }   /* as big as a note's title */
 /* the pictures inside (the icons, the burst, the heart and flower) stay the size they are on the card in the collection */
 .card.big .card-in .pxs.fine { width: calc(var(--w) * var(--cu-mini)); height: calc(var(--h) * var(--cu-mini)); }
+/* the card's picture: the icon at its own size, zoomed to twice as big (each of its pixels two card pixels) */
+.card .card-art > .pxs.fine.zoom { width: calc(var(--w) * 2 * var(--cu)); height: calc(var(--h) * 2 * var(--cu)); }
+.card.big .card-in .card-art > .pxs.fine.zoom { width: calc(var(--w) * 2 * var(--cu-mini)); height: calc(var(--h) * 2 * var(--cu-mini)); }
 .card.big .card-title, .card.big .card-desc { display: block !important; -webkit-line-clamp: unset; line-clamp: none; overflow: visible; }
 .card.big .card-screen { --fill:
     linear-gradient(var(--gl) var(--cu), transparent 0) calc(-1 * var(--cu)) calc(-1 * var(--cu)) / calc(8 * var(--cu)) calc(8 * var(--cu)),

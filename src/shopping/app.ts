@@ -10,7 +10,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { iconSvg } from '../pixelart.ts';
-import { PICKER_ICONS, PICKER_ICON_NAMES, stickerSvg } from '../achievement/pixelart.ts';
+import { PICKER_ICONS, groupedPicks, stickerSvg } from '../achievement/pixelart.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { onAppShown, onShown } from '../shared/apps.ts';
 import { esc, plural } from '../shared/html.ts';
@@ -499,8 +499,8 @@ function openCat(id: string | null) {
       <fieldset class="field"><legend>Colour</legend><div class="nswatches">${CAT_COLORS.map((k) =>
         `<label title="${COLOR[k][1]}"><input type="radio" name="color" value="${k}" ${k === color ? 'checked' : ''} aria-label="${COLOR[k][1]}"><span style="${tint(k)}"></span></label>`).join('')}</div></fieldset>
       <details class="pick-fold" id="cat-pick" style="${tint(color)}"><summary><span class="nart">${stickerSvg(icon, 1)}</span> Picture</summary>
-        <div class="ndoodles picons">${PICKER_ICON_NAMES.map((n) =>
-          `<label title="${esc(PICKER_ICONS[n].label)}"><input type="radio" name="icon" value="${n}" ${n === icon ? 'checked' : ''} aria-label="${esc(PICKER_ICONS[n].label)}"><span>${stickerSvg(n, 1)}</span></label>`).join('')}</div></details>
+        <div class="ndoodles picons">${groupedPicks((n) =>
+          `<label title="${esc(PICKER_ICONS[n].label)}"><input type="radio" name="icon" value="${n}" ${n === icon ? 'checked' : ''} aria-label="${esc(PICKER_ICONS[n].label)}"><span>${stickerSvg(n, 1)}</span></label>`)}</div></details>
       <fieldset class="field"><legend>Sub-categories</legend><div class="stack">
         <ul class="subrows" id="cat-subs">${(c?.subs ?? []).map((s) => subRowHtml(s.id, s.name)).join('')}</ul>
         <div class="shop-add"><label class="field"><input id="cat-sub-new" maxlength="${LIMITS.name}" placeholder="Baking, Spices, Tins…" autocomplete="off" aria-label="New sub-category"></label>

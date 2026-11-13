@@ -104,6 +104,8 @@ async function migrateLegacyDiary(old: [string, DiaryEntry][]): Promise<boolean>
 // ---- in memory ----
 let entries: Record<number, DiaryEntry> = {};
 let reflections: Record<string, Reflection> = {};
+// What a new diary starts with: every option on (each can be turned off under Settings → Diary).
+const ALL_ON: DiaryExtras = { trackamaniac: true, teleportation: true, photographer: true, titles: true, starry: true };
 let extras: DiaryExtras = {};
 let ready = false;
 const listeners = new Set<() => void>();
@@ -143,9 +145,9 @@ export function initDiary(legacy: Legacy = {}): Promise<boolean> {
     reflections = await readReflections();
     const stored = await readExtras();
     if (stored) extras = stored;
-    else {   // the settings used to live in Habit Kitty's save
-      extras = sanitizeExtras({ trackamaniac: legacy.trackamaniac, moodNames: legacy.moodNames });
-      if (Object.keys(extras).length) await writeExtras(extras);
+    else {   // a new diary starts with every option on; the emotion names used to live in Habit Kitty's save
+      extras = sanitizeExtras({ ...ALL_ON, moodNames: legacy.moodNames });
+      await writeExtras(extras);
     }
     ready = true;
     resolveInit();

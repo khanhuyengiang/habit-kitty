@@ -24,7 +24,7 @@ import { music } from '../../shared/music.ts';
 import { PHOTO_MAX_BYTES, compressPhoto } from '../../shared/photo.ts';
 import { sharePicture } from '../../shared/snapshot.ts';
 import {
-  PICKER_ICONS, PICKER_ICON_NAMES, avatarSvg, burstSvg, cornerSvg, flowerSvg, heartSvg, iconSvg, starsSvg, stickerSvg,
+  PICKER_ICONS, PICKER_ICON_NAMES, avatarSvg, groupedPicks, burstSvg, cornerSvg, flowerSvg, heartSvg, iconSvg, starsSvg, stickerSvg,
 } from '../pixelart.ts';
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
@@ -165,7 +165,7 @@ function cardHtml(v: CardView, o: { static?: boolean; unlock?: boolean; big?: bo
   const planned = v.status === 'planned';
   const cls = ['card', planned ? 'planned' : `rar-${v.rarity}`, o.static && 'static', o.big && 'big', o.unlock && 'unlock'].filter(Boolean).join(' ');
   const style = `--sqc:${v.color};--sqi:${inkFor(v.color)};--rar:${RARITY_COLOR[v.rarity]}`;
-  const art = v.photo ? `<img src="${esc(v.photo)}" alt="">` : `${burstSvg()}${stickerSvg(v.icon)}`;
+  const art = v.photo ? `<img src="${esc(v.photo)}" alt="">` : `${burstSvg()}${stickerSvg(v.icon, 1, 'zoom')}`;
   const date = v.date ? (planned ? `Plan ${shortDate(v.date)}` : shortDate(v.date)) : (planned ? 'Someday' : '');
   const rim = v.quest ? `<span class="rim l" aria-hidden="true">${esc(v.quest)}</span><span class="rim r" aria-hidden="true">${esc(v.quest)}</span>` : '';
   const inner = `${(['tl', 'tr', 'bl', 'br'] as const).map((c) => cornerSvg(c, o.big)).join('')}${rim}${starsSvg(planned ? 0 : RARITIES.indexOf(v.rarity) + 1)}<span class="card-in">
@@ -408,8 +408,8 @@ const iconSummary = (n: string) => `${stickerSvg(n, 1)}<span class="fold-name">$
 // The icon list folds away once an icon is chosen; the chosen icon (in the summary) opens it again.
 const iconPicker = (sel: string, open: boolean, name = 'icon') => `<div class="field"><fieldset class="field"><legend>Icon <span aria-hidden="true">*</span></legend>
   <details class="icon-fold" ${open ? 'open' : ''}><summary class="fold-sum" aria-label="Icon: ${esc(iconLabel(sel))}. Change">${iconSummary(sel)}</summary>
-  <div class="icon-pick">${PICKER_ICON_NAMES.map((n) =>
-  `<label title="${PICKER_ICONS[n].label}"><input type="radio" name="${name}" value="${n}" ${n === sel ? 'checked' : ''} aria-label="${PICKER_ICONS[n].label}"><span>${iconSvg(n)}</span></label>`).join('')}</div></details></fieldset><p class="err" data-err="${name}" role="alert"></p></div>`;
+  <div class="icon-pick">${groupedPicks((n) =>
+  `<label title="${PICKER_ICONS[n].label}"><input type="radio" name="${name}" value="${n}" ${n === sel ? 'checked' : ''} aria-label="${PICKER_ICONS[n].label}"><span>${iconSvg(n)}</span></label>`)}</div></details></fieldset><p class="err" data-err="${name}" role="alert"></p></div>`;
 
 function photosField(m: { photos: FormPhoto[] }, label = 'Photos'): string {
   return `<div class="field"><label for="f-photos">${label}</label>

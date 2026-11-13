@@ -28,6 +28,7 @@ import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, trophyIcon, ty
 import { mountDiarySettings } from '../diary/settings.ts';
 import { collectNotes, initNotes, restoreNotes } from '../notes/data.ts';
 import { mountNotesSettings } from '../notes/settings.ts';
+import { mountPixelSettings } from '../pixel/settings.ts';
 import { collectShopping, initShopping, restoreShopping } from '../shopping/data.ts';
 import { mountLookSettings } from '../shared/look.ts';
 import { publishHabitStats } from '../shared/stats.ts';
@@ -1498,9 +1499,10 @@ function renderTabbar() {
 }
 
 // Settings: a main page (everything shared, then a button per mini-app), and one page for each mini-app's own options.
-const SETTINGS_PAGES = ['main', 'habit', 'diary', 'notes', 'achievement'] as const;
+const SETTINGS_PAGES = ['main', 'habit', 'diary', 'notes', 'achievement', 'pixel'] as const;
 function showSettingsApp(app: string | null) {
   for (const p of SETTINGS_PAGES) $(`set-${p}`).hidden = p !== (app ?? 'main');
+  if (app === 'pixel') redrawPixelSettings();   // its counts change in Kitty Gallery
   window.scrollTo(0, 0);
 }
 function showTab(name: string) {
@@ -2194,6 +2196,7 @@ $('ach-file').addEventListener('change', async (ev) => {
 
 mountDiarySettings($('set-diary-body'), toast);
 mountNotesSettings($('set-notes-body'), toast);
+const redrawPixelSettings = mountPixelSettings($('set-pixel-body'), toast);
 mountLookSettings($('set-look'));
 
 $('load-file').addEventListener('change', async (ev) => {

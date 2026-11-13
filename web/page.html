@@ -208,6 +208,10 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .btn:active:not(:disabled), .gear:active { transform: translateY(calc(3 * var(--px))); box-shadow: none; }
 .btn:disabled { background: var(--none); color: var(--muted); border-color: var(--line); box-shadow: none; cursor: default; }
 .btns { display: flex; gap: var(--s2); }
+/* a heading over each group of icons in an icon picker; it takes a whole row of the picker's grid (or flex row) */
+.pick-group { grid-column: 1 / -1; flex-basis: 100%; margin: var(--s2) 0 0; font-size: 16px; font-weight: 700; color: var(--muted); text-transform: capitalize; }
+.pick-group:first-child { margin-top: 0; }
+.pick-group .num { font-weight: 400; }
 .linkish { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; text-decoration-thickness: var(--px); text-underline-offset: var(--px); font-size: 18px; }
 
 /* ---------- tabs: a thin switch with rounder corners; the chosen tab is a pink key inside it ---------- */
@@ -737,6 +741,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
         <button class="btn menu-btn" type="button" data-action="settings-app" data-app="diary"><i data-icon="diary"></i><span>Diary</span></button>
         <button class="btn menu-btn" type="button" data-action="settings-app" data-app="notes"><i data-icon="pencil"></i><span>Notes</span></button>
         <button class="btn menu-btn" type="button" data-action="settings-app" data-app="achievement"><i data-icon="trophy"></i><span>Achievements</span></button>
+        <button class="btn menu-btn" type="button" data-action="settings-app" data-app="pixel"><i data-icon="pencil"></i><span>Kitty Gallery</span></button>
       </div>
       <footer class="foot">
       <span><span id="saved">Saved on this device</span> · <span id="version"></span></span>
@@ -809,6 +814,11 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
         <p class="form-error" id="ach-error" hidden></p>
       </div></details>
     </div>
+
+    <div class="set-page" id="set-pixel" hidden>
+      <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Kitty Gallery</h3></div>
+      <div class="set-page" id="set-pixel-body"></div>
+    </div>
   </main>
 </div>
 <nav class="tabbar" id="tabbar" aria-label="Habit Kitty"><div class="tabbar-in" role="tablist">
@@ -839,5 +849,6 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 <!--__DIARY__-->
 <!--__NOTES__-->
 <!--__SHOPPING__-->
+<!--__PIXEL__-->
 
 <script>/*__APP__*/</script>

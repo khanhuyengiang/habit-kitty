@@ -40,9 +40,10 @@ describe('diary data', () => {
     expect(data.dayCount()).toBe(2);
   });
 
-  it('takes the settings the old save had, into diary.json', () => {
-    expect(data.diaryExtras()).toEqual({ trackamaniac: true, moodNames: { joyful: 'Yay' } });
-    expect(JSON.parse(text('habit-kitty/diary.json')!)).toEqual({ trackamaniac: true, moodNames: { joyful: 'Yay' } });
+  it('starts a new diary with every option on, and the emotion names the old save had, in diary.json', () => {
+    const want = { trackamaniac: true, teleportation: true, photographer: true, titles: true, starry: true, moodNames: { joyful: 'Yay' } };
+    expect(data.diaryExtras()).toEqual(want);
+    expect(JSON.parse(text('habit-kitty/diary.json')!)).toEqual(want);
   });
 
   it('saves a page with a photo, and clears it again', async () => {
