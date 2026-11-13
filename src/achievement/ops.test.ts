@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   achievementsToLeave, ageOf, titleFor, allTags, checkIntegrity, collection, counts, migrate, monthOf, deleteAchievement, deleteMainQuest, deleteSideQuest, emptyData, levelOf,
-  moveSideQuest, photosOf, saveAchievement, saveMainQuest, saveSideQuest, setMainQuestArchived, setSideQuestArchived,
+  moveSideQuest, photosOf, progressOf, saveAchievement, stepProgress, saveMainQuest, saveSideQuest, setMainQuestArchived, setSideQuestArchived,
   sideQuestsOf, updateProfile, type AchievementInput,
 } from './ops.ts';
 import { inkFor, isValidDate } from './model.ts';
@@ -223,5 +223,42 @@ describe('profile and helpers', () => {
     expect(isValidDate('2026-02-29')).toBe(false);
     expect(inkFor('#f2b705')).toBe('#231d44');
     expect(inkFor('#6a6de8')).toBe('#ffffff');
+  });
+});
+
+describe('counted achievements', () => {
+  it('saves a goal, counts up to it, and says when a locked card reaches it', () => {
+    const w = world();
+    const a = saveAchievement(w.d, input(w, { title: 'Run 3 marathons', status: 'planned', rarity: 'normal', date: '', goal: 3, progress: 1 }));
+    expect(a.errors).toEqual({});
+    expect(progressOf(a.data.achievements[0])).toEqual({ n: 1, goal: 3, done: false });
+    const two = stepProgress(a.data, a.id, 1);
+    expect(two.reached).toBe(false);
+    const three = stepProgress(two.data, a.id, 1);
+    expect(three.reached).toBe(true);
+    expect(progressOf(three.data.achievements[0])).toEqual({ n: 3, goal: 3, done: true });
+    expect(stepProgress(three.data, a.id, 1).reached).toBe(false);   // only the step that meets the goal
+  });
+  it('never counts below zero, and a one-off card has nothing to count', () => {
+    const w = world();
+    const a = saveAchievement(w.d, input(w, { goal: 5, progress: 0 }));
+    expect(stepProgress(a.data, a.id, -1).data).toBe(a.data);
+    const plain = saveAchievement(w.d, input(w));
+    expect(progressOf(plain.data.achievements[0])).toBeNull();
+    expect(stepProgress(plain.data, plain.id, 1).data).toBe(plain.data);
+  });
+  it('keeps the count when the goal is left out, and drops it when the goal is removed', () => {
+    const w = world();
+    const a = saveAchievement(w.d, input(w, { goal: 10, progress: 4 }));
+    const edited = saveAchievement(a.data, input(w, { title: 'Renamed' }), a.id);
+    expect(progressOf(edited.data.achievements[0])).toEqual({ n: 4, goal: 10, done: false });
+    const off = saveAchievement(a.data, input(w, { goal: null }), a.id);
+    expect(progressOf(off.data.achievements[0])).toBeNull();
+  });
+  it('rejects goals that are not whole numbers', () => {
+    const w = world();
+    expect(saveAchievement(w.d, input(w, { goal: 0 })).errors.goal).toBeTruthy();
+    expect(saveAchievement(w.d, input(w, { goal: 2.5 })).errors.goal).toBeTruthy();
+    expect(saveAchievement(w.d, input(w, { goal: 5, progress: -1 })).errors.progress).toBeTruthy();
   });
 });

@@ -46,6 +46,7 @@ label.btn { cursor: pointer; }
 .block:hover { background: var(--accent-soft); }
 .block.planned { border-style: dashed; border-color: var(--line); color: var(--muted); opacity: .8; }
 .block.planned .pxs { filter: grayscale(1); }
+.blk-goal { position: absolute; left: var(--bw); bottom: var(--bw); height: var(--bw); width: calc((100% - 2 * var(--bw)) * var(--p)); background: var(--c); }
 .block.add { border-color: var(--line); color: var(--muted); background: transparent; border-style: dashed; }
 .block.add:hover { color: var(--accent-text); border-color: var(--accent-edge); }
 
@@ -129,7 +130,16 @@ dd.tags .tag { text-transform: none; letter-spacing: 0; font-size: 16px; }
     linear-gradient(var(--gl) var(--cu), transparent 0) calc(-1 * var(--cu)) calc(-1 * var(--cu)) / calc(8 * var(--cu)) calc(8 * var(--cu)),
     linear-gradient(90deg, var(--gl) var(--cu), transparent 0) calc(-1 * var(--cu)) calc(-1 * var(--cu)) / calc(8 * var(--cu)) calc(8 * var(--cu)),
     var(--panel); }
-.card-count { justify-self: end; font-size: max(12px, calc(4.7 * var(--cp))); line-height: 1; letter-spacing: .04em; color: var(--txt); opacity: .85; min-height: 1em; }
+.card-row { display: flex !important; align-items: center; gap: calc(2 * var(--cu)); min-width: 0; }
+/* a counted achievement: a pixel bar in the side quest's colour and the count, left of the date */
+.card-goal { flex: 1; min-width: 0; display: flex !important; align-items: center; gap: calc(2 * var(--cu)); }
+.goal-bar { flex: 1; min-width: calc(10 * var(--cu)); height: calc(5 * var(--cu)); display: block !important; border: var(--cu) solid var(--dk); background: var(--panel); clip-path: var(--fnotch); }
+.goal-bar > i { display: block; height: 100%; background: var(--sq); }
+.goal-n { font-size: max(12px, calc(4.7 * var(--cp))); line-height: 1; color: var(--txt); white-space: nowrap; }
+.card:not(.big) .card-goal ~ .card-count { display: none !important; }   /* a small card has no room for both: the count wins, the date is on its page */
+.card.big .goal-n { font-size: 18px; }
+.card.big .goal-bar { height: calc(7 * var(--cu)); }
+.card-count { margin-left: auto; white-space: nowrap; justify-self: end; font-size: max(12px, calc(4.7 * var(--cp))); line-height: 1; letter-spacing: .04em; color: var(--txt); opacity: .85; min-height: 1em; }
 .card-art { position: relative; display: grid !important; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; overflow: hidden; min-height: 0; }
 .card-art > .pxs { grid-area: 1 / 1; }
 .card-deco { position: absolute !important; left: 0; bottom: 0; display: flex !important; gap: var(--cu); align-items: end; }
@@ -213,6 +223,8 @@ details.panel .manage { margin-top: var(--s4); }
 /* an achievement on its own page: the buttons, the card drawn big with all of its words, its photos and the facts */
 .ctools { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
 .ctools .grow { flex: 1; }
+.goal-panel { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); flex-wrap: wrap; width: 100%; max-width: calc(216 * var(--px)); justify-self: center; }
+.goal-big { margin: 0; font-size: 28px; display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
 .facts { display: grid; gap: var(--s4); width: 100%; max-width: calc(216 * var(--px)); justify-self: center; }   /* as wide as the big card */
 .facts dl { display: grid; grid-template-columns: auto 1fr; gap: var(--s2) var(--s5); margin: 0; font-size: 18px; }
 .facts dt { color: var(--muted); } .facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }

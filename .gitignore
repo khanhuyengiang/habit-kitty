@@ -2,7 +2,7 @@
 node_modules/
 
 # Build output (regenerate with `npm run build:web` / `npm run app:apk`)
-dist/
+# dist/
 app-www/
 
 # Dev preview server output (`npm run preview`)

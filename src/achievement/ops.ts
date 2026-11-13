@@ -7,7 +7,7 @@ import {
 import { PICKER_ICON_NAMES } from './pixelart.ts';
 import { toPalette } from '../shared/palette.ts';
 
-export const LIMITS = { title: 80, location: 60, description: 2000, name: 30, quest: 60, tags: 10, tag: 24 };
+export const LIMITS = { title: 80, location: 60, description: 2000, name: 30, quest: 60, tags: 10, tag: 24, goal: 100000 };
 
 // Older saves predate tags (and may have been written before a field existed): fill in what is missing, so the
 // rest of the code can trust the shape. Changes nothing that is already there.
@@ -175,6 +175,29 @@ export interface AchievementInput {
   status: Status; rarity: Rarity;
   date: string;   // the planned date while planned, the completion date once completed
   photos: PhotoInput[];
+  goal?: number | null;   // null: a one-off achievement; left out: keep what the card had
+  progress?: number;      // how many so far (only with a goal)
+}
+
+// A counted achievement's numbers, or null for a one-off.
+export function progressOf(a: Pick<Achievement, 'goal' | 'progress'>): { n: number; goal: number; done: boolean } | null {
+  if (!a.goal) return null;
+  const n = a.progress ?? 0;
+  return { n, goal: a.goal, done: n >= a.goal };
+}
+
+// Counts a counted achievement up (or back down, never below 0). `reached` is true when this step met the goal of a
+// locked card, which is the moment to offer unlocking it.
+export function stepProgress(d: Data, id: string, by: number, now = Date.now()): { data: Data; reached: boolean } {
+  const a = d.achievements.find((x) => x.id === id);
+  const p = a && progressOf(a);
+  if (!a || !p) return { data: d, reached: false };
+  const n = Math.min(LIMITS.goal, Math.max(0, p.n + by));
+  if (n === p.n) return { data: d, reached: false };
+  return {
+    data: { ...d, achievements: d.achievements.map((x) => (x.id === id ? { ...x, progress: n, updatedAt: now } : x)) },
+    reached: a.status === 'planned' && p.n < p.goal && n >= p.goal,
+  };
 }
 
 export const photosOf = (d: Data, achievementId: string): AchievementPhoto[] =>
@@ -199,6 +222,9 @@ export function validateAchievement(d: Data, i: AchievementInput, opts: { requir
   if (tags.length > LIMITS.tags) errors.tags = `Keep it to ${LIMITS.tags} tags.`;
   else if (tags.some((t) => t.length > LIMITS.tag)) errors.tags = `Keep each tag to ${LIMITS.tag} characters.`;
   if (!RARITIES.includes(i.rarity)) errors.rarity = 'Choose a rarity.';
+  const whole = (n: number) => Number.isInteger(n) && n >= 0 && n <= LIMITS.goal;
+  if (i.goal != null && (!whole(i.goal) || i.goal < 1)) errors.goal = `Enter a whole number from 1 to ${LIMITS.goal}, or leave it empty.`;
+  else if (i.goal != null && i.progress != null && !whole(i.progress)) errors.progress = `Enter a whole number from 0 to ${LIMITS.goal}.`;
   if (i.date ? !isValidDate(i.date) : opts.requireDate) {
     errors.date = i.date ? 'Enter a valid date.' : 'Set the date it happened.';
   }
@@ -220,6 +246,7 @@ export function saveAchievement(d: Data, i: AchievementInput, id?: string, opts:
     rarity: completed ? i.rarity : 'normal' as Rarity,
     plannedDate: completed ? old?.plannedDate ?? null : i.date || null,
     completionDate: completed ? i.date || null : null,
+    ...(i.goal === undefined ? {} : { goal: i.goal, progress: i.goal ? i.progress ?? old?.progress ?? 0 : 0 }),
     updatedAt: now,
   };
   const achievement: Achievement = old

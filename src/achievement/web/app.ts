@@ -6,7 +6,7 @@ import {
 } from '../model.ts';
 import {
   LIMITS, activeMainQuests, allTags, archivedMainQuests, collection, counts, deleteAchievement, deleteMainQuest, deleteSideQuest, emptyData,
-  ageOf, levelOf, migrate, monthOf, moveSideQuest, photosOf, pickColor, saveAchievement, saveMainQuest, saveSideQuest, setMainQuestArchived,
+  ageOf, levelOf, migrate, monthOf, moveSideQuest, photosOf, pickColor, progressOf, saveAchievement, stepProgress, saveMainQuest, saveSideQuest, setMainQuestArchived,
   setSideQuestArchived, sideQuestsOf, titleFor, updateProfile, type AchievementInput, type Errors, type Filter,
 } from '../ops.ts';
 import { IDB_PREFIX, MemoryRepo, Saver, isLocalRef, type Repo } from '../storage.ts';
@@ -140,7 +140,7 @@ function fitCards() {
   root.style.setProperty('--cgap', `${gap}px`);
 }
 
-interface CardView { id?: string; title: string; icon: string; sideIcon: string; status: Status; rarity: Rarity; color: string; date: string | null; location: string; description: string; photo: string | null; side: string; quest: string }
+interface CardView { id?: string; title: string; icon: string; sideIcon: string; status: Status; rarity: Rarity; color: string; date: string | null; location: string; description: string; photo: string | null; side: string; quest: string; goal: number | null; progress: number }
 
 function cardView(a: Achievement): CardView {
   const side = data.sideQuests.find((s) => s.id === a.sideQuestId);
@@ -149,7 +149,7 @@ function cardView(a: Achievement): CardView {
     side: side?.title ?? data.mainQuests.find((q) => q.id === a.mainQuestId)?.title ?? '', color: colorOf(side),
     quest: data.mainQuests.find((q) => q.id === a.mainQuestId)?.title ?? '',
     date: a.status === 'completed' ? a.completionDate : a.plannedDate,
-    location: a.location ?? '', description: a.description,
+    location: a.location ?? '', description: a.description, goal: a.goal ?? null, progress: a.progress ?? 0,
     photo: src(photosOf(data, a.id)[0]?.imageUrl ?? null) || null,
   };
 }
@@ -166,16 +166,18 @@ function cardHtml(v: CardView, o: { static?: boolean; unlock?: boolean; big?: bo
   const cls = ['card', planned ? 'planned' : `rar-${v.rarity}`, o.static && 'static', o.big && 'big', o.unlock && 'unlock'].filter(Boolean).join(' ');
   const style = `--sqc:${v.color};--sqi:${inkFor(v.color)};--rar:${RARITY_COLOR[v.rarity]}`;
   const art = v.photo ? `<img src="${esc(v.photo)}" alt="">` : `${burstSvg()}${stickerSvg(v.icon, 1, 'zoom')}`;
-  const date = v.date ? (planned ? `Plan ${shortDate(v.date)}` : shortDate(v.date)) : (planned ? 'Someday' : '');
+  const p = progressOf(v);
+  const date = v.date ? (planned ? `Plan ${shortDate(v.date)}` : shortDate(v.date)) : (planned && !p ? 'Someday' : '');
+  const goal = p ? `<span class="card-goal"><span class="goal-bar"><i style="width:${Math.min(100, (p.n / p.goal) * 100)}%"></i></span><span class="goal-n">${p.n}/${p.goal}</span></span>` : '';
   const rim = v.quest ? `<span class="rim l" aria-hidden="true">${esc(v.quest)}</span><span class="rim r" aria-hidden="true">${esc(v.quest)}</span>` : '';
   const inner = `${(['tl', 'tr', 'bl', 'br'] as const).map((c) => cornerSvg(c, o.big)).join('')}${rim}${starsSvg(planned ? 0 : RARITIES.indexOf(v.rarity) + 1)}<span class="card-in">
     <span class="card-head">${stickerSvg(v.icon, 1)}<span class="card-title">${esc(v.title || 'Untitled')}</span></span>
-    <span class="card-screen"><span class="card-count">${esc(date)}</span>
+    <span class="card-screen"><span class="card-row">${goal}<span class="card-count">${esc(date)}</span></span>
       <span class="card-art${v.photo ? ' has-photo' : ''}">${art}<span class="card-deco">${heartSvg()}${flowerSvg()}</span>${planned ? `<span class="lockmark">${iconSvg('lock')}</span>` : ''}</span>
       ${v.description ? `<span class="card-desc">${esc(v.description)}</span>` : ''}</span>
     <span class="card-foot">${stickerSvg(v.sideIcon, 1)}<span class="card-place">${v.location ? esc(v.location) : esc(v.side)}</span></span></span>`;
   if (o.static) return `<div class="${cls}" style="${style}">${inner}</div>`;
-  const label = `${v.title}, ${v.side}, ${planned ? 'locked' : `${RARITY_LABEL[v.rarity]}, unlocked`}`;
+  const label = `${v.title}, ${v.side}, ${p ? `${p.n} of ${p.goal}, ` : ''}${planned ? 'locked' : `${RARITY_LABEL[v.rarity]}, unlocked`}`;
   return `<button type="button" class="${cls}" style="${style}" data-action="open-card" data-id="${v.id}" data-main="${data.achievements.find((x) => x.id === v.id)?.mainQuestId ?? ''}" aria-label="${esc(label)}">${inner}</button>`;
 }
 
@@ -209,8 +211,10 @@ function profileHtml(): string {
 // One small block per achievement, in the side quest's colour (grey and dashed while locked), and a + block to add another.
 function blockHtml(a: Achievement, color: string): string {
   const planned = a.status === 'planned';
-  const label = `${a.title}, ${planned ? 'locked' : 'unlocked'}`;
-  return `<button class="block${planned ? ' planned' : ''}" style="--c:${color}" title="${esc(a.title)}" aria-label="${esc(label)}" data-action="open-card" data-id="${a.id}" data-main="${a.mainQuestId}">${iconSvg(a.icon)}</button>`;
+  const p = progressOf(a);
+  const label = `${a.title}, ${p ? `${p.n} of ${p.goal}, ` : ''}${planned ? 'locked' : 'unlocked'}`;
+  const fill = p ? `<i class="blk-goal" style="--p:${Math.min(1, p.n / p.goal)}"></i>` : '';
+  return `<button class="block${planned ? ' planned' : ''}" style="--c:${color}" title="${esc(p ? `${a.title} (${p.n}/${p.goal})` : a.title)}" aria-label="${esc(label)}" data-action="open-card" data-id="${a.id}" data-main="${a.mainQuestId}">${iconSvg(a.icon)}${fill}</button>`;
 }
 
 // A main quest on the main page. Open: its side quests (and the cards directly in it) as rows of blocks, with buttons to
@@ -361,6 +365,7 @@ function cardPageHtml(a: Achievement): string {
   const i = Math.min(detailPhoto, Math.max(0, photos.length - 1));
   const v = { ...cardView(a), photo: src(photos[i]?.imageUrl ?? null) || null };
   const planned = a.status === 'planned';
+  const p = progressOf(a);
   const when = planned ? ['Target date', a.plannedDate ? fmtDate(a.plannedDate) : 'No date set'] : ['Unlocked on', a.completionDate ? fmtDate(a.completionDate) : 'No date set'];
   return `<div class="ctools">
       <button class="btn small" data-action="close-detail">${iconSvg('prev')} Back</button><span class="grow"></span>
@@ -369,12 +374,16 @@ function cardPageHtml(a: Achievement): string {
       <button class="btn small" data-action="edit-card" data-id="${a.id}">${iconSvg('pencil')} Edit</button>
       <button class="btn small danger" data-action="delete-card" data-id="${a.id}">${iconSvg('trash')} Delete</button></div>
     <h2 class="sr">${esc(a.title)}</h2>
+    ${p ? `<section class="panel goal-panel" aria-label="Progress"><p class="goal-big" aria-live="polite"><b class="num">${p.n}</b> <span class="muted">/ ${p.goal}</span>${p.done ? ' <span class="tag">Goal reached</span>' : ''}</p>
+      <div class="btns"><button class="btn" data-action="goal-down" data-id="${a.id}" aria-label="Count one less" ${p.n ? '' : 'disabled'}>−1</button>
+      <button class="btn primary" data-action="goal-up" data-id="${a.id}" aria-label="Count one more">+1</button></div></section>` : ''}
     ${cardHtml(v, { static: true, big: true, unlock: a.id === unlocked })}
     ${photos.length > 1 ? `<div class="gallery" role="group" aria-label="Photos">${photos.map((p, n) => `<button data-action="gallery" data-i="${n}" aria-current="${n === i}" aria-label="Photo ${n + 1}"><img src="${esc(src(p.imageUrl))}" alt=""></button>`).join('')}</div>` : ''}
     <section class="panel facts" aria-label="Details"><dl>
       <dt>Main quest</dt><dd>${esc(main?.title ?? '')}</dd>
       <dt>Side quest</dt><dd>${side ? `<span class="side-ico" style="color:${colorOf(side)}">${iconSvg(side.icon)}</span>${esc(side.title)}` : 'None'}</dd>
       <dt>Status</dt><dd>${planned ? 'Locked' : 'Unlocked'}</dd>
+      ${p ? `<dt>Progress</dt><dd>${p.n} of ${p.goal}</dd>` : ''}
       ${planned ? '' : `<dt>Rarity</dt><dd>${RARITY_LABEL[a.rarity]}</dd>`}
       ${a.location ? `<dt>Location</dt><dd>${esc(a.location)}</dd>` : ''}
       <dt>${when[0]}</dt><dd>${esc(when[1])}</dd>
@@ -383,7 +392,7 @@ function cardPageHtml(a: Achievement): string {
 
 // ---------- modals ----------
 
-interface FormValues { title: string; description: string; location: string; icon: string; tags: string; mainQuestId: string; sideQuestId: string; status: Status; rarity: Rarity; date: string }
+interface FormValues { title: string; description: string; location: string; icon: string; tags: string; mainQuestId: string; sideQuestId: string; status: Status; rarity: Rarity; date: string; goal: string; progress: string }
 interface FormPhoto { imageUrl: string; existingId?: string; blob?: Blob }
 type Modal =
   | { kind: 'achievement'; id?: string; v: FormValues; photos: FormPhoto[]; busy?: boolean; iconOpen?: boolean }
@@ -428,6 +437,8 @@ function sideOptions(mainId: string, selected: string, keep?: string): string {
 }
 
 const splitTags = (s: string) => s.split(',');
+// The goal fields as typed: an empty goal is a one-off achievement. Anything else goes to the rules, which say what is wrong.
+const formGoal = (v: FormValues) => (v.goal.trim() === '' ? { goal: null, progress: 0 } : { goal: Number(v.goal), progress: v.progress.trim() === '' ? 0 : Number(v.progress) });
 
 function achievementForm(m: Extract<Modal, { kind: 'achievement' | 'complete' }>): string {
   const complete = m.kind === 'complete';
@@ -454,6 +465,9 @@ function achievementForm(m: Extract<Modal, { kind: 'achievement' | 'complete' }>
     ${field('Title', 'title', `<input id="f-title" name="title" maxlength="80" value="${esc(v.title)}" autocomplete="off" required>`, '', true)}
     ${where}
     ${complete ? '' : iconPicker(v.icon, (m as { iconOpen?: boolean }).iconOpen ?? !editing)}
+    ${complete ? '' : `<div class="row">
+      ${field('Goal (times)', 'goal', `<input id="f-goal" name="goal" type="number" inputmode="numeric" min="1" max="${LIMITS.goal}" step="1" value="${esc(v.goal)}" placeholder="e.g. 10">`, 'Optional. For things you do many times, like 10 marathons.')}
+      <div id="progress-block" ${v.goal.trim() ? '' : 'hidden'}>${field('Done so far', 'progress', `<input id="f-progress" name="progress" type="number" inputmode="numeric" min="0" max="${LIMITS.goal}" step="1" value="${esc(v.progress)}">`, 'Count up from its page.')}</div></div>`}
     ${field(v.status === 'planned' ? 'Target date' : complete ? 'Date it happened' : 'Date', 'date', `<input id="f-date" name="date" type="date" value="${esc(v.date)}">`, v.status === 'planned' ? 'Optional' : '', complete)}
     ${rarityBlock}
     ${field('Location', 'location', `<input id="f-location" name="location" maxlength="60" value="${esc(v.location)}" placeholder="Bangkok" autocomplete="off">`, 'Optional')}
@@ -466,7 +480,7 @@ function achievementForm(m: Extract<Modal, { kind: 'achievement' | 'complete' }>
 
 function previewView(v: FormValues, photos: FormPhoto[]): CardView {
   const side = data.sideQuests.find((s) => s.id === v.sideQuestId);
-  return { title: v.title.trim(), icon: v.icon, sideIcon: side?.icon ?? 'trophy', status: v.status, rarity: v.rarity, side: side?.title ?? data.mainQuests.find((q) => q.id === v.mainQuestId)?.title ?? '', quest: data.mainQuests.find((q) => q.id === v.mainQuestId)?.title ?? '', color: colorOf(side), date: v.date || null, location: v.location.trim(), description: v.description.trim(), photo: photos[0] ? src(photos[0].imageUrl) : null };
+  return { title: v.title.trim(), icon: v.icon, sideIcon: side?.icon ?? 'trophy', status: v.status, rarity: v.rarity, side: side?.title ?? data.mainQuests.find((q) => q.id === v.mainQuestId)?.title ?? '', quest: data.mainQuests.find((q) => q.id === v.mainQuestId)?.title ?? '', color: colorOf(side), date: v.date || null, location: v.location.trim(), description: v.description.trim(), photo: photos[0] ? src(photos[0].imageUrl) : null, ...formGoal(v) };
 }
 
 function modalHtml(m: Modal): string {
@@ -596,12 +610,13 @@ function confirmDialog(title: string, body: string, label: string, run: () => vo
 
 const blank = (mainId: string, sideId: string, status: Status): FormValues => ({
   title: '', description: '', location: '', tags: '', icon: PICKER_ICON_NAMES.includes(sideQuestIcon(sideId)) ? sideQuestIcon(sideId) : 'star', mainQuestId: mainId, sideQuestId: sideId,
-  status, rarity: 'normal', date: status === 'completed' ? todayStr() : '',
+  status, rarity: 'normal', date: status === 'completed' ? todayStr() : '', goal: '', progress: '0',
 });
 const sideQuestIcon = (id: string) => data.sideQuests.find((s) => s.id === id)?.icon ?? 'star';
 const valuesOf = (a: Achievement): FormValues => ({
   title: a.title, description: a.description, location: a.location ?? '', tags: a.tags.join(', '), icon: a.icon, mainQuestId: a.mainQuestId, sideQuestId: a.sideQuestId ?? '', status: a.status, rarity: a.rarity,
   date: (a.status === 'completed' ? a.completionDate : a.plannedDate) ?? '',
+  goal: a.goal ? String(a.goal) : '', progress: String(a.progress ?? 0),
 });
 const formPhotos = (id: string): FormPhoto[] => photosOf(data, id).map((p) => ({ imageUrl: p.imageUrl, existingId: p.id }));
 
@@ -612,6 +627,7 @@ function readValues(form: HTMLFormElement, base: FormValues): FormValues {
     title: get('title', base.title), description: get('description', base.description), location: get('location', base.location), icon: get('icon', base.icon), tags: get('tags', base.tags),
     mainQuestId: get('mainQuestId', base.mainQuestId), sideQuestId: get('sideQuestId', base.sideQuestId),
     status: get('status', base.status) as Status, rarity: get('rarity', base.rarity) as Rarity, date: get('date', base.date),
+    goal: get('goal', base.goal), progress: get('progress', base.progress),
   };
 }
 
@@ -651,6 +667,8 @@ function syncForm(changed?: string) {
     const lab = form.querySelector('label[for="f-date"]'); if (lab) lab.textContent = m.v.status === 'planned' ? 'Target date' : 'Date';
     if (prevStatus !== m.v.status) form.querySelector('#h-date')?.replaceChildren(document.createTextNode(m.v.status === 'planned' ? 'Optional' : ''));
   }
+  const prog = form.querySelector<HTMLElement>('#progress-block');
+  if (prog) prog.hidden = !m.v.goal.trim();
   const rarity = form.querySelector<HTMLElement>('#rarity-block');
   if (rarity) rarity.hidden = m.v.status !== 'completed';
   $('preview').innerHTML = cardHtml(previewView(m.v, m.photos), { static: true });
@@ -686,7 +704,7 @@ async function submitAchievement(form: HTMLFormElement) {
   if (!m || (m.kind !== 'achievement' && m.kind !== 'complete') || m.busy) return;
   m.v = readValues(form, m.v);
   if (m.kind === 'complete') m.v.status = 'completed';
-  const input = (): AchievementInput => ({ ...m.v, tags: splitTags(m.v.tags), photos: m.photos.map((p) => ({ id: p.existingId, imageUrl: p.imageUrl })) });
+  const input = (): AchievementInput => ({ ...m.v, ...formGoal(m.v), tags: splitTags(m.v.tags), photos: m.photos.map((p) => ({ id: p.existingId, imageUrl: p.imageUrl })) });
   const opts = { requireDate: m.kind === 'complete' };
   const id = m.id;
   const check = saveAchievement(data, input(), id, opts);
@@ -863,6 +881,17 @@ function onAction(el: HTMLElement) {
     }
     case 'open-card': scrolls.set(lastKey, window.scrollY); openedInApp = true; detailPhoto = 0; location.hash = r.page === 'all' ? `${ALL_HASH}/card/${id}` : `${questHash(el.dataset.main || questId)}/card/${id}`; break;
     case 'close-detail': closeDetail(); break;
+    case 'goal-up': case 'goal-down': {
+      const res = stepProgress(data, id, el.dataset.action === 'goal-up' ? 1 : -1);
+      if (res.data === data) break;
+      commit(res.data);
+      if (res.reached) {   // the goal is met: offer to unlock the card right away
+        const a = data.achievements.find((x) => x.id === id)!;
+        toast('Goal reached!');
+        openModal({ kind: 'complete', id, v: { ...valuesOf(a), status: 'completed', date: todayStr(), rarity: 'normal' }, photos: formPhotos(id) });
+      }
+      break;
+    }
     case 'gallery': detailPhoto = Number(el.dataset.i); render(); break;
     case 'share-card': {
       const a = data.achievements.find((x) => x.id === id), card = document.querySelector<HTMLElement>('.card.big');

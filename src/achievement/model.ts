@@ -65,6 +65,10 @@ export interface Achievement {
   rarity: Rarity;   // only meaningful (and only shown) while completed; planned cards keep 'normal'
   plannedDate: string | null;      // YYYY-MM-DD
   completionDate: string | null;   // YYYY-MM-DD
+  // A counted achievement ("Run 10 marathons", "Cook 100 pasta meals this year"): how many times in all, and how many so
+  // far (counted up from its page). null or missing (older saves) for a one-off achievement; progress is 0 then.
+  goal?: number | null;
+  progress?: number;
   createdAt: number;
   updatedAt: number;
 }
