@@ -4,14 +4,14 @@
 import { PLAYER_GENDERS, PLAYER_GENDER_LABEL, type Data, type PlayerGender } from '../achievement/model.ts';
 import { LIMITS, ageOf, levelOf, titleFor } from '../achievement/ops.ts';
 import { avatarSvg } from '../achievement/pixelart.ts';
-import { iconSvg } from '../pixelart.ts';
+import { DECOS, iconSvg } from '../pixelart.ts';
+import { fineSvg } from '../achievement/pixelart.ts';
 import { hpLine, lvLine, mpLine, shortId } from '../player.ts';
 import { meterHtml } from '../shared/meter.ts';
 import { lastApp, onAppShown } from '../shared/apps.ts';
 import { compressPhoto } from '../shared/photo.ts';
 import { avatarUrlOf, loadPlayerData, savePlayer } from '../shared/player.ts';
 import { napSvg } from '../shared/pixelcat.ts';
-import { artSvg } from '../shared/pixelart.ts';
 import { esc } from '../shared/html.ts';
 import { appName, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
 import { habitStats, onHabitStats } from '../shared/stats.ts';
@@ -65,24 +65,7 @@ function renderTop() {
   $('home-top').innerHTML = titleBar('Kitty', 'Home', playerButton() + settingsButton());
 }
 
-// A white feathered wing, copied from inspo/menu.jpg: the tip up and out, three tiers of feathers whose tips notch the
-// outer edge, and a round joint with a curl at the bottom, next to the key. This is the left one; the right is drawn
-// mirrored. o outline, w white, s feather line.
-const WING = [
-  '.oo.........',
-  'owwoo.......',
-  'owwwwoo.....',
-  '.owwwwwoo...',
-  'osssswwwwo..',
-  'owwwwwwwwwo.',
-  '.ossswwwwwwo',
-  'owwwwwooowwo',
-  'owwwwowwwowo',
-  '.osssowswowo',
-  '..owwowwwowo',
-  '...oooooooo.',
-];
-const WING_PAL = { o: '#9a8cc8', w: '#ffffff', s: '#a29bb8' };
+// The wing on each side of the chosen app's key is a Kitty Gallery decoration (DECOS.wing; the right one is mirrored).
 // The menu (after inspo/menu.jpg): short, long keys, one per app, each name written like its title bar. Player Stat is the
 // person in the title bar.
 const SLEEPER = { fur: '#fffafd', pattern: 'plain' as const };
@@ -100,7 +83,7 @@ function renderMenu() {
     const btn = `<button class="btn menu-btn" type="button" style="--mb: var(--m${i + 1})" data-action="go" data-to="${e.to}">${appName(...e.name)}</button>`;
     // the key of the app opened last is the chosen one: a white outline that glows and a wing on each side
     const key = e.to === chosen
-      ? `<div class="perch"><span class="wing l">${artSvg(WING, '', WING_PAL)}</span><span class="glow">${btn}</span><span class="wing r">${artSvg(WING, '', WING_PAL)}</span></div>`
+      ? `<div class="perch"><span class="wing l">${fineSvg(DECOS.wing.art)}</span><span class="glow">${btn}</span><span class="wing r">${fineSvg(DECOS.wing.art)}</span></div>`
       : btn;
     // a white cat always sleeps on Habit Kitty's key, whichever key is chosen
     return e.to === 'habit' ? `<div class="seat">${key}<span class="sitter">${napSvg(SLEEPER)}</span></div>` : key;

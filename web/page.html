@@ -192,6 +192,11 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .brand h1 { font: 700 var(--title-size)/1 var(--font); white-space: nowrap; letter-spacing: .02em; text-shadow: var(--px) var(--px) 0 var(--line); }
 .brand h1 .kitty { color: var(--accent-text); }
 .brand-r { display: flex; align-items: center; gap: var(--s3); }
+/* a list to put in order (shared/ui.ts orderList): a row per thing, its name and the up and down buttons */
+.order-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.order-list li { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s3); border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); background: var(--surface2); }
+.order-list .nm { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s3); font-weight: 700; overflow-wrap: anywhere; color: var(--ink); }
+.order-list .btns { display: flex; gap: var(--s2); flex: none; }
 .gear { width: calc(13 * var(--u)); height: calc(13 * var(--u)); display: grid; place-items: center; padding: 0; background: var(--surface); color: var(--ink);
   box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--bevel); }
 
@@ -342,6 +347,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .cat-side .sq { width: 100%; padding: var(--s2) var(--s1); }
 .sq { flex: none; display: grid; place-items: center; align-content: center; gap: var(--s1); font-size: 16px; line-height: 1; }
 .sq .food { margin: 0; }
+.food.sticker { color: #fffafd; }   /* cat food is a sticker: its base colour is cream on the feed button */
 .sq b { display: grid; place-items: center; height: calc(8 * var(--u)); }
 .cat-name { font: 700 24px/1.1 var(--font); overflow-wrap: anywhere; }
 .cat-habit { font-size: 18px; color: var(--muted); overflow-wrap: anywhere; }
@@ -462,9 +468,12 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .preview .btn { flex: 1; }
 .pencil { background: none; border: 0; padding: 0 var(--s1); margin-left: var(--s1); color: var(--accent-text); cursor: pointer; font-size: 16px; text-decoration: underline; text-decoration-thickness: var(--px); text-underline-offset: var(--px); }
 
-/* cozy room: 108 x 150 pixels, the same pixels as the cats in it; everything in the room counts in --px */
+/* cozy room and garden: 240 x 320 pixels, the same pixels as the cats in it; everything in the room counts in --px.
+   The room (and its 2-pixel border: 244 wide) is as wide as the page, up to its height, so inside it --px is the room's own pixel. */
+#tab-room { container-type: inline-size; }
 .room, .room * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-.room { box-sizing: content-box; position: relative; isolation: isolate; width: calc(108 * var(--px)); height: calc(150 * var(--px)); margin-inline: auto; overflow: hidden; background: var(--bg3); }
+.room { --px: max(1px, min(calc(100cqw / 244), calc((100dvh - 13rem) / 324))); box-sizing: content-box; position: relative; isolation: isolate;
+  width: calc(240 * var(--px)); height: calc(320 * var(--px)); margin-inline: auto; overflow: hidden; background: var(--bg3); }
 .room svg.bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .room-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); }
 #outdoor { display: block; }
@@ -714,7 +723,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
     </div></details>
 
     <details class="panel fold"><summary>Backup</summary><div class="fold-body">
-      <p class="muted">One <b>.kitty</b> file holds <b>both apps</b>: your kitties, every diary page and photo, and your Kitty Achievement quests and achievements (photos are scaled down so the file stays small). Save it on this device, or share it to Drive or by mail.</p>
+      <p class="muted">One <b>.kitty</b> file holds <b>everything</b>: your kitties, every diary page and photo, notes, Kitty Mart, your Kitty Gallery icons, and your Kitty Achievement quests and achievements (photos are scaled down so the file stays small). Save it on this device, or share it to Drive or by mail.</p>
       <div class="btns flow">
         <button class="btn primary" type="button" data-action="save-file">Save to device…</button>
         <button class="btn" type="button" data-action="share-file" data-native-only>Share…</button>
@@ -722,6 +731,17 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
       </div>
       <div id="auto-backup" hidden></div>
       <input type="file" id="load-file" accept=".kitty,.zip,.json,application/zip,application/octet-stream,application/json,text/plain" hidden>
+      <details class="more"><summary>Settings only</summary>
+        <p class="muted">A small <b>.kittyset</b> file with how your app looks and works, to give someone else (or a new phone) the same setup: the look, Habit Kitty options and sounds, diary options and emotion names, Kitty Mart categories and aisle order, and your Kitty Gallery icons.</p>
+        <p class="muted">It holds <b>nothing personal</b>: no kitties, diary pages, photos, birthdays, notes, shopping lists, pantry, recipes or achievements. When you load one, you pick which parts to take.</p>
+        <div class="btns flow">
+          <button class="btn" type="button" data-action="settings-save">Save settings…</button>
+          <button class="btn" type="button" data-action="settings-share" data-native-only>Share…</button>
+          <button class="btn" type="button" data-action="settings-load">Load settings…</button>
+        </div>
+        <input type="file" id="settings-file" hidden>
+        <p class="form-error" id="settings-error" hidden></p>
+      </details>
       <details class="more"><summary>Game only, as text</summary>
         <p class="muted">Copies just the kitties and settings, without diary or photos.</p>
         <label class="field">Save text <textarea id="save-text" spellcheck="false" placeholder="Paste a saved game here"></textarea></label>

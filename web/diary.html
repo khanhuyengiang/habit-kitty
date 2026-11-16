@@ -25,6 +25,11 @@
   margin: 0; display: block; width: 100%; max-height: calc(87 * var(--u)); object-fit: cover; border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-s-box); mask: var(--notch-s-m); image-rendering: pixelated; }
 .diary-photo .photo-grid:not([data-n="1"]) img { aspect-ratio: 1; max-height: none; }
 .photo-grid .btn { position: absolute; top: var(--s1); right: var(--s1); padding: var(--s1); }
+/* a page's icon instead of its photos (the icon picker and the Photo / Icon choice share notes' look, web/notes.html):
+   the sticker four times its size, every pixel kept square, its base colour the accent */
+.diary-pic .nkinds { margin-bottom: var(--s3); }
+.diary-icon { display: flex; justify-content: center; padding: var(--s3) 0; color: var(--accent); }
+.diary-icon .sticker { width: calc(var(--w) * 4 * var(--px)); height: calc(var(--h) * 4 * var(--px)); }
 .diary-nav .diary-date { flex: 1; margin: 0; text-align: center; font: 700 24px/1.1 var(--font); }
 .diary-title { margin: 0; text-align: center; }
 .where .pin { display: inline-flex; color: var(--accent-text); }

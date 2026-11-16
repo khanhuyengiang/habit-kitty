@@ -18,4 +18,5 @@ export function mountLookSettings(el: HTMLElement) {
     else if (t.id === 'look-fancy') setFancy(t.checked);
   });
   draw();
+  return draw;   // to redraw after the look was changed from elsewhere (loading a settings file)
 }

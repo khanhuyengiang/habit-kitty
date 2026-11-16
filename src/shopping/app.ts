@@ -10,17 +10,17 @@
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { iconSvg } from '../pixelart.ts';
-import { PICKER_ICONS, groupedPicks, stickerSvg } from '../achievement/pixelart.ts';
+import { PICKER_ICONS, groupedPicks, pickable, stickerSvg } from '../achievement/pixelart.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { onAppShown, onShown } from '../shared/apps.ts';
 import { esc, plural } from '../shared/html.ts';
-import { homeButton, playerButton, settingsButton, titleBar } from '../shared/ui.ts';
+import { homeButton, orderList, playerButton, refocusMove, settingsButton, titleBar } from '../shared/ui.ts';
 import { COLOR, tint, winBar } from '../notes/window.ts';
-import { change, onShop, shopData, shopInitialised, shopReady, undo, undoLabel } from './data.ts';
+import { change, onShop, shopData, shopInitialised, shopReady, undo, undoLabel, undoTop } from './data.ts';
 import {
   CAT_COLORS, LIMITS, OTHER, addItem, addList, addRecipe, addSub, addToPantry, agoText, alsoIn, canStep, catName, catNameTaken, catOf,
   clone, complete, dayTime, deleteCat, findInPantry, finishTrip, forgetHad, forgetRegular, guessCategory, hadBefore, inPantry,
-  ingredientsText, isDay, itemText, lastBought, learnPlace, listOf, listToText, moveCat, moveItem, newId, onList, pantryCount,
+  ingredientsText, isDay, itemText, lastBought, learnPlace, listOf, listToText, listCats, moveCat, moveItem, moveListCat, resetListOrder, newId, onList, pantryCount,
   parseIngredients, parseQuick, placeOf, qtyText, recipeNeeds, regularOf, removeItems, restock, ruleText, saveCat, setRegular,
   settleSuggestion, shelves, shownItems, stepHave, suggestions, takeSuggestion, textToList, updateHave, updateItem, useUp, usualGap,
   type Cat, type CatColor, type Category, type Had, type Have, type Item, type Recipe, type Regular, type Rule, type Suggestion,
@@ -48,11 +48,13 @@ let pantryView: 'cards' | 'list' = 'cards';   // the pantry's home: a card per c
 let toastTimer = 0;
 function toast(text: string, canUndo = false) {
   const el = $('shop-toast');
-  el.innerHTML = `${esc(text)}${canUndo ? ' <button class="linkish" type="button" data-action="undo">Undo</button>' : ''}`;
+  el.innerHTML = `${esc(text)}${canUndo ? ' <button class="linkish" type="button" data-action="undo">Undo</button> <button class="linkish" type="button" data-action="undo-hide">Cancel</button>' : ''}`;
   el.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => (el.hidden = true), canUndo ? 6000 : 3200);
 }
+// The last change's notice ("Changed Egg", with Undo) can be put away with Cancel: it stays away until the next change.
+let hiddenUndo: object | null = null;
 // A change that can be undone, with the toast that offers it.
 const commit = (next: ReturnType<typeof shopData>, label: string, say = label) => { change(next, label); toast(say, true); };
 
@@ -69,8 +71,8 @@ function render() {
   const id = a && $('shop-body').contains(a) ? a.id : '';
   const sel = id && typeof a!.selectionStart === 'number' ? [a!.selectionStart, a!.selectionEnd] : null;
   if (!shopReady()) { $('shop-body').innerHTML = '<div class="panel"><p class="muted">Loading…</p></div>'; return; }
-  const u = undoLabel();
-  const undoBar = u ? `<div class="shop-undo"><span class="muted">${esc(u)}</span><button class="btn small" type="button" data-action="undo">Undo</button></div>` : '';
+  const u = undoLabel(), top = undoTop();
+  const undoBar = u && top !== hiddenUndo ? `<div class="shop-undo"><span class="muted">${esc(u)}</span><button class="btn small" type="button" data-action="undo">Undo</button><button class="btn small" type="button" data-action="undo-hide">Cancel</button></div>` : '';
   $('shop-body').innerHTML = undoBar + (tab === 'lists' ? listsHtml() : tab === 'recipes' ? recipesHtml() : tab === 'pantry' ? pantryHtml() : regularsHtml());
   if (id) {
     const el = document.getElementById(id) as HTMLInputElement | null;
@@ -81,7 +83,9 @@ function render() {
 const catOptions = (sel: Category) => shopData().cats.map((c) => `<option value="${c.id}" ${c.id === sel ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
 const subOptions = (cat: Category, sel: string) => `<option value="">No sub-category</option>${(catOf(shopData(), cat)?.subs ?? [])
   .map((s) => `<option value="${s.id}" ${s.id === sel ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}`;
-const catIcon = (c: Cat | undefined, size: 1 | 2 = 2) => stickerSvg(c && PICKER_ICONS[c.icon] ? c.icon : 'bag', size);
+// A category's icon, as it is drawn (no Scale2x: a big one is the same pixels, just bigger). An icon that is gone (deleted in
+// Kitty Gallery) is drawn as a heart.
+const catIcon = (c: Cat | undefined) => stickerSvg(c?.icon || 'bag', 1);
 // "Cupboard · Baking"
 const whereText = (x: { cat: Category; sub: string }) => { const c = catOf(shopData(), x.cat); return [c?.name ?? 'Other', c?.subs.find((s) => s.id === x.sub)?.name].filter(Boolean).join(' · '); };
 const listOptions = (sel: string, any?: string) => (any !== undefined ? `<option value="">${esc(any)}</option>` : '')
@@ -140,7 +144,7 @@ function listHtml(): string {
   const d = shopData();
   const l = listOf(d, listId)!;
   const pins = Object.values(d.regulars).filter((g) => g.pinned && (!g.store || g.store === l.id) && !onList(l, g.name)).sort((a, b) => a.name.localeCompare(b.name));
-  const groups = shownItems(l, d.opts.sink, d.cats, (n) => placeOf(d, n).sub);
+  const groups = shownItems(l, d.opts.sink, listCats(d, l), (n) => placeOf(d, n).sub);
   const anyDone = l.items.some((i) => i.done);
   return `<section class="panel shop-list" aria-label="${esc(l.name)} shopping list">
     <div class="shop-head"><h3>${esc(l.name)}</h3><button class="btn small" type="button" data-action="list-menu">List…</button></div>
@@ -201,11 +205,28 @@ function openListMenu() {
   openLayer(`<button class="x-close" type="button" data-action="layer-close" aria-label="Close">${iconSvg('x')}</button><h3>${esc(l.name)}</h3>
     <form class="shop-add" id="list-rename-form"><label class="field">Supermarket <input id="list-rename" maxlength="${LIMITS.name}" value="${esc(l.name)}" autocomplete="off"></label>
       <button class="btn" type="submit">Rename</button></form>
+    <h4 class="sub">Category order</h4>
+    <p class="muted">Put the categories the way you walk through ${esc(l.name)}: the list is sorted like this. Every supermarket has its own.</p>
+    <div id="list-order">${listOrderHtml()}</div>
     <h4 class="sub">Share with someone</h4>
     <p class="muted">Sends the list as text (by message, mail…). Whoever gets it can paste it into their Kitty Mart. Lists don't stay in sync by themselves: share again after a change.</p>
     <div class="btns flow"><button class="btn" type="button" data-action="list-share">Share list…</button><button class="btn" type="button" data-action="list-import">Paste a shared list…</button></div>
     <h4 class="sub">Delete</h4>
     <div class="btns"><button class="btn danger" type="button" data-action="list-delete">Delete this list</button></div>`, `${l.name} list`);
+}
+
+// The categories of the open list (its supermarket's order), and of the pantry, to move up and down.
+const catRows = (cats: Cat[]) => cats.map((c) => ({ id: c.id, name: c.name, pic: `<span class="nart">${catIcon(c)}</span>`, style: tint(c.color) }));
+function listOrderHtml(): string {
+  const d = shopData(), l = listOf(d, listId);
+  return `${orderList('list-cat-move', catRows(listCats(d, l)))}${l?.order ? '<div class="btns"><button class="btn small" type="button" data-action="list-order-reset">Use the pantry\'s order</button></div>' : ''}`;
+}
+const pantryOrderHtml = () => orderList('pantry-cat-move', catRows(shopData().cats));
+function openPantryOrder() {
+  openLayer(`<button class="x-close" type="button" data-action="layer-close" aria-label="Close">${iconSvg('x')}</button><h3>Arrange the pantry</h3>
+    <p class="muted">The pantry's cards and list follow this order, so you can see what you have the way you like. A shopping list has its own order (in its List… menu).</p>
+    <div id="pantry-order">${pantryOrderHtml()}</div>
+    <div class="btns"><span class="grow"></span><button class="btn primary" type="button" data-action="layer-close">Done</button></div>`, 'Arrange the pantry');
 }
 
 function openImport() {
@@ -365,6 +386,7 @@ function pantryHomeHtml(): string {
       `<button type="button" role="radio" data-action="pantry-view" data-view="${v}" aria-checked="${pantryView === v}" aria-selected="${pantryView === v}">${v === 'cards' ? 'Cards' : 'List'}</button>`).join('')}</div>
     <div id="pantry-main">${pantryMainHtml()}</div>
     <div class="shop-bar"><span class="muted">${plural(d.pantry.length, 'thing')} at home${low ? ` · ${low} running low` : ''}</span><span class="grow"></span>
+      <button class="btn small" type="button" data-action="pantry-order">Arrange</button>
       <button class="btn small" type="button" data-action="cat-new" ${d.cats.length >= LIMITS.cats ? 'disabled' : ''}>+ Category</button></div>
     <label class="check"><input type="checkbox" id="opt-showempty" ${d.opts.showEmpty ? 'checked' : ''}><span><b>Show empty categories</b><br><span class="muted">The cards of categories with nothing in them.</span></span></label>
     <label class="check"><input type="checkbox" id="opt-topantry" ${d.opts.toPantry ? 'checked' : ''}><span><b>Fill from shopping trips</b><br><span class="muted">When a trip is done, what you bought is put in here, where it went before.</span></span></label>`;
@@ -394,7 +416,7 @@ function pantryListHtml(): string {
   const cats = d.cats.filter((c) => pantryCount(d, c.id).n);
   if (!cats.length) return '<div class="panel"><p class="muted">The pantry is empty. Type above to add something.</p></div>';
   return cats.map((c) => `<section class="panel shop-list" aria-label="${esc(c.name)}">
-      <div class="shop-head"><h3 class="pcat-title" style="${tint(c.color)}"><span class="nart">${catIcon(c, 1)}</span>${esc(c.name)}</h3>
+      <div class="shop-head"><h3 class="pcat-title" style="${tint(c.color)}"><span class="nart">${catIcon(c)}</span>${esc(c.name)}</h3>
         <button class="btn small" type="button" data-action="cat-open" data-id="${c.id}" aria-label="Open ${esc(c.name)}">Open</button></div>
       ${shelves(d, c.id).filter((s) => s.items.length).map((s) => `<div class="shop-group">${s.name ? `<h4>${esc(s.name)}</h4>` : ''}
         <ul class="shop-items">${s.items.map((h) => haveRowHtml(h)).join('')}</ul></div>`).join('')}</section>`).join('');
@@ -416,7 +438,7 @@ function catPageHtml(c: Cat): string {
   return `<div class="shop-bar"><button class="btn small" type="button" data-action="cat-back">${iconSvg('prev')} Pantry</button><span class="grow"></span>
       <button class="btn small" type="button" data-action="cat-edit">${iconSvg('pencil')} Edit</button></div>
     <section class="panel shop-list" aria-label="${esc(c.name)}">
-      <div class="shop-head"><h3 class="pcat-title" style="${tint(c.color)}"><span class="nart">${catIcon(c, 1)}</span>${esc(c.name)}</h3></div>
+      <div class="shop-head"><h3 class="pcat-title" style="${tint(c.color)}"><span class="nart">${catIcon(c)}</span>${esc(c.name)}</h3></div>
       <form class="shop-add pshelf-add" id="shelf-form"><label class="field"><input id="shelf-input" maxlength="80" placeholder="Add: 2 beans" autocomplete="off" enterkeyhint="done" aria-label="Add to ${esc(c.name)}"></label>
         ${c.subs.length ? `<label class="field"><select id="shelf-sub" aria-label="Sub-category">${subOptions(c.id, shelfSub)}</select></label>` : ''}
         <button class="btn primary" type="submit">Add</button></form>
@@ -491,8 +513,7 @@ const subRowHtml = (id: string, name: string) => `<li><label class="field"><inpu
 function openCat(id: string | null) {
   const d = shopData(), c = id ? catOf(d, id) : undefined;
   if (id && !c) return;
-  const icon = c && PICKER_ICONS[c.icon] ? c.icon : 'bag', color = c?.color ?? CAT_COLORS[d.cats.length % CAT_COLORS.length];
-  const at = c ? d.cats.indexOf(c) : -1;
+  const icon = c ? pickable(c.icon) : 'bag', color = c?.color ?? CAT_COLORS[d.cats.length % CAT_COLORS.length];
   openLayer(`<button class="x-close" type="button" data-action="layer-close" aria-label="Close">${iconSvg('x')}</button><h3>${c ? `Change ${esc(c.name)}` : 'New category'}</h3>
     <form class="stack" id="cat-form" data-id="${c?.id ?? ''}">
       <label class="field">Name <input name="name" maxlength="${LIMITS.name}" value="${esc(c?.name ?? '')}" placeholder="Baby, Pets, Garden…" autocomplete="off" data-focus></label>
@@ -506,10 +527,6 @@ function openCat(id: string | null) {
         <div class="shop-add"><label class="field"><input id="cat-sub-new" maxlength="${LIMITS.name}" placeholder="Baking, Spices, Tins…" autocomplete="off" aria-label="New sub-category"></label>
           <button class="btn" type="button" data-action="cat-sub-add">+ Add</button></div>
         <p class="muted">The pantry page and your shopping lists are sorted by these, in this order. Deleting one keeps what was in it.</p></div></fieldset>
-      ${c ? `<fieldset class="field"><legend>Order</legend><div class="btns flow">
-          <button class="btn small" type="button" data-action="cat-move" data-by="-1" ${at <= 0 ? 'disabled' : ''}>${iconSvg('prev')} Earlier</button>
-          <button class="btn small" type="button" data-action="cat-move" data-by="1" ${at >= d.cats.length - 1 ? 'disabled' : ''}>Later ${iconSvg('next')}</button></div>
-        <p class="muted">The cards and your shopping lists follow this order: put it the way you walk through the shop.</p></fieldset>` : ''}
       <div class="btns">${c && c.id !== OTHER ? `<button class="btn danger" type="button" data-action="cat-delete">Delete</button>` : ''}<span class="grow"></span>
         <button class="btn" type="button" data-action="layer-close">Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`, c ? c.name : 'New category');
 }
@@ -619,6 +636,7 @@ onShown('shopping', 'click', (ev) => {
   const d = shopData();
   switch (btn.dataset.action) {
     case 'shop-tab': tab = btn.dataset.tab as Tab; recipeEditing = false; pantryCat = null; renderTop(); render(); window.scrollTo(0, 0); break;
+    case 'undo-hide': hiddenUndo = undoTop(); $('shop-toast').hidden = true; render(); break;
     case 'undo': { const l = undo(); toast(l ? `Undone: ${l}.` : 'Nothing to undo.'); break; }
     case 'layer-close': if (ev.target === btn || btn.tagName === 'BUTTON') closeLayer(); break;
     // lists
@@ -702,16 +720,24 @@ onShown('shopping', 'click', (ev) => {
       btn.focus();
       break;
     }
-    case 'cat-move': {
-      // moved at once (the rest of the form is saved with Save); the two keys follow
-      const id = ($('shop-layer').querySelector('#cat-form') as HTMLFormElement | null)?.dataset.id ?? '';
-      const x = moveCat(d, id, btn.dataset.by === '1' ? 1 : -1);
+    case 'list-cat-move': case 'pantry-cat-move': {   // moved at once, no Undo (moving it back is one tap)
+      const id = btn.dataset.id ?? '', by = btn.dataset.by === '1' ? 1 : -1, list = btn.dataset.action === 'list-cat-move';
+      const x = list ? moveListCat(d, listId, id, by) : moveCat(d, id, by);
       if (x === d) break;
       change(x);
-      const at = x.cats.findIndex((c) => c.id === id);
-      $('shop-layer').querySelectorAll<HTMLButtonElement>('[data-action="cat-move"]').forEach((b) => { b.disabled = b.dataset.by === '1' ? at >= x.cats.length - 1 : at <= 0; });
+      const box = document.getElementById(list ? 'list-order' : 'pantry-order');
+      if (box) { box.innerHTML = list ? listOrderHtml() : pantryOrderHtml(); refocusMove(box, btn.dataset.action!, id, btn.dataset.by ?? '-1'); }
       break;
     }
+    case 'list-order-reset': {
+      const x = resetListOrder(d, listId);
+      if (x === d) break;
+      change(x);
+      const box = document.getElementById('list-order');
+      if (box) box.innerHTML = listOrderHtml();
+      break;
+    }
+    case 'pantry-order': openPantryOrder(); break;
     case 'cat-delete': {
       const c = catOf(d, ($('shop-layer').querySelector('#cat-form') as HTMLFormElement | null)?.dataset.id ?? '');
       if (!c) break;

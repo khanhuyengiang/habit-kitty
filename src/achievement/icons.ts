@@ -1,346 +1,358 @@
-// The icons people can put on an achievement or a side quest, drawn at 16×16 on the fine grid (see pixelart.ts).
+// The icons people can put on an achievement or a side quest, drawn at 18×18 on the fine grid (see pixelart.ts).
 // Letters: s the side-quest colour (lit and shaded at the edges for you; l and d paint it lit or shaded by hand), o a dark line, w white, y/Y yellow/gold,
 // r pink, R red, g/G green, b/B blue, n/N brown, k/K grey, c cream, v lavender, f peach, x lime; each note colour lit/shaded:
-// p/P pink, a/A lavender, i/I sky, m/M mint, j/J sun, u/U peach, z/Z lime; '.' is empty. The outline is added for you,
-// so draw only the inside. Icon names are stored with the data: rename none, only add.
+// p/P pink, a/A lavender, i/I sky, m/M mint, j/J sun, u/U peach, z/Z lime; '.' is empty. The dark outline is part of the
+// art (draw it with o); the side-quest colour's edges that touch the outside are lit and shaded for you. Icon names are stored with the data: rename none, only add.
 // `group` sorts the icons in Kitty Gallery and the pickers; without one an icon is in the "default" group. Order here doesn't
 // matter: each group is listed A to Z by label.
+// These are the OFFICIAL icons. The app draws from PICKER_ICONS below, which is these with Kitty Gallery's drawings put over
+// them (see src/pixel/live.ts), so an icon drawn there can be picked everywhere as if it had always been here.
 
-export const PICKER_ICONS: Record<string, { label: string; art: string[]; group?: string }> = {
+// `food`: the kitties can eat it (Habit Kitty's feed button gives each kitty a different one every day).
+export interface PickerIcon { label: string; art: string[]; group?: string; food?: boolean }
+export const OFFICIAL_PICKER_ICONS: Readonly<Record<string, PickerIcon>> = {
   star: { label: 'Star', group: 'nature n weather', art: [
-    '.......ss.......', '.......ss.......', '......swss......', '......ssss......', '.....swssss.....', 'ssssssssssssssss',
-    '.ssssssssssssss.', '..ssssossossss..', '...srssssssrs...', '....ssssssss....', '....ssssssss....', '...ssssssssss...',
-    '...ssss..ssss...', '..ssss....ssss..', '..sss......sss..', '.ss..........ss.'] },
+    '........oo........', '.......ollo.......', '.......oldo.......', '......olwslo......', '......olssdo......', '.ooooolwssslooooo.',
+    'olllllsssssslllllo', '.olssssssssssssdo.', '..olsssossosssdo..', '...olrssssssrdo...', '....olssssssdo....', '....olssssssdo....',
+    '...olsssddssslo...', '...olssdoolssdo...', '..olssdo..olsslo..', '..olddo....olddo..', '.oldoo......oollo.', '..oo..........oo..'] },
   heart: { label: 'Heart', art: [
-    '................', '..ssss....ssss..', '.ssssss..ssssss.', 'sswwssssssssssss', 'swwsssssssssssss', 'swssssssssssssss',
-    'ssssssssssssssss', '.ssssssssssssss.', '.ssssssssssssss.', '..ssssssssssss..', '...ssssssssss...', '....ssssssss....',
-    '.....ssssss.....', '......ssss......', '.......ss.......', '................'] },
-  food: { label: 'Food', group: 'food', art: [
-    '............N.N.', '...........N.N..', '..........N.N...', '....w.w..N.N....', '.....w..N.N.....', '..cccccNcNcccc..',
-    '.cyycccgccRccgc.', 'oooooooooooooooo', 'ssssssssssssssss', 'swssssssssssssss', '.ssssssssssssss.', '.ssssssssssssss.',
-    '..ssssssssssss..', '...ssssssssss...', '.....ssssss.....', '....ssssssss....'] },
+    '..................', '...oooo....oooo...', '..ollllo..ollllo..', '.olssssloolsssslo.', 'olswwsssllsssssslo', 'olwwssssssssssssdo',
+    'olwsssssssssssssdo', 'olssssssssssssssdo', '.olssssssssssssdo.', '.olssssssssssssdo.', '..olssssssssssdo..', '...olssssssssdo...',
+    '....olssssssdo....', '.....olssssdo.....', '......olssdo......', '.......oldo.......', '........oo........', '..................'] },
+  food: { label: 'Food', group: 'food', food: true, art: [
+    '.............o.o..', '............oNoNo.', '...........oNoNo..', '.....o.o..oNoNo...', '....owowooNoNo....', '...ooowooNoNooo...',
+    '..occcccNcNcccco..', '.ocyycccgccRccgco.', 'oooooooooooooooooo', 'olssssssssssssssdo', 'olwsssssssssssssdo', '.olssssssssssssdo.',
+    '.olssssssssssssdo.', '..olssssssssssdo..', '...oldssssssddo...', '....oolssssdoo....', '....olddddddlo....', '.....oooooooo.....'] },
   coffee: { label: 'Drink 1', group: 'food', art: [
-    '................', '....w...w.......', '.....w...w......', '....w...w.......', '................', '.sssssssssss....',
-    '.sNNNNNNNNNs....', '.ssssssssssssss.', '.swsssssssss..s.', '.swsssssssss..s.', '.ssssssssssssss.', '.sssssssssss....',
-    '..sssssssss.....', 'kkkkkkkkkkkkkk..', '.kkkkkkkkkkkk...', '................'] },
-  cake: { label: 'Cake', group: 'food', art: [
-    '.......Y........', '......yYy.......', '.......y........', '.......r........', '.......r........', '.wwwwwwwwwwwww..',
-    '.wwwwwwwwwwwwww.', '.wswwwswwwwswww.', '.dsrsssssrsssss.', '.dsssssssssssss.', '.cccccccccccccc.', '.dsssssssssssss.',
-    '.dsssssssssssss.', '.dsssssssssssss.', 'kkkkkkkkkkkkkkkk', '................'] },
-  fish: { label: 'Fish', group: 'pet', art: [
-    '................', '................', '....sssss.....ss', '..sssssssss..sss', '.sssssssssss.sss', 'ssowssssssssssss',
-    'ssoosssssssss...', 'sssssssssssss...', 'sssssssssssss...', 'ssssssssssssssss', '.sssssssssss.sss', '..sssssssss..sss',
-    '....sssss.....ss', '................', '................', '................'] },
+    '..................', '.....o...o........', '....owo.owo.......', '.....owo.owo......', '....owo.owo.......', '..ooooooooooo.....',
+    '.olllllllllllo....', '.olNNNNNNNNNdooo..', '.olsssssssssslllo.', '.olwssssssssdoolo.', '.olwssssssssdoolo.', '.olsssssssssslldo.',
+    '.olsssssssssdooo..', '.oolsssssssdooo...', 'okkkkkkkkkkkkkko..', '.okkkkkkkkkkkko...', '..oooooooooooo....', '..................'] },
+  cake: { label: 'Cake', group: 'food', food: true, art: [
+    '........o.........', '.......oYo........', '......oyYyo.......', '.......oyo........', '.......oro........', '..ooooooroooooo...',
+    '.owwwwwwwwwwwwwo..', '.owwwwwwwwwwwwwwo.', '.owswwwswwwwswwwo.', '.odsrsssssrssssdo.', '.odssssssssssssdo.', '.occcccccccccccco.',
+    '.odssssssssssssdo.', '.odssssssssssssdo.', '.odssssssssssssdo.', 'okkkkkkkkkkkkkkkko', '.oooooooooooooooo.', '..................'] },
+  fish: { label: 'Fish', group: 'pet', food: true, art: [
+    '..................', '..................', '.....ooooo.....oo.', '...oollllloo..ollo', '..ollssssslloolsdo', '.olssssssssslolsdo',
+    'olsowssssssssldddo', 'olsoossssssssdooo.', 'olsssssssssssdo...', 'olsssssssssssdooo.', 'olsssssssssssdlllo', '.olsssssssssdolsdo',
+    '..oldsssssddoolsdo', '...oolddddoo..oldo', '.....ooooo.....oo.', '..................', '..................', '..................'] },
   camera: { label: 'Camera', group: 'object', art: [
-    '................', '................', '..kk..ssss......', '.ssssssssssssss.', '.swsssssssssRRs.', '.sssssoooosssss.',
-    '.ssssoBBBBossss.', '.sssoBbwBBBosss.', '.sssoBwBBBBosss.', '.sssoBBBBBBosss.', '.ssssoBBBBossss.', '.sssssoooosssss.',
-    '.ssssssssssssss.', '................', '................', '................'] },
+    '..................', '..................', '...oo..oooo.......', '..okkoollllooooo..', '.olssllsssslllllo.', '.olwsssssssssRRdo.',
+    '.olssssoooossssdo.', '.olsssoBBBBosssdo.', '.olssoBbwBBBossdo.', '.olssoBwBBBBossdo.', '.olssoBBBBBBossdo.', '.olsssoBBBBosssdo.',
+    '.olssssoooossssdo.', '.oldddddddddddddo.', '..oooooooooooooo..', '..................', '..................', '..................'] },
   mountain: { label: 'Mountain', group: 'nature n weather', art: [
-    '................', '................', '......w.........', '.....www........', '....wlwlw...w...', '....lllll..www..',
-    '...lsssssl.wlww.', '...ssssssslllll.', '..ssssssssssssll', '..ssssssssssssss', '.sssssssssssssss', '.sssssssssssssss',
-    'ssssssssssssssss', 'gggggggggggggggg', 'GgGgGgGgGgGgGgGg', '................'] },
+    '..................', '..................', '.......o..........', '......owo.........', '.....owwwo...o....', '....owlwlwo.owo...',
+    '....ollllloowwwo..', '...olssssslowlwwo.', '...olsssssslllllo.', '..olsssssssssssllo', '..olssssssssssssdo', '.olsssssssssssssdo',
+    '.olsssssssssssssdo', 'olssssssssssssssdo', 'oggggggggggggggggo', 'oGgGgGgGgGgGgGgGgo', '.oooooooooooooooo.', '..................'] },
   tree: { label: 'Tree', group: 'nature n weather', art: [
-    '......ssss......', '....ssssssss....', '...swwsssssss...', '..swssssssssss..', '.ssssssrsssssss.', '.ssssssssssssss.',
-    '.ssrssssssssrss.', '..ssssssssssss..', '...ssssssssss...', '.....ssnnss.....', '......nnnn......', '......nnnn......',
-    '......nnnn......', '.....nnnnnn.....', '...gggggggggg...', '................'] },
+    '.......oooo.......', '.....oolllloo.....', '....ollssssllo....', '...olwwsssssslo...', '..olwssssssssslo..', '.olsssssrsssssslo.',
+    '.olssssssssssssdo.', '.olsrssssssssrsdo.', '..olssssssssssdo..', '...oldssssssddo...', '....oolsnnsdoo....', '......onnnno......',
+    '......onnnno......', '......onnnno......', '....oonnnnnnoo....', '...oggggggggggo...', '....oooooooooo....', '..................'] },
   wave: { label: 'Parasol', group: 'object', art: [
-    '................', '......ssss......', '....swssssss....', '..sswssswsssss..', '.swsssswsssswss.', 'swssssswssssswss',
-    'ss..ss.nn.ss..ss', '.......nn.......', '.......nn.......', '.......nn.......', '.......nn.......', '.......nn.......',
-    '.......nn.......', 'cccccccnnccccccc', 'cccccccccccccccc', '................'] },
+    '..................', '.......oooo.......', '.....oolllloo.....', '...oolwsssslloo...', '..ollwssswsssllo..', '.olwsssswsssswslo.',
+    'olwddssdwsdssdwslo', 'oldooldonnoldooldo', '.oo..ooonnooo..oo.', '.......onno.......', '.......onno.......', '.......onno.......',
+    '.......onno.......', '.ooooooonnooooooo.', 'occcccccnnccccccco', 'occcccccccccccccco', '.oooooooooooooooo.', '..................'] },
   sun: { label: 'Sun', group: 'nature n weather', art: [
-    '.......y........', '..y....y....y...', '...y........y...', '.....ssssss.....', '....ssssssss....', '...sswsssssss...',
-    '...ssssssssss...', 'yy.ssosssosss.yy', '...srssssssrs...', '...ssssoossss...', '....ssssssss....', '.....ssssss.....',
-    '...y........y...', '..y....y....y...', '.......y........', '................'] },
+    '........o.........', '...o...oyo...o....', '..oyo..oyo..oyo...', '...oyooooooooyo...', '....oolllllloo....', '....olsssssslo....',
+    '...olswsssssslo...', '.ooolssssssssdooo.', 'oyyolsosssossdoyyo', '.ooolrssssssrdooo.', '...olsssoosssdo...', '....olssssssdo....',
+    '....ooldddddoo....', '...oyooooooooyo...', '..oyo..oyo..oyo...', '...o...oyo...o....', '........o.........', '..................'] },
   temple: { label: 'Temple', group: 'housing', art: [
-    '.......yy.......', '.......ss.......', '......ssss......', '.....ssssss.....', '..yyyyyyyyyyyy..', 'y..ssssssssss..y',
-    '...ssossssoss...', '.yyyyyyyyyyyyyy.', 'y.ssssssssssss.y', '..ssoossssooss..', '..ssoossssooss..', '..sssssoosssss..',
-    '..sssssoosssss..', '.kkkkkkkkkkkkkk.', 'kkkkkkkkkkkkkkkk', '................'] },
+    '........oo........', '.......oyyo.......', '.......oldo.......', '......olsslo......', '...ooolsssslooo...', '.ooyyyyyyyyyyyyoo.',
+    'oyoolssssssssdooyo', '.ooolsossssosdooo.', '.oyyyyyyyyyyyyyyo.', 'oyolssssssssssdoyo', '.oolsoossssoosdoo.', '..olsoossssoosdo..',
+    '..olssssoossssdo..', '..olssssoossssdo..', '.okkkkkkkkkkkkkko.', 'okkkkkkkkkkkkkkkko', '.oooooooooooooooo.', '..................'] },
   plane: { label: 'Plane', group: 'transport', art: [
-    '.......ss.......', '......ssss......', '......sBBs......', '......ssss......', '......ssss......', '.....ssssss.....',
-    '...ssssssssss...', '.ssssssssssssss.', 'RssssssssssssssR', 'sss...ssss...sss', '......ssss......', '......ssss......',
-    '.....ssssss.....', '....ssssssss....', '....sss..sss....', '................'] },
+    '........oo........', '.......ollo.......', '......olsslo......', '......olBBdo......', '......olssdo......', '......olssdo......',
+    '....oolssssloo....', '..oollsssssslloo..', '.ollssssssssssllo.', 'oRssdddssssdddssRo', 'olddooolssdooolddo', '.ooo..olssdo..ooo.',
+    '......olssdo......', '.....olsssslo.....', '....olssddsslo....', '....olddoolddo....', '.....ooo..ooo.....', '..................'] },
   boot: { label: 'Hiking boots', group: 'object', art: [
-    '................', '..ssssss........', '..ssswws........', '..ssssss........', '..ssswws........', '..ssssss........',
-    '..ssswwss.......', '..ssssssssss....', '..sssssssssss...', '.ssssssssssssss.', '.ssssssssssssss.', 'NNNNNNNNNNNNNNNN',
-    'N.N.N.N.N.N.N.N.', '................', '................', '................'] },
+    '..................', '...oooooo.........', '..ollllllo........', '..olsswwdo........', '..olssssdo........', '..olsswwdo........',
+    '..olssssdo........', '..olsswwslooo.....', '..olsssssslllo....', '..olsssssssssloo..', '.olsssssssssssllo.', '.olssssssssssssdo.',
+    'oNNNNNNNNNNNNNNNNo', 'oNoNoNoNoNoNoNoNo.', '.o.o.o.o.o.o.o.o..', '..................', '..................', '..................'] },
   pin: { label: 'Place', art: [
-    '....ssssssss....', '...ssssssssss...', '..sswsssssssss..', '..swssoooossss..', '..sssowwwwosss..', '..sssowwwwosss..',
-    '..ssssoooossss..', '..ssssssssssss..', '...ssssssssss...', '....ssssssss....', '.....ssssss.....', '......ssss......',
-    '.......ss.......', '....kkkkkkkk....', '................', '................'] },
+    '.....oooooooo.....', '....ollllllllo....', '...olsssssssslo...', '..olswsssssssslo..', '..olwssoooosssdo..', '..olssowwwwossdo..',
+    '..olssowwwwossdo..', '..olsssoooosssdo..', '..olssssssssssdo..', '...olssssssssdo...', '....olssssssdo....', '.....olssssdo.....',
+    '......olssdo......', '.....oooldooo.....', '....okkkkkkkko....', '.....oooooooo.....', '..................', '..................'] },
   home: { label: 'Home', group: 'housing', art: [
-    '...........nn...', '.......RR..nn...', '......RRRR.nn...', '.....RRRRRRnn...', '....RRRRRRRR....', '...RRRRRRRRRR...',
-    '..RRRRRRRRRRRR..', '.RRRRRRRRRRRRRR.', '..ssssssssssss..', '..sBBssssssBBs..', '..sBBsnnnnsBBs..', '..ssssnnnnssss..',
-    '..ssssnnynssss..', '..ssssnnnnssss..', 'gggggggggggggggg', '................'] },
+    '............oo....', '........oo.onno...', '.......oRRoonno...', '......oRRRRonno...', '.....oRRRRRRnno...', '....oRRRRRRRRo....',
+    '...oRRRRRRRRRRo...', '..oRRRRRRRRRRRRo..', '.oRRRRRRRRRRRRRRo.', '..olssssssssssdo..', '..olBBssssssBBdo..', '..olBBsnnnnsBBdo..',
+    '..olsssnnnnsssdo..', '..olsssnnynsssdo..', '.oolsssnnnnsssdoo.', 'oggggggggggggggggo', '.oooooooooooooooo.', '..................'] },
   book: { label: 'Book', group: 'object', art: [
-    '................', '................', '.wwwwww..wwwwww.', 'swkkkkwwwwkkkkws', 'swwwwwwwwwwwwwws', 'swkkkkwwwwkkkkws',
-    'swwwwwwwwwwwwwws', 'swkkkkwwwwkkkkws', 'swwwwwwwwwwwwwws', 'swkkkkwwwwkkkkws', 'swwwwwwsswwwwwws', 'ssssssssssssssss',
-    '.ssssss..ssssss.', '................', '................', '................'] },
+    '..................', '..................', '..oooooo..oooooo..', '.owwwwwwoowwwwwwo.', 'olwkkkkwwwwkkkkwlo', 'olwwwwwwwwwwwwwwdo',
+    'olwkkkkwwwwkkkkwdo', 'olwwwwwwwwwwwwwwdo', 'olwkkkkwwwwkkkkwdo', 'olwwwwwwwwwwwwwwdo', 'olwkkkkwwwwkkkkwdo', 'olwwwwwwsswwwwwwdo',
+    'olssssssddssssssdo', '.oldddddooldddddo.', '..oooooo..oooooo..', '..................', '..................', '..................'] },
   music: { label: 'Music', art: [
-    '................', '.....sssssssssss', '.....sssssssssss', '.....ss.......ss', '.....ss.......ss', '.....ss.......ss',
-    '.....ss.......ss', '.....ss.......ss', '.....ss.......ss', '..sssss....sssss', '.swssss...swssss', '.ssssss...ssssss',
-    '..ssss.....ssss.', '................', '................', '................'] },
+    '..................', '......ooooooooooo.', '.....olllllllllllo', '.....olsdddddddsdo', '.....oldoooooooldo', '.....oldo.....oldo',
+    '.....oldo.....oldo', '.....oldo.....oldo', '.....oldo.....oldo', '...oooldo...oooldo', '..olllsdo..olllsdo', '.olwsssdo.olwsssdo',
+    '.olssssdo.olssssdo', '..oldddo...oldddo.', '...oooo.....oooo..', '..................', '..................', '..................'] },
   flag: { label: 'Flag pole', group: 'object', art: [
-    '................', '.nssssssssss....', '.nsssssssssss...', '.nsssswsssssss..', '.nssswwwssssss..', '.nsssswssssss...',
-    '.nssssssssssss..', '.nsssssssss.....', '.n..............', '.n..............', '.n..............', '.n..............',
-    '.n..............', '.n..............', 'kkk.............', '................'] },
+    '..................', '..ooooooooooo.....', '.onllllllllllo....', '.onsssssssssslo...', '.onsssswsssssslo..', '.onssswwwsssssdo..',
+    '.onsssswsssssdo...', '.onsssssssssddlo..', '.ondddddddddooo...', '.onooooooooo......', '.ono..............', '.ono..............',
+    '.ono..............', '.ono..............', '.ono..............', 'okkko.............', '.ooo..............', '..................'] },
   trophy: { label: 'Trophy', group: 'object', art: [
-    '...ssssssssss...', '.yyyyyyyyyyyyyy.', 'yy.yyyyyyyyyy.yy', 'y..yyyylsyyyy..y', 'yy.yyyssssyyy.yy', '.yyyyyysdyyyyyy.',
-    '....yyyyyyyy....', '....yyyyyyyy....', '.....yyyyyy.....', '.....yyyyyy.....', '......ssss......', '......yyyy......',
-    '.......yy.......', '.......yy.......', '.....ssssss.....', '....ssssssss....'] },
+    '....oooooooooo....', '..oolllllllllloo..', '.oyyyyyyyyyyyyyyo.', 'oyyoyyyyyyyyyyoyyo', 'oyooyyyylsyyyyooyo', 'oyyoyyyssssyyyoyyo',
+    '.oyyyyyysdyyyyyyo.', '..oooyyyyyyyyooo..', '....oyyyyyyyyo....', '.....oyyyyyyo.....', '.....oyyyyyyo.....', '......olssdo......',
+    '......oyyyyo......', '.......oyyo.......', '......ooyyoo......', '.....ollssllo.....', '....olddddddlo....', '.....oooooooo.....'] },
   gem: { label: 'Gem', group: 'object', art: [
-    '................', '................', '...ssssssssss...', '..swwsssssssss..', '.swwsssssssssss.', 'dddddddddddddddd',
-    '.ssssssssssssss.', '..sswsssssssss..', '...ssssssssss...', '....ssssssss....', '.....ssssss.....', '......ssss......',
-    '.......ss.......', '................', '................', '................'] },
+    '..................', '..................', '....oooooooooo....', '...ollllllllllo...', '..olwwsssssssslo..', '.olwwsssssssssslo.',
+    'oddddddddddddddddo', '.olssssssssssssdo.', '..olswssssssssdo..', '...olssssssssdo...', '....olssssssdo....', '.....olssssdo.....',
+    '......olssdo......', '.......oldo.......', '........oo........', '..................', '..................', '..................'] },
   fire: { label: 'Fire', art: [
-    '.......R........', '......RR........', '......RRR....R..', '.....RRRR...RR..', '....RRRRRR..RRR.', '...RRRRYRRRRRRR.',
-    '..RRRRYYRRRRRRR.', '..RRRYYYYRRRRRR.', '.RRRYYyyYYRRRRR.', '.RRYYyyyyYYRRRR.', '.RRYyyyyyyYRRRR.', '.RRYyyywyyYRRR..',
-    '..RRYyyyyyYRR...', '...RRYYYYYRR....', '.....RRRRRR.....', '................'] },
+    '........o.........', '.......oRo........', '......oRRo....o...', '......oRRRo..oRo..', '.....oRRRRo.oRRo..', '....oRRRRRRooRRRo.',
+    '...oRRRRYRRRRRRRo.', '..oRRRRYYRRRRRRRo.', '..oRRRYYYYRRRRRRo.', '.oRRRYYyyYYRRRRRo.', '.oRRYYyyyyYYRRRRo.', '.oRRYyyyyyyYRRRRo.',
+    '.oRRYyyywyyYRRRo..', '..oRRYyyyyyYRRo...', '...oRRYYYYYRRo....', '....ooRRRRRRo.....', '......oooooo......', '..................'] },
   paw: { label: 'Paw', group: 'pet', art: [
-    '................', '....ss....ss....', '...ssss..ssss...', '...ssss..ssss...', '....ss....ss....', '.ss..........ss.',
-    'ssss........ssss', 'ssss..ssss..ssss', '.ss..ssssss..ss.', '....ssssssss....', '...ssssssssss...', '...ssssssssss...',
-    '...ssssssssss...', '....sss..sss....', '................', '................'] },
+    '..................', '.....oo....oo.....', '....ollo..ollo....', '...olssloolsslo...', '...olssdoolssdo...', '..oooldo..oldooo..',
+    '.ollooo....ooollo.', 'olsslo.oooo.olsslo', 'olssdoolllloolssdo', '.oldoolsssslooldo.', '..ooolsssssslooo..', '...olsssssssslo...',
+    '...olssssssssdo...', '...olsssddsssdo...', '....olddoolddo....', '.....ooo..ooo.....', '..................', '..................'] },
   bag: { label: 'Shopping Bag', group: 'object', art: [
-    '................', '......ssss......', '.....s....s.....', '.....s....s.....', '..ssssssssssss..', '..swwsssssssss..',
-    '..swssssssssss..', '..ssssssssssss..', '.ssssswsswsssss.', '.sssswwwwwwssss.', '.ssssswwwwsssss.', '.sssssswwssssss.',
-    '.ssssssssssssss.', '.ssssssssssssss.', '................', '................'] },
+    '..................', '.......oooo.......', '......ollllo......', '.....oloooolo.....', '...oooloooolooo...', '..olllsllllslllo..',
+    '..olwwssssssssdo..', '..olwsssssssssdo..', '..olssssssssssdo..', '.olsssswsswsssslo.', '.olssswwwwwwsssdo.', '.olsssswwwwssssdo.',
+    '.olssssswwsssssdo.', '.olssssssssssssdo.', '.oldddddddddddddo.', '..oooooooooooooo..', '..................', '..................'] },
   cat: { label: 'Cat', group: 'pet', art: [
-    '...s........s...', '..sss......sss..', '..ssss....ssss..', '..ssssssssssss..', '.ssssssssssssss.', '.ssssssssssssss.',
-    'ssswosssssswosss', 'sssoossssssoosss', 'sssssssrrsssssss', 'ooossssoossssooo', 'sssssoossoosssss', 'ooossssssssssooo',
-    '..sssssssssssss.', '...ssssssssss...', '.....ssssss.....', '................'] },
+    '....o........o....', '...olo......olo...', '..olslo....olslo..', '..olssloooolssdo..', '..olsssllllsssdo..', '.olsssssssssssslo.',
+    '.olssssssssssssdo.', 'olsswosssssswosslo', 'olssoossssssoossdo', 'olssssssrrssssssdo', 'oooossssoossssoooo', 'olssssoossoossssdo',
+    'oooossssssssssoooo', '.oolssssssssssddo.', '...oldssssssddoo..', '....ooldddddoo....', '......oooooo......', '..................'] },
   dog: { label: 'Dog', group: 'pet', art: [
-    '................', '..nn........nn..', '.nnnssssssssnnn.', '.nnssssssssssnn.', '.nnssssssssssnn.', '.nnsowssssowsnn.',
-    '.nnsoossssoosnn.', '..nssssssssssn..', '...swwwNNwwws...', '....swwwwwws....', '.....sswwss.....', '......ssss......',
-    '................', '................', '................', '................'] },
+    '..................', '...oo........oo...', '..onnoooooooonno..', '.onnnllllllllnnno.', '.onnssssssssssnno.', '.onnssssssssssnno.',
+    '.onnsowssssowsnno.', '.onnsoossssoosnno.', '..onssssssssssno..', '...olwwwNNwwwdo...', '....olwwwwwwdo....', '.....olswwsdo.....',
+    '......oldddo......', '.......oooo.......', '..................', '..................', '..................', '..................'] },
   flower: { label: 'Flower', group: 'nature n weather', art: [
-    '................', '......ssss......', '.....ssssss.....', '..ss.ssssss.ss..', '.ssss.ssss.ssss.', '.sssssyyyysssss.',
-    '..sssyywyyysss..', '...ssyyyyyyss...', '..sssyyyyyysss..', '.sssssyyyysssss.', '.ssss.ssss.ssss.', '..ss.ssssss.ss..',
-    '.....ssssss.....', '.......GG.......', '....gggGGggg....', '................'] },
-  icecream: { label: 'Ice cream', group: 'food', art: [
-    '.....ssssss.....', '....swwsssss....', '...swssssssss...', '...ssRsssbsss...', '..ssssssssssss..', '..sssysssssRss..',
-    '..ssssssssssss..', '...nnnnnnnnnn...', '...nNnnnNnnnN...', '....nnnnnnnn....', '....nnNnnnNn....', '.....nnnnnn.....',
-    '.....nNnnNn.....', '......nnnn......', '.......nn.......', '.......nn.......'] },
+    '..................', '.......oooo.......', '......ollllo......', '...ooolsssslooo...', '..ollolssssdollo..', '.olsslolssdolsslo.',
+    '.olssslyyyylsssdo.', '..olssyywyyyssdo..', '...olsyyyyyysdo...', '..olssyyyyyysslo..', '.olsssdyyyydssslo.', '.olssdolssdolssdo.',
+    '..oldolssssloldo..', '...oooldssddooo...', '.....oooGGooo.....', '....ogggGGgggo....', '.....oooooooo.....', '..................'] },
+  icecream: { label: 'Ice cream', group: 'food', food: true, art: [
+    '......oooooo......', '.....ollllllo.....', '....olwwsssslo....', '...olwssssssslo...', '...olsRsssbssdo...', '..olsssssssssslo..',
+    '..olssysssssRsdo..', '..olssssssssssdo..', '...onnnnnnnnnno...', '...onNnnnNnnnNo...', '....onnnnnnnno....', '....onnNnnnNno....',
+    '.....onnnnnno.....', '.....onNnnNno.....', '......onnnno......', '.......onno.......', '.......onno.......', '........oo........'] },
   gift: { label: 'Gift', group: 'object', art: [
-    '................', '...yy......yy...', '..y..y....y..y..', '..y...y..y...y..', '...yyyyyyyyyy...', '.ssssssyyssssss.',
-    '.swssssyyssssss.', '.ddddddyydddddd.', '..sssssyysssss..', '..swsssyysssss..', '..sssssyysssss..', '..sssssyysssss..',
-    '..sssssyysssss..', '..sssssyysssss..', '................', '................'] },
+    '..................', '....oo......oo....', '...oyyo....oyyo...', '..oyooyo..oyooyo..', '..oyoooyooyoooyo..', '..ooyyyyyyyyyyoo..',
+    '.ollssssyyssssllo.', '.olwssssyysssssdo.', '.oddddddyyddddddo.', '..olssssyyssssdo..', '..olwsssyyssssdo..', '..olssssyyssssdo..',
+    '..olssssyyssssdo..', '..olssssyyssssdo..', '..olddddyydddddo..', '...oooooooooooo...', '..................', '..................'] },
   tent: { label: 'Tent', group: 'housing', art: [
-    '................', '.......nn.......', '.......ss.......', '......ssss......', '.....ssssss.....', '....ssssssss....',
-    '...ssssoossss...', '..sssssoosssss..', '..ssssoKKossss..', '.sssssoKKosssss.', '.ssssoKKKKossss.', 'sssssoKKKKosssss',
-    'ssssoKKKKKKossss', 'gggggggggggggggg', 'GgGgGgGgGgGgGgGg', '................'] },
+    '..................', '........oo........', '.......onno.......', '.......oldo.......', '......olsslo......', '.....olsssslo.....',
+    '....olsssssslo....', '...olsssoossslo...', '..olssssoosssslo..', '..olsssoKKosssdo..', '.olssssoKKosssslo.', '.olsssoKKKKosssdo.',
+    'olssssoKKKKosssslo', 'olsssoKKKKKKosssdo', 'oggggggggggggggggo', 'oGgGgGgGgGgGgGgGgo', '.oooooooooooooooo.', '..................'] },
   ticket: { label: 'Ticket', group: 'object', art: [
-    '................', '................', '................', 'ssssssssssssssss', 'ssssssssssysssss', 'ssssswsssyyyssss',
-    '.sssssssyyyyyss.', '.sssswsssyyysss.', '.ssssssssysysss.', 'ssssswssssssssss', 'ssssssssssssssss', '................',
-    '................', '................', '................', '................'] },
+    '..................', '..................', '..................', '.oooooooooooooooo.', 'ollllllllllllllllo', 'olsssssssssyssssdo',
+    'olsssswsssyyysssdo', '.olssssssyyyyysdo.', '.olssswsssyyyssdo.', '.olsssssssysyssdo.', 'olsssswssssssssslo', 'oldddddddddddddddo',
+    '.oooooooooooooooo.', '..................', '..................', '..................', '..................', '..................'] },
   game: { label: 'Controller', group: 'object', art: [
-    '................', '................', '................', '...ssssssssss...', '.sswsssssssssss.', 'sssKssssssssysss',
-    'ssKKKssssssBsBss', 'sssKssssssssgsss', 'ssssssssssssssss', 'ssssss....ssssss', '.ssss......ssss.', '..ss........ss..',
-    '................', '................', '................', '................'] },
+    '..................', '..................', '..................', '....oooooooooo....', '..oolllllllllloo..', '.ollwsssssssssllo.',
+    'olssKssssssssysslo', 'olsKKKssssssBsBsdo', 'olssKssssssssgssdo', 'olsssssddddsssssdo', 'olssssdoooolssssdo', '.olssdo....olssdo.',
+    '..oldo......oldo..', '...oo........oo...', '..................', '..................', '..................', '..................'] },
   dumbbell: { label: 'Dumbbell', group: 'object', art: [
-    '................', '................', '................', '.ss..........ss.', 'swss........swss', 'swss........swss',
-    'ssss........ssss', 'sssskkkkkkkkssss', 'sssskkkkkkkkssss', 'ssss........ssss', 'ssss........ssss', 'ssss........ssss',
-    '.ss..........ss.', '................', '................', '................'] },
+    '..................', '..................', '..................', '..oo..........oo..', '.ollo........ollo.', 'olwslo......olwslo',
+    'olwsdo......olwsdo', 'olssdoooooooolssdo', 'olssskkkkkkkksssdo', 'olssskkkkkkkksssdo', 'olssdoooooooolssdo', 'olssdo......olssdo',
+    'olssdo......olssdo', '.oldo........oldo.', '..oo..........oo..', '..................', '..................', '..................'] },
   night: { label: 'Night', group: 'nature n weather', art: [
-    '................', '....ssss........', '...sssss.....y..', '..sssss.....yyy.', '.sssss.......y..', '.sssss..........',
-    'sssss...........', 'sssss...........', 'ssoss.......y...', 'ssssrs..........', '.ssssss.........', '.ssssssss.......',
-    '..ssssssssss....', '...ssssssss.....', '.....ssss.......', '................'] },
+    '..................', '.....oooo.........', '....ollllo....o...', '...olsssdo...oyo..', '..olsssdo...oyyyo.', '.olsssdo.....oyo..',
+    '.olsssdo......o...', 'olsssdo...........', 'olsssdo......o....', 'olsosdo.....oyo...', 'olsssrlo.....o....', '.olssssloo........',
+    '.olsssssllooo.....', '..olsssssslllo....', '...oldssssddo.....', '....ooldddoo......', '......oooo........', '..................'] },
   rainbow: { label: 'Rainbow', group: 'nature n weather', art: [
-    '................', '................', '................', '................', '......RRRR......', '....RRYYYYRR....',
-    '...RYYyyyyYYR...', '...RYyggggyYR...', '..RYygBBBBgyYR..', '..RYygB..BgyYR..', '..RYygB..BgyYR..', '.wwwwww..wwwwww.',
-    '.wwwwww..wwwwww.', '..wwww....wwww..', '................', '................'] },
+    '..................', '..................', '..................', '..................', '.......oooo.......', '.....ooRRRRoo.....',
+    '....oRRYYYYRRo....', '...oRYYyyyyYYRo...', '...oRYyggggyYRo...', '..oRYygBBBBgyYRo..', '..oRYygBooBgyYRo..', '..oRYygBooBgyYRo..',
+    '.owwwwwwoowwwwwwo.', '.owwwwwwoowwwwwwo.', '..owwwwo..owwwwo..', '...oooo....oooo...', '..................', '..................'] },
   cheers: { label: 'Cocktail', group: 'food', art: [
-    '............y...', '...........yyy..', '.wwwwwwwwwwwwww.', '.ssssssssssssss.', '..sssssssssRss..', '...ssssssssss...',
-    '....ssssssss....', '.....ssssss.....', '......ssss......', '.......kk.......', '.......kk.......', '.......kk.......',
-    '.....kkkkkk.....', '................', '................', '................'] },
+    '.............o....', '............oyo...', '..ooooooooooyyyo..', '.owwwwwwwwwwwwwwo.', '.olssssssssssssdo.', '..olssssssssRsdo..',
+    '...olssssssssdo...', '....olssssssdo....', '.....olssssdo.....', '......olssdo......', '.......okko.......', '.......okko.......',
+    '......ookkoo......', '.....okkkkkko.....', '......oooooo......', '..................', '..................', '..................'] },
   rocket: { label: 'Rocket', group: 'transport', art: [
-    '.......ss.......', '......ssss......', '.....ssssss.....', '.....ssssss.....', '.....ssBBss.....', '.....ssBBss.....',
-    '.....ssssss.....', '.....ssssss.....', '....ssssssss....', '...RssssssssR...', '..RRssssssssRR..', '..RR.ssssss.RR..',
-    '.....yyyyyy.....', '......yyyy......', '......rYYr......', '.......yy.......'] },
+    '........oo........', '.......ollo.......', '......olsslo......', '.....olsssslo.....', '.....olssssdo.....', '.....olsBBsdo.....',
+    '.....olsBBsdo.....', '.....olssssdo.....', '.....olssssdo.....', '....olsssssslo....', '...oRssssssssRo...', '..oRRdssssssdRRo..',
+    '..oRRolssssdoRRo..', '...oooyyyyyyooo...', '......oyyyyo......', '......orYYro......', '.......oyyo.......', '........oo........'] },
   balloon: { label: 'Hot Air Balloon', group: 'transport', art: [
-    '...ssssssssss...', '..ssssssssssss..', '.ssssssssssssss.', '.sssssYYYYsssss.', '.sssssYYYYsssss.', '.sssssYYYYsssss.',
-    '..ssssYYYYssss..', '...sssYYYYsss...', '....ssYYYYss....', '.....o....o.....', '.....o....o.....', '.....o....o.....',
-    '.....o....o.....', '....nnnnnnnn....', '....nNNNNNNn....', '....nnnnnnnn....'] },
+    '....oooooooooo....', '...ollllllllllo...', '..olsssssssssslo..', '.olsssssssssssslo.', '.olssssYYYYssssdo.', '.olssssYYYYssssdo.',
+    '.olssssYYYYssssdo.', '..olsssYYYYsssdo..', '...olssYYYYssdo...', '....olsYYYYsdo....', '.....oooooooo.....', '.....ooo..ooo.....',
+    '.....ooo..ooo.....', '.....oooooooo.....', '....onnnnnnnno....', '....onNNNNNNno....', '....onnnnnnnno....', '.....oooooooo.....'] },
   umbrella: { label: 'Rain', group: 'nature n weather', art: [
-    '...sss..........', '..sssss..ssss...', '.sssssssssssss..', 'sssssssssssssss.', 'sssssssssssssss.', 'sssssssssssssss.',
-    '.s.ss.ssss.ss...', '................', '................', '..B..B....B..B..', '.B..B....B..B...', '................',
-    '................', '................', '................', '................'] },
+    '....ooo...........', '...olllo..oooo....', '..olsssloollllo...', '.olsssssllsssslo..', 'olssssssssssssslo.', 'olsssssssssssssdo.',
+    'olsdssdssssdssddo.', '.ololdoldddoldoo..', '..o.oo.oooo.oo....', '...o..o....o..o...', '..oBooBo..oBooBo..', '.oBooBo..oBooBo...',
+    '..o..o....o..o....', '..................', '..................', '..................', '..................', '..................'] },
   snow: { label: 'Snow', group: 'nature n weather', art: [
-    '................', '.......ss.......', '......ssss......', '...s...ss...s...', '....s..ss..s....', '.....s.ss.s.....',
-    '..s...ssss...s..', '.sssssswwssssss.', '.sssssswwssssss.', '..s...ssss...s..', '.....s.ss.s.....', '....s..ss..s....',
-    '...s...ss...s...', '......ssss......', '.......ss.......', '................'] },
+    '..................', '........oo........', '.......ollo.......', '....o.olsslo.o....', '...olo.oldo.olo...', '....olooldoolo....',
+    '...o.ololdolo.o...', '..olooolsslooolo..', '.olslllswwslllslo.', '.olsdddswwsdddsdo.', '..olooolssdooolo..', '...o.ololdolo.o...',
+    '....olooldoolo....', '...olo.oldo.olo...', '....o.olsslo.o....', '.......oldo.......', '........oo........', '..................'] },
   cloud: { label: 'Cloud', group: 'nature n weather', art: [
-    '................', '................', '................', '.........sss....', '...ss...ssssss..', '..ssss.sssssss..',
-    '.ssssssssssssss.', 'ssssssssssssssss', 'ssssssssssssssss', '.ssssssssssssss.', '..ssssssssssss..', '................',
-    '................', '................', '................', '................'] },
+    '..................', '..................', '..................', '..........ooo.....', '....oo...ollloo...', '...ollo.olsssllo..',
+    '..olsslolsssssdo..', '.olsssslssssssslo.', 'olsssssssssssssslo', 'olssssssssssssssdo', '.olssssssssssssdo.', '..oldddddddddddo..',
+    '...oooooooooooo...', '..................', '..................', '..................', '..................', '..................'] },
   sparkle: { label: 'Sparkle', art: [
-    '.......ss.......', '.......ss.......', '.......ss.......', '.......ss.......', '.......ss.......', '......ssss......',
-    '.....ssssss.....', 'ssssssswwsssssss', 'ssssssswwsssssss', '.....ssssss.....', '......ssss......', '.......ss.......',
-    '.......ss.......', '.......ss.......', '.......ss.......', '................'] },
+    '........oo........', '.......ollo.......', '.......oldo.......', '.......oldo.......', '.......oldo.......', '.......oldo.......',
+    '......olsslo......', '.ooooolsssslooooo.', 'olllllsswwsslllllo', 'olddddsswwssdddddo', '.ooooolssssdooooo.', '......olssdo......',
+    '.......oldo.......', '.......oldo.......', '.......oldo.......', '.......oldo.......', '........oo........', '..................'] },
   leaf: { label: 'Leaf', group: 'nature n weather', art: [
-    '...........sssss', '........ssssdsss', '......ssssdsdsss', '.....sssssdsdsss', '....sssdssddddds', '...ssssdssdsssss',
-    '..ssdssddddssss.', '..ssdssddddddss.', '..ssdssdssssss..', '..ssdsddssssss..', '..ssddddsssss...', '...dddddddss....',
-    '..Nddsssss......', '.NN.sssss.......', 'NN..............', 'N...............'] },
+    '............ooooo.', '.........ooolllllo', '.......oolllsdssdo', '......ollssdsdssdo', '.....olssssdsdssdo', '....olssdssddddddo',
+    '...olsssdssdssssdo', '..olsdssddddsssdo.', '..olsdssddddddsdo.', '..olsdssdsssssdo..', '..olsdsddsssssdo..', '..olsddddssssdo...',
+    '...odddddddddo....', '..oNddssssdoo.....', '.oNNolddddo.......', 'oNNo.ooooo........', 'oNo...............', '.o................'] },
   cactus: { label: 'Cactus', group: 'nature n weather', art: [
-    '.......rr.......', '......ssss......', '......ssss......', '..ss..ssss..ss..', '..ss..ssss..ss..', '..ss..ssss..ss..',
-    '..ssssssssssss..', '..ssssssssssss..', '......ssss......', '......ssss......', '......ssss......', '......ssss......',
-    '...nnnnnnnnnn...', '....nnnnnnnn....', '....nNNNNNNn....', '................'] },
+    '........oo........', '.......orro.......', '......olsslo......', '...oo.olssdo.oo...', '..olloolssdoollo..', '..oldoolssdooldo..',
+    '..oldoolssdooldo..', '..olsllssssllsdo..', '..oldddssssddddo..', '...oooolssdoooo...', '......olssdo......', '......olssdo......',
+    '....ooolssdooo....', '...onnnnnnnnnno...', '....onnnnnnnno....', '....onNNNNNNno....', '.....oooooooo.....', '..................'] },
   mushroom: { label: 'Mushroom', group: 'food', art: [
-    '.....ssssss.....', '...ssssssssss...', '..ssssssssssss..', '.sswwsssssswwss.', 'ssswwsssssswwsss', 'sssssswwwwssssss',
-    'ssssssssssssssss', '.ssssssssssssss.', '..ssssssssssss..', '................', '....cccccccc....', '....cccccccc....',
-    '....cccccccc....', '....cccccccc....', '.....cccccc.....', '................'] },
+    '......oooooo......', '....oolllllloo....', '...ollssssssllo...', '..olsssssssssslo..', '.olswwsssssswwslo.', 'olsswwsssssswwsslo',
+    'olssssswwwwsssssdo', 'olssssssssssssssdo', '.olssssssssssssdo.', '..oldddddddddddo..', '...oooooooooooo...', '....occcccccco....',
+    '....occcccccco....', '....occcccccco....', '....occcccccco....', '.....occcccco.....', '......oooooo......', '..................'] },
   butterfly: { label: 'Butterfly', group: 'pet', art: [
-    '.....d....d.....', '......d..d......', '.......dd.......', '.ss..ssddss..ss.', 'sssssssddsssssss', 'ssswlssddsswlsss',
-    'ssswwssddsswwsss', 'sssssssddsssssss', '.ssssssddssssss.', '..sssssddsssss..', '.ssssddddddssss.', '.ssslssddsslsss.',
-    '..sssssddsssss..', '...sss.dd.sss...', '.......dd.......', '................'] },
+    '......o....o......', '.....odo..odo.....', '......odoodo......', '..oo..ooddoo..oo..', '.olloollddlloollo.', 'olssllssddssllsslo',
+    'olsswlssddsswlssdo', 'olsswwssddsswwssdo', 'olssssssddssssssdo', '.olsssssddsssssdo.', '..olssssddssssdo..', '.olsssddddddssslo.',
+    '.olsslssddsslssdo.', '..olsssddddsssdo..', '...olddoddolddo...', '....ooooddoooo....', '........oo........', '..................'] },
   chick: { label: 'Chick', group: 'pet', art: [
-    '.....yyyyyy.....', '....yyyyyyyy....', '..yyyyyyysysyy..', '.yyyyyyyyysyyyy.', '.yyyyyyyyyyyyyy.', 'yyyoyyyyyyyyoyyy',
-    'yyyyyyyyyyyyyyyy', 'yyyyyyyRRyyyyyyy', 'yyyyyyyRRyyyyyyy', '.yyyyyyyyyyyyyy.', '.yyyyyyyyyyyyyy.', '..yyyyyyyyyyyy..',
-    '...yyyyyyyyyy...', '...R..R..R..R...', '..RR.RR..RR.RR..', '................'] },
-  pizza: { label: 'Pizza', group: 'food', art: [
-    'nnnnnnnnnnnnnnnn', 'nnnnnnnnnnnnnnnn', 'yyssyyyyyyyyssyy', '.ysdyyyylyyysdy.', '.yyyyssyyyyyyyy.', '..yyysdyyssyyy..',
-    '..ysyyyyysdysy..', '...yyyyyyyyyy...', '...yyyyysyyyy...', '....ylyyyysy....', '....yyyyyyyy....', '.....yyssyy.....',
-    '.....yysdyy.....', '......yyyy......', '.......ys.......', '.......yy.......'] },
-  burger: { label: 'Burger', group: 'food', art: [
-    '................', '....nnnnnnnn....', '..nnnnnnnnnnnn..', '.nnnwnnnnnnwnnn.', 'nnnnnnnnnnnnnnnn', 'gggggggggggggggg',
-    'ssssssssssssssss', 'yyyyyyyyyyyyyyyy', 'NNNNNNNNNNNNNNNN', 'NNNNNNNNNNNNNNNN', 'gggggggggggggggg', 'nnnnnnnnnnnnnnnn',
-    '.nnnnnnnnnnnnnn.', '..nnnnnnnnnnnn..', '................', 'dddddddddddddddd'] },
-  apple: { label: 'Fruit', group: 'food', art: [
-    '...........GG...', '.......nn.GGG...', '.......nn.GG....', '................', '..sssss..sssss..', '.ssssssssssssss.',
-    'sswsssssssssssss', 'sswsssssssssssss', 'ssssssssssssssss', 'ssssssssssssssss', 'ssssssssssssssss', 'ssssssssssssssss',
-    '.ssssssssssssss.', '..ssssssssssss..', '...ssssssssss...', '....sss..sss....'] },
+    '......oooooo......', '.....oyyyyyyo.....', '...ooyyyyyyyyoo...', '..oyyyyyyysysyyo..', '.oyyyyyyyyysyyyyo.', '.oyyyyyyyyyyyyyyo.',
+    'oyyyoyyyyyyyyoyyyo', 'oyyyyyyyyyyyyyyyyo', 'oyyyyyyyRRyyyyyyyo', 'oyyyyyyyRRyyyyyyyo', '.oyyyyyyyyyyyyyyo.', '.oyyyyyyyyyyyyyyo.',
+    '..oyyyyyyyyyyyyo..', '...oyyyyyyyyyyo...', '...oRooRooRooRo...', '..oRRoRRooRRoRRo..', '...oo.oo..oo.oo...', '..................'] },
+  pizza: { label: 'Pizza', group: 'food', food: true, art: [
+    '.oooooooooooooooo.', 'onnnnnnnnnnnnnnnno', 'onnnnnnnnnnnnnnnno', 'oyyssyyyyyyyyssyyo', '.oysdyyyylyyysdyo.', '.oyyyyssyyyyyyyyo.',
+    '..oyyysdyyssyyyo..', '..oysyyyyysdysyo..', '...oyyyyyyyyyyo...', '...oyyyyysyyyyo...', '....oylyyyysyo....', '....oyyyyyyyyo....',
+    '.....oyyssyyo.....', '.....oyysdyyo.....', '......oyyyyo......', '.......oydo.......', '.......oyyo.......', '........oo........'] },
+  burger: { label: 'Burger', group: 'food', food: true, art: [
+    '..................', '.....oooooooo.....', '...oonnnnnnnnoo...', '..onnnnnnnnnnnno..', '.onnnwnnnnnnwnnno.', 'onnnnnnnnnnnnnnnno',
+    'oggggggggggggggggo', 'olssssssssssssssdo', 'oyyyyyyyyyyyyyyyyo', 'oNNNNNNNNNNNNNNNNo', 'oNNNNNNNNNNNNNNNNo', 'oggggggggggggggggo',
+    'onnnnnnnnnnnnnnnno', '.onnnnnnnnnnnnnno.', '..onnnnnnnnnnnno..', '.oooooooooooooooo.', 'oddddddddddddddddo', '.oooooooooooooooo.'] },
+  apple: { label: 'Fruit', group: 'food', food: true, art: [
+    '............oo....', '........oo.oGGo...', '.......onnoGGGo...', '.......onnoGGo....', '...oooooooooooo...', '..ollllloolllllo..',
+    '.olsssssllssssslo.', 'olswsssssssssssslo', 'olswssssssssssssdo', 'olssssssssssssssdo', 'olssssssssssssssdo', 'olssssssssssssssdo',
+    'olssssssssssssssdo', '.olssssssssssssdo.', '..olssssssssssdo..', '...olsssddsssdo...', '....olddoolddo....', '.....ooo..ooo.....'] },
   headphones: { label: 'Headphone', group: 'object', art: [
-    '....ssssssss....', '..sss......sss..', '.ss..........ss.', '.s............s.', 'ss............ss', 'ss............ss',
-    'ssss........ssss', 'sssk........ksss', 'sssk........ksss', 'sssk........ksss', 'sssk........ksss', 'ssss........ssss',
-    '.ss..........ss.', '................', '................', '................'] },
+    '.....oooooooo.....', '...oolllllllloo...', '..olldoooooolllo..', '.oldoo......oollo.', '.olo..........olo.', 'oldo..........ollo',
+    'oldoo........ooldo', 'olsllo......ollsdo', 'olssko......okssdo', 'olssko......okssdo', 'olssko......okssdo', 'olssko......okssdo',
+    'olssdo......olssdo', '.oldo........oldo.', '..oo..........oo..', '..................', '..................', '..................'] },
   cap: { label: 'Study', group: 'object', art: [
-    '................', '.......ss.......', '....ssssssss....', '..ssssssssssss..', 'ssssssssssssssss', '..ssssssssssss.y',
-    '...KssssssssK..y', '...KKKKssKKKK..y', '...KKKKKKKKKK..y', '...KKKKKKKKKK..Y', '...KKKKKKKKKK...', '...KKKKKKKKKK...',
-    '...KKKKKKKKKK...', '....KKKKKKKK....', '................', '................'] },
+    '..................', '........oo........', '.....ooollooo.....', '...oolllssllloo...', '.oollsssssssslloo.', 'ollssssssssssssllo',
+    '.oolssssssssssdoyo', '...oKssssssssKooyo', '...oKKKKssKKKKooyo', '...oKKKKKKKKKKooyo', '...oKKKKKKKKKKooYo', '...oKKKKKKKKKKo.o.',
+    '...oKKKKKKKKKKo...', '...oKKKKKKKKKKo...', '....oKKKKKKKKo....', '.....oooooooo.....', '..................', '..................'] },
   laptop: { label: 'Laptop', group: 'object', art: [
-    '................', '..ssssssssssss..', '..ssssssssssss..', '..sBwBBBBBBBBs..', '..sBwBBBBBBBBs..', '..sBBBBBBBBBBs..',
-    '..sBBBBBBBBBBs..', '..sBBBBBBBBBBs..', '..ssssssssssss..', '................', 'kkkkkkkkkkkkkkkk', '.kkkkkkkkkkkkkk.',
-    '................', '................', '................', '................'] },
+    '..................', '...oooooooooooo...', '..ollllllllllllo..', '..olssssssssssdo..', '..olBwBBBBBBBBdo..', '..olBwBBBBBBBBdo..',
+    '..olBBBBBBBBBBdo..', '..olBBBBBBBBBBdo..', '..olBBBBBBBBBBdo..', '..oldddddddddddo..', '.oooooooooooooooo.', 'okkkkkkkkkkkkkkkko',
+    '.okkkkkkkkkkkkkko.', '..oooooooooooooo..', '..................', '..................', '..................', '..................'] },
   bulb: { label: 'Light bulb', group: 'object', art: [
-    '.....yyyyyy.....', '...yyyyyyyyyy...', '..yyyyyyyyyyyy..', '..ywyyyyyyyyyy..', '.yywyyyyyyyyyyy.', '.yyyyyyyyyyyyyy.',
-    '.yyyyyyyyyyyyyy.', '.yyyyyyyyyyyyyy.', '..yyyyyyyyyyyy..', '...yyyyyyyyyy...', '....yyyyyyyy....', '....ssssssss....',
-    '....dddddddd....', '....ssssssss....', '.....ssssss.....', '......ssss......'] },
+    '......oooooo......', '....ooyyyyyyoo....', '...oyyyyyyyyyyo...', '..oyyyyyyyyyyyyo..', '..oywyyyyyyyyyyo..', '.oyywyyyyyyyyyyyo.',
+    '.oyyyyyyyyyyyyyyo.', '.oyyyyyyyyyyyyyyo.', '.oyyyyyyyyyyyyyyo.', '..oyyyyyyyyyyyyo..', '...oyyyyyyyyyyo...', '....oyyyyyyyyo....',
+    '....olssssssdo....', '....oddddddddo....', '....olssssssdo....', '.....olssssdo.....', '......oldddo......', '.......oooo.......'] },
   medal: { label: 'Medal', group: 'object', art: [
-    '..ss........ss..', '..sss......sss..', '...sss....sss...', '....sss..sss....', '.....ssssss.....', '......ssss......',
-    '....yyyyyyyy....', '...yyyyyyyyyy...', '..yyyyyyyyyyyy..', '..yyyyYYYYyyyy..', '..yyyYYYYYYyyy..', '..yyyYYYYYYyyy..',
-    '..yyyyYYYYyyyy..', '...yyyyyyyyyy...', '....yyyyyyyy....', '................'] },
+    '...oo........oo...', '..ollo......ollo..', '..olslo....olsdo..', '...olslo..olsdo...', '....olsloolsdo....', '.....olsllsdo.....',
+    '.....oolssdoo.....', '....oyyyyyyyyo....', '...oyyyyyyyyyyo...', '..oyyyyyyyyyyyyo..', '..oyyyyYYYYyyyyo..', '..oyyyYYYYYYyyyo..',
+    '..oyyyYYYYYYyyyo..', '..oyyyyYYYYyyyyo..', '...oyyyyyyyyyyo...', '....oyyyyyyyyo....', '.....oooooooo.....', '..................'] },
   crown: { label: 'Crown', group: 'object', art: [
-    'y..............y', 'yy.....yy.....yy', 'yyy....yy....yyy', 'yyyy..yyyy..yyyy', 'yyyy..yyyy..yyyy', 'yyyyyyyyyyyyyyyy',
-    'yyyyyyyyyyyyyyyy', 'yyyyyyyyyyyyyyyy', 'yyyssyyssyyssyyy', 'yyyssyyssyyssyyy', 'yyyyyyyyyyyyyyyy', 'dddddddddddddddd',
-    'dddddddddddddddd', 'dddddddddddddddd', '................', '................'] },
+    '.o..............o.', 'oyo.....oo.....oyo', 'oyyo...oyyo...oyyo', 'oyyyo..oyyo..oyyyo', 'oyyyyooyyyyooyyyyo', 'oyyyyooyyyyooyyyyo',
+    'oyyyyyyyyyyyyyyyyo', 'oyyyyyyyyyyyyyyyyo', 'oyyyyyyyyyyyyyyyyo', 'oyyyssyyssyyssyyyo', 'oyyyssyyssyyssyyyo', 'oyyyyyyyyyyyyyyyyo',
+    'oddddddddddddddddo', 'oddddddddddddddddo', 'oddddddddddddddddo', '.oooooooooooooooo.', '..................', '..................'] },
   clock: { label: 'Clock', group: 'object', art: [
-    '....ssssssss....', '..ssssssssssss..', '.ssssssssssssss.', '.ssswwwwwwwwsss.', 'ssswwwwowwwwwsss', 'ssswwwwowwwwwsss',
-    'ssswwwwowwwwwsss', 'ssswwwwowwwwwsss', 'ssswwwwooooowsss', 'ssswwwwwwwwwwsss', 'ssswwwwwwwwwwsss', '.ssswwwwwwwwsss.',
-    '.ssssssssssssss.', '..ssssssssssss..', '....ssssssss....', '................'] },
+    '.....oooooooo.....', '...oolllllllloo...', '..ollssssssssllo..', '.olsssssssssssslo.', '.olsswwwwwwwwssdo.', 'olsswwwwowwwwwsslo',
+    'olsswwwwowwwwwssdo', 'olsswwwwowwwwwssdo', 'olsswwwwowwwwwssdo', 'olsswwwwooooowssdo', 'olsswwwwwwwwwwssdo', 'olsswwwwwwwwwwssdo',
+    '.olsswwwwwwwwssdo.', '.olssssssssssssdo.', '..oldssssssssddo..', '...ooldddddddoo...', '.....oooooooo.....', '..................'] },
   bell: { label: 'Bell', group: 'object', art: [
-    '.......yy.......', '......ssss......', '.....slssss.....', '....sllsssss....', '....slssssss....', '...sllsssssss...',
-    '...slssssssss...', '...ssssssssss...', '..ssssssssssss..', '.ssssssssssssss.', 'ssssssssssssssss', 'ssssssssssssssss',
-    '................', '.....yyyyyy.....', '......yyyy......', '................'] },
+    '........oo........', '.......oyyo.......', '......olsslo......', '.....ollssslo.....', '....olllsssslo....', '....ollsssssdo....',
+    '...olllsssssslo...', '...ollsssssssdo...', '...olssssssssdo...', '..olsssssssssslo..', '.olsssssssssssslo.', 'olsssssssssssssslo',
+    'oldddddddddddddddo', '.oooooooooooooooo.', '.....oyyyyyyo.....', '......oyyyyo......', '.......oooo.......', '..................'] },
   ball: { label: 'Ball', group: 'object', art: [
-    '....sssoosss....', '..ossssoosssso..', '.sossssoossssos.', '.sossssoossssos.', 'ssossssoossssoss', 'ssossssoossssoss',
-    'ssossssoossssoss', 'oooooooooooooooo', 'oooooooooooooooo', 'ssossssoossssoss', 'ssossssoossssoss', 'ssossssoossssoss',
-    '.sossssoossssos.', '.sossssoossssos.', '..ossssoosssso..', '....sssoosss....'] },
+    '.....oooooooo.....', '...oollloollloo...', '..oolsssoosssloo..', '.olossssoossssolo.', '.olossssoossssodo.', 'olsossssoossssoslo',
+    'olsossssoossssosdo', 'olsossssoossssosdo', 'oooooooooooooooooo', 'oooooooooooooooooo', 'olsossssoossssosdo', 'olsossssoossssosdo',
+    'olsossssoossssosdo', '.olossssoossssodo.', '.olossssoossssodo.', '..oodsssoosssdoo..', '...oolddoodddoo...', '.....oooooooo.....'] },
   train: { label: 'Train', group: 'transport', art: [
-    '................', '..ssssssssssss..', '.ssssssssssssss.', '.ssBBBBBBBBBBss.', '.ssBBBBBBBBBBss.', '.ssBBBBBBBBBBss.',
-    '.ssssssssssssss.', '.ssssssssssssss.', '.ssyssssssssyss.', '.ssssssssssssss.', '.ssssssssssssss.', '..KK..KKKK..KK..',
-    '................', '................', 'KKKKKKKKKKKKKKKK', '................'] },
+    '..................', '...oooooooooooo...', '..ollllllllllllo..', '.olsssssssssssslo.', '.olsBBBBBBBBBBsdo.', '.olsBBBBBBBBBBsdo.',
+    '.olsBBBBBBBBBBsdo.', '.olssssssssssssdo.', '.olssssssssssssdo.', '.olsyssssssssysdo.', '.olssssssssssssdo.', '.olssddssssddssdo.',
+    '..oKKooKKKKooKKo..', '...oo..oooo..oo...', '.oooooooooooooooo.', 'oKKKKKKKKKKKKKKKKo', '.oooooooooooooooo.', '..................'] },
   backpack: { label: 'Backpack', group: 'object', art: [
-    '..dd..KKKK..dd..', '..ddssssssssdd..', '..ssssssssssss..', '.sssllllllllsss.', '.ssssssssssssss.', '.ssssssssssssss.',
-    '.sssddddddddsss.', '.sssdKdKKdKdsss.', '.sssddddddddsss.', '.sssddddddddsss.', '.sssddddddddsss.', '.sssddddddddsss.',
-    '.ssssssssssssss.', '..ssssssssssss..', '..dd........dd..', '..dd........dd..'] },
+    '...oo..oooo..oo...', '..oddooKKKKooddo..', '..oddllssssllddo..', '..olssssssssssdo..', '.olssllllllllsslo.', '.olssssssssssssdo.',
+    '.olssssssssssssdo.', '.olssddddddddssdo.', '.olssdKdKKdKdssdo.', '.olssddddddddssdo.', '.olssddddddddssdo.', '.olssddddddddssdo.',
+    '.olssddddddddssdo.', '.olssssssssssssdo.', '..olsddddddddsdo..', '..oddooooooooddo..', '..oddo......oddo..', '...oo........oo...'] },
   compass: { label: 'Compass', group: 'object', art: [
-    '....ssssssss....', '..ssssssssssss..', '.ssslllRRlllsss.', '.ssllllRRRlllss.', 'ssllllRRRRllllss', 'sslllRRRRRRlllss',
-    'sslllRRRRRRlllss', 'ssllllloolllllss', 'ssllllloolllllss', 'sslllkkkkkklllss', 'sslllkkkkkklllss', 'ssllllkkkkllllss',
-    '.ssllllkkllllss.', '.sssllllllllsss.', '..ssssssssssss..', '....ssssssss....'] },
+    '.....oooooooo.....', '...oolllllllloo...', '..ollssssssssllo..', '.olsslllRRlllsslo.', '.olsllllRRRlllsdo.', 'olsllllRRRRllllslo',
+    'olslllRRRRRRlllsdo', 'olslllRRRRRRlllsdo', 'olsllllloolllllsdo', 'olsllllloolllllsdo', 'olslllkkkkkklllsdo', 'olslllkkkkkklllsdo',
+    'olsllllkkkkllllsdo', '.olsllllkkllllsdo.', '.olssllllllllssdo.', '..oldssssssssddo..', '...ooldddddddoo...', '.....oooooooo.....'] },
   key: { label: 'Key', group: 'object', art: [
-    '................', '................', '................', '................', '................', '..ssss..........',
-    '.ssssss.........', 'sss..sssssssssss', 'sss..sssssssssss', '.ssssss...ss.ss.', '..ssss....ss.ss.', '................',
-    '................', '................', '................', '................'] },
+    '..................', '..................', '..................', '..................', '..................', '...oooo...........',
+    '..ollllo..........', '.olsddslooooooooo.', 'olsdoolslllllllllo', 'olsdoolsdddssdssdo', '.olsllsdoooldoldo.', '..oldddo..oldoldo.',
+    '...oooo....oo.oo..', '..................', '..................', '..................', '..................', '..................'] },
   car: { label: 'Car', group: 'transport', art: [
-    '................', '................', '................', '.....ssssss.....', '...ssBBsBBBs....', '..ssBBBsBBBBs...',
-    '..ssBBBsBBBBs...', '.sssssssssssss..', 'ssssssssssssssss', 'sssKKKKssKKKKsyy', 'sssKkkKssKkkKsss', '...KkkK..KkkK...',
-    '...KKKK..KKKK...', '................', '................', '................'] },
+    '..................', '..................', '..................', '......oooooo......', '....oollllllo.....', '...ollBBsBBBlo....',
+    '..olsBBBsBBBBlo...', '..olsBBBsBBBBdo...', '.olsssssssssssloo.', 'olsssssssssssssllo', 'olssKKKKssKKKKsyyo', 'olddKkkKddKkkKdddo',
+    '.oooKkkKooKkkKooo.', '...oKKKKooKKKKo...', '....oooo..oooo....', '..................', '..................', '..................'] },
   boat: { label: 'Boat', group: 'transport', art: [
-    '.......N........', '.......Nw.......', '.......Nww......', '.......Nwww.....', '.......Nwwww....', '.......Nwwwww...',
-    '.......Nwwwwww..', '.......Nwwwwwww.', '.......N........', 'ssssssssssssssss', '.ssssssssssssss.', '..ssssssssssss..',
-    '...ssssssssss...', 'bbbbbbbbbbbbbbbb', '.bb..bb..bb..bb.', '................'] },
+    '........o.........', '.......oNo........', '.......oNwo.......', '.......oNwwo......', '.......oNwwwo.....', '.......oNwwwwo....',
+    '.......oNwwwwwo...', '.......oNwwwwwwo..', '.......oNwwwwwwwo.', '.oooooooNoooooooo.', 'olllllllsllllllllo', '.olssssssssssssdo.',
+    '..olssssssssssdo..', '.ooolssssssssdooo.', 'obbbbbbbbbbbbbbbbo', '.obboobboobboobbo.', '..oo..oo..oo..oo..', '..................'] },
   strawberrycake: { label: 'Strawberry cake', group: 'cute dessert', art: [
-    '................', '......RRll......', '.....RRrRsll....', '.....RoRRssll...', '....llRRlsssll..', '...lllllllllsl..',
-    '..llllllcccccc..', '..ccccccllRRll..', '..llRRlllRrrRl..', '.YlRrrRllRrrRlY.', 'wYlRrrRlccccccYw', 'wYccccccccccccYw',
-    'wYccccccYYYYYYww', 'wwYYYYYYwwwwwwww', '.wwwwwwwwwwwwww.', '...wwwwwwwwww...'] },
+    '..................', '.......oooo.......', '......oRRlloo.....', '.....oRRrRsllo....', '.....oRoRRssllo...', '....ollRRlsssllo..',
+    '...olllllllllslo..', '..ollllllcccccco..', '..occccccllRRllo..', '..ollRRlllRrrRlo..', '.oYlRrrRllRrrRlYo.', 'owYlRrrRlccccccYwo',
+    'owYccccccccccccYwo', 'owYccccccYYYYYYwwo', 'owwYYYYYYwwwwwwwwo', '.owwwwwwwwwwwwwwo.', '..oowwwwwwwwwwoo..', '....oooooooooo....'] },
   strawberrymacaron: { label: 'Strawberry macaron', group: 'cute dessert', art: [
-    '................', '.....ssslww.....', '...ssssslwwls...', '..sssssssllsss..', '..ssssssssssss..', '.dssssssssssssd.',
-    '.ddssssssssssdd.', '.dsllssssssllsd.', '.wdsssslsllssdw.', '.wRddssssssddRw.', '.RrrRwwRRwwRrrR.', '..lrRwRrrRwRrl..',
-    '..sslwRrrRwlss..', '...ssssssssss...', '.....ssssss.....', '................'] },
+    '..................', '......oooooo......', '....oollllwwoo....', '...ollssslwwllo...', '..olssssssllsslo..', '..olssssssssssdo..',
+    '.odssssssssssssdo.', '.oddssssssssssddo.', '.odsllssssssllsdo.', '.owdsssslsllssdwo.', '.owRddssssssddRwo.', '.oRrrRwwRRwwRrrRo.',
+    '..olrRwRrrRwRrlo..', '..olslwRrrRwlsdo..', '...oldssssssddo...', '....ooldddddoo....', '......oooooo......', '..................'] },
   chocolate: { label: 'Chocolate', group: 'cute dessert', art: [
-    '..wwwccnnnnnNN..', '..woonoonoonNN..', '..wNNnNNnNNnNN..', '..cNNnNNnNNnNN..', '..nnnnnnnnnnNN..', '..noonoonoonNN..',
-    '..nNNnNNnNNnNN..', '..nNNnNNnNNnNN..', '.KKKnnnnnnKKKKK.', '.kkkKKNNKKkkkkk.', '.kkkkkKKkkkkkkk.', '.kkkkkkKkkkkkkk.',
-    '..dddddddddddd..', '..ssssssssssdd..', '..ssssssssssdd..', '................'] },
+    '...oooooooooooo...', '..owwwccnnnnnNNo..', '..owoonoonoonNNo..', '..owNNnNNnNNnNNo..', '..ocNNnNNnNNnNNo..', '..onnnnnnnnnnNNo..',
+    '..onoonoonoonNNo..', '..onNNnNNnNNnNNo..', '..onNNnNNnNNnNNo..', '.oKKKnnnnnnKKKKKo.', '.okkkKKNNKKkkkkko.', '.okkkkkKKkkkkkkko.',
+    '.okkkkkkKkkkkkkko.', '..oddddddddddddo..', '..olsssssssssddo..', '..oldddddddddddo..', '...oooooooooooo...', '..................'] },
   flavouredchocolate: { label: 'Flavoured Chocolate', group: 'cute dessert', art: [
-    '..wwwllsssssdd..', '..woosoosoosdd..', '..wddsddsddsdd..', '..lddsddsddsdd..', '..ssssssssssdd..', '..soosoosoosdd..',
-    '..sddsddsddsdd..', '..sddsddsddsdd..', '.KKKssssssKKKKK.', '.kkkKKddKKkkkkk.', '.kkkkkKKkkkkkkk.', '.kkkkkkKkkkkkkk.',
-    '..KKKKKKKKKKKK..', '..kkkkkkkkkkKK..', '..kkkkkkkkkkKK..', '................'] },
+    '...oooooooooooo...', '..owwwlllllllddo..', '..owoosoosoosddo..', '..owddsddsddsddo..', '..olddsddsddsddo..', '..olsssssssssddo..',
+    '..oloosoosoosddo..', '..olddsddsddsddo..', '..olddsddsddsddo..', '.oKKKssssssKKKKKo.', '.okkkKKddKKkkkkko.', '.okkkkkKKkkkkkkko.',
+    '.okkkkkkKkkkkkkko.', '..oKKKKKKKKKKKKo..', '..okkkkkkkkkkKKo..', '..okkkkkkkkkkKKo..', '...oooooooooooo...', '..................'] },
   strawberrysundae: { label: 'Strawberry Sundae', group: 'cute dessert', art: [
-    '.......cc.....Gg', '......wcwc...gGg', '....cwwcwwcwGgG.', '..RRwwwcwwcwRR..', '.wRrRwcRRccRrRw.', '.wRRRcRRrRcRRRw.',
-    '..wwdcRRRRcdww..', '..wswwwwwwwwsw..', '...wssssssssw...', '...wsdsdsdsdw...', '...wddddddddw...', '....wddddddw....',
-    '....BwwwwwwB....', '....wBBBBBBw....', '....wwbwwbww....', '.....wwwwww.....'] },
+    '........oo.....oo.', '.......occo...oGgo', '.....oowcwcooogGgo', '...oocwwcwwcwGgGo.', '..oRRwwwcwwcwRRo..', '.owRrRwcRRccRrRwo.',
+    '.owRRRcRRrRcRRRwo.', '..owwdcRRRRcdwwo..', '..owswwwwwwwwswo..', '...owsssssssswo...', '...owsdsdsdsdwo...', '...owddddddddwo...',
+    '....owddddddwo....', '....oBwwwwwwBo....', '....owBBBBBBwo....', '....owwbwwbwwo....', '.....owwwwwwo.....', '......oooooo......'] },
   strawberrypankcake: { label: 'Strawberry Pancake', group: 'cute dessert', art: [
-    '................', '......www.......', '.....wwwwwlGG...', '...lswcwwwRRGG..', '..llswccwRRrRG..', '..lllswwwRrRRl..',
-    '..lwwlllloRRll..', '..dlllwlllllld..', '..yddllllllldy..', '..cccsssllldcc..', '.nycccyydlldcyn.', '.ncyycccdlldycn.',
-    '..nccyycyddccn..', '...nnccccccnn...', '.....nnnnnn.....', '................'] },
+    '..................', '.......ooo........', '......owwwoooo....', '....oowwwwwlGGo...', '...ollwcwwwRRGGo..', '..ollswccwRRrRGo..',
+    '..olllswwwRrRRlo..', '..olwwlllloRRllo..', '..odlllwlllllldo..', '..oyddllllllldyo..', '..occcsssllldcco..', '.onycccyydlldcyno.',
+    '.oncyycccdlldycno.', '..onccyycyddccno..', '...onnccccccnno...', '....oonnnnnnoo....', '......oooooo......', '..................'] },
   strawberryflan: { label: 'Strawberry Flan', group: 'cute dessert', art: [
-    '.........RR.....', '.....RR.RRrR....', '....RrrRRRRR....', '....RrrrgggR....', '...sRrrGgggGs...', '...ssRRGggGGs...',
-    '...slsssGGsss...', '..clssllsssslc..', '..cclsssssslcc..', '..cccccccccccc..', '..cccccccccccc..', '.wnccccccccccnw.',
-    '.wwnnccccccnnww.', '.wwwwYYYYYYwwww.', '..wwwwwwwwwwww..', '....wwwwwwww....'] },
+    '..........oo......', '......oo.oRRo.....', '.....oRRoRRrRo....', '....oRrrRRRRRo....', '....oRrrrgggRo....', '...olRrrGgggGlo...',
+    '...olsRRGggGGdo...', '...ollsssGGssdo...', '..oclssllsssslco..', '..occlsssssslcco..', '..occcccccccccco..', '..occcccccccccco..',
+    '.ownccccccccccnwo.', '.owwnnccccccnnwwo.', '.owwwwYYYYYYwwwwo.', '..owwwwwwwwwwwwo..', '...oowwwwwwwwoo...', '.....oooooooo.....'] },
   pawcoffee: { label: 'Paw Coffee', group: 'cute dessert', art: [
-    '...wwwwwwww.....', '.wwcnnnnnncww...', 'wcnnNNwwNNnncw..', 'wnncwNccNwcnnw..', 'wnnwNwwwwNwnnw..', 'wnnNwwwwwwNnnwww',
-    'wcnncwwwwcnncwlw', 'wwwcnnnnnncwwwdw', 'wwwwwwwwwwwwwwdw', 'lwwwlswwslwwwwlw', 'lwwwsssssswwwww.', '.wwwsssssswww...',
-    '.lwwwsssswwwl...', '..lwwwsswwwl....', '....wwwwww......', '................'] },
+    '....oooooooo......', '..oowwwwwwwwoo....', '.owwcnnnnnncwwo...', 'owcnnNNwwNNnncwo..', 'ownncwNccNwcnnwo..', 'ownnwNwwwwNwnnwoo.',
+    'ownnNwwwwwwNnnwwwo', 'owcnncwwwwcnncwlwo', 'owwwcnnnnnncwwwdwo', 'owwwwwwwwwwwwwwdwo', 'olwwwlswwslwwwwlwo', 'olwwwsssssswwwwwo.',
+    '.owwwsssssswwwoo..', '.olwwwsssswwwlo...', '..olwwwsswwwlo....', '...oowwwwwwoo.....', '.....oooooo.......', '..................'] },
   honeyjar: { label: 'Honey jar', group: 'cute dessert', art: [
-    '....YycccyY.....', '..ccyYYcYYycc...', '..cccyyyyyccc...', '.YYYyccyccyYYY..', '.ccyYYYYYYYycc..', '...ccocccocc....',
-    '..YooYoooYooY...', '.yYYYYyywwwwwY..', '.yyYYwwwwYYwww..', '.YYYwwwwycYwww..', '.YyywwwwyyYYww..', '.YyywwwycYcYww..',
-    '.YYYwwwyyYYwww..', '...Ywwwwwwwwwy..', '...YYwwwwwwYy...', '.....YYyyYY.....'] },
+    '.....ooooooo......', '...ooYycccyYoo....', '..occyYYcYYycco...', '..occcyyyyyccco...', '.oYYYyccyccyYYYo..', '.occyYYYYYYYycco..',
+    '..ooccocccoccoo...', '..oYooYoooYooYo...', '.oyYYYYyywwwwwYo..', '.oyyYYwwwwYYwwwo..', '.oYYYwwwwycYwwwo..', '.oYyywwwwyyYYwwo..',
+    '.oYyywwwycYcYwwo..', '.oYYYwwwyyYYwwwo..', '..ooYwwwwwwwwwyo..', '...oYYwwwwwwYyo...', '....ooYYyyYYoo....', '......oooooo......'] },
   rabbittanghulu: { label: 'Rabbit Tanghulu', group: 'cute dessert', art: [
-    '...........rrw..', '..........rrww..', '........wwwwwsww', '........lwowwwwr', '.......wwowwwwrr', '.......swwwwowr.',
-    '.....wwwswwoww..', '....wwwwwswwlw..', '....wwwwwwsww...', '..sdwwlllw......', '.sssdwlllw......', '.ssssdwww.......',
-    '.sssssd.........', '..sssss.........', '.n.sss..........', 'n...............'] },
+    '............ooo...', '...........orrwo..', '.........oorrwwoo.', '........owwwwwswwo', '........olwowwwwro', '.......owwowwwwrro',
+    '......oolwwwwowro.', '.....owwwswwowwo..', '....owwwwwswwlwo..', '...oowwwwwwdwwo...', '..oldwwlllwooo....', '.olssdwlllwo......',
+    '.olsssdwwwo.......', '.olssssdoo........', '..olsssdo.........', '.onolddo..........', 'ono.ooo...........', '.o................'] },
   drink: { label: 'Drink 2', group: 'cute dessert', art: [
-    '......wwwwwww...', '....wwssllwllww.', '...wwsllwlwwllww', '...ksswlwwllllsw', '..Kkdswllwwwlsdw', 'wwwwkdwwwssssdww',
-    'w.KKwwdddddddwwK', 'k.KKkwwwwwwwwwkK', 'k.KKkkkkkkkkkkkK', 'k.KKkkwwwwwwwwkK', 'k.KKkkwwwwwwwwkK', 'kkKKkkwwwwwwwwkK',
-    '.kKKkkwwwwwwwwkd', '...dkkwwwwwwwwd.', '....dkwwwwwwwd..', '.....ddsssssd...'] },
+    '.......ooooooo....', '.....oowwwwwwwoo..', '....owwssllwllwwo.', '...owwsllwlwwllwwo', '...oksswlwwllllswo', '.ooKkdswllwwwlsdwo',
+    'owwwwkdwwwssssdwwo', 'owoKKwwdddddddwwKo', 'okoKKkwwwwwwwwwkKo', 'okoKKkkkkkkkkkkkKo', 'okoKKkkwwwwwwwwkKo', 'okoKKkkwwwwwwwwkKo',
+    'okkKKkkwwwwwwwwkKo', '.okKKkkwwwwwwwwkdo', '..oodkkwwwwwwwwdo.', '....odkwwwwwwwdo..', '.....oddddddddo...', '......oooooooo....'] },
   rabbit: { label: 'Rabbit', group: 'pet', art: [
-    '................', '....wwwwwww..w..', '..wwwwooowww.ww.', '.wwwwwowwowwwow.', '.wwwwwocwwowwow.', 'wwwwwwoccwowwwww',
-    'wwwwwwwocwwwwwww', 'wwwwwwwwwwwwwwww', 'wcwwwwwwwwwwwwww', '.wcwwwwwwwldwwww', '.wccwwwwwwddwwow', 'ldwwwwwwccwwwwwd',
-    'lsdddwwwwwwwwddl', 'llsssddddddddssl', '.slllssssssssll.', '...lslllllsll...'] },
+    '..................', '.....ooooooo..o...', '...oowwwwwwwoowo..', '..owwwwooowwwowwo.', '.owwwwwowwowwwowo.', '.owwwwwocwwowwowo.',
+    'owwwwwwoccwowwwwwo', 'owwwwwwwocwwwwwwwo', 'owwwwwwwwwwwwwwwwo', 'owcwwwwwwwwwwwwwwo', '.owcwwwwwwwldwwwwo', '.owccwwwwwwddwwowo',
+    'oldwwwwwwccwwwwwdo', 'olsdddwwwwwwwwddlo', 'ollsssddddddddsslo', '.ollllssssssssllo.', '..ooldllllldlloo..', '....oooooooooo....'] },
   chicken2: { label: 'Chicken', group: 'pet', art: [
-    '....sss.........', '...sssss........', '..ssswwww.......', '..swwwwwww......', '.swwwwwwww....wc', '.wwwowwwwww..wwc',
-    'yyyworrwwwwccwwc', 'YYYwwrrwwwwwwwwn', 'cwwwwwwwwwwwwwnc', 'cwwwwwwwwcwwcnwc', 'cwwwwwwwwwcwwwnc', 'cwwwwwwwwwwccnwn',
-    '.cwwwwwwwwwwwwc.', '.cwwwwwwwwwwwwn.', '..ccwwwwwwwccn..', '....ccccccc.....'] },
+    '.....ooo..........', '....olllo.........', '...olssslo........', '..olsswwwwo.......', '..olwwwwwwwo...oo.', '.olwwwwwwwwo..owco',
+    '.owwwowwwwwwoowwco', 'oyyyworrwwwwccwwco', 'oYYYwwrrwwwwwwwwno', 'ocwwwwwwwwwwwwwnco', 'ocwwwwwwwwcwwcnwco', 'ocwwwwwwwwwcwwwnco',
+    'ocwwwwwwwwwwccnwno', '.ocwwwwwwwwwwwwco.', '.ocwwwwwwwwwwwwno.', '..occwwwwwwwccno..', '...oocccccccooo...', '.....ooooooo......'] },
   chicken: { label: 'Chicken (Cream)', group: 'pet', art: [
-    '....sss.........', '...sdddd........', '..sddcccc.......', '..dccccccc......', '.dcccccccc....cy', '.cccocccccc..ccy',
-    'yyycorrccccyyccy', 'YYYccrrccccccccn', 'ycccccccccccccny', 'yccccccccyccynwy', 'ycccccccccycccny', 'yccccccccccyynwn',
-    '.yccccccccccccy.', '.yccccccccccccn.', '..yycccccccyyn..', '....yyyyyyy.....'] },
+    '.....ooo..........', '....olllo.........', '...olddddo........', '..olddcccco.......', '..odccccccco...oo.', '.odcccccccco..ocyo',
+    '.occcoccccccooccyo', 'oyyycorrccccyyccyo', 'oYYYccrrccccccccno', 'oycccccccccccccnyo', 'oyccccccccyccynwyo', 'oycccccccccycccnyo',
+    'oyccccccccccyynwno', '.oyccccccccccccyo.', '.oyccccccccccccno.', '..oyycccccccyyno..', '...ooyyyyyyyooo...', '.....ooooooo......'] },
   bee: { label: 'Bee', group: 'pet', art: [
-    '...www..........', '...wwwww........', '...lllwww.......', '...oolllwl...N..', 'wwwwloolllN.N...', 'llwwwllolN..N...',
-    'llllwllnYNyyN...', '.lllllnYyNyyyy..', 'yYnYYnyyyyyyyoy.', 'ynyynnyyyyyyyoy.', 'Ynyynnyyyyoyyyr.', 'YnyynnYyyyoyyyy.',
-    'YnYynnnyyrryyyy.', '..nYYnnYYyyyyy..', '..nnYYnnnYYYY...', '....YYYnnnn.....'] },
+    '....ooo...........', '...owwwoo.........', '...owwwwwo........', '...olllwwwo...o...', '.ooooolllwlo.oNo..', 'owwwwloolllNoNo...',
+    'ollwwwllolNooNo...', 'ollllwllnYNyyNo...', '.olllllnYyNyyyyo..', 'oyYnYYnyyyyyyyoyo.', 'oynyynnyyyyyyyoyo.', 'oYnyynnyyyyoyyyro.',
+    'oYnyynnYyyyoyyyyo.', 'oYnYynnnyyrryyyyo.', '.oonYYnnYYyyyyyo..', '..onnYYnnnYYYYo...', '...ooYYYnnnnoo....', '.....ooooooo......'] },
 };
+// Every icon the app knows: the official ones with Kitty Gallery's put over them (src/pixel/live.ts keeps it so).
+export const PICKER_ICONS: Record<string, PickerIcon> = { ...OFFICIAL_PICKER_ICONS };
+
 // The order the pickers show them in: the icons without a group first, then each group A to Z, and A to Z by name in each.
+// Both lists are filled in place (refreshPickerOrder), so whoever holds them sees Kitty Gallery's icons once they are in.
 const az = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
-export const PICKER_ICON_NAMES = Object.keys(PICKER_ICONS).sort((a, b) => {
-  const ga = PICKER_ICONS[a].group ?? '', gb = PICKER_ICONS[b].group ?? '';
-  return az(ga, gb) || az(PICKER_ICONS[a].label, PICKER_ICONS[b].label);
-});
+export const PICKER_ICON_NAMES: string[] = [];
 // The same, cut into groups for the pickers' headings: [group, names] with the icons without a group under "default", first.
-export const PICKER_ICON_GROUPS: [string, string[]][] = (() => {
-  const out: [string, string[]][] = [];
-  for (const n of PICKER_ICON_NAMES) {
+export const PICKER_ICON_GROUPS: [string, string[]][] = [];
+export function refreshPickerOrder() {
+  const names = Object.keys(PICKER_ICONS).sort((a, b) => {
+    const ga = PICKER_ICONS[a].group ?? '', gb = PICKER_ICONS[b].group ?? '';
+    return az(ga, gb) || az(PICKER_ICONS[a].label, PICKER_ICONS[b].label);
+  });
+  const groups: [string, string[]][] = [];
+  for (const n of names) {
     const g = PICKER_ICONS[n].group ?? 'default';
-    if (out[out.length - 1]?.[0] !== g) out.push([g, []]);
-    out[out.length - 1][1].push(n);
+    if (groups[groups.length - 1]?.[0] !== g) groups.push([g, []]);
+    groups[groups.length - 1][1].push(n);
   }
-  return out;
-})();
+  PICKER_ICON_NAMES.splice(0, PICKER_ICON_NAMES.length, ...names);
+  PICKER_ICON_GROUPS.splice(0, PICKER_ICON_GROUPS.length, ...groups);
+}
+refreshPickerOrder();

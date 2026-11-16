@@ -1,5 +1,4 @@
 // Notes, pure so they can be tested. A note is one Markdown file; its name is its title (so Obsidian shows it the same way).
-import { PICKER_ICON_NAMES } from '../achievement/icons.ts';
 import { esc } from '../shared/html.ts';
 
 export interface Note { name: string; text: string; mtime: number }   // name without ".md"
@@ -52,10 +51,11 @@ export function searchNotes(notes: Note[], query: string): Note[] {
 // Any other frontmatter (Obsidian's tags, aliases...) is kept as it is. Only what differs from the default is written.
 export type Cover = { kind: 'icon'; name: string } | { kind: 'image'; src: string } | null;
 export const NOTE_COLORS = ['pink', 'lavender', 'blue', 'mint', 'lemon', 'peach'] as const;
-export const NOTE_DOODLES = ['none', ...PICKER_ICON_NAMES] as const;
+// "none", or the name of a sticker icon (Kitty Gallery's too, so any name is kept: one that is gone is drawn as a heart).
+const DOODLE = /^[\w-]{1,40}$/;
 export const NOTE_FACES = ['happy', 'open', 'sleepy', 'sad', 'starving'] as const;
 export type NoteColor = typeof NOTE_COLORS[number];
-export type NoteDoodle = typeof NOTE_DOODLES[number];
+export type NoteDoodle = string;
 export type NoteFace = typeof NOTE_FACES[number];
 export interface ParsedNote { front: string[]; cover: Cover; color: NoteColor; doodle: NoteDoodle; face: NoteFace; date?: string; body: string }
 
@@ -91,7 +91,7 @@ export function parseNote(text: string): ParsedNote {
     if (k) v[k[1]] = unquote(k[2]); else front.push(line);
   }
   const cover: Cover = IMAGE_SRC.test(v.image ?? '') ? { kind: 'image', src: v.image } : /^[\w-]{1,40}$/.test(v.icon ?? '') ? { kind: 'icon', name: v.icon } : null;
-  return { front, cover, color: oneOf(NOTE_COLORS, v.color, 'pink'), doodle: oneOf(NOTE_DOODLES, v.doodle, 'heart'), face: oneOf(NOTE_FACES, v.face, 'happy'),
+  return { front, cover, color: oneOf(NOTE_COLORS, v.color, 'pink'), doodle: DOODLE.test(v.doodle ?? '') ? v.doodle : 'heart', face: oneOf(NOTE_FACES, v.face, 'happy'),
     ...(isDateText(v.date) && { date: v.date }), body: text.slice(m[0].length) };
 }
 

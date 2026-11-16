@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addItem, addList, addRecipe, addSub, addToPantry, alsoIn, deleteCat, findInPantry, hadBefore, learnPlace, moveCat, placeOf, restock, saveCat,
+  addItem, addList, listCats, moveListCat, resetListOrder, addRecipe, addSub, addToPantry, alsoIn, deleteCat, findInPantry, hadBefore, learnPlace, moveCat, placeOf, restock, saveCat,
   shelves, stepHave, updateHave, useUp, complete, dayKey, emptyData, finishTrip, guessCategory, itemText, keyOf, listOf,
   listToText, moveItem, parseIngredients, parseQuick, recipeNeeds, sanitize, setRegular, settleSuggestion, shownItems, suggestions,
   takeSuggestion, textToList, updateItem, usualGap, type ShopData,
@@ -277,5 +277,24 @@ describe('categories and where things go', () => {
     expect(d.pantry[0]).toMatchObject({ cat: 'pantry', sub: '' });
     expect(d.places).toEqual({ rice: { cat: 'pantry', sub: '' } });
     expect(learnPlace(d, 'rice', 'nope')).toBe(d);
+  });
+});
+
+describe('category order per supermarket', () => {
+  it('follows the pantry until a list gets its own order, which leaves the pantry and other lists alone', () => {
+    const { d, ids: [aldi, lidl] } = withLists('Aldi', 'Lidl');
+    const ids = (cats: { id: string }[]) => cats.map((c) => c.id);
+    expect(ids(listCats(d, listOf(d, aldi)))).toEqual(ids(d.cats));
+    const x = moveListCat(d, aldi, 'dairy', -1);
+    expect(ids(listCats(x, listOf(x, aldi))).slice(0, 2)).toEqual(['dairy', 'produce']);
+    expect(ids(x.cats)).toEqual(ids(d.cats));
+    expect(ids(listCats(x, listOf(x, lidl)))).toEqual(ids(d.cats));
+    expect(moveListCat(x, aldi, 'dairy', -1)).toBe(x);   // already first
+    // a category made later goes after the list's own order; a deleted one drops out
+    const y = sanitize(JSON.parse(JSON.stringify(deleteCat(x, 'bakery'))));
+    expect(ids(listCats(y, listOf(y, aldi)))).not.toContain('bakery');
+    expect(listOf(y, aldi)!.order?.[0]).toBe('dairy');
+    expect(listOf(resetListOrder(x, aldi), aldi)!.order).toBeUndefined();
+    expect(resetListOrder(d, aldi)).toBe(d);
   });
 });

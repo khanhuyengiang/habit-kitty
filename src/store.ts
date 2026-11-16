@@ -5,6 +5,7 @@
 //   game.json                cats, tasks, settings (no diary)
 //   diary/2026-10-12.md      frontmatter (mood, mood2, feeling, weather, photo, updated) + the text as plain Markdown
 //   photos/2026-10-12.jpg
+//   gallery.json             Kitty Gallery's icons (your drawings and changes), as kept on the device
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
 import { dateOf, dayOf } from './calendar.ts';
 import { PHOTO_MAX_BYTES } from './shared/photo.ts';
@@ -13,8 +14,9 @@ import { MAX_NOTES, MAX_TEXT, safeName } from './notes/model.ts';
 export const MOOD_KEYS = ['joyful', 'calm', 'tired', 'sad', 'stressed'] as const;
 export type Mood = typeof MOOD_KEYS[number];
 // One diary page per day, keyed by day index. `photo` says whether photos/<date>.jpg exists.
-export const WEATHER_KEYS = ['sunny', 'cloudy', 'windy', 'rainy', 'storm', 'snow'] as const;
-export type Weather = typeof WEATHER_KEYS[number];
+// A weather is the id of one in WEATHER (src/pixelart.ts): the official ones, or one drawn in Kitty Gallery.
+export type Weather = string;
+const WEATHER_ID = /^[a-z][a-z0-9]{0,31}$/i;
 // `mood2` is an optional second emotion (the kitty is drawn half and half); `feeling` is the user's own word for it and
 // replaces the emotion name on the page; `weather` is only set when the Meteorokinesis option is on.
 // `title` is only used while the Titles option is on; `star` marks a day to remember (only with Starry Nights): happy is a
@@ -24,10 +26,11 @@ export type Star = typeof STAR_KEYS[number];
 // `photos` is how many photos the page has when that is more than one (the Photographer option allows 1, 2 or 4): the first is
 // photos/<date>.jpg, the others photos/<date>-2.jpg, -3.jpg and -4.jpg.
 export const MAX_PHOTOS = 4;
-export interface DiaryEntry { text: string; title?: string; location?: string; photos?: number; mood?: Mood; mood2?: Mood; feeling?: string; weather?: Weather; star?: Star; note?: string; photo?: boolean; updated: number }
+export interface DiaryEntry { text: string; title?: string; location?: string; photos?: number; icon?: string; mood?: Mood; mood2?: Mood; feeling?: string; weather?: Weather; star?: Star; note?: string; photo?: boolean; updated: number }
 
 // Format 2 can carry Kitty Achievement's whole save as one more entry (achievement.achkitty, itself a zip, see achievement/backup.ts),
-// so one file backs up both apps. Format 1 files (Habit Kitty only) still load.
+// so one file backs up both apps. Format 1 files (Habit Kitty only) still load. Newer entries (notes, shopping.json,
+// gallery.json) were added without a new format: an older app skips what it does not know.
 // A person whose birthday the diary reminds you of. `year` is optional (the age is only shown when it is known).
 export interface Person { id: string; name: string; month: number; day: number; year?: number; note?: string }
 // Monthly reflection: one note for a whole month, kept as reflections/YYYY-MM.md.
@@ -91,12 +94,15 @@ export function sanitizeExtras(raw: unknown): DiaryExtras {
   return out;
 }
 
+// A page shows its photos, or instead an icon: the name of a sticker icon (Kitty Gallery's too; one that is gone is drawn as a heart).
+const ICON_NAME = /^[\w-]{1,40}$/;
+
 export function entryToMarkdown(e: DiaryEntry): string {
   const feeling = e.feeling?.replace(/\s+/g, ' ').trim();
   const title = e.title?.replace(/\s+/g, ' ').trim();
   const note = e.note?.replace(/\s+/g, ' ').trim();
   const location = e.location?.replace(/\s+/g, ' ').trim();
-  const head = [title ? `title: ${title}` : '', e.star ? `star: ${e.star}` : '', note ? `note: ${note}` : '', location ? `location: ${location}` : '', e.mood ? `mood: ${e.mood}` : '', e.mood && e.mood2 && e.mood2 !== e.mood ? `mood2: ${e.mood2}` : '', feeling ? `feeling: ${feeling}` : '', e.weather ? `weather: ${e.weather}` : '', e.photo ? 'photo: yes' : '', e.photo && e.photos && e.photos > 1 ? `photos: ${Math.min(e.photos, MAX_PHOTOS)}` : '', `updated: ${Math.round(e.updated)}`].filter(Boolean);
+  const head = [title ? `title: ${title}` : '', e.star ? `star: ${e.star}` : '', note ? `note: ${note}` : '', location ? `location: ${location}` : '', e.mood ? `mood: ${e.mood}` : '', e.mood && e.mood2 && e.mood2 !== e.mood ? `mood2: ${e.mood2}` : '', feeling ? `feeling: ${feeling}` : '', e.weather ? `weather: ${e.weather}` : '', e.photo ? 'photo: yes' : '', e.photo && e.photos && e.photos > 1 ? `photos: ${Math.min(e.photos, MAX_PHOTOS)}` : '', !e.photo && e.icon && ICON_NAME.test(e.icon) ? `icon: ${e.icon}` : '', `updated: ${Math.round(e.updated)}`].filter(Boolean);
   return `---\n${head.join('\n')}\n---\n${e.text}\n`;
 }
 
@@ -110,11 +116,11 @@ export function entryFromMarkdown(md: string): DiaryEntry | null {
   }
   const mood = (MOOD_KEYS as readonly string[]).includes(meta.mood) ? (meta.mood as Mood) : undefined;
   const mood2 = mood && (MOOD_KEYS as readonly string[]).includes(meta.mood2) && meta.mood2 !== mood ? (meta.mood2 as Mood) : undefined;
-  const weather = (WEATHER_KEYS as readonly string[]).includes(meta.weather) ? (meta.weather as Weather) : undefined;
+  const weather = WEATHER_ID.test(meta.weather ?? '') ? meta.weather : undefined;
   const star = (STAR_KEYS as readonly string[]).includes(meta.star) ? (meta.star as Star) : undefined;
   const updated = Number(meta.updated);
   const count = Number(meta.photos);
-  return { text: m[2].replace(/\n$/, ''), ...(meta.title && { title: meta.title }), ...(star && { star }), ...(meta.note && { note: meta.note }), ...(meta.location && { location: meta.location }), mood, ...(mood2 && { mood2 }), ...(meta.feeling && { feeling: meta.feeling }), ...(weather && { weather }), ...(meta.photo === 'yes' && Number.isInteger(count) && count > 1 && count <= MAX_PHOTOS && { photos: count }), photo: meta.photo === 'yes', updated: Number.isFinite(updated) ? updated : 0 };
+  return { text: m[2].replace(/\n$/, ''), ...(meta.title && { title: meta.title }), ...(star && { star }), ...(meta.note && { note: meta.note }), ...(meta.location && { location: meta.location }), mood, ...(mood2 && { mood2 }), ...(meta.feeling && { feeling: meta.feeling }), ...(weather && { weather }), ...(meta.photo === 'yes' && Number.isInteger(count) && count > 1 && count <= MAX_PHOTOS && { photos: count }), ...(meta.photo !== 'yes' && ICON_NAME.test(meta.icon ?? '') && { icon: meta.icon }), photo: meta.photo === 'yes', updated: Number.isFinite(updated) ? updated : 0 };
 }
 
 export interface Backup {
@@ -127,6 +133,7 @@ export interface Backup {
   extras?: DiaryExtras;
   notes?: Record<string, string>;     // the notes, by name (notes/<name>.md in the file)
   shopping?: string;                  // Kitty Mart's data, as JSON (shopping.json in the file)
+  gallery?: string;                   // Kitty Gallery's icons, as JSON (gallery.json in the file); none in a backup from before it
 }
 
 export function packBackup(b: Backup, exportedAt = Date.now()): Uint8Array {
@@ -139,6 +146,7 @@ export function packBackup(b: Backup, exportedAt = Date.now()): Uint8Array {
   }
   for (const [name, text] of Object.entries(b.notes ?? {})) if (name === safeName(name) && text.length <= MAX_TEXT) files[`notes/${name}.md`] = strToU8(text);
   if (b.shopping) files['shopping.json'] = strToU8(b.shopping);
+  if (b.gallery) files['gallery.json'] = strToU8(b.gallery);
   const extras = sanitizeExtras(b.extras);
   if (Object.keys(extras).length) files[EXTRAS_FILE] = strToU8(JSON.stringify(extras));
   if (b.achievement) files[ACHIEVEMENT_ENTRY] = [b.achievement, { level: 0 }];   // photos inside are JPEGs already
@@ -206,5 +214,5 @@ export function unpackBackup(bytes: Uint8Array): Backup {
   }
   let extras: DiaryExtras = {};
   try { if (files[EXTRAS_FILE]) extras = sanitizeExtras(JSON.parse(strFromU8(files[EXTRAS_FILE]))); } catch { /* ignore a damaged settings file */ }
-  return { game: JSON.parse(strFromU8(files['game.json'])), diary, photos, morePhotos, reflections, extras, notes, ...(files['shopping.json'] && { shopping: strFromU8(files['shopping.json']) }), ...(files[ACHIEVEMENT_ENTRY] && { achievement: files[ACHIEVEMENT_ENTRY] }) };
+  return { game: JSON.parse(strFromU8(files['game.json'])), diary, photos, morePhotos, reflections, extras, notes, ...(files['shopping.json'] && { shopping: strFromU8(files['shopping.json']) }), ...(files['gallery.json'] && { gallery: strFromU8(files['gallery.json']) }), ...(files[ACHIEVEMENT_ENTRY] && { achievement: files[ACHIEVEMENT_ENTRY] }) };
 }

@@ -59,6 +59,8 @@ export function change(next: ShopData, label?: string): Promise<boolean> {
   return write();
 }
 export const undoLabel = () => undos[undos.length - 1]?.label ?? null;
+// The change Undo would put back (the same object until another change or an undo), so a screen can tell it apart.
+export const undoTop = (): object | null => undos[undos.length - 1] ?? null;
 export function undo(): string | null {
   const u = undos.pop();
   if (!u) return null;
@@ -69,7 +71,8 @@ export function undo(): string | null {
 }
 
 // ---- backup ----
-export const collectShopping = (): string | undefined => (ready && (data.lists.length || data.recipes.length || data.pantry.length || Object.keys(data.regulars).length) ? JSON.stringify(data) : undefined);
+// Left out only while it is just as a new Kitty Mart starts (so restoring an older backup can't wipe it by accident).
+export const collectShopping = (): string | undefined => (ready && JSON.stringify(data) !== JSON.stringify(emptyData()) ? JSON.stringify(data) : undefined);
 export async function restoreShopping(text: string): Promise<boolean> {
   let next: ShopData;
   try { next = sanitize(JSON.parse(text)); } catch { return false; }

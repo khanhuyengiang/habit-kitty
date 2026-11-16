@@ -2,19 +2,38 @@
 
 Newest first. The app bundles this file: it shows the latest entry once after an update, and the whole list under Settings → Change log.
 
+## 0.6.0 - 2026-11-16
+
+### New
+- **Kitty Gallery.** A new key on the home page: draw your own pixel art and change the app's own. Stickers, mini stickers (the card friends), button icons, weather, decorations and Habit Kitty's scenes each have their own tab, with the icons in groups (**default** and **user** to start). What you draw is used everywhere in the app straight away. **Colours** lists every colour in the app.
+- **Kitty Gallery: Select.** A tool on the drawing board: drag a box over part of a drawing, then drag it (or use the arrows) to move it over the rest without wiping it. Flip, **Duplicate** or **Delete** just that part; **Select all** moves the whole drawing. One Undo takes back the whole move.
+- **Kitty Gallery: Organise.** Tap icons to pick them (or **Pick all** in a group), then **Move** them to another group, **Delete** them, or make stickers cat food or not, in one go. The group of an icon is a dropdown, with **New group…** to make one.
+- **Kitty Gallery: delete official icons.** An official sticker or weather can be deleted: the app stops showing and using it, and anything that had it shows a heart. Deleted ones wait under **Deleted**, to bring back with your changes. The heart can't be deleted.
+- **Kitty Gallery: cat food.** Tick **Can kitty eat this?** on a sticker and Habit Kitty's feed button can serve it. Every kitty still gets a different food each day.
+- **Kitty Gallery: your own weather.** Draw new weather for Meteorokinesis, and it turns up on every diary page.
+- **Kitty Gallery: scenes.** The cosy room and the garden are redrawn, bigger and more detailed, so the kitties are small in a cosy world. In Kitty Gallery you can draw on them, **Use a photo…** to turn a photo into pixel art in the app's colours, and place the **Kitty spots** where the kitties sit (and, in the room, the diary book and the trophy). The home-screen widget shows the new room.
+- **Kitty Gallery: decorations.** The wings beside the chosen app on the home page can be redrawn.
+- **Kitty Gallery: safe imports.** **Export icons** saves your icons in their own file and **Import icons** reads one back. Before an import replaces icons you've changed or drawn yourself, Kitty Gallery lists them and asks: **Replace** yours, **Keep both** (the file's comes in as a new icon), or **Cancel**. No two icons in a category can share a name. If two ever do, they become "Star 1" and "Star 2".
+- **Kitty Gallery: more colours.** Every note colour (pink, lavender, sky, mint, sun, peach) can be drawn in, lit or shaded, and there is a new lime green and a light and a dark red. The colours are listed three to a row in rainbow order, the base colour on top, and **Choose a colour…** opens every other colour of the app, with the ones you picked before at the top.
+- **Kitty Gallery: tool icons.** Pencil, Eraser, Fill, Pick, Select and Mirror are icons, so the drawing bar fits a phone without scrolling.
+- **Kitty Gallery: Reset to original.** Settings → Kitty Gallery puts every icon back as it comes with the app. **Reset changed icons** keeps the icons you drew yourself; **Reset and delete my own icons** clears those too.
+- **New sticker icons.** A cute dessert group (strawberry cake, macaron, sundae, pancake, flan, chocolates, paw coffee, honey jar, rabbit tanghulu and a drink), plus a rabbit, two chickens and a bee. The other icons are redrawn and sorted into groups.
+- **Counted achievements.** Give an achievement a **Goal (times)**, like 10 marathons or 100 pasta meals. Its page has **−1** and **+1** to count, and the card shows a pixel bar with the count. When a locked card reaches its goal, the app offers to unlock it.
+- **Diary: an icon instead of a photo.** Under **Picture**, choose **Photo** or **Icon**. A page with an icon shows that sticker, and its day turns pink like a written page. Saving with an icon removes the page's photos.
+- **Settings file.** Settings → Backup → **Settings only** saves a small **.kittyset** file with how your app looks and works: the look, Habit Kitty options and sounds, your day and room names, diary options and emotion names, Kitty Mart categories and aisle order, and your Kitty Gallery icons. It holds nothing personal (no kitties, diary, notes, shopping lists or achievements), so you can give it to someone else or a new phone. **Load settings…** asks which parts to take.
+- **Kitty Mart: aisle order per supermarket.** **List… → Category order** puts the categories the way you walk through that shop. Every supermarket has its own; **Use the pantry's order** goes back. The pantry has its own order under **Arrange**.
+- **Fancy background and every Diary option on to start.** New installs start with the fancy background, and a new diary starts with Meteorokinesis, Teleportation, Photographer, Titles and Starry Nights on. Each can be turned off in Settings.
+
+### Changed
+- **The backup holds Kitty Gallery too.** The .kitty file now carries your icons and scenes, and restoring it puts them back. Older backups still load.
+- **Stickers are 18 × 18.** Icons you drew at 16 × 16 keep their look: **Add border to all** in Kitty Gallery gives them their border and edges.
+- **Icon pickers in groups.** The icon lists in notes, Kitty Achievement and Kitty Mart show a heading over each group, so an icon is quicker to find. A card's big picture is the icon itself, zoomed in, rather than a smoothed redraw.
+- **Cancel on the Undo notice** in Kitty Gallery and Kitty Mart puts it away until the next change.
+- **Home and Player stat buttons** use the new button icons.
+
 ## 0.5.1 - 2026-11-11
 
 ### New
-- **Kitty Gallery.** A new key on the home page: draw pixel icons at the app's own sizes (sticker icons, card friends, button icons), change the ones that are there, and see the base colour follow each note colour. Icons sit in groups (**default** and **user** to start). **Export icons** saves them in their own file (not the backup), and **Import icons** reads one back. **Colours** lists every colour in the app.
-- **Kitty Gallery: Select.** A new tool on the drawing board: drag a box over part of a drawing, then drag it (or use the arrows) to move it over the rest without wiping it. Flip, **Duplicate** or **Delete** just that part; **Select all** moves the whole drawing. One Undo takes back the whole move.
-- **Kitty Gallery: Organise groups.** Tap icons to pick them (or **Pick all** in a group), choose a group, and **Move** them there in one go. The group of an icon is now a dropdown, with **New group…** to make one.
-- **Kitty Gallery: safe imports.** Before an import replaces icons you've changed or drawn yourself, Kitty Gallery lists them and asks: **Replace** yours, **Keep both** (the file's comes in as a new icon), or **Cancel**. No two icons in a category can share a name. If two ever do, they become "Star 1" and "Star 2".
-- **New sticker icons.** A cute dessert group (strawberry cake, macaron, sundae, pancake, flan, chocolates, paw coffee, honey jar, rabbit tanghulu and a drink), plus a rabbit, two chickens and a bee. The other icons are redrawn and sorted into groups.
-- **Fancy background and every Diary option on to start.** New installs start with the fancy background, and a new diary starts with Meteorokinesis, Teleportation, Photographer, Titles and Starry Nights on. Each can be turned off in Settings.
-- **Icon pickers in groups.** The icon lists in notes, Kitty Achievement and Kitty Mart show a heading over each group, so an icon is quicker to find. A card's big picture is now the icon itself, zoomed in, rather than a smoothed redraw.
-- **Kitty Gallery: more colours.** Every note colour (pink, lavender, sky, mint, sun, peach) can be drawn in, lit or shaded, and there is a new lime green with its lit and shaded cousins too. The colours are listed three to a row in rainbow order, the base colour on top, and **Choose a colour…** opens every other colour of the app, with the ones you picked before at the top.
-- **Kitty Gallery: tool icons.** Pencil, Eraser, Fill, Pick, Select and Mirror are icons now, so the drawing bar fits a phone without scrolling.
-- **Kitty Gallery: Reset to original.** Settings → Kitty Gallery puts every icon back as it comes with the app. **Reset changed icons** keeps the icons you drew yourself; **Reset and delete my own icons** clears those too.
 - **Kitty Mart.** Shopping Lists is here, on the home page, with four tabs: Lists, Recipes, Pantry and Regulars.
 - **Kitty Mart: Lists**: one shopping list per supermarket. Type "2 milk" or "500 g flour" to add something; items are sorted by category, in the order you walk through the shop. Tick what goes in the basket, then **Shopping trip done** clears it (and keeps or deletes what you didn't buy). Each row has a **×** to delete it outright. An item on two lists is flagged. **List… → Share list** sends a list as text, and **Paste a shared list** reads one back.
 - **Kitty Mart: Suggestions** on top of the lists: what you mark as running low, reminders, "always buy" items, and things you buy every so often.

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { BOOK_ART, FOODS, ICONS, MARKS, PAL, ROOM_H, ROOM_W, TROPHY_ART, WEATHER_ART, artSvg, iconSvg, outdoorSvg, roomSvg } from './pixelart.ts';
+import { BOOK_ART, ICONS, MARKS, PAL, ROOM_H, ROOM_W, TROPHY_ART, artSvg, iconSvg, outdoorSvg, roomSvg } from './pixelart.ts';
 import { BODY_H, BODY_W, FACE_W, FURS, MINI_W, PATTERNS, bodySvg, faceSvg, miniSvg, popperSvg } from './shared/pixelcat.ts';
 
-const arts: Record<string, string[]> = { book: BOOK_ART, trophy: TROPHY_ART, ...Object.fromEntries(Object.entries(FOODS)), ...MARKS, ...WEATHER_ART };
+// (the cat food is drawn on the fine grid with Kitty Gallery's letters: src/pixel/model.test.ts checks it)
+const arts: Record<string, string[]> = { book: BOOK_ART, trophy: TROPHY_ART, ...MARKS };
 
 describe('one pixel grid', () => {
   it('draws every picture as full rows of known palette letters', () => {

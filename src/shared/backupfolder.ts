@@ -63,14 +63,14 @@ const wholeBackup = () => {
 export const saveBackupToDevice = async () => saveToDevice(backupName(BACKUP_PREFIX, BACKUP_EXT), await wholeBackup());
 
 // The share sheet (Drive, Bluetooth, mail...); Android only.
-export async function shareBackup() {
-  const name = backupName(BACKUP_PREFIX, BACKUP_EXT);
-  await toCache(name, await wholeBackup());
+export async function shareFile(name: string, bytes: Uint8Array, title: string, dialogTitle: string) {
+  await toCache(name, bytes);
   try {
     const { uri } = await Filesystem.getUri({ path: name, directory: Directory.Cache });
-    await Share.share({ title: 'Habit Kitty backup', files: [uri], dialogTitle: 'Share your backup' });
+    await Share.share({ title, files: [uri], dialogTitle });
   } finally { await dropCache(name); }
 }
+export const shareBackup = async () => shareFile(backupName(BACKUP_PREFIX, BACKUP_EXT), await wholeBackup(), 'Habit Kitty backup', 'Share your backup');
 
 // ---- auto-backup ----
 export interface BackupSource {

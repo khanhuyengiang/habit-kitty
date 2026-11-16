@@ -113,7 +113,7 @@ const listeners = new Set<() => void>();
 export const diaryReady = () => ready;
 export const onDiary = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
 
-const hasPage = (e?: DiaryEntry) => !!e && (!!e.text.trim() || !!e.photo);   // a written page or a photo turns the day pink
+const hasPage = (e?: DiaryEntry) => !!e && (!!e.text.trim() || !!e.photo || !!e.icon);   // a written page, a photo or an icon turns the day pink
 export const diaryEntries = () => entries;
 export const entryOf = (day: number): DiaryEntry | undefined => entries[day];
 export const hasPageOn = (day: number) => hasPage(entries[day]);

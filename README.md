@@ -1,6 +1,6 @@
 # Itty Bitty Kitty
 
-A cozy pixel-cat app with a few mini-apps: Habit Kitty, Kitty Journal, Kitty Achievement and Kitty Mart.
+A cozy pixel-cat app with a few mini-apps: Habit Kitty, Kitty Journal, Kitty Achievement, Kitty Mart and Kitty Gallery.
 
 **Habit Kitty** is a habit tracker where every habit is a pixel cat. Do the habit, feed the cat. Skip it and the cat goes hungry.
 It lives in a cozy pastel pixel world (pink, baby blue and lavender, with a pixel grid behind everything) and runs as a
@@ -27,7 +27,7 @@ single web page and as an offline Android app (via Capacitor).
 - Changed your mind? Press and hold a kitty, then **Release to the stray colony**: it becomes a daily stray again, with no penalty, and can be adopted back as the same kitty.
 - Treats and strays can always be done, but each kind pays out at most its cap per day.
 - Everything is drawn on one pixel grid, so kitties, icons, food and the room share a single pixel size.
-- Every cat gets a different food each day (dry food, wet food, fish, chicken, shrimp or meat).
+- Every cat gets a different food each day, picked from the sticker icons marked as cat food (draw your own in Kitty Gallery and tick **Can kitty eat this?**).
   Each cat has its own look, which you can randomise when adopting.
 
 - Every kitty is a girl or a boy (chosen when you adopt). Feeding earns a warm message, with special ones for first meals, streaks and milestones.
@@ -60,14 +60,14 @@ On Android, **Settings → Notes → Sync with the notes folder** keeps a copy o
 
 The **Diary** is the first tab of the **Journal** button on the home page (the other tab is **Notes**). It is no longer a tab in Habit Kitty.
 
-- **Calendar:** a monthly calendar. Tap a day to write a page, pick one or two moods (little pixel cats) and attach a photo from your gallery.
+- **Calendar:** a monthly calendar. Tap a day to write a page, pick one or two moods (little pixel cats) and attach a photo from your gallery, or pick a sticker icon instead.
   Days with a page turn pink and the mood shows inside the day. Photos are shrunk to at most 60 KB (900 px on the long side) and kept on the device (not in saved text).
 - **Reflection:** one note for each month, with a tally of the moods you picked that month.
 - **Birthdays:** add the people whose birthdays you want to remember (the year is optional). A cake marks the day on the calendar and on that day's page, and the next ones are listed at the top.
-- **Settings** (the gear in the Diary): Trackamaniac (a weather choice on every page) and your own names for the five emotions.
+- **Settings** (the gear in the Diary): Meteorokinesis (a weather choice on every page, including any weather you draw in Kitty Gallery), Teleportation, Photographer, Titles, Starry Nights, and your own names for the five emotions.
 - The days you have written fill your **MP** bar (10 days to leave level 1, 20 for level 2, and so on).
 
-**Settings** is the gear icon at the top right of every screen, and opens the same screen everywhere. It holds the shared options (sound, your day start, backup, change log) and a button for each mini-app with its own options: Habit Kitty (feeding reminders, game options, unlimited kitty, how to use), Diary (Trackamaniac, emotion names) and Achievements (load achievements).
+**Settings** is the gear icon at the top right of every screen, and opens the same screen everywhere. It holds the shared options (sound, your day start, backup, change log) and a button for each mini-app with its own options: Habit Kitty (feeding reminders, game options, unlimited kitty, how to use), Diary (Meteorokinesis and the other page options, emotion names), Achievements (load achievements) and Kitty Gallery (reset to original).
 
 ### Feeding reminders
 
@@ -84,8 +84,26 @@ In the room, a cat at home sometimes thinks of one that is with the sitter (more
 cats that passed away, ran away or recently came home. One bubble at a time, with rests between them, and always based on
 the cat's current status.
 
-Progress is stored on the device. Use **Settings → Save & load** to back it up (on Android, *Save to file*
-opens the share sheet) or move it to another device.
+### Kitty Achievement
+
+Quests, side quests and achievement cards. An achievement can have a **Goal (times)** ("Run 10 marathons"): count it up
+with **+1** on its page, and the card shows a pixel bar with the count. When a locked card reaches its goal, the app offers to unlock it.
+
+### Kitty Gallery
+
+Draw the app's pixel art yourself. Each tab is one kind: **Sticker** (18 × 18, used on notes, achievement cards, side quests and
+Kitty Mart categories), **Mini sticker** (the card friends), **Button** (one-colour button icons), **Weather** (for Meteorokinesis),
+**Decoration** (such as the wings on the home page) and **Scene** (Habit Kitty's cosy room and garden, 240 × 320).
+New icons and changes are used everywhere in the app straight away, and official stickers and weather can be deleted (and brought back).
+A sticker can be marked as cat food. A scene can be drawn on, made from a photo (**Use a photo…**), and given its **Kitty spots**.
+**Export icons** writes your icons to a file, which can be merged into the code to make them official; **Import icons** reads one back.
+
+### Backup and settings
+
+Everything is stored on the device. **Settings → Backup** saves one **.kitty** file with everything: kitties, diary pages and photos,
+notes, Kitty Mart, Kitty Gallery icons and Kitty Achievement. Save it on the device, share it (Android), or pick a backup folder for daily auto-backups.
+**Settings only** saves a small **.kittyset** file with just the look and options (and Kitty Gallery icons), with nothing personal in it,
+to give someone else the same setup. Loading one asks which parts to take.
 
 ## Development
 
@@ -126,7 +144,11 @@ You can also open the `android/` folder in Android Studio and press Run after `n
 | `src/catdiary.ts` | Each cat's own diary of little happenings (pure, seeded). |
 | `src/reminders.ts` | What each daily reminder says and when (pure, tested). |
 | `src/thoughts.ts` | Who a cat thinks about, and how often (pure, tested). |
-| `src/pixelart.ts` | Icons, weather, food and room art (pure, returns SVG). |
+| `src/pixelart.ts` | Button icons, weather and decorations (pure, returns SVG). |
+| `src/scene.ts` | The cosy room and the garden (240 × 320), their kitty spots, and the diary book and trophy. |
+| `src/pixel/` | Kitty Gallery: the screen (`app.ts`), its icon model, import and export (`model.ts`, pure and tested), storage (`data.ts`), and `live.ts`, which puts your icons over the official ones app-wide. `web/pixel.html` has its markup and styles. |
+| `src/shopping/` | Kitty Mart: the screen (`app.ts`), its lists, pantry, recipes and aisle orders (`model.ts`, pure and tested) and storage (`data.ts`). `web/shopping.html` has its markup and styles. |
+| `src/settings-file.ts` | The `.kittyset` settings file: what goes in it, and cleaning one that is read back. |
 | `src/shared/pixelart.ts` | Shared by both apps: the pixel grid and pastel palette that every picture is drawn with. |
 | `src/shared/pixelcat.ts`, `src/shared/coats.ts` | Shared by both apps: the pixel cats and the per-coat pattern layers (edit them with `npm run editor`). |
 | `src/achievement/` | Kitty Achievement: its data model, rules (`ops.ts`), storage, backup, card art and UI. |

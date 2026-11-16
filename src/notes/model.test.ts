@@ -104,7 +104,9 @@ describe('the card picture in the frontmatter', () => {
     expect([p.color, p.doodle, p.face]).toEqual(['blue', 'paw', 'sleepy']);
     expect(composeNote(p)).toBe('---\nkitty-color: blue\nkitty-doodle: paw\nkitty-face: sleepy\n---\nx');
     expect(composeNote({ ...p, color: 'pink', doodle: 'heart', face: 'happy' })).toBe('x');
-    expect(parseNote('---\nkitty-color: <b>\nkitty-doodle: bomb\n---\nx')).toMatchObject({ color: 'pink', doodle: 'heart' });
+    // a doodle no icon has (one deleted in Kitty Gallery, say) is kept, and drawn as a heart; one that can't be a name is a heart
+    expect(parseNote('---\nkitty-color: <b>\nkitty-doodle: bomb\n---\nx')).toMatchObject({ color: 'pink', doodle: 'bomb' });
+    expect(parseNote('---\nkitty-doodle: <b>\n---\nx')).toMatchObject({ doodle: 'heart' });
   });
   it('is ignored by titles and search', () => {
     expect(titleFromText('---\nkitty-icon: cat\n---\nGroceries')).toBe('Groceries');

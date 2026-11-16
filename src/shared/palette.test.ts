@@ -13,9 +13,9 @@ const full = (h: string) => (h.length <= 5 ? '#' + [...h.slice(1)].map((c) => c 
 const hex = (n: string) => (+n).toString(16).padStart(2, '0');
 
 describe('palette', () => {
-  it('has 61 distinct colours', () => {
-    expect(Object.keys(PALETTE)).toHaveLength(61);
-    expect(PALETTE_HEXES.size).toBe(61);
+  it('has 63 distinct colours', () => {
+    expect(Object.keys(PALETTE)).toHaveLength(63);
+    expect(PALETTE_HEXES.size).toBe(63);
   });
 
   it('puts every colour in exactly one family', () => {

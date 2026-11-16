@@ -1,12 +1,14 @@
 <style>
 /* Kitty Gallery. Drawn with the shared sheet and Habit Kitty's; these are its own parts. Only the shared colour variables. */
 .pixel-body { display: grid; gap: var(--s4); }
-.pixel .pix-cats { overflow-x: auto; }
+.pixel .pix-cats { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); }   /* six categories: two rows of three */
+.pixel .pix-cats button { padding-inline: var(--s2); }
 .pixel h3 .num { font-size: 16px; }
 .pix-intro .btns, .pix-save .btns { justify-content: flex-start; }
 .pix-badge, .pixel .badge { flex: none; font-size: 14px; font-weight: 700; padding: 0 var(--s2); background: var(--surface2); color: var(--muted); }
 .pixel .badge.new { background: var(--accent-soft); color: var(--accent-text); }
 .pixel .badge.changed { background: var(--warn-bg); color: var(--warn-ink); }
+.pix-gone .pix-pic, .pix-gone .pix-pbig { opacity: .45; filter: grayscale(1); }
 /* a group: its icons as tiles, as many to a row as fit */
 .pix-ghead { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
 .pix-ghead h3 { margin: 0; text-transform: capitalize; }
@@ -54,6 +56,24 @@
 /* the selection: a dashed box (on a light edge, so it shows on any colour); lifted, it is tinted and can be dragged */
 .pix-sel { position: absolute; box-sizing: border-box; border: 2px dashed var(--accent-text); box-shadow: 0 0 0 1px var(--surface), inset 0 0 0 1px var(--surface); cursor: move; }
 .pix-sel.lifted { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+/* a scene: one canvas, zoomed in by --zoom inside a box you move around in (the Move around tool) */
+.pix-board-wrap.scene { display: block; overflow: auto; max-height: 72vh; overscroll-behavior: contain; }
+.pix-board.scene { display: block; width: calc(100% * var(--zoom, 1)); max-width: none; background: var(--surface2); }
+.pix-board.scene canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.pix-board.scene[data-tool="pan"] { cursor: grab; }
+.pix-board.spots { cursor: pointer; }
+.pix-zooms, .pix-modes { margin-block: var(--s2); }
+/* the kitty spots: a see-through kitty on each, numbered; the picked one outlined */
+.pix-marks { position: absolute; inset: 0; pointer-events: none; }
+.pix-spot { position: absolute; opacity: .8; }
+.pix-spot .sprite, .pix-spot .pxs { width: 100%; height: 100%; }
+.pix-spot b { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); font: 700 14px/1 var(--font); color: var(--ink);
+  paint-order: stroke fill; -webkit-text-stroke: 3px var(--surface); }
+.pix-spot.on { opacity: 1; outline: 2px dashed var(--accent-text); outline-offset: 1px; }
+.pix-spot.prop { opacity: 1; }
+.pix-photo { align-items: center; justify-content: center; text-align: center; font-size: 16px; }
+.pix-scene { display: block; width: 60px; height: 80px; image-rendering: pixelated; }
+.pix-scene.big { width: min(100%, 240px); height: auto; aspect-ratio: 3 / 4; }
 .pix-selbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--s2) var(--s3); font-size: 16px; text-align: center; }
 .pix-selbar:empty { display: none; }
 .pix-selbar .btns { justify-content: center; }

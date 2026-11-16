@@ -38,13 +38,24 @@ describe('diary markdown', () => {
     expect(entryFromMarkdown(entryToMarkdown(e))).toEqual({ ...e, photo: false });
   });
   it('drops a second emotion that has no first or repeats it, and an unknown weather', () => {
-    const e = entryFromMarkdown('---\nmood2: sad\nweather: hail\nupdated: 1\n---\nx');
+    const e = entryFromMarkdown('---\nmood2: sad\nweather: hail storm!\nupdated: 1\n---\nx');
     expect(e?.mood).toBeUndefined(); expect(e?.mood2).toBeUndefined(); expect(e?.weather).toBeUndefined();
     expect(entryFromMarkdown('---\nmood: sad\nmood2: sad\nupdated: 1\n---\nx')?.mood2).toBeUndefined();
   });
   it('ignores an unknown mood and rejects files without frontmatter', () => {
     expect(entryFromMarkdown('---\nmood: furious\nupdated: 1\n---\nx')?.mood).toBeUndefined();
     expect(entryFromMarkdown('just text')).toBeNull();
+  });
+});
+
+describe('diary page icon', () => {
+  it('keeps an icon shown instead of photos, and drops it when the page has photos or the name is not one', () => {
+    const e: DiaryEntry = { text: 'Hi', mood: undefined, icon: 'teapot', photo: false, updated: 1 };
+    expect(entryToMarkdown(e)).toContain('\nicon: teapot\n');
+    expect(entryFromMarkdown(entryToMarkdown(e))).toEqual(e);
+    expect(entryToMarkdown({ ...e, photo: true })).not.toContain('icon:');
+    expect(entryFromMarkdown('---\nphoto: yes\nicon: star\nupdated: 1\n---\nx')?.icon).toBeUndefined();
+    expect(entryFromMarkdown('---\nicon: <b>\nupdated: 1\n---\nx')?.icon).toBeUndefined();
   });
 });
 

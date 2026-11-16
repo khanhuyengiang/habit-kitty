@@ -5,33 +5,46 @@
 // and its own letters. In a sticker or a card friend, `s` is the BASE COLOUR: it is not one colour but whatever colour
 // the card, note or category it sits on has (that is why the heart turns from pink to blue with its note).
 //
-// What you draw lives only in Kitty Gallery (it is not in the backup) until it is made official: Export writes a file
-// (the format is below) to put in the repo, and its icons are then copied into the code by hand.
-import { CARD_FRIENDS, PALETTE_INKS, PICKER_ICONS, UI_ICONS } from '../achievement/pixelart.ts';
-import { ICONS } from '../pixelart.ts';
+// What you draw is used everywhere in the app straight away (see ./live.ts), as if it were official. The backup and the
+// settings file carry it to another phone; to make it official, Export writes a file (the format is below) to put in the
+// repo, and its icons are then copied into the code by hand.
+import { OFFICIAL_CARD_FRIENDS, OFFICIAL_PICKER_ICONS, OFFICIAL_UI_ICONS, PALETTE_INKS, bakeSticker } from '../achievement/pixelart.ts';
+import { OFFICIAL_DECOS, OFFICIAL_ICONS, OFFICIAL_WEATHER } from '../pixelart.ts';
 import { PALETTE, type PaletteName } from '../shared/palette.ts';
+import { OFFICIAL_GARDEN_SPOTS, OFFICIAL_PROPS, OFFICIAL_ROOM_SPOTS, ROOM_H, ROOM_W, officialSceneGrid, type SceneId, type Spot } from '../scene.ts';
 
-export type CategoryId = 'sticker' | 'friend' | 'button';
+export type CategoryId = 'sticker' | 'friend' | 'button' | 'weather' | 'deco' | 'scene';
 export interface Category {
   id: CategoryId;
   label: string;
   where: string;      // where the app shows them
   w: number; h: number;   // the size of a new one (an official one keeps its own size)
   letters: string;    // the letters you can draw with, in the palette's order
-  outline: boolean;   // the dark outline and the lit and shaded edges are added for you
+  outline: boolean;   // the lit and shaded edges of the base colour are added for you (the dark outline is drawn with the rest)
+  base: string;       // what the base colour (s, l, d) follows, or '' when it has none
 }
 // The colours of a sticker or a card friend as the drawing board lists them, three to a row: the base colour (it follows the card)
 // on top, then one row per family in rainbow order (by hue), a family never split; a row that has fewer is left short.
 export const BASE_ROWS = ['sld', 'o'];
-export const INK_ROWS = ['R', 'fuU', 'Y', 'yjJ', 'c', 'xzZ', 'G', 'gmM', 'biI', 'B', 'vaA', 'rpP', 'nN', 'wkK'];
+export const INK_ROWS = ['#R&', 'fuU', 'Y', 'yjJ', 'c', 'xzZ', 'G', 'gmM', 'biI', 'B', 'vaA', 'rpP', 'nN', 'wkK'];
 // Every other palette colour can be drawn too (picked with "Choose a colour"), each with its own sign.
 export const MORE_INKS = Object.keys(PALETTE_INKS).join('');
 const INKS = [...BASE_ROWS, ...INK_ROWS].join('') + MORE_INKS;
+const FULL_INKS = INKS.replace(/[sld]/g, '');   // the same without the base colour
 export const CATEGORIES: Category[] = [
-  { id: 'sticker', label: 'Sticker icon', where: 'Notes, Kitty Achievement cards and side quests, Kitty Mart categories', w: 16, h: 16, letters: INKS, outline: true },
-  { id: 'friend', label: 'Card friend', where: 'The little friends in the corner of a Kitty Achievement card', w: 9, h: 9, letters: INKS, outline: false },
-  { id: 'button', label: 'Button icon', where: 'The small one-colour icons on buttons', w: 7, h: 7, letters: 'o', outline: false },
+  { id: 'sticker', label: 'Sticker', where: 'Notes, Kitty Achievement cards and side quests, Kitty Mart categories', w: 18, h: 18, letters: INKS, outline: true, base: 'the card or note it is on' },
+  { id: 'friend', label: 'Mini sticker', where: 'The card friends in the corner of a Kitty Achievement card', w: 9, h: 9, letters: INKS, outline: false, base: 'the card or note it is on' },
+  { id: 'button', label: 'Button', where: 'The small one-colour icons on buttons', w: 7, h: 7, letters: 'o', outline: false, base: '' },
+  { id: 'weather', label: 'Weather', where: 'The weather choice on a diary page (with Meteorokinesis on)', w: 13, h: 10, letters: FULL_INKS, outline: false, base: '' },
+  { id: 'deco', label: 'Decoration', where: 'Pictures drawn in one place only, such as the wings beside the chosen app on the home screen', w: 12, h: 12, letters: FULL_INKS, outline: false, base: '' },
+  { id: 'scene', label: 'Scene', where: "Habit Kitty's cosy room and garden, where the kitties live", w: ROOM_W, h: ROOM_H, letters: '', outline: false, base: '' },
 ];
+// Decorations and scenes are each drawn in their own place: they can be changed, but there are no new ones.
+export const isFixed = (id: CategoryId) => id === 'deco' || id === 'scene';
+// An official sticker or weather can be deleted too: it stays in the code but the app no longer shows or uses it (anything
+// still holding a deleted sticker is drawn as a heart). The heart sticker can't be: it is what the others fall back on.
+// The other kinds are drawn by name in fixed places (the card's heart and flower, the buttons), so they can't be deleted.
+export const canDeleteOfficial = (cat: CategoryId, id: string) => (cat === 'sticker' && id !== 'heart') || cat === 'weather';
 export const categoryOf = (id: CategoryId): Category => CATEGORIES.find((c) => c.id === id) ?? CATEGORIES[0];
 export const isCategory = (v: unknown): v is CategoryId => CATEGORIES.some((c) => c.id === v);
 
@@ -42,6 +55,7 @@ export const LETTERS: Record<string, { name: string; palette?: PaletteName }> = 
   w: { name: 'Cream', palette: 'cream' }, c: { name: 'Butter', palette: 'butter50' },
   y: { name: 'Sun', palette: 'sun300' }, Y: { name: 'Orange', palette: 'orange' },
   r: { name: 'Pink', palette: 'pink300' }, R: { name: 'Red', palette: 'red' },
+  '#': { name: 'Light red', palette: 'red300' }, '&': { name: 'Dark red', palette: 'red700' },
   g: { name: 'Mint', palette: 'mint200' }, G: { name: 'Green', palette: 'green500' },
   b: { name: 'Sky', palette: 'blue300' }, B: { name: 'Blue', palette: 'blue500' },
   n: { name: 'Wood', palette: 'wood' }, N: { name: 'Taupe', palette: 'taupe' },
@@ -54,6 +68,27 @@ export const LETTERS: Record<string, { name: string; palette?: PaletteName }> = 
   // the rest of the palette, named after it: lavender100 is "Lavender 100", slateBlue "Slate blue"
   ...Object.fromEntries(Object.entries(PALETTE_INKS).map(([ch, k]) => [ch, { name: paletteLabel(k), palette: k }])),
 };
+// A scene has the same colours as a decoration (every colour, no base colour). It becomes a picture (also on the home-screen widget), so every letter is a
+// fixed colour: the lit and shaded ones mixed the way FINE mixes them, the dark line as it is on a plain page.
+// LETTER_OF_HEX turns the official pictures back into letters: the first letter LETTERS gives each palette colour.
+export const LETTER_OF_HEX = new Map<string, string>();
+for (const [ch, v] of Object.entries(LETTERS)) if (v.palette && !LETTER_OF_HEX.has(PALETTE[v.palette])) LETTER_OF_HEX.set(PALETTE[v.palette], ch);
+export const SCENE_INKS = FULL_INKS;
+CATEGORIES.find((c) => c.id === 'scene')!.letters = SCENE_INKS;
+const rgb = (hex: string) => [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16));
+const mix = (a: string, pa: number, b: string) => `#${rgb(a).map((v, i) => Math.round(v * pa + rgb(b)[i] * (1 - pa)).toString(16).padStart(2, '0')).join('')}`;
+const LIT: Record<string, [string, PaletteName]> = {
+  p: ['P', 'pink300'], a: ['A', 'lavender300'], i: ['I', 'blue300'], m: ['M', 'mint200'], j: ['J', 'sun300'], u: ['U', 'peach'], z: ['Z', 'lime'],
+};
+const SCENE_HEX: Record<string, string> = { o: mix(PALETTE.grey600, 0.3, PALETTE.night950) };
+for (const ch of SCENE_INKS) { const k = LETTERS[ch]?.palette; if (k) SCENE_HEX[ch] = PALETTE[k]; }
+for (const [lit, [shaded, k]] of Object.entries(LIT)) {
+  SCENE_HEX[lit] = mix(PALETTE[k], 0.4, PALETTE.white);
+  SCENE_HEX[shaded] = mix(PALETTE[k], 0.7, PALETTE.night950);
+}
+// A scene letter's colour.
+export const sceneColors = (): Record<string, string> => ({ ...SCENE_HEX });
+
 // Palette colours in rainbow order: by hue in 30° steps from red, light to dark in each step; the greys (hardly any colour) last.
 export function byHue(chars: string[]): string[] {
   const key = (ch: string) => {
@@ -77,41 +112,61 @@ export const DEFAULT_GROUP = 'default', USER_GROUP = 'user';
 export const LIMITS = { name: 30, group: 30, icons: 500 };
 
 // ---- the official icons, from the code ----
-export interface Official { id: string; name: string; group: string; art: string[] }
+// A scene also has its kitty spots and (the room) where the diary book and the trophy stand.
+export type Props = Record<'book' | 'trophy', Spot>;
+// A sticker can be cat food too (food: true): the kitties are fed it on Habit Kitty's feed button.
+export interface Official { id: string; name: string; group: string; art: string[]; spots?: Spot[]; props?: Props; food?: boolean }
+export const SCENES: [SceneId, string][] = [['room', 'Cosy room'], ['garden', 'Garden']];
+export const MAX_SPOTS = 16;
+const sceneArts: Partial<Record<SceneId, string[]>> = {};
+const sceneArt = (id: SceneId) => (sceneArts[id] ??= officialSceneGrid(id).map((r) => r.map((hex) => LETTER_OF_HEX.get(hex) ?? '.').join('')));
+const officialSpots = (id: SceneId): Spot[] => (id === 'room' ? OFFICIAL_ROOM_SPOTS : OFFICIAL_GARDEN_SPOTS).map((p) => [...p] as Spot);
 const titleCase = (id: string) => id.charAt(0).toUpperCase() + id.slice(1);
 export function officials(cat: CategoryId): Official[] {
-  if (cat === 'sticker') return Object.entries(PICKER_ICONS).map(([id, v]) => ({ id, name: v.label, group: v.group ?? DEFAULT_GROUP, art: v.art }));
-  if (cat === 'friend') return Object.entries(CARD_FRIENDS).map(([id, v]) => ({ id, name: v.label, group: DEFAULT_GROUP, art: v.art }));
+  if (cat === 'sticker') return Object.entries(OFFICIAL_PICKER_ICONS).map(([id, v]) => ({ id, name: v.label, group: v.group ?? DEFAULT_GROUP, art: v.art, food: !!v.food }));
+  if (cat === 'friend') return Object.entries(OFFICIAL_CARD_FRIENDS).map(([id, v]) => ({ id, name: v.label, group: DEFAULT_GROUP, art: v.art }));
+  if (cat === 'weather') return Object.entries(OFFICIAL_WEATHER).map(([id, v]) => ({ id, name: v.label, group: DEFAULT_GROUP, art: v.art }));
+  if (cat === 'deco') return Object.entries(OFFICIAL_DECOS).map(([id, v]) => ({ id, name: v.label, group: DEFAULT_GROUP, art: v.art }));
+  if (cat === 'scene') return SCENES.map(([id, name]) => ({ id, name, group: DEFAULT_GROUP, art: sceneArt(id), spots: officialSpots(id),
+    ...(id === 'room' && { props: { book: [...OFFICIAL_PROPS.book] as Spot, trophy: [...OFFICIAL_PROPS.trophy] as Spot } }) }));
   // Habit Kitty's button icons, then Kitty Achievement's that Habit Kitty has not got
-  const all: Record<string, string[]> = { ...ICONS };
-  for (const [id, art] of Object.entries(UI_ICONS)) all[id] ??= art;
+  const all: Record<string, string[]> = { ...OFFICIAL_ICONS };
+  for (const [id, art] of Object.entries(OFFICIAL_UI_ICONS)) all[id] ??= art;
   return Object.entries(all).map(([id, art]) => ({ id, name: titleCase(id), group: DEFAULT_GROUP, art }));
 }
 export const officialOf = (cat: CategoryId, id: string) => officials(cat).find((o) => o.id === id);
 
 // ---- your icons ----
-// A drawing of your own, or a change to an official icon (it has the official one's id).
-export interface PixelIcon { category: CategoryId; id: string; name: string; group: string; art: string[]; updated: number }
+// A drawing of your own, or a change to an official icon (it has the official one's id). deleted: true marks an official
+// icon you deleted (see canDeleteOfficial); it keeps its picture, name and group, so bringing it back loses nothing.
+export interface PixelIcon { category: CategoryId; id: string; name: string; group: string; art: string[]; spots?: Spot[]; props?: Props; food?: boolean; deleted?: boolean; updated: number }
 export interface PixelData { version: 1; icons: PixelIcon[] }
 export const emptyData = (): PixelData => ({ version: 1, icons: [] });
 
-export type Status = 'official' | 'changed' | 'new';
+export type Status = 'official' | 'changed' | 'new' | 'deleted';
 export interface Shown extends Official { status: Status }
 
 // Every icon of a category as Kitty Gallery lists it: the official ones (with your changes) in the code's order, then yours.
+// A deleted official one is in it too (status 'deleted'): Kitty Gallery lists those on their own, to bring back.
 export function iconsOf(data: PixelData, cat: CategoryId): Shown[] {
   const mine = data.icons.filter((i) => i.category === cat);
   const byId = new Map(mine.map((i) => [i.id, i]));
   const offs = officials(cat);
   const shown: Shown[] = offs.map((o) => {
     const m = byId.get(o.id);
-    return m ? { id: o.id, name: m.name, group: m.group, art: m.art, status: 'changed' } : { ...o, status: 'official' };
+    return m ? { ...o, name: m.name, group: m.group, art: m.art, spots: m.spots ?? o.spots, props: m.props ?? o.props, food: m.food ?? o.food, status: m.deleted ? 'deleted' : 'changed' } : { ...o, status: 'official' };
   });
   const offIds = new Set(offs.map((o) => o.id));
-  for (const m of mine) if (!offIds.has(m.id)) shown.push({ id: m.id, name: m.name, group: m.group, art: m.art, status: 'new' });
+  for (const m of mine) if (!offIds.has(m.id)) shown.push({ id: m.id, name: m.name, group: m.group, art: m.art, ...(m.food && { food: true }), status: 'new' });
   return shown;
 }
-export const statusOf = (cat: CategoryId, id: string): 'changed' | 'new' => (officialOf(cat, id) ? 'changed' : 'new');
+export const statusOf = (i: { category: CategoryId; id: string; deleted?: boolean }): 'changed' | 'new' | 'deleted' =>
+  (!officialOf(i.category, i.id) ? 'new' : i.deleted ? 'deleted' : 'changed');
+// The icons the app shows and uses: all but the deleted ones.
+export const liveIcons = (data: PixelData, cat: CategoryId): Shown[] => iconsOf(data, cat).filter((i) => i.status !== 'deleted');
+// What putIcon needs to save a listed icon again as it is (deleted or not).
+const again = (cat: CategoryId, i: Shown): Omit<PixelIcon, 'updated'> =>
+  ({ category: cat, id: i.id, name: i.name, group: i.group, art: i.art, spots: i.spots, props: i.props, food: i.food, ...(i.status === 'deleted' && { deleted: true }) });
 
 // The groups in order: default, user, then the rest A to Z.
 export function groupsOf(icons: { group: string }[]): string[] {
@@ -155,17 +210,33 @@ export const isBlank = (art: string[]) => art.every((r) => /^\.*$/.test(r));
 export function putIcon(data: PixelData, icon: Omit<PixelIcon, 'updated'>, now = Date.now()): PixelData {
   const rest = data.icons.filter((i) => !(i.category === icon.category && i.id === icon.id));
   const o = officialOf(icon.category, icon.id);
-  if (o && o.name === icon.name && o.group === icon.group && o.art.join('\n') === icon.art.join('\n')) return { ...data, icons: rest };
-  return { ...data, icons: [...rest, { ...icon, updated: now }] };
+  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  if (icon.deleted && !(o && canDeleteOfficial(icon.category, icon.id))) return data;   // only an official one can be marked deleted
+  if (o && !icon.deleted && o.name === icon.name && o.group === icon.group && o.art.join('\n') === icon.art.join('\n')
+    && same(icon.spots ?? o.spots, o.spots) && same(icon.props ?? o.props, o.props) && !!(icon.food ?? o.food) === !!o.food) return { ...data, icons: rest };
+  const { spots, props, food, deleted, ...rest2 } = icon;
+  return { ...data, icons: [...rest, { ...rest2, ...(spots && { spots }), ...(props && { props }), ...(icon.category === 'sticker' && food !== undefined && { food }), ...(deleted && { deleted: true }), updated: now }] };
 }
-// Deletes your own icon, or puts an official one back as it is in the code.
+// Deletes your own icon, or puts an official one back as it is in the code (a deleted one too).
 export const dropIcon = (data: PixelData, cat: CategoryId, id: string): PixelData =>
   ({ ...data, icons: data.icons.filter((i) => !(i.category === cat && i.id === id)) });
 
-// Puts every official icon back as it is in the code (art, name and group). `all` deletes your own drawings too.
+// Deletes an official icon (see canDeleteOfficial), keeping your changes to it; restoreIcon brings it back with them.
+export function deleteOfficial(data: PixelData, cat: CategoryId, id: string, now = Date.now()): PixelData {
+  const i = iconsOf(data, cat).find((s) => s.id === id);
+  if (!i || i.status === 'new' || i.status === 'deleted' || !canDeleteOfficial(cat, id)) return data;
+  return putIcon(data, { ...again(cat, i), deleted: true }, now);
+}
+export function restoreIcon(data: PixelData, cat: CategoryId, id: string, now = Date.now()): PixelData {
+  const i = iconsOf(data, cat).find((s) => s.id === id);
+  if (i?.status !== 'deleted') return data;
+  return uniqueNames(putIcon(data, { ...again(cat, i), deleted: false }, now), now);   // a new icon may have taken its name meanwhile
+}
+
+// Puts every official icon back as it is in the code (art, name and group), deleted ones too. `all` deletes your own drawings too.
 export const resetIcons = (data: PixelData, all = false): PixelData =>
   ({ ...data, icons: all ? [] : data.icons.filter((i) => !officialOf(i.category, i.id)) });
-// How many of each kind there are: changes to official icons, and icons of your own.
+// How many of each kind there are: changes to official icons (deleting one counts), and icons of your own.
 export const countMine = (data: PixelData) => {
   const changed = data.icons.filter((i) => officialOf(i.category, i.id)).length;
   return { changed, mine: data.icons.length - changed };
@@ -176,7 +247,7 @@ export function renameGroup(data: PixelData, cat: CategoryId, from: string, to: 
   const target = cleanGroup(to, from);
   if (target === from) return data;
   let next = data;
-  for (const i of iconsOf(data, cat)) if (i.group === from) next = putIcon(next, { category: cat, id: i.id, name: i.name, group: target, art: i.art }, now);
+  for (const i of iconsOf(data, cat)) if (i.group === from) next = putIcon(next, { ...again(cat, i), group: target }, now);
   return next;
 }
 
@@ -184,9 +255,47 @@ export function renameGroup(data: PixelData, cat: CategoryId, from: string, to: 
 export function moveIcons(data: PixelData, cat: CategoryId, ids: string[], to: string, now = Date.now()): PixelData {
   const target = cleanGroup(to, USER_GROUP), pick = new Set(ids);
   let next = data;
-  for (const i of iconsOf(data, cat)) if (pick.has(i.id) && i.group !== target) next = putIcon(next, { category: cat, id: i.id, name: i.name, group: target, art: i.art }, now);
+  for (const i of iconsOf(data, cat)) if (pick.has(i.id) && i.group !== target) next = putIcon(next, { ...again(cat, i), group: target }, now);
   return next;
 }
+
+// Deletes some icons at once: your own are deleted, and official ones are deleted where they can be (see
+// canDeleteOfficial, keeping your changes for when they come back). Where they can't, changed ones are put back as
+// they are in the code, and ones you haven't changed stay as they are.
+export function dropIcons(data: PixelData, cat: CategoryId, ids: string[], now = Date.now()): PixelData {
+  const pick = new Set(ids);
+  let next: PixelData = { ...data, icons: data.icons.filter((i) => !(i.category === cat && pick.has(i.id)) || (canDeleteOfficial(cat, i.id) && officialOf(cat, i.id))) };
+  for (const id of pick) next = deleteOfficial(next, cat, id, now);
+  return next;
+}
+// What dropIcons would do to the picked icons: how many of yours are deleted, official ones deleted, and changed ones put back as they were.
+export function dropCount(data: PixelData, cat: CategoryId, ids: string[]): { deleted: number; official: number; reverted: number } {
+  const pick = new Set(ids);
+  const shown = iconsOf(data, cat).filter((i) => pick.has(i.id));
+  const off = shown.filter((i) => i.status === 'official' || i.status === 'changed');
+  return { deleted: shown.filter((i) => i.status === 'new').length,
+    official: off.filter((i) => canDeleteOfficial(cat, i.id)).length,
+    reverted: off.filter((i) => i.status === 'changed' && !canDeleteOfficial(cat, i.id)).length };
+}
+
+// Makes some stickers (official ones too) cat food, or not; the ones already so stay as they are.
+export function setFood(data: PixelData, ids: string[], food: boolean, now = Date.now()): PixelData {
+  const pick = new Set(ids);
+  let next = data;
+  for (const i of liveIcons(data, 'sticker')) if (pick.has(i.id) && !!i.food !== food)
+    next = putIcon(next, { ...again('sticker', i), food }, now);
+  return next;
+}
+
+// ---- TEMPORARY: stickers grew from 16×16 to 18×18 ----
+// A 16×16 sticker of yours (or in an export) is kept as it is until "Add border to all" turns it into an 18×18 one.
+const OLD_STICKER: [number, number] = [16, 16];
+const isOldSticker = (i: { category: CategoryId; art: string[] }) => i.category === 'sticker' && i.art.length === OLD_STICKER[1] && i.art.every((r) => r.length === OLD_STICKER[0]);
+export const oldStickers = (data: PixelData) => data.icons.filter(isOldSticker).length;
+// Every 16×16 sticker of yours gets an empty pixel around it, then the dark outline and the lit and shaded edges as they
+// used to be added for it (see bakeSticker), so it looks just as before.
+export const borderAll = (data: PixelData, now = Date.now()): PixelData =>
+  ({ ...data, icons: data.icons.map((i) => (isOldSticker(i) ? { ...i, art: bakeSticker(i.art), updated: now } : i)) });
 
 // What is kept on the device, read back: anything broken is left out.
 export function sanitize(raw: unknown): PixelData {
@@ -205,9 +314,30 @@ export function sanitize(raw: unknown): PixelData {
 function checkIcon(i: unknown): Omit<PixelIcon, 'updated'> | null {
   const v = i as Partial<PixelIcon> | null;
   if (!v || !isCategory(v.category) || typeof v.id !== 'string' || !/^[a-z][a-z0-9]{0,31}$/i.test(v.id)) return null;
-  const art = cleanArt(v.art, v.category, sizeOf(v.category, v.id));
+  if (isFixed(v.category) && !officialOf(v.category, v.id)) return null;   // only the official ones
+  const art = cleanArt(v.art, v.category, sizeOf(v.category, v.id)) ?? (v.category === 'sticker' ? cleanArt(v.art, v.category, OLD_STICKER) : null);
   if (!art) return null;
-  return { category: v.category, id: v.id, name: cleanName(String(v.name ?? ''), v.id), group: cleanGroup(String(v.group ?? '')), art };
+  const icon: Omit<PixelIcon, 'updated'> = { category: v.category, id: v.id, name: cleanName(String(v.name ?? ''), v.id), group: cleanGroup(String(v.group ?? '')), art };
+  if (v.category === 'sticker' && typeof v.food === 'boolean') icon.food = v.food;
+  if (v.deleted === true && officialOf(v.category, v.id) && canDeleteOfficial(v.category, v.id)) icon.deleted = true;
+  if (v.category === 'scene') {
+    const spots = cleanSpots(v.spots);
+    if (spots) icon.spots = spots;
+    const book = cleanSpot(v.props?.book, 9, 9), trophy = cleanSpot(v.props?.trophy, 9, 10);
+    if (v.id === 'room' && book && trophy) icon.props = { book, trophy };
+  }
+  return icon;
+}
+// A kitty spot is where a cat's feet stand: [x, y] with the whole cat (30 x 30) inside the scene. A prop's is its top-left corner.
+export const CAT_SIZE = 30;
+export const clampSpot = ([x, y]: Spot): Spot => [Math.max(0, Math.min(ROOM_W - CAT_SIZE, Math.round(x))), Math.max(CAT_SIZE, Math.min(ROOM_H, Math.round(y)))];
+export const clampProp = ([x, y]: Spot, w: number, h: number): Spot => [Math.max(0, Math.min(ROOM_W - w, Math.round(x))), Math.max(0, Math.min(ROOM_H - h, Math.round(y)))];
+const isPair = (p: unknown): p is Spot => Array.isArray(p) && p.length === 2 && p.every((n) => Number.isFinite(n));
+const cleanSpot = (p: unknown, w: number, h: number): Spot | null => (isPair(p) ? clampProp(p, w, h) : null);
+function cleanSpots(raw: unknown): Spot[] | null {
+  if (!Array.isArray(raw)) return null;
+  const spots = raw.filter(isPair).slice(0, MAX_SPOTS).map(clampSpot);
+  return spots.length ? spots : null;
 }
 
 // ---- the export file ----
@@ -217,17 +347,20 @@ function checkIcon(i: unknown): Omit<PixelIcon, 'updated'> | null {
 //     "icons": [
 //       { "category": "sticker", "id": "teapot", "status": "new", "name": "Teapot", "group": "user",
 //         "art": ["................", ...16 rows of 16 letters] },
-//       { "category": "sticker", "id": "star", "status": "changed", ... }
+//       { "category": "sticker", "id": "star", "status": "changed", ... },
+//       { "category": "weather", "id": "fog", "status": "deleted", "deleted": true, ... }
 //     ]
 //   }
-// "status" says whether it is a new icon or a change to an official one (of the same id). Only your icons are in it.
+// "status" says whether it is a new icon, a change to an official one (of the same id), or an official one you deleted
+// (to take out of the code; its picture is the one it had). Only your icons are in it.
 export const EXPORT_FORMAT = 'itty-bitty-kitty-icons';
 export const exportName = (day: string) => `kitty-icons-${day}.json`;
 
 export function exportText(data: PixelData, day: string): string {
   const order = CATEGORIES.map((c) => c.id);
   const icons = [...data.icons].sort((a, b) => order.indexOf(a.category) - order.indexOf(b.category) || a.group.localeCompare(b.group) || a.updated - b.updated)
-    .map((i) => ({ category: i.category, id: i.id, status: statusOf(i.category, i.id), name: i.name, group: i.group, art: i.art }));
+    .map((i) => ({ category: i.category, id: i.id, status: statusOf(i), ...(i.deleted && { deleted: true }), name: i.name, group: i.group, art: i.art,
+      ...(i.spots && { spots: i.spots }), ...(i.props && { props: i.props }), ...(i.food !== undefined && { food: i.food }) }));
   return JSON.stringify({ format: EXPORT_FORMAT, version: 1, exported: day, icons }, null, 2) + '\n';
 }
 
@@ -245,7 +378,7 @@ export function readExport(text: string): Omit<PixelIcon, 'updated'>[] {
 export function importClashes(data: PixelData, icons: Omit<PixelIcon, 'updated'>[]): Omit<PixelIcon, 'updated'>[] {
   return icons.filter((i) => {
     const mine = data.icons.find((m) => m.category === i.category && m.id === i.id);
-    return !!mine && (mine.name !== i.name || mine.group !== i.group || mine.art.join('\n') !== i.art.join('\n'));
+    return !!mine && (mine.name !== i.name || mine.group !== i.group || mine.art.join('\n') !== i.art.join('\n') || !!mine.deleted !== !!i.deleted);
   });
 }
 
@@ -256,6 +389,7 @@ export function importIcons(data: PixelData, icons: Omit<PixelIcon, 'updated'>[]
   const clash = new Set(mode === 'keep' ? importClashes(data, icons) : []);
   const next = icons.reduce((d, i) => {
     if (!clash.has(i)) return putIcon(d, i, now);
+    if (i.deleted) return d;   // keep yours: it is there, not deleted
     const [w, h] = sizeOf(i.category, null);
     if (i.art.length !== h || i.art.some((r) => r.length !== w)) return d;
     return putIcon(d, { ...i, id: newId(i.name, i.category, d), group: i.group === DEFAULT_GROUP ? USER_GROUP : i.group }, now);
@@ -265,17 +399,18 @@ export function importIcons(data: PixelData, icons: Omit<PixelIcon, 'updated'>[]
 
 // ---- names ----
 // No two icons of a category share a name (in any case). Saving one with a taken name is not allowed; this finds it.
+// A deleted icon's name is free (it is told apart again when it comes back).
 const nameKey = (name: string) => name.trim().toLowerCase();
 export function nameTaken(data: PixelData, cat: CategoryId, name: string, id: string | null): Shown | undefined {
   const key = nameKey(name);
-  return iconsOf(data, cat).find((i) => i.id !== id && nameKey(i.name) === key);
+  return liveIcons(data, cat).find((i) => i.id !== id && nameKey(i.name) === key);
 }
 // The safeguard, should two icons of a category end up with one name anyway (an import, or icons saved before the
 // rule): they become "Star 1", "Star 2", ... in the order Kitty Gallery lists them, with numbers no other icon has.
 export function uniqueNames(data: PixelData, now = Date.now()): PixelData {
   let next = data;
   for (const c of CATEGORIES) {
-    const shown = iconsOf(next, c.id);
+    const shown = liveIcons(next, c.id);
     const byName = new Map<string, Shown[]>();
     for (const i of shown) byName.set(nameKey(i.name), [...(byName.get(nameKey(i.name)) ?? []), i]);
     const taken = new Set(shown.map((i) => nameKey(i.name)));
@@ -287,7 +422,7 @@ export function uniqueNames(data: PixelData, now = Date.now()): PixelData {
         let name: string;
         do { const tail = ` ${n++}`; name = base.slice(0, LIMITS.name - tail.length).trimEnd() + tail; } while (taken.has(nameKey(name)));
         taken.add(nameKey(name));
-        next = putIcon(next, { category: c.id, id: i.id, name, group: i.group, art: i.art }, now);
+        next = putIcon(next, { ...again(c.id, i), name }, now);
       }
     }
   }

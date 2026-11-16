@@ -70,9 +70,9 @@
 .pcard .ncard-foot { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 .pcard .ncard-foot::after { display: none; }
 /* a sticker in the category's colour, outside a window: the title of its page, the picture choices */
-.pcat-title, .pick-fold { --nc: var(--accent); --sq: var(--nc); --dk: color-mix(in srgb, var(--nc) 25%, #231d44); }
+.pcat-title, .pick-fold, .order-list li { --nc: var(--accent); --sq: var(--nc); --dk: color-mix(in srgb, var(--nc) 25%, #231d44); }
 .pcat-title { display: flex; align-items: center; gap: var(--s3); min-width: 0; overflow-wrap: anywhere; }
-.pcat-title .nart, .pick-fold .nart { width: calc(10 * var(--u)); flex: none; }
+.pcat-title .nart, .pick-fold .nart, .order-list .nart { width: calc(10 * var(--u)); flex: none; }
 .shopping .nart .sticker, .shop-dialog .nart .sticker { display: block; }
 /* a thing in the pantry: its name (tap to change it), then − + and Low */
 .prow { display: flex; align-items: center; gap: var(--s2); }

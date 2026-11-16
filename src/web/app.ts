@@ -6,8 +6,9 @@ import {
 } from '../rules.ts';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Share } from '@capacitor/share';
-import { BACKUP_EXT, BACKUP_PREFIX, backupNow, backupStatus, chooseFolder, folderBackups, markDirty, nativeBackups, onBackupStatus, readFolderBackup, refreshFolder, registerBackupSource, saveBackupToDevice, shareBackup as shareBackupFile, stopBackups } from '../shared/backupfolder.ts';
+import { BACKUP_EXT, BACKUP_PREFIX, backupNow, backupStatus, chooseFolder, folderBackups, markDirty, nativeBackups, onBackupStatus, readFolderBackup, refreshFolder, registerBackupSource, saveBackupToDevice, saveToDevice, shareBackup as shareBackupFile, shareFile, stopBackups } from '../shared/backupfolder.ts';
 import { achievementCount, restoreAchievement, snapshotAchievement } from '../achievement/web/snapshot.ts';
+import { PICKER_ICONS, iconLabel, stickerSvg } from '../achievement/pixelart.ts';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { anyReminder, catAlarmsOn, defaultReminder, planReminders, type LastCall, type ReminderSettings } from '../reminders.ts';
@@ -23,20 +24,24 @@ import {
   type Backup, type DiaryEntry, type Mood,
 } from '../store.ts';
 import { CONFETTI_COLORS, TRAITS, notifyIconName, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
-import { BOOK_ART, FOODS, MARKS, ROOM_H, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, weatherSvg, heartSvg, iconSvg, markSvg, outdoorSvg, roomSvg } from '../pixelart.ts';
+import { BOOK_ART, GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, weatherSvg, heartSvg, iconSvg, markSvg, outdoorSvg, roomSvg, sceneVersion } from '../pixelart.ts';
 import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, trophyIcon, type AppName } from '../shared/apps.ts';
 import { mountDiarySettings } from '../diary/settings.ts';
 import { collectNotes, initNotes, restoreNotes } from '../notes/data.ts';
 import { mountNotesSettings } from '../notes/settings.ts';
 import { mountPixelSettings } from '../pixel/settings.ts';
-import { collectShopping, initShopping, restoreShopping } from '../shopping/data.ts';
+import { change as changeShop, collectShopping, initShopping, restoreShopping, shopData, shopInitialised } from '../shopping/data.ts';
+import { applyMartSettings, martSettingsOf } from '../shopping/model.ts';
+import { collectPixel, initPixel, restorePixel, setPixelData } from '../pixel/data.ts';
+import { PARTS, SETTINGS_EXT, SETTINGS_PREFIX, cleanDiary, isSettingsText, readSettings, settingsText, type HabitSettings, type Part, type SettingsFile } from '../settings-file.ts';
+import { backupName } from '../backup-schedule.ts';
 import { mountLookSettings } from '../shared/look.ts';
 import { publishHabitStats } from '../shared/stats.ts';
 import { meterHtml } from '../shared/meter.ts';
 import { hpLine } from '../player.ts';
-import { collectDiary, initDiary, pageCount, restoreDiary } from '../diary/data.ts';
+import { collectDiary, diaryExtras, diaryInitialised, initDiary, pageCount, restoreDiary, updateExtras } from '../diary/data.ts';
 import { esc, plural } from '../shared/html.ts';
-import { backButton, homeButton, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
+import { backButton, fancyOn, homeButton, playerButton, setFancy, setThemeMode, settingsButton, showToast, themeMode, titleBar } from '../shared/ui.ts';
 import { provideMusic } from '../shared/music.ts';
 import { compressPhoto } from '../shared/photo.ts';
 import { at, fileBytes, removeFile, toBase64, writeOk } from '../shared/files.ts';
@@ -263,11 +268,16 @@ document.documentElement.style.setProperty('--face-w', String(FACE_W));   // the
 document.querySelectorAll<HTMLElement>('[data-icon]').forEach((el) => el.insertAdjacentHTML('afterbegin', el.dataset.icon === 'cat' ? habitKittySvg() : el.dataset.icon === 'trophy' ? trophyIcon() : iconSvg(el.dataset.icon ?? 'x')));
 
 // ===================== Food =====================
-const FOOD_KEYS = Object.keys(FOODS);
 const pixelArt = (art: string[], cls = '') => artSvg(art, `pixart ${cls}`);
-// A different treat for every cat, every day (stable within the day).
-const foodFor = (c: Cat, day: number) => FOOD_KEYS[hash(`${c.id}:${day}`) % FOOD_KEYS.length];
-const foodIcon = (kind: string) => artSvg(FOODS[kind], 'food');
+// A different treat for every cat, every day (stable within the day), from every sticker the kitties can eat (Kitty
+// Gallery's too: "Can kitty eat this?"). With none at all, a heart.
+const foodFor = (c: { id: string }, day: number) => {
+  const keys = Object.keys(PICKER_ICONS).filter((k) => PICKER_ICONS[k].food);
+  return keys.length ? keys[hash(`${c.id}:${day}`) % keys.length] : 'heart';
+};
+// Drawn as a sticker, 18 × 18 with its outline; one that is gone (deleted in Kitty Gallery) is a heart.
+const foodIcon = (kind: string) => stickerSvg(kind, 1, 'food');
+const foodName = (kind: string) => iconLabel(kind).toLowerCase();
 
 // ===================== Rendering =====================
 const viewMonth = new Map<string, number>();   // cat id -> months back from current
@@ -529,13 +539,9 @@ function renderHeat() {
 }
 
 // ---- cozy room: lives in real time (sky follows the clock, cats wander, sleep at night) ----
-// Positions are [x, feet-y] in room pixels (108 x 150); a cat is 28 pixels wide and BODY_H tall, the same pixels as the room.
+// Positions are [x, feet-y] in room pixels (240 x 320, see scene.ts); a cat is BODY_W pixels wide and BODY_H tall, the same pixels as the room.
 const PET_W = BODY_W, PET_H = BODY_H;
-const SPOTS: [number, number][] = [
-  [3, 113], [36, 139], [62, 131], [16, 134], [78, 142], [40, 118],   // cushion, rug, floor
-  [77, 58], [71, 84], [78, 112],                                    // cat tree: top, middle, base
-];
-const NIGHT_SPOTS: [number, number][] = [[3, 113], [36, 139], [78, 112], [62, 131], [16, 134], [78, 142], [77, 58], [71, 84], [40, 118]];
+const SPOTS = ROOM_SPOTS, NIGHT_SPOTS = ROOM_NIGHT_SPOTS;
 const roomPos = new Map<string, number>(); // cat id -> index into SPOTS
 let roomSig = '';
 const skyPhase = (): 'day' | 'dusk' | 'night' => {
@@ -557,7 +563,8 @@ const roomBg = roomSvg;
 // The diary book and the trophy on the wall shelf (drawn in roomSvg); these are their click areas, in room pixels.
 const prop = (action: string, label: string, [x, y, w, h]: [number, number, number, number]) =>
   `<button class="prop" type="button" data-action="${action}" aria-label="${label}" style="left:calc(${x} * var(--px));top:calc(${y} * var(--px));width:calc(${w} * var(--px));height:calc(${h} * var(--px))"></button>`;
-const PROPS = prop('book', "Kitty diary: everyone's day", SHELF_BOOK) + prop('trophies', 'Accomplishments', SHELF_TROPHY);
+// Where they stand can change (a room drawn in Kitty Gallery puts them elsewhere), so they are placed on every draw.
+const props = () => prop('book', "Kitty diary: everyone's day", SHELF_BOOK) + prop('trophies', 'Accomplishments', SHELF_TROPHY);
 
 // Cats that are away (sitter, ran away) aren't home, so they aren't in the room.
 const homeCats = () => sortedCats().filter((c) => c.status === 'alive').slice(0, SPOTS.length);
@@ -579,19 +586,19 @@ function renderIndoor() {
   const asleep = asleepNow();
   const faceOf = (c: Cat): Face => (asleep ? 'sleepy' : catStatus(c, t).face);
   const lookKey = (c: Cat) => Object.values(lookFor(c)).join('');
-  const sig = phase + (asleep ? 'z' : '') + '|' + pets.map((c) => `${c.id}:${faceOf(c)}:${lookKey(c)}:${c.name}`).join('|');
+  const sig = phase + (asleep ? 'z' : '') + sceneVersion() + '|' + pets.map((c) => `${c.id}:${faceOf(c)}:${lookKey(c)}:${c.name}`).join('|');
   renderRoomNote();
   if (sig === roomSig) return;
   roomSig = sig;
   const taken = new Set<number>();
   const spotIdx = (c: Cat, i: number) => {
-    let k = roomPos.get(c.id) ?? i;
+    let k = (roomPos.get(c.id) ?? i) % SPOTS.length;   // the room may have fewer spots than before
     while (taken.has(k)) k = (k + 1) % SPOTS.length;
     taken.add(k);
     roomPos.set(c.id, k);
     return k;
   };
-  $('room').innerHTML = `<div class="room ${phase}">${roomBg(phase)}${PROPS}${pets.map((c, i) => {
+  $('room').innerHTML = `<div class="room ${phase}">${roomBg(phase)}${props()}${pets.map((c, i) => {
     const pos = asleep ? NIGHT_SPOTS[i] : SPOTS[spotIdx(c, i)];
     const nap = isNapping(c.id, phase, asleep);
     return `<div class="pet${nap ? ' napping' : ''}" data-id="${c.id}" data-fx="${pos[0]}" data-fy="${pos[1]}" data-nap="${nap ? 1 : ''}" data-hold="cat" style="${petStyle(pos, nap)}">${nap ? napSvg(lookFor(c)) : bodySvg(faceOf(c), lookFor(c), hash(c.id))}${nap ? '<b class="zz">z z</b>' : ''}<em>${esc(c.name)}</em></div>`;
@@ -615,7 +622,7 @@ function renderRoomNote() {
 }
 
 // ---- outdoors: strays are habits, so there is nothing to save. Each one turns up with a 30% chance every 6 hours, one that is due to be fed today turns up with 80%, and one that is fed leaves with 50%. ----
-const OUT_SPOTS: [number, number][] = [[2, 112], [39, 110], [76, 112], [2, 146], [39, 142], [76, 146]];
+const OUT_SPOTS = GARDEN_SPOTS;
 const strayLook = (k: MindfulTask) => lookFor({ id: k.id, look: k.former?.look });
 const strayName = strayNameOf;   // a nickname, a released kitty's name, or a stable one from its id
 const strayDoneToday = (k: MindfulTask, t: number) => k.lastDoneDay === t;
@@ -641,7 +648,7 @@ function renderOutdoor() {
   const asleep = asleepNow();
   const strays = visibleStrays();
   const faceOf = (k: MindfulTask): Face => (asleep ? 'sleepy' : strayDoneToday(k, t) ? 'happy' : 'open');
-  const sig = phase + (asleep ? 'z' : '') + '|' + strays.map((k) => `${k.id}:${faceOf(k)}:${strayName(k)}`).join('|');
+  const sig = phase + (asleep ? 'z' : '') + sceneVersion() + '|' + strays.map((k) => `${k.id}:${faceOf(k)}:${strayName(k)}`).join('|');
   renderRoomNote();
   if (sig === outdoorSig) return;
   outdoorSig = sig;
@@ -741,7 +748,7 @@ setInterval(zoomies, 7000);
 // ---- home-screen widget (Android): the room as three pictures, one per time of day ----
 // The native widget (RoomWidgetProvider) picks the file that matches the clock. Cats sit where they are in the room now.
 const RoomWidget = registerPlugin<{ refresh(): Promise<void>; pendingTab(): Promise<{ tab: string }> }>('RoomWidget');
-const WIDGET_Y = 6, WIDGET_PX = 6;   // crop off the empty ceiling; 6 pixels per room unit
+const WIDGET_Y = 8, WIDGET_PX = 3;   // crop off the ceiling trim; 3 pixels per room unit
 
 // One thought bubble per hour, so the picture holds still between pushes (the room itself rolls them live).
 function widgetThought(phase: 'day' | 'dusk' | 'night') {
@@ -755,7 +762,7 @@ function roomPicture(phase: 'day' | 'dusk' | 'night'): string {
   const t = today();
   const thought = widgetThought(phase);
   const cats = homeCats().map((c, i) => {
-    const [x, y] = phase === 'night' ? NIGHT_SPOTS[i] : SPOTS[roomPos.get(c.id) ?? i];
+    const [x, y] = phase === 'night' ? NIGHT_SPOTS[i] : SPOTS[(roomPos.get(c.id) ?? i) % SPOTS.length];
     const nap = isNapping(c.id, phase);
     const body = (nap ? napSvg(lookFor(c)) : bodySvg(catStatus(c, t).face, lookFor(c), hash(c.id)))
       .replace('<g class="tail b">', '<g display="none">').replace('<g class="blink">', '<g display="none">')   // no CSS here: show tail frame A only
@@ -1192,7 +1199,8 @@ async function loadDiary() {
 
 // ---- Backup: one .kitty file (a zip) holding the game, every diary page and every photo ----
 async function collectBackup(): Promise<Backup> {
-  return { game: gameOnly(), ...await collectDiary(), notes: collectNotes(), shopping: collectShopping(), achievement: await snapshotAchievement() };
+  await initPixel();
+  return { game: gameOnly(), ...await collectDiary(), notes: collectNotes(), shopping: collectShopping(), gallery: collectPixel(), achievement: await snapshotAchievement() };
 }
 
 registerBackupSource({ prefix: BACKUP_PREFIX, ext: BACKUP_EXT, pack: async () => packBackup(await collectBackup()) });
@@ -1262,11 +1270,12 @@ function askRestore(b: Backup) {
     b.game ? `your kitties, ${pages} diary ${pages === 1 ? 'page' : 'pages'} and ${photos} ${photos === 1 ? 'photo' : 'photos'}` : '',
     b.notes && Object.keys(b.notes).length ? `${plural(Object.keys(b.notes).length, 'note')}` : '',
     b.shopping ? 'your shopping lists' : '',
+    b.gallery ? 'your Kitty Gallery icons' : '',
     b.achievement ? `${ach} ${ach === 1 ? 'achievement' : 'achievements'} (Kitty Achievement)` : '',
   ].filter(Boolean);
   openModal(`<div class="panel"><h3>Restore this backup?</h3>
     <p>It holds ${parts.join(' and ')}.</p>
-    <p class="muted">${b.game && b.achievement ? 'Everything in both apps' : b.game ? 'Everything in Habit Kitty' : 'Everything in Kitty Achievement'} on this device will be replaced.${b.notes && Object.keys(b.notes).length ? ' So will your notes.' : ''}${b.shopping ? ' So will your shopping lists, recipes and pantry.' : ''}</p>
+    <p class="muted">${b.game && b.achievement ? 'Everything in both apps' : b.game ? 'Everything in Habit Kitty' : 'Everything in Kitty Achievement'} on this device will be replaced.${b.notes && Object.keys(b.notes).length ? ' So will your notes.' : ''}${b.shopping ? ' So will your shopping lists, recipes and pantry.' : ''}${b.gallery ? ' So will your Kitty Gallery icons.' : ''}</p>
     <div class="btns"><button class="btn" data-action="modal-close">Cancel</button>
     <button class="btn primary" data-action="restore-yes">Restore</button></div></div>`);
 }
@@ -1285,6 +1294,8 @@ async function restoreBackup() {
     if (!await restoreDiary(b, g)) { closeModal(); toast("Couldn't restore the kitties and diary. Achievements were restored."); return; }
     if (b.notes && Object.keys(b.notes).length && !await restoreNotes(b.notes)) toast("Couldn't restore the notes. Everything else was restored.");   // a backup from before notes leaves yours alone
     if (b.shopping && !await restoreShopping(b.shopping)) toast("Couldn't restore the shopping lists. Everything else was restored.");   // likewise for one from before Kitty Mart
+    if (b.gallery && !await restorePixel(b.gallery)) toast("Couldn't restore the Kitty Gallery icons. Everything else was restored.");   // and for one from before the icons were in it
+    else if (b.gallery) redrawPixelSettings();
     const { trackamaniac, moodNames, ...rest } = g;   // older backups kept the diary settings here (restoreDiary took them)
     save = normalize(rest);
     lastLevel = null;
@@ -1298,6 +1309,99 @@ async function restoreBackup() {
     return;
   }
   toast('Backup restored.');
+}
+
+// ---- Settings only: a .kittyset file (see src/settings-file.ts), to give someone your look, options and icons ----
+// without your kitties, diary, notes or shopping lists. Loading one asks which parts to take, and replaces only those.
+async function collectSettings(): Promise<SettingsFile> {
+  await Promise.all([initPixel(), shopInitialised, diaryInitialised]);
+  const { allowRename, showClock, timeTravel, amnesia, unlimited, sound, muted, roomName, outdoorName } = save;
+  const habit: HabitSettings = {
+    allowRename: !!allowRename, showClock: !!showClock, timeTravel: !!timeTravel, amnesia: !!amnesia, unlimited: !!unlimited, muted: !!muted,
+    dayStart: dayStartHour(), roomName: roomName ?? '', outdoorName: outdoorName ?? '', ...(sound && { sound: { ...sound } }),
+  };
+  const icons = JSON.parse(collectPixel() ?? '{"icons":[]}').icons;
+  return { look: { theme: themeMode(), fancy: fancyOn() }, habit, diary: cleanDiary(diaryExtras()), mart: martSettingsOf(shopData()), gallery: { icons } };
+}
+const settingsName = () => backupName(SETTINGS_PREFIX, SETTINGS_EXT);
+const settingsBytes = async () => new TextEncoder().encode(settingsText(await collectSettings(), new Date().toISOString().slice(0, 10)));
+async function saveSettingsFile() {
+  try {
+    const where = await saveToDevice(settingsName(), await settingsBytes());
+    if (where !== null) toast(where ? `Settings saved: ${where}` : 'Settings downloaded.');
+  } catch { toast("Couldn't save the settings file. Try again."); }
+}
+async function shareSettingsFile() {
+  try { await shareFile(settingsName(), await settingsBytes(), 'Itty Bitty Kitty settings', 'Share your settings'); }
+  catch (e) { if (!/cancel/i.test(String((e as Error)?.message ?? e))) toast("Couldn't make the settings file. Try again."); }
+}
+
+let pendingSettings: SettingsFile | null = null;
+const SETTINGS_WARN: Partial<Record<Part, string>> = {
+  habit: 'Your kitties, habits and reminders stay as they are.',
+  diary: 'Your diary pages and birthdays stay as they are.',
+  mart: 'Your lists, pantry and recipes stay; anything in a category the file has not got moves to Other.',
+  gallery: 'Your icons become exactly the ones in the file: icons of your own that are not in it are deleted.',
+};
+function askSettings(s: SettingsFile) {
+  pendingSettings = s;
+  const parts = PARTS.filter(([k]) => s[k]);
+  openModal(`<div class="panel"><h3>Load these settings?</h3>
+    <p class="muted">Pick what to take. Each part you tick replaces yours.</p>
+    <div id="settings-parts">${parts.map(([k, label]) => `<label class="check"><input type="checkbox" data-part="${k}" checked><span><b>${esc(label)}</b>${SETTINGS_WARN[k] ? `<br><span class="muted">${esc(SETTINGS_WARN[k]!)}</span>` : ''}</span></label>`).join('')}</div>
+    <div class="btns"><button class="btn" data-action="modal-close">Cancel</button>
+    <button class="btn primary" data-action="settings-yes">Load</button></div></div>`);
+}
+
+// Your day moves only when that leaves you in the same day right now (as in Settings → Your day).
+function applyHabitSettings(h: HabitSettings): string {
+  for (const k of ['allowRename', 'showClock', 'timeTravel', 'amnesia', 'unlimited', 'muted', 'roomName', 'outdoorName'] as const) {
+    if (h[k] !== undefined) (save as unknown as Record<string, unknown>)[k] = h[k];
+  }
+  if (h.sound) save.sound = { ...save.sound, ...h.sound };
+  let note = '';
+  if (h.dayStart !== undefined && h.dayStart !== dayStartHour()) {
+    const old = dayStartHour(), before = today();
+    setDayStart(h.dayStart);
+    if (today() !== before) { setDayStart(old); note = ` Your day was not moved: it would put you in a different day right now. Try again after ${hourText(Math.max(old, h.dayStart))}.`; }
+    else save.dayStart = dayStartHour();
+  }
+  persist(); renderAll(); syncMusic();
+  return note;
+}
+
+async function loadSettings() {
+  const s = pendingSettings;
+  pendingSettings = null;
+  if (!s) return;
+  const pick = new Set([...document.querySelectorAll<HTMLInputElement>('#settings-parts [data-part]')].filter((i) => i.checked).map((i) => i.dataset.part as Part));
+  closeModal();
+  if (!pick.size) return;
+  const failed: string[] = [];
+  let note = '';
+  if (pick.has('look') && s.look) { setThemeMode(s.look.theme); setFancy(s.look.fancy); redrawLookSettings(); }
+  if (pick.has('habit') && s.habit) note = applyHabitSettings(s.habit);
+  if (pick.has('diary') && s.diary) {
+    await diaryInitialised;
+    const d = s.diary;
+    if (!await updateExtras({ trackamaniac: !!d.trackamaniac, teleportation: !!d.teleportation, photographer: !!d.photographer, titles: !!d.titles, starry: !!d.starry, moodNames: d.moodNames ?? {} })) failed.push('diary options');
+  }
+  if (pick.has('mart') && s.mart) {
+    await shopInitialised;
+    if (!await changeShop(applyMartSettings(shopData(), s.mart), 'Loaded settings')) failed.push('Kitty Mart');
+  }
+  if (pick.has('gallery') && s.gallery) {
+    await initPixel();
+    if (!await setPixelData({ version: 1, icons: s.gallery.icons })) failed.push('Kitty Gallery icons');
+    redrawPixelSettings(); renderAll();
+  }
+  toast(failed.length ? `Couldn't load the ${failed.join(' and ')}. The rest was loaded.` : `Settings loaded.${note}`);
+}
+async function readSettingsFile(f: File | undefined) {
+  if (!f) return;
+  const err = $('settings-error');
+  try { err.hidden = true; askSettings(readSettings(await f.text())); }
+  catch (e) { err.textContent = (e as Error).message || "That isn't a settings file."; err.hidden = false; }
 }
 
 // ===================== Feeding reminders =====================
@@ -1819,7 +1923,7 @@ onShown('habit', 'click', (ev) => {
     case 'feed':
       act((s, at) => feedCat(s, id, at), () => {
         const fed = save.state.cats.find((c) => c.id === id) as Cat;
-        return cat?.status === 'ranAway' ? `${fed.name} came back! Welcome home.` : fedMessage(fed, foodFor(fed, today()), streak(fed, today()));
+        return cat?.status === 'ranAway' ? `${fed.name} came back! Welcome home.` : fedMessage(fed, foodName(foodFor(fed, today())), streak(fed, today()));
       }, cat);
       if (menuCat === id) openCatMenu(id);   // keep the open menu in step (fed, or called back)
       break;
@@ -2041,6 +2145,10 @@ onShown('habit', 'click', (ev) => {
     case 'restore-folder': openFolderRestore(); break;
     case 'restore-pick': pickFolderBackup(btn.dataset.name ?? ''); break;
     case 'restore-yes': restoreBackup(); break;
+    case 'settings-save': saveSettingsFile(); break;
+    case 'settings-share': shareSettingsFile(); break;
+    case 'settings-load': $('settings-file').click(); break;
+    case 'settings-yes': loadSettings(); break;
     case 'save-copy': {
       const text = JSON.stringify(gameOnly());
       ($('save-text') as HTMLTextAreaElement).value = text;
@@ -2197,8 +2305,14 @@ $('ach-file').addEventListener('change', async (ev) => {
 mountDiarySettings($('set-diary-body'), toast);
 mountNotesSettings($('set-notes-body'), toast);
 const redrawPixelSettings = mountPixelSettings($('set-pixel-body'), toast);
-mountLookSettings($('set-look'));
+const redrawLookSettings = mountLookSettings($('set-look'));
 
+$('settings-file').addEventListener('change', (ev) => {
+  const input = ev.target as HTMLInputElement;
+  const f = input.files?.[0];
+  input.value = '';
+  readSettingsFile(f);
+});
 $('load-file').addEventListener('change', async (ev) => {
   const input = ev.target as HTMLInputElement;
   const f = input.files?.[0];
@@ -2206,7 +2320,11 @@ $('load-file').addEventListener('change', async (ev) => {
   if (!f) return;
   const err = $('save-error');
   const bytes = new Uint8Array(await f.arrayBuffer());
-  if (!isZip(bytes)) { loadSave(new TextDecoder().decode(bytes)); return; }
+  if (!isZip(bytes)) {
+    const text = new TextDecoder().decode(bytes);
+    if (isSettingsText(text)) { readSettingsFile(f); return; }   // a settings file picked under Restore: it only holds settings
+    loadSave(text); return;
+  }
   try { err.hidden = true; askRestore(unpackBackup(bytes)); }
   catch { err.textContent = "That doesn't look like a Habit Kitty backup."; err.hidden = false; }
 });
@@ -2392,7 +2510,7 @@ function strayHead(k: MindfulTask, t: number, holdable = false): string {
   const look = strayLook(k);
   const face: Face = fed ? 'happy' : 'open';
   const label = fed ? 'Fed today' : left ? `Next in ${plural(left, 'day')}` : 'Waiting for a meal';
-  const button = `<button class="btn primary sq" data-action="task" data-id="${k.id}" ${left ? 'disabled' : ''} aria-label="${left ? `${esc(k.name)} is fed for now` : `Feed ${esc(k.name)}`}">${left ? `<b>${iconSvg('check')}</b>` : foodIcon(FOOD_KEYS[hash(`${k.id}:${t}`) % FOOD_KEYS.length])}</button>`;
+  const button = `<button class="btn primary sq" data-action="task" data-id="${k.id}" ${left ? 'disabled' : ''} aria-label="${left ? `${esc(k.name)} is fed for now` : `Feed ${esc(k.name)}`}">${left ? `<b>${iconSvg('check')}</b>` : foodIcon(foodFor(k, t))}</button>`;
   return `<div class="cat-head"${holdable ? ` data-hold="stray" data-id="${k.id}"` : ''}><div class="cat-side">${sprite(face, look)}${button}</div>
     <div><p class="cat-name">${esc(strayName(k))}<span class="mode">stray · ${look.trait}</span></p>
       <p class="cat-habit">${esc(k.name)} · ${scheduleText(k)} · +${k.xp} XP</p>

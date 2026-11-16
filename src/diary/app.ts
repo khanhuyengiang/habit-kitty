@@ -2,7 +2,7 @@
 // The data lives in ./data.ts (Habit Kitty starts it); the pure parts are in ../store.ts and ./people.ts.
 // Drawn with Habit Kitty's stylesheet, in web/diary.html's root.
 import { dateOf, dayOf } from '../calendar.ts';
-import { iconSvg, weatherSvg } from '../pixelart.ts';
+import { WEATHER, iconSvg, weatherLabel, weatherSvg } from '../pixelart.ts';
 import { mpLine } from '../player.ts';
 import { dayIndex } from '../rules.ts';
 import { monoSvg } from '../shared/pixelart.ts';
@@ -11,6 +11,7 @@ import { homeButton, playerButton, settingsButton, showToast, titleBar } from '.
 import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
 import { meterHtml } from '../shared/meter.ts';
 import { compressPhoto } from '../shared/photo.ts';
+import { groupedPicks, iconLabel, iconSvg as uiIcon, pickable, stickerSvg, PICKER_ICONS } from '../achievement/pixelart.ts';
 import { habitStats } from '../shared/stats.ts';
 import { allNotes, noteOf } from '../notes/data.ts';
 import { noteDate, parseNote } from '../notes/model.ts';
@@ -20,7 +21,7 @@ import {
   dayCount, diaryEntries, diaryExtras, diaryInitialised, diaryReady, entryOf, getPhoto, hasPageOn, onDiary, reflectionOf, saveEntry,
   saveReflection, updateExtras,
 } from './data.ts';
-import { MOOD_KEYS, STAR_LABEL, WEATHER, feelingText, moodName, moodSprite, moodsSprite, pinSvg, starSvg } from './moods.ts';
+import { MOOD_KEYS, STAR_LABEL, feelingText, moodName, moodSprite, moodsSprite, pinSvg, starSvg } from './moods.ts';
 import { MAX_PEOPLE, birthdaysOn, personErrors, personFrom, turning, upcoming, whenText } from './people.ts';
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
@@ -122,7 +123,7 @@ function calendarCard(): string {
     if (has) pages++;
     const born = birthdaysOn(people(), d);
     const star = settings().starry ? e?.star : undefined;
-    const what = [has ? 'entry' : '', e?.mood ? `feeling ${feelingText(e, names()).toLowerCase()}` : '', e?.weather ? WEATHER[e.weather].toLowerCase() : '',
+    const what = [has ? 'entry' : '', e?.mood ? `feeling ${feelingText(e, names()).toLowerCase()}` : '', e?.weather ? weatherLabel(e.weather).toLowerCase() : '',
       born.length ? `birthday: ${born.map((p) => p.name).join(', ')}` : '', star ? STAR_LABEL[star].toLowerCase() : ''].filter(Boolean).join(', ') || 'empty';
     cells.push(`<button type="button" class="dc${has ? ' has' : ''}${d === t ? ' now' : ''}" data-action="diary-open" data-day="${d}" ${d > t ? 'disabled' : ''}
       aria-label="${esc(dateOf(d).toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }))}: ${esc(what)}"><span class="dn">${d - first + 1}</span>${born.length ? cake(star ? 'bday mid' : 'bday') : ''}${star ? starSvg(star, 'dstar') : ''}${e?.mood ? moodsSprite(e.mood, e.mood2) : ''}</button>`);
@@ -210,7 +211,8 @@ function drawPicker(view: 'month' | 'year') {
 interface DraftPhoto { blob: Blob; url: string }
 // photos: the page's pictures in order (one, or up to four with the Photographer option); photoLost: a saved photo could not be
 // read, so its file is kept as it is unless the photos are changed; busy: what is being done to them (they cannot be saved meanwhile).
-interface Draft { day: number; moods: Mood[]; weather?: Weather; star?: Star; note?: string; photos: DraftPhoto[]; touched?: boolean; busy?: string; photoLost?: boolean; reading?: boolean; loaded?: Promise<unknown> }
+// pic: what the page shows, its photos or instead an icon (a sticker icon, Kitty Gallery's too); icon: the icon picked.
+interface Draft { day: number; pic: 'photo' | 'icon'; icon: string; iconOpen: boolean; moods: Mood[]; weather?: Weather; star?: Star; note?: string; photos: DraftPhoto[]; touched?: boolean; busy?: string; photoLost?: boolean; reading?: boolean; loaded?: Promise<unknown> }
 let draft: Draft | null = null;
 const maxPhotos = () => (settings().photographer ? MAX_PHOTOS : 1);
 function revokePhotos() { draft?.photos.forEach((p) => URL.revokeObjectURL(p.url)); }
@@ -235,6 +237,23 @@ function drawDraftPhoto() {
   box.innerHTML = urls.length ? photoGrid(urls, true) : '<p class="muted">No photo attached.</p>';
   const hint = document.getElementById('diary-photo-hint');
   if (hint) hint.textContent = settings().photographer ? `${urls.length} of ${MAX_PHOTOS}. A page has 1, 2 or 4 photos.` : '';
+}
+// The page's icon (instead of photos): Kitty Achievement's icon list, Kitty Gallery's icons too, folded to the chosen one.
+function iconFieldHtml(): string {
+  if (!draft) return '';
+  const sel = draft.icon;
+  return `<details class="icon-fold" id="diary-icon-fold" ${draft.iconOpen ? 'open' : ''}><summary class="fold-sum" aria-label="${esc(iconLabel(sel))}. Change">${stickerSvg(sel, 1)}<span class="fold-name">${esc(iconLabel(sel))}</span><span class="fold-chev">${uiIcon('chev')}</span></summary>
+    <div class="icon-pick">${groupedPicks((n) => `<label title="${esc(PICKER_ICONS[n].label)}"><input type="radio" name="diary-icon" value="${n}" ${n === sel ? 'checked' : ''} aria-label="${esc(PICKER_ICONS[n].label)}"><span>${stickerSvg(n, 1)}</span></label>`)}</div></details>
+    ${draft.photos.length || entryOf(draft.day)?.photo ? '<p class="muted">Saving with an icon removes this page\'s photos.</p>' : ''}`;
+}
+// Photos or an icon: shows the one and hides the other (the photos are kept in the form until it is saved).
+function setPic(pic: 'photo' | 'icon') {
+  if (!draft) return;
+  draft.pic = pic;
+  document.querySelectorAll<HTMLInputElement>('input[name="diary-pic"]').forEach((r) => (r.checked = r.value === pic));
+  const photo = document.getElementById('diary-pic-photo'), icon = document.getElementById('diary-pic-icon');
+  if (photo) photo.hidden = pic !== 'photo';
+  if (icon) { icon.hidden = pic !== 'icon'; icon.innerHTML = iconFieldHtml(); }
 }
 async function loadPhotos(day: number, count: number): Promise<{ photos: DraftPhoto[]; lost: boolean }> {
   const found = await Promise.all(Array.from({ length: count }, (_, i) => getPhoto(day, i)));
@@ -272,7 +291,7 @@ function openDiary(day: number, edit = false) {
   const e = entryOf(day);
   revokePhotos();
   const reading = !edit && !!e?.text.trim();
-  draft = { day, moods: [e?.mood, e?.mood2].filter((m): m is Mood => !!m), weather: e?.weather, star: e?.star, note: e?.note, photos: [], busy: e?.photo ? 'Loading photo…' : undefined, reading };
+  draft = { day, pic: e?.icon && !e.photo ? 'icon' : 'photo', icon: pickable(e?.icon ?? 'heart'), iconOpen: false, moods: [e?.mood, e?.mood2].filter((m): m is Mood => !!m), weather: e?.weather, star: e?.star, note: e?.note, photos: [], busy: e?.photo ? 'Loading photo…' : undefined, reading };
   const born = birthdaysOn(people(), day);
   const birthday = born.length ? `<p class="mood-now">${cake('bday-ico')}<span>${esc(born.map((p) => `${p.name}'s birthday`).join(', '))}</span></p>` : '';
   if (reading && e) {
@@ -281,11 +300,11 @@ function openDiary(day: number, edit = false) {
     openModal(`<div class="panel" id="diary-read">${closeX()}
       ${diaryNav(day)}${settings().titles && e.title?.trim() ? `<h3 class="diary-date diary-title">${esc(e.title.trim())}</h3>` : ''}${birthday}
       <div class="diary-mood"><span class="mood-line">${e.mood ? `<span class="mood-now">${moodsSprite(e.mood, e.mood2)}<span>${esc(feelingText(e, names()))}</span></span>` : ''}${
-        e.weather ? `<span class="mood-now">${weatherSvg(e.weather)}<span>${WEATHER[e.weather]}</span></span>` : ''}</span><button class="btn small" type="button" data-action="diary-edit">Edit</button></div>
+        e.weather ? `<span class="mood-now">${weatherSvg(e.weather)}<span>${esc(weatherLabel(e.weather))}</span></span>` : ''}</span><button class="btn small" type="button" data-action="diary-edit">Edit</button></div>
       ${settings().teleportation && e.location?.trim() ? `<span class="mood-now where">${pinSvg()}<span>${esc(e.location.trim())}</span></span>` : ''}
       <p class="diary-read">${esc(e.text)}</p>
       ${linked && p ? `<div class="nwin nlink" style="${tint(p.color)}" role="note" aria-label="Linked note: ${esc(linked.name)}">${winBar(linked.name, p.face)}</div>` : ''}
-      <div id="diary-photo" class="diary-photo"></div>
+      <div id="diary-photo" class="diary-photo">${!e.photo && e.icon ? `<div class="diary-icon" role="img" aria-label="${esc(iconLabel(e.icon))}">${stickerSvg(e.icon, 1)}</div>` : ''}</div>
     </div>`);
     if (e.photo) draft.loaded = loadPhotos(day, e.photos ?? 1).then((r) => { if (draft?.day === day && !draft.photos.length) { draft.photos = r.photos; draft.busy = undefined; drawDraftPhoto(); } else r.photos.forEach((p) => URL.revokeObjectURL(p.url)); });
     return;
@@ -299,17 +318,21 @@ function openDiary(day: number, edit = false) {
         `<button type="button" data-action="diary-mood" data-mood="${k}" aria-pressed="false">${moodSprite(k)}<span>${esc(moodName(k, names()))}</span></button>`).join('')}</div>
       <input id="diary-feeling" maxlength="40" autocomplete="off" placeholder="In your own words (optional)" value="${esc(e?.feeling ?? '')}" aria-label="Your own word for this feeling"></div>
     ${settings().trackamaniac ? `<div class="field"><span>Weather</span>
-      <div class="moods" id="diary-weather">${(Object.keys(WEATHER) as Weather[]).map((k) =>
-        `<button type="button" data-action="diary-weather" data-weather="${k}" aria-pressed="false">${weatherSvg(k)}<span>${WEATHER[k]}</span></button>`).join('')}</div></div>` : ''}
+      <div class="moods" id="diary-weather">${Object.keys(WEATHER).map((k) =>
+        `<button type="button" data-action="diary-weather" data-weather="${k}" aria-pressed="false">${weatherSvg(k)}<span>${esc(weatherLabel(k))}</span></button>`).join('')}</div></div>` : ''}
     ${settings().starry ? `<div class="field"><span>Star this day <span class="muted">(to remember it)</span></span>
       <div class="stars" id="diary-stars">${(['happy', 'sad'] as Star[]).map((k) =>
         `<button type="button" class="btn small" data-action="diary-star" data-star="${k}" aria-pressed="false">${starSvg(k)}<span>${STAR_LABEL[k]}</span></button>`).join('')}</div></div>` : ''}
     <label class="field">Dear diary <textarea id="diary-text" class="diary-text" maxlength="5000" placeholder="What happened today?">${esc(e?.text ?? '')}</textarea></label>
     <div class="field"><span>Link to notes</span><div id="diary-notes" class="diary-notes"></div></div>
-    <div class="field"><span>${settings().photographer ? 'Photos' : 'Photo'}</span><div id="diary-photo" class="diary-photo"></div>
-      <div class="btns"><button class="btn" type="button" data-action="diary-photo-add">Add photo</button></div>
-      <p class="muted" id="diary-photo-hint"></p>
-      <input type="file" id="diary-file" accept="image/*" ${settings().photographer ? 'multiple' : ''} hidden></div>
+    <fieldset class="field diary-pic"><legend>Picture</legend>
+      <div class="nkinds" role="radiogroup">${([['photo', settings().photographer ? 'Photos' : 'Photo'], ['icon', 'Icon']] as const).map(([k, label]) =>
+        `<label><input type="radio" name="diary-pic" value="${k}" ${draft!.pic === k ? 'checked' : ''}><span>${label}</span></label>`).join('')}</div>
+      <div id="diary-pic-photo" ${draft!.pic === 'photo' ? '' : 'hidden'}><div id="diary-photo" class="diary-photo"></div>
+        <div class="btns"><button class="btn" type="button" data-action="diary-photo-add">Add photo</button></div>
+        <p class="muted" id="diary-photo-hint"></p>
+        <input type="file" id="diary-file" accept="image/*" ${settings().photographer ? 'multiple' : ''} hidden></div>
+      <div id="diary-pic-icon" ${draft!.pic === 'icon' ? '' : 'hidden'}>${iconFieldHtml()}</div></fieldset>
     <p class="form-error" id="diary-error" hidden></p>
     <div class="btns"><button class="btn" type="button" data-action="diary-clear">Clear</button><button class="btn" type="button" data-action="modal-close">Cancel</button><button class="btn primary" type="submit">Save</button></div>
   </form>`);
@@ -333,18 +356,19 @@ async function saveDiary() {
   const location = settings().teleportation ? ($('diary-location') as HTMLInputElement).value.replace(/\s+/g, ' ').trim() : entryOf(dr.day)?.location;   // stays put while Teleportation is off
   const star = settings().starry ? dr.star : entryOf(dr.day)?.star;
   const note = dr.note;
-  const keep = !!dr.photoLost && !dr.touched;   // a photo that could not be read stays as it is
-  const count = keep ? entryOf(dr.day)?.photos ?? 1 : dr.photos.length;
+  const icon = dr.pic === 'icon' ? dr.icon : undefined;   // an icon instead of photos: saving drops the photos
+  const keep = !icon && !!dr.photoLost && !dr.touched;   // a photo that could not be read stays as it is
+  const count = icon ? 0 : keep ? entryOf(dr.day)?.photos ?? 1 : dr.photos.length;
   if (settings().photographer && !keep && count === 3) {
     const err = $('diary-error');
     err.textContent = 'A page has 1, 2 or 4 photos. Add one more or remove one.';
     err.hidden = false;
     return;
   }
-  const empty = !text.trim() && !title && !mood && !feeling && !weather && !star && !note && !location && !count;
+  const empty = !text.trim() && !title && !mood && !feeling && !weather && !star && !note && !location && !count && !icon;
   const entry: DiaryEntry | null = empty ? null
-    : { text, ...(title && { title }), ...(location && { location }), mood, ...(mood2 && { mood2 }), ...(feeling && { feeling }), ...(weather && { weather }), ...(star && { star }), ...(note && { note }), ...(count > 1 && { photos: count }), photo: count > 0, updated: Date.now() };
-  if (!await saveEntry(dr.day, entry, keep ? 'keep' : dr.photos.map((p) => p.blob))) {
+    : { text, ...(title && { title }), ...(location && { location }), mood, ...(mood2 && { mood2 }), ...(feeling && { feeling }), ...(weather && { weather }), ...(star && { star }), ...(note && { note }), ...(count > 1 && { photos: count }), ...(icon && { icon }), photo: count > 0, updated: Date.now() };
+  if (!await saveEntry(dr.day, entry, icon ? 'none' : keep ? 'keep' : dr.photos.map((p) => p.blob))) {
     const err = $('diary-error');
     err.textContent = "Couldn't store this page on the device. Try again.";
     err.hidden = false;
@@ -422,6 +446,7 @@ onShown('diary', 'toggle', (ev) => {
   if (el.id === 'bday-fold') bdayOpen = el.open;
   if (el.id === 'mem-fold') memOpen = el.open;
   if (el.id === 'glance-fold') glanceOpen = el.open;
+  if (el.id === 'diary-icon-fold' && draft) draft.iconOpen = el.open;
 }, true);
 
 onShown('diary', 'click', (ev) => {
@@ -476,7 +501,7 @@ onShown('diary', 'click', (ev) => {
       break;
     case 'diary-clear':
       openLayer(`<h3>Clear this page?</h3>
-        <p>This empties the title, location, text, feelings, weather, star, linked note and photo on this diary page. Nothing is deleted until you press Save, so closing the page without saving keeps it as it was.</p>
+        <p>This empties the title, location, text, feelings, weather, star, linked note and photo or icon on this diary page. Nothing is deleted until you press Save, so closing the page without saving keeps it as it was.</p>
         <div class="btns"><button class="btn" type="button" data-action="layer-close" data-focus>Cancel</button><button class="btn primary" type="button" data-action="diary-clear-yes">Clear</button></div>`, 'Clear this page?');
       break;
     case 'diary-clear-yes':
@@ -484,7 +509,7 @@ onShown('diary', 'click', (ev) => {
       ($('diary-text') as HTMLTextAreaElement).value = '';
       ($('diary-feeling') as HTMLInputElement).value = '';
       for (const id of ['diary-title', 'diary-location']) { const t = document.getElementById(id) as HTMLInputElement | null; if (t) t.value = ''; }
-      if (draft) { draft.moods = []; draft.weather = undefined; draft.star = undefined; draft.note = undefined; drawNoteLink(); draft.photoLost = false; draft.touched = true; markMood(); revokePhotos(); draft.photos = []; drawDraftPhoto(); }
+      if (draft) { draft.moods = []; draft.weather = undefined; draft.star = undefined; draft.note = undefined; drawNoteLink(); draft.photoLost = false; draft.touched = true; markMood(); revokePhotos(); draft.photos = []; drawDraftPhoto(); setPic('photo'); }
       break;
     case 'reflect-edit': openReflection(); break;
     case 'people-open': openPeople(); break;
@@ -513,6 +538,8 @@ onShown('diary', 'submit', (ev) => {
 onShown('diary', 'change', async (ev) => {
   const t = ev.target as HTMLInputElement;
   if (t.id === 'diary-note-pick') { if (draft && t.value) { draft.note = t.value; drawNoteLink(); } return; }
+  if (t.name === 'diary-pic') { setPic(t.value === 'icon' ? 'icon' : 'photo'); return; }
+  if (t.name === 'diary-icon' && draft) { draft.icon = t.value; draft.iconOpen = false; $('diary-pic-icon').innerHTML = iconFieldHtml(); return; }
   if (t.id !== 'diary-file') return;
   const d = draft;
   const files = [...(t.files ?? [])].slice(0, d ? maxPhotos() - d.photos.length : 0);

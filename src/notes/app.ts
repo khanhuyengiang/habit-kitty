@@ -2,7 +2,7 @@
 // Edit turns it into the form (title, the card's picture, the text), which saves as you type.
 // The data is in ./data.ts (Habit Kitty starts it), the pure parts in ./model.ts. Drawn with Habit Kitty's stylesheet, in web/notes.html.
 import { iconSvg } from '../pixelart.ts';
-import { PICKER_ICONS, groupedPicks, iconSvg as uiIcon, stickerSvg } from '../achievement/pixelart.ts';
+import { PICKER_ICONS, groupedPicks, iconLabel, iconSvg as uiIcon, pickable, stickerSvg } from '../achievement/pixelart.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
 import { esc } from '../shared/html.ts';
@@ -42,7 +42,7 @@ const when = (t: number) => new Date(t).toLocaleDateString('en', { day: 'numeric
 const foot = (t: number | null) => (t ? when(t) : '');
 
 const coverOf = (o: Open): Cover =>
-  o.kind === 'icon' && PICKER_ICONS[o.icon] ? { kind: 'icon', name: o.icon } : o.kind === 'image' && o.image ? { kind: 'image', src: o.image } : null;
+  o.kind === 'icon' && o.icon ? { kind: 'icon', name: o.icon } : o.kind === 'image' && o.image ? { kind: 'image', src: o.image } : null;
 const textOf = (o: Open) => composeNote({ front: o.front, cover: coverOf(o), color: o.color, doodle: o.doodle, face: o.face, date: o.date || undefined, body: o.body });
 const nameOf = (o: Open) => o.title.trim() || o.name || titleFromText(o.body);
 const isEmpty = (o: Open) => !o.title.trim() && !o.body.trim() && !coverOf(o);
@@ -62,7 +62,8 @@ function openNote(n: Note | null, editing: boolean): Open {
 // line with the date. The note's colour (--nc) tints all of it. In the list every card is the same size (.ncard in web/notes.html).
 // The bottom-left picture is one of Kitty Achievement's icons (a sticker at the note's own pixel) and the title bar's cat (./window.ts) is the
 // outline of one of Habit Kitty's mini moods, so everything on the card is drawn on the same grid.
-const doodleSvg = (d: NoteDoodle) => (PICKER_ICONS[d] ? stickerSvg(d, 1) : '');
+// An icon that is gone (deleted in Kitty Gallery) is drawn as a heart.
+const doodleSvg = (d: NoteDoodle) => (d === 'none' ? '' : stickerSvg(d, 1));
 const FACE_LABEL: Record<NoteFace, string> = { happy: 'Happy', open: 'Awake', sleepy: 'Sleepy', sad: 'Sad', starving: 'Hungry' };
 const TWINKLE = ['..o..', '..o..', 'oo.oo', '..o..', '..o..'];
 const decoHtml = (d: NoteDoodle) => `<span class="ndeco" aria-hidden="true">${['tl', 'tr', 'br'].map((c) => `<span class="tw ${c}">${monoSvg(TWINKLE)}</span>`).join('')}${
@@ -154,10 +155,12 @@ function coverFieldHtml(): string {
     <p class="hint">The picture is scaled down and kept inside the note's file.</p>`;
 }
 // The icon list (Kitty Achievement's), folded to the chosen one; `none` adds a "None" choice.
+// An icon that is gone (deleted in Kitty Gallery) is a heart, so the heart is the one chosen.
 function iconFold(id: string, name: string, sel: string, open: boolean, none: boolean): string {
-  const label = PICKER_ICONS[sel]?.label ?? 'None';
+  if (!(none && sel === 'none')) sel = pickable(sel);
+  const label = sel === 'none' ? 'None' : iconLabel(sel);
   const pick = (n: string, text: string, art: string) => `<label title="${text}"><input type="radio" name="${name}" value="${n}" ${n === sel ? 'checked' : ''} aria-label="${text}"><span>${art}</span></label>`;
-  return `<details class="icon-fold" id="${id}" ${open ? 'open' : ''}><summary class="fold-sum" aria-label="${esc(label)}. Change">${PICKER_ICONS[sel] ? stickerSvg(sel, 1) : ''}<span class="fold-name">${esc(label)}</span><span class="fold-chev">${uiIcon('chev')}</span></summary>
+  return `<details class="icon-fold" id="${id}" ${open ? 'open' : ''}><summary class="fold-sum" aria-label="${esc(label)}. Change">${sel === 'none' ? '' : stickerSvg(sel, 1)}<span class="fold-name">${esc(label)}</span><span class="fold-chev">${uiIcon('chev')}</span></summary>
     <div class="icon-pick">${none ? pick('none', 'None', 'None') : ''}${groupedPicks((n) => pick(n, PICKER_ICONS[n].label, stickerSvg(n, 1)))}</div></details>`;
 }
 const doodleFieldHtml = () => (cur ? iconFold('note-doodle-fold', 'note-doodle', cur.doodle, cur.doodleOpen, true) : '');

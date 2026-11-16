@@ -16,7 +16,7 @@ import { BACKUP_PREFIX, backupStatus, markDirty, nativeBackups, saveBackupToDevi
 import { platformRepo } from './snapshot.ts';
 import { onAppShown, onShown, shownApp } from '../../shared/apps.ts';
 import { esc, plural } from '../../shared/html.ts';
-import { homeButton, playerButton, settingsButton, showToast, titleBar } from '../../shared/ui.ts';
+import { homeButton, moveButtons, playerButton, refocusMove, settingsButton, showToast, titleBar } from '../../shared/ui.ts';
 import { meterHtml } from '../../shared/meter.ts';
 import { lvLine } from '../../player.ts';
 import { paintBackdrop } from '../../shared/backdrop.ts';
@@ -24,7 +24,7 @@ import { music } from '../../shared/music.ts';
 import { PHOTO_MAX_BYTES, compressPhoto } from '../../shared/photo.ts';
 import { sharePicture } from '../../shared/snapshot.ts';
 import {
-  PICKER_ICONS, PICKER_ICON_NAMES, avatarSvg, groupedPicks, burstSvg, cornerSvg, flowerSvg, heartSvg, iconSvg, starsSvg, stickerSvg,
+  PICKER_ICONS, PICKER_ICON_NAMES, avatarSvg, iconLabel, pickable, groupedPicks, burstSvg, cornerSvg, flowerSvg, heartSvg, iconSvg, starsSvg, stickerSvg,
 } from '../pixelart.ts';
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
@@ -412,13 +412,13 @@ const top = () => modals[modals.length - 1];
 function field(label: string, name: string, control: string, hint = '', required = false): string {
   return `<div class="field"><label for="f-${name}">${label}${required ? ' <span aria-hidden="true">*</span>' : ''}</label>${control}<p class="hint" id="h-${name}">${hint}</p><p class="err" data-err="${name}" role="alert"></p></div>`;
 }
-const iconLabel = (n: string) => PICKER_ICONS[n]?.label ?? 'Icon';
 const iconSummary = (n: string) => `${stickerSvg(n, 1)}<span class="fold-name">${esc(iconLabel(n))}</span><span class="fold-chev">${iconSvg('chev')}</span>`;
-// The icon list folds away once an icon is chosen; the chosen icon (in the summary) opens it again.
-const iconPicker = (sel: string, open: boolean, name = 'icon') => `<div class="field"><fieldset class="field"><legend>Icon <span aria-hidden="true">*</span></legend>
+// The icon list folds away once an icon is chosen; the chosen icon (in the summary) opens it again. An icon that is gone
+// (deleted in Kitty Gallery) is a heart, here as on the card, so the heart is the one chosen.
+const iconPicker = (sel: string, open: boolean, name = 'icon') => (sel = pickable(sel), `<div class="field"><fieldset class="field"><legend>Icon <span aria-hidden="true">*</span></legend>
   <details class="icon-fold" ${open ? 'open' : ''}><summary class="fold-sum" aria-label="Icon: ${esc(iconLabel(sel))}. Change">${iconSummary(sel)}</summary>
   <div class="icon-pick">${groupedPicks((n) =>
-  `<label title="${PICKER_ICONS[n].label}"><input type="radio" name="${name}" value="${n}" ${n === sel ? 'checked' : ''} aria-label="${PICKER_ICONS[n].label}"><span>${iconSvg(n)}</span></label>`)}</div></details></fieldset><p class="err" data-err="${name}" role="alert"></p></div>`;
+  `<label title="${PICKER_ICONS[n].label}"><input type="radio" name="${name}" value="${n}" ${n === sel ? 'checked' : ''} aria-label="${PICKER_ICONS[n].label}"><span>${iconSvg(n)}</span></label>`)}</div></details></fieldset><p class="err" data-err="${name}" role="alert"></p></div>`);
 
 function photosField(m: { photos: FormPhoto[] }, label = 'Photos'): string {
   return `<div class="field"><label for="f-photos">${label}</label>
@@ -507,8 +507,7 @@ case 'achievement': case 'complete': return `<div class="panel wide form-panel" 
         <ul class="manage">${all.map((s) => { const i = visible.indexOf(s); return `<li class="${s.archivedAt ? 'arch' : ''}" style="--c:${isColor(s.color) ? s.color : '#8f78d0'}">
           <span class="nm">${iconSvg(s.icon)}${esc(s.title)}${s.archivedAt ? ' <span class="tag">Archived</span>' : ''}</span>
           <div class="btns"><button class="btn small" data-action="side-edit" data-id="${s.id}">${iconSvg('pencil')} Edit</button>
-          ${s.archivedAt ? `<button class="btn small" data-action="side-restore" data-id="${s.id}">Restore</button>` : `<button class="btn small" data-action="side-up" data-id="${s.id}" aria-label="Move ${esc(s.title)} up" ${i === 0 ? 'disabled' : ''}>${iconSvg('up')}</button>
-          <button class="btn small" data-action="side-down" data-id="${s.id}" aria-label="Move ${esc(s.title)} down" ${i === visible.length - 1 ? 'disabled' : ''}>${iconSvg('down')}</button>
+          ${s.archivedAt ? `<button class="btn small" data-action="side-restore" data-id="${s.id}">Restore</button>` : `${moveButtons('side-move', s.id, s.title, i === 0, i === visible.length - 1)}
           <button class="btn small" data-action="side-archive" data-id="${s.id}">${iconSvg('archive')} Archive</button>`}
           <button class="btn small danger" data-action="side-delete" data-id="${s.id}">${iconSvg('trash')}<span class="sr">Delete ${esc(s.title)}</span></button></div></li>`; }).join('')}</ul>
         <div class="btns end"><button class="btn" data-action="new-side" data-main="${m.mainId}">${iconSvg('plus')} Side quest</button><button class="btn primary" data-action="close-modal">Done</button></div></div>`;
@@ -848,7 +847,7 @@ function onAction(el: HTMLElement) {
     }
     case 'manage-sides': openModal({ kind: 'sides', mainId: id }); break;
     case 'side-edit': { const s = data.sideQuests.find((x) => x.id === id)!; openModal({ kind: 'side', mainId: s.mainQuestId, id, title: s.title, color: s.color, icon: s.icon }); break; }
-    case 'side-up': case 'side-down': { commit(moveSideQuest(data, id, el.dataset.action === 'side-up' ? -1 : 1)); renderModal(); (appRoot.querySelector(`[data-action="${el.dataset.action}"][data-id="${id}"]:not(:disabled)`) as HTMLElement | null)?.focus(); break; }
+    case 'side-move': { commit(moveSideQuest(data, id, el.dataset.by === '1' ? 1 : -1)); renderModal(); refocusMove(appRoot, 'side-move', id, el.dataset.by ?? '-1'); break; }
     case 'side-archive': commit(setSideQuestArchived(data, id, true)); renderModal(); break;
     case 'side-restore': commit(setSideQuestArchived(data, id, false)); renderModal(); break;
     case 'side-delete': {

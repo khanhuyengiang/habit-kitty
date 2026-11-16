@@ -3,13 +3,13 @@ import { PICKER_ICONS, PICKER_ICON_NAMES } from '../achievement/icons.ts';
 import {
   BASE_ROWS, INK_ROWS, MORE_INKS, byHue, categoryOf, paletteLabel,
   CATEGORIES, DEFAULT_GROUP, EXPORT_FORMAT, LETTERS, USER_GROUP, blankGrid, cleanArt, dropIcon, emptyData, exportText, floodFill,
-  byName, countMine, dropFloat, groupsOf, resetIcons, iconsOf, importClashes, importIcons, nameTaken, uniqueNames, inRect, liftArea, linePoints, moveIcons, rectOf, newId, officials, putIcon, readExport, renameGroup, sanitize, shiftGrid, sizeOf, toArt, toGrid,
+  borderAll, oldStickers, byName, canDeleteOfficial, deleteOfficial, liveIcons, restoreIcon, countMine, dropCount, dropFloat, dropIcons, groupsOf, setFood, resetIcons, iconsOf, importClashes, importIcons, nameTaken, uniqueNames, inRect, liftArea, linePoints, moveIcons, rectOf, newId, officials, putIcon, readExport, renameGroup, sanitize, shiftGrid, sizeOf, toArt, toGrid,
 } from './model.ts';
 import { PALETTE, type PaletteName } from '../shared/palette.ts';
 import { FINE } from '../achievement/pixelart.ts';
 
-const blank16 = () => Array.from({ length: 16 }, () => '.'.repeat(16));
-const teapot = () => { const a = blank16(); a[8] = '....ssssssss....'; return a; };
+const blank18 = () => Array.from({ length: 18 }, () => '.'.repeat(18));
+const teapot = () => { const a = blank18(); a[8] = '.....ssssssss.....'; return a; };
 
 describe('officials', () => {
   it('lists every picker icon as a sticker, in its group (default without one)', () => {
@@ -20,6 +20,7 @@ describe('officials', () => {
   it('has the card friends and the button icons too', () => {
     expect(officials('friend').map((o) => o.id)).toEqual(['heart', 'flower']);
     expect(officials('button').map((o) => o.id)).toEqual(expect.arrayContaining(['x', 'gear', 'lock', 'trash']));
+    expect(officials('sticker').filter((o) => o.food).map((o) => o.id)).toEqual(expect.arrayContaining(['fish', 'food', 'cake', 'apple']));
   });
   it('draws every official icon with its category letters only', () => {
     for (const c of CATEGORIES) for (const o of officials(c.id)) {
@@ -120,14 +121,14 @@ describe('the export file', () => {
 
 describe('importing over your icons', () => {
   const mine = () => putIcon(emptyData(), { category: 'sticker', id: 'star', name: 'Star', group: DEFAULT_GROUP, art: teapot() });
-  const theirs = () => { const a = teapot(); a[2] = '....ssssssss....'; return [{ category: 'sticker' as const, id: 'star', name: 'Star', group: DEFAULT_GROUP, art: a }]; };
+  const theirs = () => { const a = teapot(); a[2] = '.....ssssssss.....'; return [{ category: 'sticker' as const, id: 'star', name: 'Star', group: DEFAULT_GROUP, art: a }]; };
   it('finds only the icons that differ from your own version', () => {
     expect(importClashes(mine(), theirs()).map((i) => i.id)).toEqual(['star']);
     expect(importClashes(emptyData(), theirs())).toEqual([]);                       // the official one: nothing of yours lost
     expect(importClashes(mine(), [{ ...theirs()[0], art: teapot() }])).toEqual([]);  // the same as yours
   });
   it('replaces yours, or keeps both as Star 1 and Star 2', () => {
-    expect(importIcons(mine(), theirs(), 'replace').icons.map((i) => [i.id, i.name, i.art[2]])).toEqual([['star', 'Star', '....ssssssss....']]);
+    expect(importIcons(mine(), theirs(), 'replace').icons.map((i) => [i.id, i.name, i.art[2]])).toEqual([['star', 'Star', '.....ssssssss.....']]);
     const both = iconsOf(importIcons(mine(), theirs(), 'keep'), 'sticker').filter((i) => i.status !== 'official');
     expect(both.map((i) => [i.id, i.name, i.status, i.group])).toEqual([['star', 'Star 1', 'changed', DEFAULT_GROUP], ['star2', 'Star 2', 'new', USER_GROUP]]);
   });
@@ -182,6 +183,106 @@ describe('moveIcons', () => {
   });
 });
 
+describe('stickers at 18 × 18 (TEMPORARY: Add border to all)', () => {
+  it('has every official sticker at 18 × 18', () => {
+    for (const o of officials('sticker')) expect([o.art.length, ...new Set(o.art.map((r) => r.length))], o.id).toEqual([18, 18]);
+  });
+  it('keeps a 16 × 16 sticker of yours until it gets its border, which looks just as it used to', () => {
+    const old = Array.from({ length: 16 }, (_, y) => (y === 8 ? '....ssssssss....' : '.'.repeat(16)));
+    let d = sanitize({ version: 1, icons: [{ category: 'sticker', id: 'teapot', name: 'Teapot', group: USER_GROUP, art: old, updated: 1 }] });
+    expect(oldStickers(d)).toBe(1);
+    d = borderAll(d, 7);
+    expect(oldStickers(d)).toBe(0);
+    const empty = '.'.repeat(18);   // one row of base colour: lit along its top, with the dark line around it
+    expect(d.icons[0].art).toEqual([...Array(8).fill(empty), '.....oooooooo.....', '....ollllllllo....', '.....oooooooo.....', ...Array(7).fill(empty)]);
+    expect(sanitize(d).icons[0].art).toEqual(d.icons[0].art);
+  });
+});
+
+describe('dropIcons', () => {
+  it('deletes your own and official stickers (keeping their changes), but never the heart', () => {
+    const [a, b, c] = officials('sticker').filter((o) => o.id !== 'heart');
+    let d = putIcon(emptyData(), { category: 'sticker', id: 'teapot', name: 'Teapot', group: USER_GROUP, art: teapot() });
+    d = moveIcons(d, 'sticker', [a.id, b.id], 'kitchen');
+    expect(dropCount(d, 'sticker', ['teapot', a.id, c.id, 'heart'])).toEqual({ deleted: 1, official: 2, reverted: 0 });
+    d = dropIcons(d, 'sticker', ['teapot', a.id, c.id, 'heart'], 5);
+    const shown = iconsOf(d, 'sticker');
+    expect(shown.find((i) => i.id === 'teapot')).toBeUndefined();
+    expect(shown.find((i) => i.id === a.id)).toMatchObject({ status: 'deleted', group: 'kitchen' });
+    expect(shown.find((i) => i.id === b.id)).toMatchObject({ status: 'changed', group: 'kitchen' });
+    expect(shown.find((i) => i.id === c.id)!.status).toBe('deleted');
+    expect(shown.find((i) => i.id === 'heart')!.status).toBe('official');
+    expect(liveIcons(d, 'sticker').map((i) => i.id)).not.toContain(a.id);
+  });
+  it("puts changed official icons back where they can't be deleted (buttons), and leaves the rest", () => {
+    const [a, b, c] = officials('button');
+    let d = moveIcons(emptyData(), 'button', [a.id, b.id], 'kitchen');
+    expect(dropCount(d, 'button', [a.id, c.id])).toEqual({ deleted: 0, official: 0, reverted: 1 });
+    d = dropIcons(d, 'button', [a.id, c.id]);
+    expect(d.icons.map((i) => i.id)).toEqual([b.id]);
+  });
+});
+
+describe('deleting an official icon', () => {
+  const star = () => officials('sticker').find((o) => o.id === 'star')!;
+  it('marks it deleted, keeps your change, and brings it back with it', () => {
+    let d = putIcon(emptyData(), { ...star(), category: 'sticker', name: 'Twinkle' });
+    d = deleteOfficial(d, 'sticker', 'star', 2);
+    expect(d.icons).toEqual([expect.objectContaining({ id: 'star', name: 'Twinkle', deleted: true })]);
+    expect(iconsOf(d, 'sticker').find((i) => i.id === 'star')!.status).toBe('deleted');
+    d = restoreIcon(d, 'sticker', 'star', 3);
+    expect(iconsOf(d, 'sticker').find((i) => i.id === 'star')).toMatchObject({ status: 'changed', name: 'Twinkle' });
+    expect(d.icons[0].deleted).toBeUndefined();
+  });
+  it('brings an unchanged one back as official, with nothing kept', () => {
+    const d = restoreIcon(deleteOfficial(emptyData(), 'weather', officials('weather')[0].id), 'weather', officials('weather')[0].id);
+    expect(d.icons).toEqual([]);
+  });
+  it("can't delete the heart, a button, a card friend or your own icon", () => {
+    expect(canDeleteOfficial('sticker', 'heart')).toBe(false);
+    expect(deleteOfficial(emptyData(), 'sticker', 'heart').icons).toEqual([]);
+    expect(deleteOfficial(emptyData(), 'button', officials('button')[0].id).icons).toEqual([]);
+    expect(deleteOfficial(emptyData(), 'friend', 'flower').icons).toEqual([]);
+    const mine = putIcon(emptyData(), { category: 'sticker', id: 'teapot', name: 'Teapot', group: USER_GROUP, art: teapot() });
+    expect(deleteOfficial(mine, 'sticker', 'teapot')).toEqual(mine);
+    expect(putIcon(emptyData(), { category: 'sticker', id: 'teapot', name: 'Teapot', group: USER_GROUP, art: teapot(), deleted: true }).icons).toEqual([]);
+  });
+  it('stays deleted when its group is renamed or it is moved, and frees its name', () => {
+    let d = deleteOfficial(emptyData(), 'sticker', 'star');
+    d = renameGroup(d, 'sticker', star().group, 'sky');
+    d = moveIcons(d, 'sticker', ['star'], 'night');
+    expect(iconsOf(d, 'sticker').find((i) => i.id === 'star')!.status).toBe('deleted');
+    expect(nameTaken(d, 'sticker', 'Star', null)).toBeUndefined();
+    // a new "Star" while it is gone: bringing it back tells the two apart
+    d = putIcon(d, { category: 'sticker', id: 'mystar', name: 'Star', group: USER_GROUP, art: teapot() });
+    d = restoreIcon(d, 'sticker', 'star');
+    expect(liveIcons(d, 'sticker').filter((i) => /^star/i.test(i.name)).map((i) => i.name).sort()).toEqual(['Star 1', 'Star 2']);
+  });
+  it('goes through the save file and the export', () => {
+    const d = deleteOfficial(emptyData(), 'sticker', 'star', 7);
+    expect(sanitize(JSON.parse(JSON.stringify(d)))).toEqual(d);
+    const text = exportText(d, '2026-11-16');
+    expect(JSON.parse(text).icons[0]).toMatchObject({ id: 'star', status: 'deleted', deleted: true });
+    expect(iconsOf(importIcons(emptyData(), readExport(text)), 'sticker').find((i) => i.id === 'star')!.status).toBe('deleted');
+    expect(sanitize({ icons: [{ ...d.icons[0], id: 'heart', art: officials('sticker').find((o) => o.id === 'heart')!.art }] }).icons[0]?.deleted).toBeUndefined();
+  });
+});
+
+describe('setFood', () => {
+  it('makes picked stickers cat food, or not, official or your own', () => {
+    const notFood = officials('sticker').find((o) => !o.food)!, food = officials('sticker').find((o) => o.food)!;
+    let d = putIcon(emptyData(), { category: 'sticker', id: 'teapot', name: 'Teapot', group: USER_GROUP, art: teapot() });
+    d = setFood(d, ['teapot', notFood.id, food.id], true, 5);
+    const shown = iconsOf(d, 'sticker');
+    expect(shown.find((i) => i.id === 'teapot')?.food).toBe(true);
+    expect(shown.find((i) => i.id === notFood.id)).toMatchObject({ food: true, status: 'changed' });
+    expect(shown.find((i) => i.id === food.id)?.status).toBe('official');
+    d = setFood(d, [notFood.id, food.id], false);
+    expect(iconsOf(d, 'sticker').find((i) => i.id === food.id)).toMatchObject({ food: false, status: 'changed' });
+    expect(d.icons.some((i) => i.id === notFood.id)).toBe(false);   // back as it was: the change is dropped
+  });
+});
+
 describe('order', () => {
   it('sorts icons by name, ignoring case, with numbers in order', () => {
     const names = ['drink 2', 'Bee', 'Drink 10', 'apple', 'Drink 1'].map((name) => ({ name }));
@@ -223,5 +324,68 @@ describe('selection', () => {
   it('keeps what is under an empty lifted pixel, and loses what is off the board', () => {
     const base = toGrid(['xxx', 'xxx', 'xxx']);
     expect(toArt(dropFloat(base, toGrid(['a.', '.b']), 1, -1))).toEqual(['xxb', 'xxx', 'xxx']);
+  });
+});
+
+describe('cat food', () => {
+  it('keeps "Can kitty eat this?" with a sticker, and an official one ticked or unticked as it was is no change', () => {
+    const fish = officials('sticker').find((o) => o.id === 'fish')!, star = officials('sticker').find((o) => o.id === 'star')!;
+    const base = { category: 'sticker' as const, group: fish.group, name: fish.name, art: fish.art };
+    expect(putIcon(emptyData(), { ...base, id: 'fish', food: true }).icons).toEqual([]);
+    const off = putIcon(emptyData(), { ...base, id: 'fish', food: false });
+    expect(iconsOf(off, 'sticker').find((i) => i.id === 'fish')!.food).toBe(false);
+    const on = putIcon(emptyData(), { category: 'sticker', id: 'star', name: star.name, group: star.group, art: star.art, food: true });
+    expect(iconsOf(on, 'sticker').find((i) => i.id === 'star')).toMatchObject({ food: true, status: 'changed' });
+    const back = sanitize(JSON.parse(JSON.stringify(on)));
+    expect(back.icons[0].food).toBe(true);
+    const mine = putIcon(emptyData(), { category: 'sticker', id: 'treat', name: 'Treat', group: 'user', art: star.art, food: true });
+    expect(iconsOf(mine, 'sticker').find((i) => i.id === 'treat')).toMatchObject({ food: true, status: 'new' });
+  });
+});
+
+describe('decorations', () => {
+  it('has the home screen wing, in the decoration colours, and takes no new ones', () => {
+    const wing = officials('deco').find((o) => o.id === 'wing')!;
+    expect(sizeOf('deco', 'wing')).toEqual([12, 12]);
+    expect(wing.art.join('').replace(/\./g, '')).toMatch(/^[H[{]+$/);
+    const ok = sanitize({ version: 1, icons: [{ category: 'deco', id: 'wing', name: 'Wing', group: 'default', art: wing.art.map((r) => r.replace(/\[/g, 'w')), updated: 1 },
+      { category: 'deco', id: 'feather', name: 'Feather', group: 'default', art: wing.art, updated: 1 }] });
+    expect(ok.icons.map((i) => i.id)).toEqual(['wing']);
+  });
+});
+
+describe('scenes', () => {
+  const room = () => officials('scene').find((o) => o.id === 'room')!;
+  it('turns the official cosy room and garden into palette letters, every pixel of them', () => {
+    for (const o of officials('scene')) {
+      expect(o.art).toHaveLength(320);
+      expect(o.art.every((r) => r.length === 240 && !r.includes('.')), o.id).toBe(true);
+      expect(new Set(o.art.join('')).size).toBeGreaterThan(20);
+      expect(o.spots?.length).toBeGreaterThan(0);
+    }
+    expect(room().props).toEqual({ book: [9, 49], trophy: [21, 48] });
+    expect(officials('scene').find((o) => o.id === 'garden')!.props).toBeUndefined();
+  });
+
+  it('keeps your spots with a changed scene, and drops a change that is just the official one', () => {
+    const o = room(), spots: [number, number][] = [[10, 100], [50, 200]];
+    const d = putIcon(emptyData(), { category: 'scene', id: 'room', name: o.name, group: o.group, art: o.art, spots, props: o.props }, 1);
+    expect(iconsOf(d, 'scene').find((i) => i.id === 'room')).toMatchObject({ status: 'changed', spots });
+    expect(putIcon(d, { category: 'scene', id: 'room', name: o.name, group: o.group, art: o.art, spots: o.spots, props: o.props }, 2).icons).toEqual([]);
+    // renaming keeps them
+    expect(iconsOf(uniqueNames(d, 3), 'scene').find((i) => i.id === 'room')?.spots).toEqual(spots);
+  });
+
+  it('reads back only the two scenes, with spots kept inside the scene', () => {
+    const o = room();
+    const raw = { icons: [
+      { category: 'scene', id: 'room', name: 'Mine', group: 'default', art: o.art, spots: [[-20, 5], [300, 400], 'x'], props: { book: [500, 0], trophy: [1, 1] } },
+      { category: 'scene', id: 'attic', name: 'Attic', group: 'default', art: o.art },
+    ] };
+    const d = sanitize(raw);
+    expect(d.icons).toHaveLength(1);
+    expect(d.icons[0].spots).toEqual([[0, 30], [210, 320]]);
+    expect(d.icons[0].props).toEqual({ book: [231, 0], trophy: [1, 1] });
+    expect(readExport(exportText(d, '2026-11-15'))[0].spots).toEqual([[0, 30], [210, 320]]);
   });
 });

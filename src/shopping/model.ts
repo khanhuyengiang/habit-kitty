@@ -22,7 +22,9 @@ export const defaultCats = (): Cat[] => DEFAULT_CATS.map(([id, name, icon, color
 // from: the recipes that put it on the list (shown next to it, greyed out)
 export interface Item { id: string; name: string; qty: string; unit: string; cat: Category; done: boolean; dupOk?: boolean; from?: string[] }
 const FROM_KEPT = 5;
-export interface List { id: string; name: string; items: Item[] }
+// order: the categories in the way you walk through this supermarket (ids; one missing goes after them, in the pantry's
+// order). With none, the list follows the pantry's order.
+export interface List { id: string; name: string; items: Item[]; order?: string[] }
 // How a regular comes back: only when you add it, on every trip, or every so many days.
 export type Rule = 'none' | 'always' | 'every';
 export interface Regular {
@@ -184,12 +186,36 @@ export function deleteCat(d: ShopData, id: string): ShopData {
   [...x.pantry, ...Object.values(x.had), ...Object.values(x.places), ...Object.values(x.regulars)].forEach(move);
   return x;
 }
-// Moves a category one place earlier (-1) or later (1): the lists are sorted in this order too (the way through the shop).
+// Moves a category one place earlier (-1) or later (1) in the pantry (the cards, and a list that has no order of its own).
 export function moveCat(d: ShopData, id: string, by: -1 | 1): ShopData {
   const i = d.cats.findIndex((c) => c.id === id), j = i + by;
   if (i < 0 || j < 0 || j >= d.cats.length) return d;
   const x = clone(d);
   [x.cats[i], x.cats[j]] = [x.cats[j], x.cats[i]];
+  return x;
+}
+
+// A list's categories in its supermarket's order: those in `order` first, then the rest in the pantry's order.
+export function listCats(d: Pick<ShopData, 'cats'>, l: Pick<List, 'order'> | undefined): Cat[] {
+  const at = new Map((l?.order ?? []).map((id, i) => [id, i]));
+  return d.cats.map((c, i) => ({ c, k: at.get(c.id) ?? at.size + i })).sort((a, b) => a.k - b.k).map((x) => x.c);
+}
+// Moves a category one place earlier (-1) or later (1) on one list only (each supermarket is laid out differently).
+export function moveListCat(d: ShopData, listId: string, id: string, by: -1 | 1): ShopData {
+  const l = d.lists.find((x) => x.id === listId);
+  if (!l) return d;
+  const order = listCats(d, l).map((c) => c.id), i = order.indexOf(id), j = i + by;
+  if (i < 0 || j < 0 || j >= order.length) return d;
+  [order[i], order[j]] = [order[j], order[i]];
+  const x = clone(d);
+  x.lists.find((y) => y.id === listId)!.order = order;
+  return x;
+}
+// The list follows the pantry's order again.
+export function resetListOrder(d: ShopData, listId: string): ShopData {
+  if (!d.lists.find((l) => l.id === listId)?.order) return d;
+  const x = clone(d);
+  delete x.lists.find((l) => l.id === listId)!.order;
   return x;
 }
 
@@ -228,6 +254,7 @@ export function sanitize(raw: unknown): ShopData {
   d.opts = { sink: o.sink !== false, learn: o.learn !== false, toPantry: o.toPantry === true, showEmpty: o.showEmpty !== false };
   d.lists = arr(r.lists).slice(0, LIMITS.lists).map((l) => obj(l)).filter((l) => str(l.name).trim()).map((l) => ({
     id: str(l.id) || newId(), name: cleanName(str(l.name)),
+    ...(arr(l.order).length && { order: [...new Set(arr(l.order).map((c) => str(c, 20)).filter((c) => d.cats.some((x) => x.id === c)))] }),
     items: arr(l.items).slice(0, LIMITS.items).map((i) => obj(i)).filter((i) => str(i.name).trim()).map((i) => ({
       id: str(i.id) || newId(), name: cleanName(str(i.name)), qty: str(i.qty, 12), unit: str(i.unit, 12), cat: cat(i.cat), done: i.done === true, ...(i.dupOk === true && { dupOk: true }),
       ...(arr(i.from).length && { from: [...new Set(arr(i.from).map((f) => cleanName(str(f))).filter(Boolean))].slice(0, FROM_KEPT) }),
@@ -268,6 +295,27 @@ export function sanitize(raw: unknown): ShopData {
 
 // Every change below works on a copy: the old data stays as it was, so it can be put back (undo).
 export const clone = (d: ShopData): ShopData => structuredClone(d);
+
+// ---- settings (for the settings file, see ../settings-file.ts) ----
+// The categories (their order, icons, colours and shelves), the options, and each supermarket's aisle order by the
+// list's name: nothing on the lists, in the pantry or the recipes.
+export interface MartSettings { cats: Cat[]; opts: Options; orders: Record<string, string[]> }
+const listKey = (name: string) => name.replace(/\s+/g, ' ').trim().toLowerCase();
+export function martSettingsOf(d: ShopData): MartSettings {
+  const orders: Record<string, string[]> = {};
+  for (const l of d.lists) if (l.order?.length) orders[listKey(l.name)] = [...l.order];
+  return { cats: structuredClone(d.cats), opts: { ...d.opts }, orders };
+}
+// Puts someone's categories and options in, and their aisle order on your list of the same name. Whatever was in a
+// category the settings don't have goes into Other (as when you delete a category).
+export function applyMartSettings(d: ShopData, s: MartSettings): ShopData {
+  const x = clone(d);
+  x.cats = structuredClone(s.cats);
+  x.opts = { ...s.opts };
+  const orders = new Map(Object.entries(s.orders).map(([name, o]) => [listKey(name), o]));
+  for (const l of x.lists) { const o = orders.get(listKey(l.name)); if (o) l.order = [...o]; }
+  return sanitize(x);
+}
 
 // ---- lists ----
 export const listOf = (d: ShopData, id: string) => d.lists.find((l) => l.id === id);

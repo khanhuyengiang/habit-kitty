@@ -1,13 +1,16 @@
-// Habit Kitty's pictures: icons, weather, food, the heart and the room, drawn on the shared grid (shared/pixelart.ts).
+// Habit Kitty's pictures: icons, weather, the heart and the room, drawn on the shared grid (shared/pixelart.ts).
 // Pure functions that return SVG strings.
 import { PAL, artSvg, monoSvg } from './shared/pixelart.ts';
+import { fineSvg } from './achievement/pixelart.ts';
 export { PAL, artSvg } from './shared/pixelart.ts';
 
-export const ICONS: Record<string, string[]> = {
+// The official button icons; ICONS below has Kitty Gallery's changes put over them (src/pixel/live.ts).
+export const OFFICIAL_ICONS: Readonly<Record<string, string[]>> = {
   x: ['o...o', '.o.o.', '..o..', '.o.o.', 'o...o'],
   tick: ['....o', '...oo', 'o.oo.', '.ooo.', '..o..'],
   check: ['........o', '.......oo', 'o.....oo.', 'oo...oo..', '.oo.oo...', '..ooo....', '...o.....'],
   home: ['....o....', '...ooo...', '..ooooo..', '.ooooooo.', '..ooooo..', '..oo.oo..', '..oo.oo..'],
+  player: ['..ooo..', '.ooooo.', '.ooooo.', '..ooo..', 'ooooooo', 'ooooooo', 'ooooooo'],
   pencil: ['.....oo', '....o.o', '...o.o.', '..o.o..', '.o.o...', 'ooo....', 'o......'],
   rewind: ['...o...o.', '..oo..oo.', '.ooo.ooo.', 'oooooooo.', '.ooo.ooo.', '..oo..oo.', '...o...o.'],
   dice: ['ooooooooo', 'o.......o', 'o.o...o.o', 'o.......o', 'o...o...o', 'o.......o', 'o.o...o.o', 'o.......o', 'ooooooooo'],
@@ -45,29 +48,25 @@ export const ICONS: Record<string, string[]> = {
   // a closed book: two title lines on the cover, the page edge and a bookmark
   diary: ['ooooooooo', 'ooooooooo', 'oo.....oo', 'ooooooooo', 'oo.....oo', 'ooooooooo', 'ooooooooo', 'ooooooooo', 'o........', 'ooooooooo', '.oo......'],
 };
+export const ICONS: Record<string, string[]> = { ...OFFICIAL_ICONS };
 
 export const iconSvg = (name: string, cls = '') => monoSvg(ICONS[name], cls);
 
-// ---- weather, for the Meteorokinesis diary option (13 x 10, same palette as the room) ----
-const CLOUD = [
-  '.....oooo....',
-  '...ooUUUUoo..',
-  '..oUUwwUUUUo.',
-  '.oUUUUUUUUUUo',
-  'oUUUUUUUUUUUo',
-  '.ooooooooooo.',
-];
-export const WEATHER_ART: Record<string, string[]> = {
-  sunny: [
-    '......y......', '.y....y....y.', '..y.YYYYY.y..', '....YyyyY....', '.y.YyyyyyY.y.',
-    'yyyYyyyyyYyyy', '.y.YyyyyyY.y.', '....YyyyY....', '..y.YYYYY.y..', '......y......'],
-  cloudy: ['.............', '.....oooo....', '...ooUUUUoo..', '..oUUwwUUUUo.', '.oUUUUUUUUUUo', 'oUUUUUUUUUUUo', 'oUUUUUUUUUUUo', '.oUUUUUUUUUo.', '..ooooooooo..', '.............'],
-  rainy: [...CLOUD, '..u..u..u....', '.u..u..u..u..', '.u..u..u.....', '..u..u..u.u..'],
-  storm: [...CLOUD.map((r) => r.replace(/U/g, 'd')), '.....yy......', '....yy.......', '...yyyy......', '.....yy......'],
-  snow: [...CLOUD, '..w...w...w..', '....w...w....', '..w...w...w..', '....w...w....'],
-  windy: ['.............', '.uuuuuuuuu...', '.........u.u.', '..........uu.', '.............', '..gggggggg...', '..........g.g', '...........gg', '.uuuuu.......', '.............'],
+// ---- weather, for the Meteorokinesis diary option (13 x 10, Kitty Gallery's letters: see FINE in achievement/pixelart.ts) ----
+// The official weather, in the diary's order; WEATHER has Kitty Gallery's changes and new weather put over it (src/pixel/live.ts).
+export const OFFICIAL_WEATHER: Readonly<Record<string, { label: string; art: string[] }>> = {
+  sunny: { label: 'Sunny', art: ['......y......', '.y....y....y.', '..y.@@@@@.y..', '....@yyy@....', '.y.@yyyyy@.y.', 'yyy@yyyyy@yyy', '.y.@yyyyy@.y.', '....@yyy@....', '..y.@@@@@.y..', '......y......'] },
+  cloudy: { label: 'Cloudy', art: ['.............', '.....QQQQ....', '...QQ%%%%QQ..', '..Q%%ww%%%%Q.', '.Q%%%%%%%%%%Q', 'Q%%%%%%%%%%%Q', 'Q%%%%%%%%%%%Q', '.Q%%%%%%%%%Q.', '..QQQQQQQQQ..', '.............'] },
+  windy: { label: 'Windy', art: ['.............', '.bbbbbbbbb...', '.........b.b.', '..........bb.', '.............', '..bbbbbbbb...', '..........b.b', '...........bb', '.bbbbb.......', '.............'] },
+  rainy: { label: 'Rainy', art: ['.....QQQQ....', '...QQ%%%%QQ..', '..Q%%ww%%%%Q.', '.Q%%%%%%%%%%Q', 'Q%%%%%%%%%%%Q', '.QQQQQQQQQQQ.', '..b..b..b....', '.b..b..b..b..', '.b..b..b.....', '..b..b..b.b..'] },
+  storm: { label: 'Storm', art: ['.....QQQQ....', '...QQLLLLQQ..', '..QLLwwLLLLQ.', '.QLLLLLLLLLLQ', 'QLLLLLLLLLLLQ', '.QQQQQQQQQQQ.', '.....yy......', '....yy.......', '...yyyy......', '.....yy......'] },
+  snow: { label: 'Snow', art: ['.....QQQQ....', '...QQ%%%%QQ..', '..Q%%ww%%%%Q.', '.Q%%%%%%%%%%Q', 'Q%%%%%%%%%%%Q', '.QQQQQQQQQQQ.', '..w...w...w..', '....w...w....', '..w...w...w..', '....w...w....'] },
 };
-export const weatherSvg = (k: string) => artSvg(WEATHER_ART[k], 'weather');
+export const WEATHER: Record<string, { label: string; art: string[] }> = { ...OFFICIAL_WEATHER };
+// A weather's picture; nothing for one that is not there any more (deleted in Kitty Gallery).
+export const weatherSvg = (k: string) => (WEATHER[k] ? fineSvg(WEATHER[k].art, 'weather') : '');
+// A weather's name; one that is not there any more keeps its id as its name.
+export const weatherLabel = (k: string) => WEATHER[k]?.label ?? k.charAt(0).toUpperCase() + k.slice(1);
 
 // ---- the petting heart ----
 const HEART_ART = ['.oo..oo.', 'orroorro', 'orwrrrro', 'orrrrrro', '.orrrro.', '..orro..', '...oo...'];
@@ -82,183 +81,29 @@ export const MARKS: Record<string, string[]> = {
 };
 export const markSvg = (name: string) => artSvg(MARKS[name], 'mark');
 
-// ---- food, the diary book and the trophy ----
-export const FOODS: Record<string, string[]> = {
-  kibbles: ['..........', '...b..b...', '..bBbbBb..', '.bbBbbbBb.', 'oooooooooo', 'ouuuuuuuuo', '.ouuuuuuo.', '..oooooo..'],
-  'wet food': ['..........', '.oooooooo.', '.owwwwwwo.', '.orrrrrro.', '.orwppwro.', '.orrrrrro.', '.oooooooo.', '..........'],
-  fish: ['..........', '....oooo.o', '..ooggggoo', '.oggoggggo', 'oggggggggo', '.ogsssggoo', '..oogggoo.', '....oooo.o'],
-  chicken: ['..oooo....', '.occCco...', '.oCccCco..', '.occCcco..', '..ooccoo..', '....oowo..', '.....owwo.', '......oo..'],
-  shrimp: [
-  '...oooo...',
-  '..ooeeeo..',
-  '.oeooeeeo.',
-  '.oeeo.oeo.',
-  '..oo.oeeo.',
-  '....ooeeo.',
-  '...oeooo..',
-  '..ooo.....',
-] ,
-  meat: ['..........', '..oooooo..', '.ommmmmmo.', 'omMMmmmwmo', 'ommmMmmmmo', '.ommmmmmo.', '..oooooo..', '..........'],
+// ---- the diary book and the trophy ----
+// (Cat food is any sticker the kitties can eat: PICKER_ICONS with food: true, in achievement/icons.ts.)
+
+// Decorations: the official pictures that are drawn in one place only. DECOS has Kitty Gallery's changes put over them.
+// The wing beside the chosen app on the home screen (after inspo/menu.jpg): the tip up and out, three tiers of feathers
+// whose tips notch the outer edge, and a round joint with a curl at the bottom, next to the key. This is the left one; the
+// right is drawn mirrored. H outline (lavender400), [ white, { feather line (grey400).
+export const OFFICIAL_DECOS: Readonly<Record<string, { label: string; art: string[] }>> = {
+  wing: { label: 'Wing', art: [
+    '.HH.........',
+    'H[[HH.......',
+    'H[[[[HH.....',
+    '.H[[[[[HH...',
+    'H{{{{[[[[H..',
+    'H[[[[[[[[[H.',
+    '.H{{{[[[[[[H',
+    'H[[[[[HHH[[H',
+    'H[[[[H[[[H[H',
+    '.H{{{H[{[H[H',
+    '..H[[H[[[H[H',
+    '...HHHHHHHH.',
+  ] },
 };
-export const BOOK_ART = ['.ooooooo.', 'orrrrrrro', 'orrwwwrro', 'orrrrrrro', 'orrwwwrro', 'orrrrrrro', 'orrrrrrro', 'owwwwwwwo', '.ooooooo.'];
-export const TROPHY_ART = ['ooooooooo', 'oyyyyyyyo', 'oyywwyyyo', 'oyyyyyyyo', '.oyyyyyo.', '..oyyyo..', '...oyo...', '..ooooo..', '.oyyyyyo.', 'ooooooooo'];
-
-// ===================== the cosy room =====================
-// 108 x 150 pixels. Cats are 28 pixels wide, so a cat is exactly as pixelated as the furniture around it.
-export const ROOM_W = 108, ROOM_H = 150;
-export type Phase = 'day' | 'dusk' | 'night';
-
-const SKY: Record<Phase, { sky: string; cloud: string; wall: string; wall2: string; trim: string; floor: string; floor2: string; ink: string; glow: string }> = {
-  day:   { sky: '#bfe6fb', cloud: '#ffffff', wall: '#ffe3ee', wall2: '#ffc4da', trim: '#e6dafc', floor: '#d9ccf7', floor2: '#bdb0e6', ink: '#6b4f9e', glow: '' },
-  dusk:  { sky: '#f1cfa0', cloud: '#ffe3ee', wall: '#ffc4da', wall2: '#ffc4da', trim: '#d9ccf7', floor: '#bdb0e6', floor2: '#bdb0e6', ink: '#6b4f9e', glow: '' },
-  night: { sky: '#322a5e', cloud: '#4a4084', wall: '#cdc8e0', wall2: '#bdb0e6', trim: '#a29bb8', floor: '#a29bb8', floor2: '#9a8cc8', ink: '#4a3a78', glow: '#ffe9a0' },
-};
-
-// One filled pixel rectangle.
-const R = (x: number, y: number, w: number, h: number, f: string) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${f}"/>`;
-
-// A stepped ellipse out of whole pixels (rugs, clouds), so there is no smooth curve anywhere.
-function blob(cx: number, cy: number, rx: number, ry: number, fill: string): string {
-  let out = '';
-  for (let y = -ry; y <= ry; y++) {
-    const half = Math.round(rx * Math.sqrt(1 - (y * y) / ((ry + 0.5) * (ry + 0.5))));
-    out += R(cx - half, cy + y, half * 2, 1, fill);
-  }
-  return out;
-}
-
-// A box with notched corners and a one-pixel outline.
-function pbox(x: number, y: number, w: number, h: number, fill: string, edge: string): string {
-  return R(x + 1, y, w - 2, 1, edge) + R(x + 1, y + h - 1, w - 2, 1, edge) + R(x, y + 1, 1, h - 2, edge) + R(x + w - 1, y + 1, 1, h - 2, edge)
-    + R(x + 1, y + 1, w - 2, h - 2, fill);
-}
-
-const OUT: Record<Phase, { sky: string; cloud: string; hill: string; hill2: string; grass: string; grass2: string; path: string; path2: string; fence: string; fence2: string; leaf: string; leaf2: string; trunk: string; ink: string }> = {
-  day:   { sky: '#bfe6fb', cloud: '#ffffff', hill: '#b6e6c0', hill2: '#8fe0c8', grass: '#b6e6c0', grass2: '#b6e6c0', path: '#e6dafc', path2: '#d9ccf7', fence: '#fff3d1', fence2: '#f1cfa0', leaf: '#8fe0c8', leaf2: '#5fc7a8', trunk: '#c99a73', ink: '#6b4f9e' },
-  dusk:  { sky: '#f1cfa0', cloud: '#ffe3ee', hill: '#8fe0c8', hill2: '#5fc7a8', grass: '#b6e6c0', grass2: '#8fe0c8', path: '#d9ccf7', path2: '#bdb0e6', fence: '#f1cfa0', fence2: '#ffb98a', leaf: '#5fc7a8', leaf2: '#2fb8b0', trunk: '#c99a73', ink: '#6b4f9e' },
-  night: { sky: '#322a5e', cloud: '#4a4084', hill: '#4f8a82', hill2: '#4f8a82', grass: '#2fb8b0', grass2: '#4f8a82', path: '#9a8cc8', path2: '#8f78d0', fence: '#b4b0c2', fence2: '#7d7594', leaf: '#2f9e6e', leaf2: '#4f8a82', trunk: '#8a6a5a', ink: '#4a3a78' },
-};
-
-// The outdoors: a garden with a fence, a tree, a path, a cardboard box and a bowl. Same size and pixel grid as the room.
-export function outdoorSvg(phase: Phase, cls = 'bg'): string {
-  const c = OUT[phase], night = phase === 'night', o = c.ink;
-  const pink = night ? '#c58fb8' : '#ff8fb8', gold = night ? '#e8a04c' : '#ffd36e', lav = night ? '#8f78d0' : '#b9a3f0';
-  let s = '';
-  s += R(0, 0, 108, 150, c.sky);
-  if (phase === 'day') {
-    s += R(78, 12, 10, 10, '#ffd36e') + R(76, 14, 14, 6, '#ffd36e') + R(80, 10, 6, 14, '#ffd36e');
-    s += blob(24, 22, 10, 3, c.cloud) + blob(30, 19, 6, 3, c.cloud) + blob(60, 40, 12, 3, c.cloud) + blob(66, 37, 6, 3, c.cloud);
-  } else if (phase === 'dusk') {
-    s += R(74, 54, 16, 10, '#ffd36e') + R(72, 56, 20, 6, '#ffd36e') + R(76, 52, 12, 14, '#ffd36e');
-    s += blob(26, 24, 12, 3, c.cloud) + blob(32, 21, 6, 3, c.cloud) + blob(70, 36, 10, 2, c.cloud);
-  } else {
-    s += R(78, 12, 10, 10, '#fff3d1') + R(83, 12, 5, 5, c.sky) + R(81, 15, 3, 3, '#fff3d1');
-    for (const [x, y] of [[10, 10], [24, 26], [44, 14], [58, 34], [96, 40], [36, 46], [70, 28], [14, 52], [100, 20]]) s += R(x, y, 1, 1, '#ffffff');
-    s += R(52, 22, 1, 3, '#ffffff') + R(51, 23, 3, 1, '#ffffff');
-  }
-  // rolling hills
-  s += blob(20, 74, 38, 14, c.hill) + blob(90, 70, 34, 12, c.hill2);
-  // grass, with a tuft pattern
-  s += R(0, 82, 108, 68, c.grass);
-  for (let y = 90, i = 0; y < 150; y += 10, i++) for (let x = (i % 2) * 7 + 3; x < 108; x += 14) s += R(x, y, 1, 2, c.grass2) + R(x + 2, y + 1, 1, 2, c.grass2);
-  // fence
-  s += R(0, 70, 108, 3, c.fence2) + R(0, 78, 108, 3, c.fence2);
-  for (let x = 1; x < 108; x += 9) s += R(x, 65, 6, 17, c.fence) + R(x + 1, 64, 4, 1, c.fence) + R(x + 2, 63, 2, 1, c.fence) + R(x + 5, 65, 1, 17, c.fence2) + R(x, 81, 6, 1, o);
-  s += R(0, 82, 108, 1, o);
-  // tree, left
-  s += R(11, 40, 6, 46, c.trunk) + R(11, 40, 1, 46, o) + R(16, 40, 1, 46, o) + R(8, 84, 12, 2, c.trunk);
-  s += blob(14, 30, 16, 12, c.leaf) + blob(8, 38, 9, 6, c.leaf2) + blob(22, 36, 8, 6, c.leaf2) + blob(14, 22, 8, 5, c.leaf);
-  s += R(10, 26, 2, 2, pink) + R(20, 32, 2, 2, pink) + R(6, 36, 2, 2, pink);
-  // path: stepped paving across the middle of the garden
-  s += blob(54, 124, 50, 11, c.path) + blob(54, 124, 42, 8, c.path2) + blob(54, 124, 34, 5, c.path);
-  for (let x = 24; x < 86; x += 12) s += R(x, 119, 1, 11, c.path2);
-  // cardboard box (a shelter), right
-  s += pbox(76, 94, 28, 20, night ? '#c99a73' : '#f1cfa0', o) + R(77, 95, 26, 3, night ? '#a07250' : '#ffb98a') + R(84, 104, 12, 10, night ? '#4b4560' : '#6b4f9e') + R(86, 102, 8, 2, night ? '#4b4560' : '#6b4f9e');
-  // food bowl
-  s += R(46, 142, 14, 1, o) + pbox(45, 143, 16, 6, pink, o) + R(47, 142, 12, 1, night ? '#cdc8e0' : '#fffafd');
-  // flowers
-  for (const [x, y, col] of [[4, 100, pink], [30, 96, gold], [64, 104, lav], [100, 130, pink], [8, 140, gold], [92, 144, lav], [70, 92, pink], [30, 146, pink]] as [number, number, string][])
-    s += R(x, y + 2, 1, 3, c.leaf2) + R(x - 1, y, 3, 1, col) + R(x, y - 1, 1, 3, col) + R(x, y, 1, 1, '#fffafd');
-  if (night) for (const [x, y] of [[40, 66], [92, 58]]) s += R(x, y, 2, 2, '#ffe9a0');   // fireflies
-  return `<svg class="${cls}" viewBox="0 0 ${ROOM_W} ${ROOM_H}" shape-rendering="crispEdges" aria-hidden="true">${s}</svg>`;
-}
-
-// The wall shelf holds the diary book and the trophy: [x, y, w, h] in room pixels, also used as their click areas.
-export const SHELF_BOOK: [number, number, number, number] = [2, 40, 9, 9];
-export const SHELF_TROPHY: [number, number, number, number] = [13, 39, 9, 10];
-
-export function roomSvg(phase: Phase, cls = 'bg'): string {
-  const c = SKY[phase];
-  const night = phase === 'night';
-  const o = c.ink;
-  const pink = night ? '#c58fb8' : '#ff8fb8', lav = night ? '#8f78d0' : '#b9a3f0', lavD = night ? '#6b4f9e' : '#8f78d0';
-  const blue = night ? '#a29bb8' : '#8fd0fa', cream = night ? '#cdc8e0' : '#fffafd', wood = night ? '#a29bb8' : '#f1cfa0', woodD = night ? '#7d7594' : '#c99a73';
-  let s = '';
-  // wall: stripes every 6 pixels, baseboard, floor boards
-  s += R(0, 0, 108, 90, c.wall);
-  for (let x = 0; x < 108; x += 12) s += R(x, 0, 6, 90, c.wall2);
-  s += R(0, 0, 108, 4, c.trim) + R(0, 4, 108, 1, o);
-  s += R(0, 90, 108, 6, c.trim) + R(0, 90, 108, 1, o) + R(0, 95, 108, 1, o);
-  s += R(0, 96, 108, 54, c.floor);
-  for (let y = 108; y < 150; y += 12) s += R(0, y, 108, 1, c.floor2);
-  for (let y = 96, i = 0; y < 150; y += 12, i++) for (let x = (i % 2) * 18 + 6; x < 108; x += 36) s += R(x, y, 1, 12, c.floor2);
-
-  // window, 40 x 40
-  s += pbox(22, 12, 44, 44, c.trim, o);
-  s += R(25, 15, 38, 38, c.sky);
-  if (phase === 'day') {
-    s += R(48, 18, 8, 8, '#ffd36e') + R(46, 20, 12, 4, '#ffd36e') + R(50, 16, 4, 12, '#ffd36e');
-    s += R(28, 36, 12, 3, c.cloud) + R(31, 33, 8, 3, c.cloud) + R(46, 44, 14, 3, c.cloud) + R(49, 41, 8, 3, c.cloud);
-  } else if (phase === 'dusk') {
-    s += R(30, 38, 12, 8, '#ffd36e') + R(28, 40, 16, 4, '#ffd36e') + R(32, 36, 8, 12, '#ffd36e');
-    s += R(46, 24, 14, 3, c.cloud) + R(49, 21, 8, 3, c.cloud);
-  } else {
-    s += R(48, 18, 8, 8, '#fff3d1') + R(52, 18, 4, 4, c.sky) + R(50, 20, 2, 2, '#fff3d1');
-    for (const [x, y] of [[29, 20], [37, 30], [58, 36], [31, 44], [44, 26], [55, 47]]) s += R(x, y, 1, 1, '#ffffff');
-    s += R(36, 20, 1, 3, '#ffffff') + R(35, 21, 3, 1, '#ffffff');
-  }
-  s += R(42, 15, 4, 38, c.trim) + R(25, 32, 38, 4, c.trim) + R(42, 15, 1, 38, o) + R(45, 15, 1, 38, o) + R(25, 32, 38, 1, o) + R(25, 35, 38, 1, o);
-  s += R(19, 56, 50, 3, c.trim) + R(19, 59, 50, 1, o) + R(19, 56, 50, 1, o);
-
-  // pennant garland over the window
-  for (let i = 0, x = 6; x < 100; i++, x += 8) {
-    const col = [pink, blue, lav][i % 3];
-    s += R(x, 8 + (i % 2), 5, 1, col) + R(x + 1, 9 + (i % 2), 3, 1, col) + R(x + 2, 10 + (i % 2), 1, 1, col);
-  }
-
-  // framed heart picture
-  s += pbox(76, 18, 22, 18, cream, o) + pbox(78, 20, 18, 14, c.wall2, o);
-  const heart = ['.rr.rr.', 'rrrrrrr', 'rrrrrrr', '.rrrrr.', '..rrr..', '...r...'];
-  heart.forEach((row, y) => [...row].forEach((ch, x) => { if (ch === 'r') s += R(80 + x, 22 + y, 1, 1, pink); }));
-
-  // plant on the floor, left
-  s += pbox(9, 80, 14, 14, night ? '#c58fb8' : '#e8a04c', o) + R(10, 82, 12, 2, night ? '#c58fb8' : '#ffb98a');
-  const leaf = night ? '#2fb8b0' : '#8fe0c8', leafD = night ? '#4f8a82' : '#5fc7a8';
-  for (const [x, y, w, h] of [[14, 56, 4, 24], [8, 62, 4, 14], [20, 60, 4, 16], [11, 68, 3, 12], [18, 70, 3, 10]]) s += R(x, y, w, h, leaf) + R(x, y, 1, h, leafD);
-
-  // cat tree on the right
-  s += R(88, 62, 8, 50, '#f1cfa0') + R(88, 62, 1, 50, '#c99a73') + R(95, 62, 1, 50, '#c99a73');
-  for (let y = 68; y < 112; y += 6) s += R(88, y, 8, 1, '#c99a73');
-  s += pbox(76, 58, 30, 7, lav, o) + R(77, 64, 28, 1, lavD);
-  s += pbox(70, 84, 30, 7, lav, o) + R(71, 90, 28, 1, lavD);
-  s += pbox(78, 110, 28, 30, '#fff3d1', o) + R(79, 110, 26, 4, lav) + R(79, 114, 26, 1, lavD);
-  s += pbox(86, 120, 12, 20, night ? '#4b4560' : '#8f78d0', o) + R(88, 118, 8, 2, night ? '#4b4560' : '#8f78d0');
-  s += R(80, 134, 4, 4, pink) + R(81, 133, 2, 1, pink);
-  s += R(102, 66, 1, 10, pink) + R(101, 76, 3, 3, '#ffd36e');
-
-  // rug (stepped ellipse) and cushion bed
-  s += blob(43, 129, 33, 12, night ? '#c58fb8' : '#ffb3d0') + blob(43, 129, 25, 8, night ? '#bdb0e6' : '#ffc4da') + blob(43, 129, 15, 4, night ? '#c58fb8' : '#ffb3d0');
-  s += pbox(2, 106, 36, 20, lav, o) + R(3, 107, 34, 4, night ? '#9a8cc8' : '#d9ccf7') + R(3, 121, 34, 4, lavD);
-  s += R(6, 118, 2, 2, cream) + R(14, 121, 2, 2, cream) + R(26, 117, 2, 2, cream) + R(33, 121, 2, 2, cream);
-  // a ball of yarn and a bone on the floor
-  s += blob(70, 145, 4, 3, blue) + R(66, 145, 8, 1, night ? '#5f86b8' : '#8fd0fa') + R(69, 143, 1, 5, night ? '#5f86b8' : '#8fd0fa');
-  s += R(18, 144, 12, 1, wood) + R(17, 143, 2, 3, wood) + R(29, 143, 2, 3, wood) + R(18, 146, 12, 1, woodD);
-
-  // wall shelf, left: the diary book and the trophy
-  s += R(0, 50, 22, 3, wood) + R(0, 50, 22, 1, o) + R(0, 53, 22, 1, o) + R(0, 52, 22, 1, woodD) + R(3, 54, 2, 3, woodD) + R(17, 54, 2, 3, woodD);
-  for (const [[x, y], art] of [[SHELF_BOOK, BOOK_ART], [SHELF_TROPHY, TROPHY_ART]] as const)
-    art.forEach((row, j) => [...row].forEach((ch, i) => { if (PAL[ch]) s += R(x + i, y + j, 1, 1, PAL[ch]); }));
-
-  if (night) s += R(5, 30, 4, 4, c.glow) + R(3, 28, 8, 1, c.glow) + R(3, 35, 8, 1, c.glow);   // a night-light by the plant
-  return `<svg class="${cls}" viewBox="0 0 ${ROOM_W} ${ROOM_H}" shape-rendering="crispEdges" aria-hidden="true">${s}</svg>`;
-}
+export const DECOS: Record<string, { label: string; art: string[] }> = { ...OFFICIAL_DECOS };
+// The diary book, the trophy, the cosy room and the garden live in ./scene.ts.
+export { BOOK_ART, TROPHY_ART, ROOM_W, ROOM_H, SHELF_BOOK, SHELF_TROPHY, ROOM_SPOTS, ROOM_NIGHT_SPOTS, GARDEN_SPOTS, roomSvg, outdoorSvg, sceneVersion, type Phase } from './scene.ts';

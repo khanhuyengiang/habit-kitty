@@ -4,15 +4,15 @@ import { PALETTE, type PaletteName } from '../shared/palette.ts';
 
 // Kitty Achievement's pictures, drawn on the shared grid (shared/pixelart.ts). Pure functions that return SVG strings.
 
-export { PICKER_ICONS, PICKER_ICON_NAMES, PICKER_ICON_GROUPS } from './icons.ts';
+export { OFFICIAL_PICKER_ICONS, PICKER_ICONS, PICKER_ICON_NAMES, PICKER_ICON_GROUPS, refreshPickerOrder } from './icons.ts';
 import { PICKER_ICONS, PICKER_ICON_GROUPS } from './icons.ts';
 
 // A picker's choices with a heading over each group (the heading spans the picker's grid or row), so a long list is easy to look through.
 export const groupedPicks = (pick: (name: string) => string): string => PICKER_ICON_GROUPS.map(([g, names]) =>
   `<p class="pick-group">${g} <span class="num">${names.length}</span></p>${names.map(pick).join('')}`).join('');
 
-// Small interface icons.
-export const UI_ICONS: Record<string, string[]> = {
+// Small interface icons (the official ones; UI_ICONS below has Kitty Gallery's changes put over them).
+export const OFFICIAL_UI_ICONS: Readonly<Record<string, string[]>> = {
   plus: ['..o..', '..o..', 'ooooo', '..o..', '..o..'],
   x: ['o...o', '.o.o.', '..o..', '.o.o.', 'o...o'],
   prev: ['..o', '.o.', 'o..', '.o.', '..o'],
@@ -26,6 +26,13 @@ export const UI_ICONS: Record<string, string[]> = {
   archive: ['ooooooo', 'ooooooo', 'o.....o', 'o.ooo.o', 'o.....o', 'ooooooo'],
   filter: ['ooooooo', '.ooooo.', '..ooo..', '...o...', '...o...', '...oo..'],
 };
+export const UI_ICONS: Record<string, string[]> = { ...OFFICIAL_UI_ICONS };
+
+// A sticker icon's name, and whether there is one by that name: an icon that is gone (deleted in Kitty Gallery) is drawn
+// as a heart, and a picker holding it picks the heart instead.
+export const hasIcon = (name: string) => Object.prototype.hasOwnProperty.call(PICKER_ICONS, name);
+export const pickable = (name: string) => (hasIcon(name) ? name : 'heart');
+export const iconLabel = (name: string) => PICKER_ICONS[pickable(name)]?.label ?? 'Heart';
 
 // An interface icon in the text colour; an achievement icon is drawn as a sticker on the fine grid instead.
 export function iconSvg(name: string, cls = ''): string {
@@ -54,7 +61,7 @@ export const FINE: Record<string, string> = {
   o: 'var(--dk, color-mix(in srgb, currentColor 30%, #231d44))', s: 'var(--sq, currentColor)',
   l: 'var(--sql, color-mix(in srgb, currentColor 40%, #fff))', d: 'var(--sqd, color-mix(in srgb, currentColor 70%, #231d44))',
   h: 'var(--hi)', t: 'var(--dith)', S: 'var(--scr)', e: 'var(--panel)', q: 'var(--rar, #a29bb8)',
-  w: '#fffafd', y: '#ffd36e', Y: '#e8a04c', r: '#ff8fb8', R: '#f0506e', g: '#8fe0c8', G: '#45c27a', b: '#8fd0fa', B: '#4a9bea',
+  w: '#fffafd', y: '#ffd36e', Y: '#e8a04c', r: '#ff8fb8', R: '#f0506e', '#': '#ff8f8f', '&': '#b0303f', g: '#8fe0c8', G: '#45c27a', b: '#8fd0fa', B: '#4a9bea',
   n: '#c99a73', N: '#8a6a5a', k: '#cdc8e0', K: '#7d7594', c: '#fff3d1',
   v: '#b9a3f0', f: '#ffb98a', x: '#b8e35f',
   ...Object.fromEntries(Object.entries(PALETTE_INKS).map(([ch, k]) => [ch, PALETTE[k]])),
@@ -103,20 +110,32 @@ function scale2x(art: string[]): string[] {
   });
 }
 
-// An achievement icon as a sticker: drawn at 1 fine pixel per icon pixel (s = 1), or enlarged with Scale2x (s = 2);
-// the side-quest colour is lit on its top-left edges and shaded on its bottom-right ones, and a one-fine-pixel dark
-// outline goes around it all (touching it side-on only, so its outer corners stay empty).
-export const stickerSvg = (name: string, s: 1 | 2 = 2, cls = ''): string => stickerArtSvg((PICKER_ICONS[name] ?? PICKER_ICONS.star).art, s, cls);
+// An achievement icon as a sticker: drawn at 1 fine pixel per icon pixel (s = 1), or enlarged with Scale2x (s = 2). Its
+// dark outline is part of the art (an 18×18 sticker has room for it); the side-quest colour is lit on its top-left edges
+// and shaded on its bottom-right ones, where it touches the outside: an empty pixel or the outer dark line.
+export const stickerSvg = (name: string, s: 1 | 2 = 2, cls = ''): string => stickerArtSvg(PICKER_ICONS[pickable(name)].art, s, cls);
 // The same from the rows themselves (Kitty Gallery draws one that is not saved yet).
 export const stickerArtSvg = (icon: string[], s: 1 | 2 = 2, cls = ''): string => fineSvg(stickerRows(icon, s), `sticker ${cls}`);
 
 function stickerRows(icon: string[], s: 1 | 2): string[] {
   const art = s === 2 ? scale2x(icon) : icon;
-  const at = (x: number, y: number) => art[y]?.[x] ?? '.', on = (x: number, y: number) => at(x, y) !== '.';
+  const at = (x: number, y: number) => art[y]?.[x] ?? '.';
+  const empty = (x: number, y: number) => at(x, y) === '.';
+  // outside: empty, or a dark line that touches empty (the outline; a dark line inside the picture is not outside)
+  const out = (x: number, y: number) => empty(x, y) || (at(x, y) === 'o' && (empty(x + 1, y) || empty(x - 1, y) || empty(x, y + 1) || empty(x, y - 1)));
+  return art.map((row, y) => [...row].map((c, x) =>
+    c !== 's' ? c : out(x, y - 1) || out(x - 1, y) ? 'l' : out(x, y + 1) || out(x + 1, y) ? 'd' : 's').join(''));
+}
+
+// A 16×16 sticker as it was drawn before stickers were 18×18: an empty pixel around it, then the dark outline (touching
+// it side-on only, so its outer corners stay empty) and the lit and shaded edges written into the art, exactly as they
+// used to be added when it was drawn. TEMPORARY: for Kitty Gallery's "Add border to all" button.
+export function bakeSticker(icon: string[]): string[] {
+  const at = (x: number, y: number) => icon[y]?.[x] ?? '.', on = (x: number, y: number) => at(x, y) !== '.';
   const rows: string[] = [];
-  for (let y = -1; y <= art.length; y++) {
+  for (let y = -1; y <= icon.length; y++) {
     let row = '';
-    for (let x = -1; x <= art[0].length; x++) {
+    for (let x = -1; x <= icon[0].length; x++) {
       const c = at(x, y);
       if (c === 's') row += !on(x, y - 1) || !on(x - 1, y) ? 'l' : !on(x, y + 1) || !on(x + 1, y) ? 'd' : 's';
       else if (c !== '.') row += c;
@@ -186,11 +205,13 @@ const STAR = ['...o...', '.ooqoo.', 'oqqqqqo', '.oqqqo.', '.oqoqo.', '.oo.oo.'];
 export const starsSvg = (n: number) => n > 0
   ? `<span class="stars" aria-hidden="true">${Array.from({ length: n }, () => fineSvg(STAR, 'star')).join('')}</span>` : '';
 
-// Small friends for the card: a heart and a flower in the corner of the screen.
-export const CARD_FRIENDS: Record<string, { label: string; art: string[] }> = {
+// Small friends for the card: a heart and a flower in the corner of the screen (the official ones; CARD_FRIENDS below has
+// Kitty Gallery's changes put over them).
+export const OFFICIAL_CARD_FRIENDS: Readonly<Record<string, { label: string; art: string[] }>> = {
   heart: { label: 'Heart', art: ['.ooo.ooo.', 'owrrorrro', 'owrrrrrro', 'orrrrrrro', '.orrrrro.', '..orrro..', '...oro...', '....o....'] },
   flower: { label: 'Flower', art: ['...ooo...', '..orrro..', '.oorrroo.', 'orrooorro', 'orroyorro', 'orrooorro', '.oorrroo.', '..orrro..', '...ooo...'] },
 };
+export const CARD_FRIENDS: Record<string, { label: string; art: string[] }> = { ...OFFICIAL_CARD_FRIENDS };
 export const heartSvg = () => fineSvg(CARD_FRIENDS.heart.art);
 export const flowerSvg = () => fineSvg(CARD_FRIENDS.flower.art);
 
