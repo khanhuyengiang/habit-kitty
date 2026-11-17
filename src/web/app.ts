@@ -5,11 +5,10 @@ import {
   type ActionResult, type AppState, type Cat, type CatMode, type CatGender, type CatLook, type CatTrait, type GameEvent, type MindfulTask, type Reason, type TaskKind,
 } from '../rules.ts';
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import { Share } from '@capacitor/share';
 import { BACKUP_EXT, BACKUP_PREFIX, backupNow, backupStatus, chooseFolder, folderBackups, markDirty, nativeBackups, onBackupStatus, readFolderBackup, refreshFolder, registerBackupSource, saveBackupToDevice, saveToDevice, shareBackup as shareBackupFile, shareFile, stopBackups } from '../shared/backupfolder.ts';
 import { achievementCount, restoreAchievement, snapshotAchievement } from '../achievement/web/snapshot.ts';
 import { PICKER_ICONS, iconLabel, stickerSvg } from '../achievement/pixelart.ts';
-import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
+import { Directory, Filesystem } from '@capacitor/filesystem';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { anyReminder, catAlarmsOn, defaultReminder, planReminders, type LastCall, type ReminderSettings } from '../reminders.ts';
 import { allCatsDiary, catDiary, clock } from '../catdiary.ts';
@@ -24,7 +23,7 @@ import {
   type Backup, type DiaryEntry, type Mood,
 } from '../store.ts';
 import { CONFETTI_COLORS, TRAITS, notifyIconName, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
-import { BOOK_ART, GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, weatherSvg, heartSvg, iconSvg, markSvg, outdoorSvg, roomSvg, sceneVersion } from '../pixelart.ts';
+import { GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, heartSvg, iconSvg, markSvg, outdoorSvg, roomSvg, sceneVersion } from '../pixelart.ts';
 import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, trophyIcon, type AppName } from '../shared/apps.ts';
 import { mountDiarySettings } from '../diary/settings.ts';
 import { collectNotes, initNotes, restoreNotes } from '../notes/data.ts';
@@ -42,9 +41,10 @@ import { hpLine } from '../player.ts';
 import { collectDiary, diaryExtras, diaryInitialised, initDiary, pageCount, restoreDiary, updateExtras } from '../diary/data.ts';
 import { esc, plural } from '../shared/html.ts';
 import { newId } from '../shared/id.ts';
-import { backButton, fancyOn, homeButton, playerButton, setFancy, setThemeMode, settingsButton, showToast, themeMode, titleBar } from '../shared/ui.ts';
+import { makeLayer } from '../shared/layer.ts';
+import { pickerHtml } from '../shared/picker.ts';
+import { backButton, closeX, fancyOn, homeButton, playerButton, setFancy, setThemeMode, settingsButton, showToast, themeMode, titleBar } from '../shared/ui.ts';
 import { provideMusic } from '../shared/music.ts';
-import { compressPhoto } from '../shared/photo.ts';
 import { at, fileBytes, removeFile, toBase64, writeOk } from '../shared/files.ts';
 import { dateOf, dayOf, firstDay, habitStreak, monthGrid, streak, weekRow, type DayKind, type Trackable } from '../calendar.ts';
 
@@ -1634,37 +1634,15 @@ function openModal(html: string) {
   m.querySelector<HTMLElement>('input')?.focus();
 }
 
-// A small dialog over the page or over the open dialog, which keeps its state underneath. Focus goes to the
-// selected choice (or the one marked data-focus) and back to whatever opened it.
-let layerFrom: HTMLElement | null = null;
-const LAYER_FOCUS = ['[aria-pressed="true"]:not(:disabled)', '.pick.now:not(:disabled)', '[data-focus]', '.pick:not(:disabled)', 'button:not(:disabled)'];
-function openLayer(html: string, label: string, from?: HTMLElement) {
-  const old = document.getElementById('layer');
-  if (!old) layerFrom = from ?? (document.activeElement as HTMLElement | null);
-  old?.remove();
-  const el = document.createElement('div');
-  el.id = 'layer';
-  el.className = 'scrim layer';
-  el.dataset.action = 'layer-close';
-  el.innerHTML = `<div class="panel" role="dialog" aria-modal="true" aria-label="${esc(label)}">${html}</div>`;
-  document.body.appendChild(el);
-  for (const q of LAYER_FOCUS) { const b = el.querySelector<HTMLElement>(q); if (b) { b.focus(); break; } }
-}
-function closeLayer(refocus = true) {
-  const el = document.getElementById('layer');
-  if (!el) return;
-  el.remove();
-  picker = null;
-  if (refocus && layerFrom?.isConnected) layerFrom.focus();
-  layerFrom = null;
-}
+// A small dialog over the page or over the open dialog, which keeps its state underneath (src/shared/layer.ts).
+const layer = makeLayer('habit', { id: 'layer', host: () => document.body, onClose: () => { picker = null; } });
+const openLayer = (html: string, label: string, from?: HTMLElement) => layer.open(html, label, { from });
+const closeLayer = layer.close;
 
 // ---- month and year picker: tap a calendar's title (the heatmaps) to jump to any month up to now ----
 interface Picker { key: string; y: number; m: number; year: number; first: number }   // year: the one being shown; first: earliest month allowed, as y * 12 + m
 let picker: Picker | null = null;
-const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => new Date(Date.UTC(2000, i, 1)).toLocaleString('en', { month: 'short', timeZone: 'UTC' }));
 const nowMonth = () => { const d = dateOf(today()); return d.getUTCFullYear() * 12 + d.getUTCMonth(); };
-const PICKER_YEARS = 12;   // the current year, the ten before it and next year (greyed), 4 x 3
 
 const monthTitle = (key: string, y: number, m: number, title: string, first: number) =>
   `<button type="button" class="month-title" data-action="picker-open" data-key="${key}" data-y="${y}" data-m="${m}" data-first="${first}" aria-haspopup="dialog" aria-label="${title}. Pick a month">${title}</button>`;
@@ -1678,20 +1656,8 @@ function openPicker(btn: HTMLElement) {
 function drawPicker(view: 'month' | 'year', from?: HTMLElement) {
   const p = picker;
   if (!p) return;
-  const cur = nowMonth(), curY = Math.floor(cur / 12);
-  const close = `<button class="x-close" type="button" data-action="layer-close" aria-label="Close">${iconSvg('x')}</button>`;
-  const cell = (cls: string, data: string, label: string, on: boolean, off: boolean, aria = label) =>
-    `<button type="button" class="pick${cls}" ${data} aria-pressed="${on}" aria-label="${aria}" ${off ? 'disabled' : ''}>${label}</button>`;
-  const html = view === 'month'
-    ? `${close}<div class="picker-head"><button class="btn small" type="button" data-action="picker-years" aria-label="Back to years">${iconSvg('prev')}Back</button><strong>${p.year}</strong></div>
-      <div class="pick-grid">${MONTH_NAMES.map((name, i) => {
-        const ym = p.year * 12 + i;
-        return cell(ym === cur ? ' now' : '', `data-action="picker-month" data-m="${i}"`, name, ym === p.y * 12 + p.m, ym > cur || ym < p.first, `${name} ${p.year}`);
-      }).join('')}</div>`
-    : `${close}<div class="picker-head"><strong>Pick a year</strong></div>
-      <div class="pick-grid">${Array.from({ length: PICKER_YEARS }, (_, i) => curY - PICKER_YEARS + 2 + i).map((y) =>
-        cell(y === curY ? ' now' : '', `data-action="picker-year" data-y="${y}"`, String(y), y === p.y, y > curY || (y + 1) * 12 <= p.first)).join('')}</div>`;
-  openLayer(html, view === 'month' ? `Pick a month in ${p.year}` : 'Pick a year', from);
+  const { html, label } = pickerHtml(view, { year: p.year, sel: p.y * 12 + p.m, cur: nowMonth(), first: p.first });
+  openLayer(html, label, from);
 }
 
 function pickMonth(m: number) {
@@ -1803,7 +1769,7 @@ function openTrophies() {
   const list = accomplishments(save.state, diaryPageCount(), today());
   const unlocked = list.filter((a) => a.unlocked).length;
   const groups = [...new Set(list.map((a) => a.group))];
-  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
+  openModal(`<div class="panel">${closeX('modal-close')}
     <h3>Accomplishments</h3><p class="muted"><b class="num">${unlocked}</b> of ${list.length} unlocked</p>
     ${groups.map((g) => `<h4 class="acc-group">${g}</h4><ul class="acc">${list.filter((a) => a.group === g).map((a) =>
       `<li class="${a.unlocked ? 'got' : ''}"><span class="acc-icon">${a.unlocked ? pixelArt(TROPHY_ART) : pixelArt(TROPHY_ART, 'dim')}</span>
@@ -1819,7 +1785,7 @@ function openBook(day: number = today()) {
   const day0 = Math.max(first, Math.min(day, t));
   const clockNow = now().getHours() * 60 + now().getMinutes();
   const lines = allCatsDiary(home.filter((c) => c.adoptedDay <= day0), day0).filter((l) => day0 < t || l.minute <= clockNow);
-  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
+  openModal(`<div class="panel">${closeX('modal-close')}
     <h3>Kitty diary</h3>
     <div class="month-nav">
       <button type="button" data-action="book-day" data-day="${day0 - 1}" ${day0 <= first ? 'disabled' : ''} aria-label="Previous day">${iconSvg('prev')}</button>
@@ -1854,7 +1820,7 @@ function openTravel(id: string, back = travelBack) {
         aria-pressed="${on}" aria-label="${fmtDay(day)}: ${on ? word : `not ${word}`}"><span class="dn">${i + 1}</span>${on ? `<b class="tick">${iconSvg('tick')}</b>` : ''}</button>`;
     }),
   ].join('');
-  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
+  openModal(`<div class="panel">${closeX('modal-close')}
     <h3>Time travel</h3><p><b>${esc(task ? task.name : `${cat?.name} · ${cat?.habit}`)}</b></p>
     <p class="muted">Tap a day to mark it ${word} or not ${word}. Affection is worked out again from your record${cat ? `, and so is how hungry ${esc(cat.name)} is` : ''}.${task?.kind === 'task' ? ' A treat is done once, so tapping another day moves it.' : ''}</p>
     <div class="month-nav">
@@ -1973,7 +1939,6 @@ onShown('habit', 'click', (ev) => {
     case 'picker-years': drawPicker('year'); break;
     case 'picker-year': if (picker) { picker.year = Number(btn.dataset.y); drawPicker('month'); } break;
     case 'picker-month': pickMonth(Number(btn.dataset.m)); break;
-    case 'layer-close': if (ev.target === btn || btn.tagName === 'BUTTON') closeLayer(); break;
     case 'log-close': save.logHidden = true; persist(); renderLog(); break;
     case 'adopt-open': startAdopt(); break;
     case 'habit-kitty': startAdopt(id); break;
@@ -2409,28 +2374,6 @@ onShown('habit', 'click', (ev) => {
 
 $('task-repeat').addEventListener('change', () => renderTasks());
 
-// Keys in a small dialog: Escape closes it, Tab stays inside it, arrows move around the month and year grids.
-const GRID_STEP: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -4, ArrowDown: 4 };
-onShown('habit', 'keydown', (ev) => {
-  const layer = document.getElementById('layer');
-  if (!layer) return;
-  if (ev.key === 'Escape') { ev.preventDefault(); closeLayer(); return; }
-  const at = document.activeElement as HTMLButtonElement;
-  if (ev.key === 'Tab') {
-    const all = [...layer.querySelectorAll<HTMLElement>('button:not(:disabled)')];
-    const i = all.indexOf(at);
-    const to = ev.shiftKey ? (i <= 0 ? all[all.length - 1] : null) : (i === -1 || i === all.length - 1 ? all[0] : null);
-    if (to) { ev.preventDefault(); to.focus(); }
-    return;
-  }
-  const grid = at?.closest('.pick-grid');
-  if (!GRID_STEP[ev.key] || !grid) return;
-  ev.preventDefault();
-  const cells = [...grid.querySelectorAll<HTMLButtonElement>('button')];
-  const next = cells[cells.indexOf(at) + GRID_STEP[ev.key]];
-  if (next && !next.disabled) next.focus();
-});
-
 // Press and hold a task or a cat. Android also fires `contextmenu` on a long press (and then cancels
 // the pointer), so that counts as the hold too; whichever comes first wins.
 const HOLD_MS = 500;
@@ -2490,7 +2433,7 @@ function openCatMenu(id: string, tab?: MenuTab) {
       ${save.timeTravel ? `<button class="btn" data-action="travel" data-id="${id}">Time travel</button>` : ''}
       ${cat.status === 'alive' ? `<button class="btn" data-action="release-ask" data-id="${id}">Release to the stray colony</button>` : ''}
       <button class="btn" data-action="shelter-ask" data-id="${id}">Return to the shelter</button></div>`;
-  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
+  openModal(`<div class="panel">${closeX('modal-close')}
     ${catHead(cat, today(), false)}
     <div class="seg" role="tablist">${(Object.keys(MENU_TABS) as MenuTab[]).map((v) =>
       `<button type="button" role="tab" data-action="menu-tab" data-view="${v}" data-id="${id}" aria-selected="${v === menuTab}">${MENU_TABS[v]}</button>`).join('')}</div>
@@ -2532,7 +2475,7 @@ function openStrayMenu(id: string, tab?: StrayTab) {
       <button class="btn" data-action="stray-schedule" data-id="${id}">Change how often</button>
       ${save.timeTravel ? `<button class="btn" data-action="travel" data-id="${id}">Time travel</button>` : ''}
       <button class="btn" data-action="task-del" data-id="${id}">Delete stray kitty</button></div>`;
-  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
+  openModal(`<div class="panel">${closeX('modal-close')}
     ${strayHead(k, today())}
     <div class="seg" role="tablist">${(Object.keys(STRAY_TABS) as StrayTab[]).map((v) =>
       `<button type="button" role="tab" data-action="stray-tab" data-view="${v}" data-id="${id}" aria-selected="${v === strayTab}">${STRAY_TABS[v]}</button>`).join('')}</div>
@@ -2544,7 +2487,7 @@ function openTreatMenu(id: string) {
   const k = save.state.tasks.find((x) => x.id === id && x.kind === 'task');
   if (!k) return;
   const done = k.lastDoneDay !== null;
-  openModal(`<div class="panel"><button class="x-close" type="button" data-action="modal-close" aria-label="Close">${iconSvg('x')}</button>
+  openModal(`<div class="panel">${closeX('modal-close')}
     <div class="cat-head solo"><div><p class="cat-name">${esc(k.name)}<span class="mode">treat · +${k.xp} XP</span></p>
       <span class="chip ${done ? 'fed' : 'today'}">${done ? 'Done' : 'To do'}</span></div></div>
     <div class="stack">

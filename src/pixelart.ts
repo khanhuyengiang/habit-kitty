@@ -1,6 +1,6 @@
 // Habit Kitty's pictures: icons, weather, the heart and the room, drawn on the shared grid (shared/pixelart.ts).
 // Pure functions that return SVG strings.
-import { PAL, artSvg, monoSvg } from './shared/pixelart.ts';
+import { artSvg, monoSvg } from './shared/pixelart.ts';
 import { fineSvg } from './achievement/pixelart.ts';
 export { PAL, artSvg } from './shared/pixelart.ts';
 

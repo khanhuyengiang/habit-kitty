@@ -8,7 +8,9 @@ import { dayIndex } from '../rules.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { esc } from '../shared/html.ts';
 import { newId } from '../shared/id.ts';
-import { homeButton, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
+import { makeLayer } from '../shared/layer.ts';
+import { MONTH_NAMES, pickerHtml } from '../shared/picker.ts';
+import { closeX, homeButton, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
 import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
 import { meterHtml } from '../shared/meter.ts';
 import { compressPhoto } from '../shared/photo.ts';
@@ -23,14 +25,13 @@ import {
   saveReflection, updateExtras,
 } from './data.ts';
 import { MOOD_KEYS, STAR_LABEL, feelingText, moodName, moodSprite, moodsSprite, pinSvg, starSvg } from './moods.ts';
-import { MAX_PEOPLE, birthdaysOn, personErrors, personFrom, turning, upcoming, whenText } from './people.ts';
+import { MAX_PEOPLE, birthdaysOn, personErrors, personFrom, upcoming, whenText } from './people.ts';
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
 // ---- the clock: the same day as Habit Kitty (its day start, and its playtest clock) ----
 const now = () => new Date(Date.now() + habitStats().offsetHours * 3_600_000);
 const today = () => dayIndex(now());
-const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => new Date(Date.UTC(2000, i, 1)).toLocaleString('en', { month: 'short', timeZone: 'UTC' }));
 const nowMonth = () => { const d = dateOf(today()); return d.getUTCFullYear() * 12 + d.getUTCMonth(); };
 const fullMonth = (y: number, m: number) => dateOf(dayOf(y, m, 1)).toLocaleString('en', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
@@ -86,7 +87,7 @@ const excerptOf = (text: string) => { const l = text.split('\n').find((x) => x.t
 
 // What the calendar's marks mean, in a small dialog (opened with the ? button).
 function openLegend() {
-  openLayer(`${closeX('layer-close')}<h3>Calendar marks</h3>
+  openLayer(`${closeX()}<h3>Calendar marks</h3>
     <div class="dlegend"><span><i class="has"></i>has an entry</span><span><i class="now"></i>today</span><span>${cake('bday-ico')}birthday</span>${settings().starry ? `<span>${starSvg('happy')}happy memory</span><span>${starSvg('sad')}sad memory</span>` : ''}${
       MOOD_KEYS.map((k) => `<span>${moodSprite(k)}${esc(moodName(k, names()))}</span>`).join('')}</div>`, 'Calendar marks');
 }
@@ -169,7 +170,6 @@ function openModal(html: string) {
   m.hidden = false;
   m.querySelector<HTMLElement>('input, textarea')?.focus();
 }
-function closeLayer() { document.getElementById('diary-layer')?.remove(); picker = null; }
 function closeModal() {
   closeLayer();
   revokePhotos();
@@ -177,17 +177,9 @@ function closeModal() {
   $('diary-modal').hidden = true; $('diary-modal').innerHTML = '';
   renderBody();   // what was written behind the dialog shows now
 }
-function openLayer(html: string, label: string) {
-  document.getElementById('diary-layer')?.remove();   // replace the open one (the picker keeps its state while it redraws)
-  const el = document.createElement('div');
-  el.id = 'diary-layer';
-  el.className = 'scrim layer';
-  el.dataset.action = 'layer-close';
-  el.innerHTML = `<div class="panel" role="dialog" aria-modal="true" aria-label="${esc(label)}">${html}</div>`;
-  document.querySelector('[data-app-root="diary"]')?.appendChild(el);
-  (el.querySelector<HTMLElement>('[data-focus], .pick:not(:disabled), button:not(:disabled)'))?.focus();
-}
-const closeX = (action = 'modal-close') => `<button class="x-close" type="button" data-action="${action}" aria-label="Close">${iconSvg('x')}</button>`;
+const layer = makeLayer('diary', { id: 'diary-layer', host: () => document.querySelector('[data-app-root="diary"]') ?? document.body, onClose: () => { picker = null; } });
+const openLayer = (html: string, label: string) => layer.open(html, label);
+const closeLayer = () => layer.close();
 
 // ---- month and year picker ----
 interface Picker { year: number }
@@ -195,17 +187,9 @@ let picker: Picker | null = null;
 function drawPicker(view: 'month' | 'year') {
   const p = picker;
   if (!p) return;
-  const cur = nowMonth(), curY = Math.floor(cur / 12);
   const { y, m } = month();
-  const cell = (cls: string, data: string, label: string, on: boolean, off: boolean, aria = label) =>
-    `<button type="button" class="pick${cls}" ${data} aria-pressed="${on}" aria-label="${aria}" ${off ? 'disabled' : ''}>${label}</button>`;
-  const html = view === 'month'
-    ? `${closeX('layer-close')}<div class="picker-head"><button class="btn small" type="button" data-action="picker-years" aria-label="Back to years">${iconSvg('prev')}Back</button><strong>${p.year}</strong></div>
-      <div class="pick-grid">${MONTH_NAMES.map((name, i) => cell(p.year * 12 + i === cur ? ' now' : '', `data-action="picker-month" data-m="${i}"`, name, p.year * 12 + i === y * 12 + m, p.year * 12 + i > cur, `${name} ${p.year}`)).join('')}</div>`
-    : `${closeX('layer-close')}<div class="picker-head"><strong>Pick a year</strong></div>
-      <div class="pick-grid">${Array.from({ length: 12 }, (_, i) => curY - 10 + i).map((yy) =>
-        cell(yy === curY ? ' now' : '', `data-action="picker-year" data-y="${yy}"`, String(yy), yy === y, yy > curY)).join('')}</div>`;
-  openLayer(html, view === 'month' ? `Pick a month in ${p.year}` : 'Pick a year');
+  const { html, label } = pickerHtml(view, { year: p.year, sel: y * 12 + m, cur: nowMonth() });
+  openLayer(html, label);
 }
 
 // ---- one day's page ----
@@ -298,7 +282,7 @@ function openDiary(day: number, edit = false) {
   if (reading && e) {
     const linked = e.note ? noteOf(e.note) : undefined;
     const p = linked && parseNote(linked.text);
-    openModal(`<div class="panel" id="diary-read">${closeX()}
+    openModal(`<div class="panel" id="diary-read">${closeX('modal-close')}
       ${diaryNav(day)}${settings().titles && e.title?.trim() ? `<h3 class="diary-date diary-title">${esc(e.title.trim())}</h3>` : ''}${birthday}
       <div class="diary-mood"><span class="mood-line">${e.mood ? `<span class="mood-now">${moodsSprite(e.mood, e.mood2)}<span>${esc(feelingText(e, names()))}</span></span>` : ''}${
         e.weather ? `<span class="mood-now">${weatherSvg(e.weather)}<span>${esc(weatherLabel(e.weather))}</span></span>` : ''}</span><button class="btn small" type="button" data-action="diary-edit">Edit</button></div>
@@ -310,7 +294,7 @@ function openDiary(day: number, edit = false) {
     if (e.photo) draft.loaded = loadPhotos(day, e.photos ?? 1).then((r) => { if (draft?.day === day && !draft.photos.length) { draft.photos = r.photos; draft.busy = undefined; drawDraftPhoto(); } else r.photos.forEach((p) => URL.revokeObjectURL(p.url)); });
     return;
   }
-  openModal(`<form class="panel" id="diary-form" novalidate>${closeX()}
+  openModal(`<form class="panel" id="diary-form" novalidate>${closeX('modal-close')}
     ${diaryNav(day)}${birthday}
     ${settings().titles ? `<label class="field">Title <input id="diary-title" maxlength="60" autocomplete="off" placeholder="Optional" value="${esc(e?.title ?? '')}"></label>` : ''}
     ${settings().teleportation ? `<label class="field">Location <input id="diary-location" maxlength="80" autocomplete="off" placeholder="Where are you? (optional)" value="${esc(e?.location ?? '')}"></label>` : ''}
@@ -384,7 +368,7 @@ async function saveDiary() {
 function openReflection() {
   const { y, m } = month();
   const r = reflectionOf(monthKey(y, m));
-  openModal(`<form class="panel dform" id="reflect-form" novalidate>${closeX()}
+  openModal(`<form class="panel dform" id="reflect-form" novalidate>${closeX('modal-close')}
     <h3>Reflection</h3><p class="muted">${esc(fullMonth(y, m))}</p>
     <label class="field">How was the month? <textarea id="reflect-text" class="reflect-area" maxlength="5000" placeholder="What went well? What was hard? What do you want to do differently next month?">${esc(r?.text ?? '')}</textarea></label>
     <p class="form-error" id="reflect-error" hidden></p>
@@ -402,7 +386,7 @@ async function submitReflection() {
 const dayMonthText = (p: Person) => `${p.day} ${MONTH_NAMES[p.month - 1]}${p.year !== undefined ? ` ${p.year}` : ''}`;
 function openPeople() {
   const list = upcoming(people(), today(), MAX_PEOPLE);
-  openModal(`<div class="panel">${closeX()}<h3>Birthdays</h3>
+  openModal(`<div class="panel">${closeX('modal-close')}<h3>Birthdays</h3>
     ${list.length ? `<ul class="dlist">${list.map(({ person: p, in: n, turning: age }) =>
       `<li><span class="who"><b>${esc(p.name)}</b><span class="muted">${dayMonthText(p)} · ${whenText(n)}${age !== null ? ` · turns ${age}` : ''}${p.note ? ` · ${esc(p.note)}` : ''}</span></span>
         <button class="btn small" type="button" data-action="person-edit" data-id="${esc(p.id)}">Edit</button></li>`).join('')}</ul>` : '<p class="muted">No birthdays yet.</p>'}
@@ -413,7 +397,7 @@ function openPerson(p?: Person, errors: Record<string, string> = {}, keep?: Part
   const v = (k: string, d: string) => keep?.[k] ?? d;
   const month = Number(v('month', String(p?.month ?? ''))) || 0;
   const err = (k: string) => (errors[k] ? `<span class="form-error">${esc(errors[k])}</span>` : '');
-  openModal(`<form class="panel dform" id="person-form" data-id="${esc(p?.id ?? '')}" novalidate>${closeX()}
+  openModal(`<form class="panel dform" id="person-form" data-id="${esc(p?.id ?? '')}" novalidate>${closeX('modal-close')}
     <h3>${p ? 'Edit birthday' : 'Add birthday'}</h3>
     <label class="field">Name <input name="name" maxlength="40" autocomplete="off" value="${esc(v('name', p?.name ?? ''))}">${err('name')}</label>
     <div class="row">
@@ -474,7 +458,6 @@ onShown('diary', 'click', (ev) => {
       closeLayer(); renderBody();
       break;
     }
-    case 'layer-close': if (ev.target === btn || btn.tagName === 'BUTTON') closeLayer(); break;
     case 'modal-close': if (ev.target === btn || btn.tagName === 'BUTTON') closeModal(); break;
     case 'diary-open': openDiary(Number(btn.dataset.day)); break;
     case 'diary-edit': if (draft) openDiary(draft.day, true); break;

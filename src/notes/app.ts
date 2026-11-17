@@ -7,6 +7,7 @@ import { monoSvg } from '../shared/pixelart.ts';
 import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
 import { esc } from '../shared/html.ts';
 import { localDateKey } from '../shared/dates.ts';
+import { makeLayer } from '../shared/layer.ts';
 import { compressPhoto } from '../shared/photo.ts';
 import { sharePicture } from '../shared/snapshot.ts';
 import { homeButton, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
@@ -242,7 +243,6 @@ onShown('notes', 'click', async (ev) => {
     case 'note-image': document.getElementById('note-file')?.click(); break;
     case 'note-image-remove': if (cur) { cur.image = ''; $('note-cover').innerHTML = coverFieldHtml(); edited(); } break;
     case 'note-delete': openConfirm(); break;
-    case 'layer-close': if (ev.target === btn || btn.tagName === 'BUTTON') closeConfirm(); break;
     case 'note-delete-yes': {
       const c = cur;
       closeConfirm();
@@ -255,16 +255,11 @@ onShown('notes', 'click', async (ev) => {
 
 function openConfirm() {
   if (!cur?.name) return;
-  const el = document.createElement('div');
-  el.id = 'notes-layer';
-  el.className = 'scrim layer';
-  el.dataset.action = 'layer-close';
-  el.innerHTML = `<div class="panel" role="alertdialog" aria-modal="true" aria-label="Delete this note?"><h3>Delete this note?</h3><p>“${esc(cur.name)}” is deleted from this device (and from the notes folder, if you sync it).</p>
-    <div class="btns"><button class="btn" type="button" data-action="layer-close" data-focus>Keep</button><button class="btn primary" type="button" data-action="note-delete-yes">Delete</button></div></div>`;
-  $('notes-layer-host').appendChild(el);
-  el.querySelector<HTMLElement>('[data-focus]')?.focus();
+  confirmLayer.open(`<h3>Delete this note?</h3><p>“${esc(cur.name)}” is deleted from this device (and from the notes folder, if you sync it).</p>
+    <div class="btns"><button class="btn" type="button" data-action="layer-close" data-focus>Keep</button><button class="btn primary" type="button" data-action="note-delete-yes">Delete</button></div>`, 'Delete this note?', { role: 'alertdialog' });
 }
-const closeConfirm = () => document.getElementById('notes-layer')?.remove();
+const confirmLayer = makeLayer('notes', { id: 'notes-layer', host: () => $('notes-layer-host'), focus: '[data-focus]' });
+const closeConfirm = () => confirmLayer.close();
 
 onShown('notes', 'input', (ev) => {
   const t = ev.target as HTMLInputElement | HTMLTextAreaElement;

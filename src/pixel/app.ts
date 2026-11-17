@@ -14,9 +14,10 @@ import { monoSvg } from '../shared/pixelart.ts';
 import { onAppShown, onShown } from '../shared/apps.ts';
 import { esc, plural } from '../shared/html.ts';
 import { localDateKey } from '../shared/dates.ts';
+import { makeLayer } from '../shared/layer.ts';
 import { PALETTE, PALETTE_GROUPS } from '../shared/palette.ts';
 import { saveToDevice } from '../shared/backupfolder.ts';
-import { homeButton, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
+import { closeX, homeButton, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
 import { COLOR } from '../notes/window.ts';
 import type { NoteColor } from '../notes/model.ts';
 import { initPixel, pixelData, pixelReady, setPixelData } from './data.ts';
@@ -828,16 +829,12 @@ async function finishImport(icons: Omit<PixelIcon, 'updated'>[], mode: 'replace'
 }
 
 // ---- a small dialog ----
-function openLayer(html: string, label: string) {
-  closeLayer();
-  const el = document.createElement('div');
-  el.id = 'pix-layer'; el.className = 'scrim layer'; el.dataset.action = 'pix-layer-close';
-  el.innerHTML = `<div class="panel" role="dialog" aria-modal="true" aria-label="${esc(label)}">
-    <button class="x-close" type="button" data-action="pix-layer-close" aria-label="Close">${iconSvg('x')}</button>${html}</div>`;
-  $('pixel-layer-host').appendChild(el);
-  el.querySelector<HTMLElement>('input, [data-focus]')?.focus();
-}
-const closeLayer = () => document.getElementById('pix-layer')?.remove();
+const dialog = makeLayer('pixel', {
+  id: 'pix-layer', host: () => $('pixel-layer-host'), closeAction: 'pix-layer-close', focus: 'input, [data-focus]',
+  onCancel: () => { afterDiscard = null; importing = null; },   // backed out of a question: forget what it was for
+});
+const openLayer = (html: string, label: string) => dialog.open(`${closeX('pix-layer-close')}${html}`, label);
+const closeLayer = () => dialog.close();
 
 // Asks first when the board has changes that would be lost.
 let afterDiscard: (() => void) | null = null;
@@ -953,7 +950,6 @@ onShown('pixel', 'click', (ev) => {
     case 'pix-import-keep': if (importing) finishImport(importing, 'keep'); break;
     case 'pix-group-rename': openGroupRename(b.dataset.group!); break;
     case 'pix-discard': { const then = afterDiscard; afterDiscard = null; closeLayer(); then?.(); break; }
-    case 'pix-layer-close': if (b.id === 'pix-layer' && ev.target !== b) break; afterDiscard = null; importing = null; closeLayer(); break;
   }
 });
 

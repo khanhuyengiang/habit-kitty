@@ -13,7 +13,7 @@ import { compressPhoto } from '../shared/photo.ts';
 import { avatarUrlOf, loadPlayerData, savePlayer } from '../shared/player.ts';
 import { napSvg } from '../shared/pixelcat.ts';
 import { esc } from '../shared/html.ts';
-import { appName, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
+import { appName, closeX, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
 import { habitStats, onHabitStats } from '../shared/stats.ts';
 import { VERSION } from '../version.ts';
 
@@ -29,14 +29,14 @@ type View = 'stat' | 'form' | null;
 let view: View = null;
 
 function statCard(): string {
-  if (!data) return `<div class="panel player"><button class="x-close" type="button" data-action="player-close" aria-label="Close">${iconSvg('x')}</button><p class="muted">${failed ? "Couldn't read the player." : 'Loading…'}</p></div>`;
+  if (!data) return `<div class="panel player">${closeX('player-close')}<p class="muted">${failed ? "Couldn't read the player." : 'Loading…'}</p></div>`;
   const u = data.user;
   const { xp, diaryDays } = habitStats();
   const age = ageOf(u);
   const facts = [age !== null ? `Age ${age}` : '', u.gender ? PLAYER_GENDER_LABEL[u.gender] : ''].filter(Boolean).join(' · ');
   const lv = levelOf(data);
   return `<div class="panel player">
-    <button class="x-close" type="button" data-action="player-close" aria-label="Close">${iconSvg('x')}</button>
+    ${closeX('player-close')}
     <h3>Player stat</h3>
     <div class="player-head">
       <div class="avatar">${avatar ? `<img src="${esc(avatar)}" alt="">` : avatarSvg()}</div>
@@ -112,7 +112,7 @@ function renderForm(errors: Record<string, string> = {}) {
   const shown = draft.picture ? draft.url : draft.cat ? '' : avatar;
   const err = (k: string) => (errors[k] ? `<span class="form-error">${esc(errors[k])}</span>` : '');
   $('home-modal').innerHTML = `<div class="scrim" data-action="player-back"><form class="panel pform" id="player-form" novalidate>
-    <button class="x-close" type="button" data-action="player-back" aria-label="Back">${iconSvg('x')}</button>
+    ${closeX('player-back', 'Back')}
     <h3>Edit player</h3>
     <div class="avatar-row"><div class="avatar">${shown ? `<img src="${esc(shown)}" alt="">` : avatarSvg()}</div>
       <div class="avatar-btns"><button class="btn small" type="button" data-action="player-picture">Choose picture</button>

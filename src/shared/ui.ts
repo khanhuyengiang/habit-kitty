@@ -18,6 +18,10 @@ const store = (k: string, v: string | null) => { try { if (v === null) localStor
   if (stored(FANCY_KEY) !== '0') document.documentElement.dataset.fancy = '';
 }
 
+// The ✕ in a dialog's corner.
+export const closeX = (action = 'layer-close', label = 'Close') =>
+  `<button class="x-close" type="button" data-action="${action}" aria-label="${label}">${iconSvg('x')}</button>`;
+
 export const isDark = () => document.documentElement.dataset.theme
   ? document.documentElement.dataset.theme === 'dark'
   : matchMedia('(prefers-color-scheme: dark)').matches;

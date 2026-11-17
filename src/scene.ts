@@ -127,23 +127,6 @@ const svg = (s: string, cls: string) =>
 
 // ---------- small things used in both scenes ----------
 const LEAF = { g: P.green500, G: P.green700, m: P.mint400, l: P.lime };
-const PLANT = [
-  '.......m........',
-  '.....m.gG.......',
-  '....mGggGg..m...',
-  '..m.gGGgg..gG...',
-  '.mGg.gGg..gGg...',
-  '.ggGgggG.gGgg...',
-  '..gGGgGggGgg....',
-  '...ggGGgGgg.....',
-  '..gG.gGGg.Gg....',
-  '.gGg..gG..gGg...',
-  '..g...gG...g....',
-  '.......G........',
-];
-const POT = ['...oooooooooo...', '...owwwwwwwwo...', '...oppppppppo...', '....oppppppo....', '....oPPPPPPo....', '.....oooooo.....'];
-const plant = (x: number, y: number, pot: string, potD: string) =>
-  spr(x, y, PLANT, LEAF) + spr(x, y + 12, POT, { o: P.lavender600, w: P.cream, p: pot, P: potD });
 
 // A pink tulip bunch in a vase (like the ones in the pictures).
 const TULIPS = [

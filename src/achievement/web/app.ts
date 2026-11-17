@@ -6,7 +6,7 @@ import {
 } from '../model.ts';
 import {
   LIMITS, activeMainQuests, allTags, archivedMainQuests, collection, counts, deleteAchievement, deleteMainQuest, deleteSideQuest, emptyData,
-  ageOf, levelOf, migrate, monthOf, moveSideQuest, photosOf, pickColor, progressOf, saveAchievement, stepProgress, saveMainQuest, saveSideQuest, setMainQuestArchived,
+  levelOf, migrate, monthOf, moveSideQuest, photosOf, pickColor, progressOf, saveAchievement, stepProgress, saveMainQuest, saveSideQuest, setMainQuestArchived,
   setSideQuestArchived, sideQuestsOf, titleFor, updateProfile, type AchievementInput, type Errors, type Filter,
 } from '../ops.ts';
 import { IDB_PREFIX, MemoryRepo, Saver, isLocalRef, type Repo } from '../storage.ts';

@@ -14,7 +14,8 @@ import { PICKER_ICONS, groupedPicks, pickable, stickerSvg } from '../achievement
 import { monoSvg } from '../shared/pixelart.ts';
 import { onAppShown, onShown } from '../shared/apps.ts';
 import { esc, plural } from '../shared/html.ts';
-import { homeButton, orderList, playerButton, refocusMove, settingsButton, titleBar } from '../shared/ui.ts';
+import { makeLayer } from '../shared/layer.ts';
+import { closeX, homeButton, orderList, playerButton, refocusMove, settingsButton, titleBar } from '../shared/ui.ts';
 import { COLOR, tint, winBar } from '../notes/window.ts';
 import { change, onShop, shopData, shopInitialised, shopReady, undo, undoLabel, undoTop } from './data.ts';
 import {
@@ -181,17 +182,12 @@ function addTyped(text: string) {
 }
 
 // ---- dialogs ----
-function openLayer(html: string, label: string) {
-  closeLayer();
-  const el = document.createElement('div');
-  el.id = 'shop-layer';
-  el.className = 'scrim layer';
-  el.dataset.action = 'layer-close';
-  el.innerHTML = `<div class="panel shop-dialog" role="dialog" aria-modal="true" aria-label="${esc(label)}">${html}</div>`;
-  $('shop-layer-host').appendChild(el);
-  el.querySelector<HTMLElement>('[data-focus], input:not([type=checkbox]):not([type=radio]), button')?.focus();
-}
-const closeLayer = () => { document.getElementById('shop-layer')?.remove(); tripFor = ''; };
+const dialog = makeLayer('shopping', {
+  id: 'shop-layer', host: () => $('shop-layer-host'), panelClass: 'shop-dialog',
+  focus: '[data-focus], input:not([type=checkbox]):not([type=radio]), button', onClose: () => { tripFor = ''; },
+});
+function openLayer(html: string, label: string) { tripFor = ''; dialog.open(html, label); }
+const closeLayer = () => dialog.close();
 
 function openNewList() {
   openLayer(`<h3>New shopping list</h3><form class="stack" id="list-new-form">
@@ -202,7 +198,7 @@ function openNewList() {
 function openListMenu() {
   const l = listOf(shopData(), listId);
   if (!l) return;
-  openLayer(`<button class="x-close" type="button" data-action="layer-close" aria-label="Close">${iconSvg('x')}</button><h3>${esc(l.name)}</h3>
+  openLayer(`${closeX()}<h3>${esc(l.name)}</h3>
     <form class="shop-add" id="list-rename-form"><label class="field">Supermarket <input id="list-rename" maxlength="${LIMITS.name}" value="${esc(l.name)}" autocomplete="off"></label>
       <button class="btn" type="submit">Rename</button></form>
     <h4 class="sub">Category order</h4>
@@ -223,7 +219,7 @@ function listOrderHtml(): string {
 }
 const pantryOrderHtml = () => orderList('pantry-cat-move', catRows(shopData().cats));
 function openPantryOrder() {
-  openLayer(`<button class="x-close" type="button" data-action="layer-close" aria-label="Close">${iconSvg('x')}</button><h3>Arrange the pantry</h3>
+  openLayer(`${closeX()}<h3>Arrange the pantry</h3>
     <p class="muted">The pantry's cards and list follow this order, so you can see what you have the way you like. A shopping list has its own order (in its List… menu).</p>
     <div id="pantry-order">${pantryOrderHtml()}</div>
     <div class="btns"><span class="grow"></span><button class="btn primary" type="button" data-action="layer-close">Done</button></div>`, 'Arrange the pantry');
@@ -254,7 +250,7 @@ function openItem(id: string) {
   const d = shopData(), it = listOf(d, listId)?.items.find((i) => i.id === id);
   if (!it) return;
   const g = regularOf(d, it.name);
-  openLayer(`<button class="x-close" type="button" data-action="layer-close" aria-label="Close">${iconSvg('x')}</button><h3>${esc(it.name)}</h3>
+  openLayer(`${closeX()}<h3>${esc(it.name)}</h3>
     <form class="stack" id="item-form" data-id="${it.id}">
       <label class="field">Name <input name="name" maxlength="${LIMITS.name}" value="${esc(it.name)}" autocomplete="off"></label>
       <div class="row"><label class="field">Amount <input name="qty" maxlength="12" inputmode="decimal" value="${esc(it.qty)}" autocomplete="off"></label>
@@ -482,7 +478,7 @@ function openHave(id: string) {
   const d = shopData(), h = d.pantry.find((p) => p.id === id);
   if (!h) return;
   const l = d.lists.length ? listFor(h.name) : undefined;
-  openLayer(`<button class="x-close" type="button" data-action="layer-close" aria-label="Close">${iconSvg('x')}</button><h3>${esc(h.name)}</h3>
+  openLayer(`${closeX()}<h3>${esc(h.name)}</h3>
     <form class="stack" id="have-form" data-id="${h.id}">
       <label class="field">Name <input name="name" maxlength="${LIMITS.name}" value="${esc(h.name)}" autocomplete="off"></label>
       <div class="row"><label class="field">Amount <input name="qty" maxlength="12" inputmode="decimal" value="${esc(h.qty)}" autocomplete="off"></label>
@@ -514,7 +510,7 @@ function openCat(id: string | null) {
   const d = shopData(), c = id ? catOf(d, id) : undefined;
   if (id && !c) return;
   const icon = c ? pickable(c.icon) : 'bag', color = c?.color ?? CAT_COLORS[d.cats.length % CAT_COLORS.length];
-  openLayer(`<button class="x-close" type="button" data-action="layer-close" aria-label="Close">${iconSvg('x')}</button><h3>${c ? `Change ${esc(c.name)}` : 'New category'}</h3>
+  openLayer(`${closeX()}<h3>${c ? `Change ${esc(c.name)}` : 'New category'}</h3>
     <form class="stack" id="cat-form" data-id="${c?.id ?? ''}">
       <label class="field">Name <input name="name" maxlength="${LIMITS.name}" value="${esc(c?.name ?? '')}" placeholder="Baby, Pets, Garden…" autocomplete="off" data-focus></label>
       <fieldset class="field"><legend>Colour</legend><div class="nswatches">${CAT_COLORS.map((k) =>
@@ -591,7 +587,7 @@ function openRegular(name: string) {
   const gap = usualGap(g);
   const radio = (r: Rule, label: string, extra = '') => `<label class="check"><input type="radio" name="rule" value="${r}" ${g.rule === r ? 'checked' : ''}><span>${label}${extra}</span></label>`;
   const repeats = REPEATS.some(([n]) => n === g.repeat) ? REPEATS : [...REPEATS, [g.repeat, `Every ${g.repeat} days`] as [number, string]];
-  openLayer(`<button class="x-close" type="button" data-action="layer-close" aria-label="Close">${iconSvg('x')}</button><h3>${esc(g.name)}</h3>
+  openLayer(`${closeX()}<h3>${esc(g.name)}</h3>
     <p class="muted">${esc(regStat(g))}</p>
     <form class="stack" id="reg-form" data-name="${esc(g.name)}">
       ${shopData().lists.length ? `<label class="field">Usually from <select name="store">${listOptions(g.store, 'Any shop')}</select></label>` : ''}
@@ -638,7 +634,6 @@ onShown('shopping', 'click', (ev) => {
     case 'shop-tab': tab = btn.dataset.tab as Tab; recipeEditing = false; pantryCat = null; renderTop(); render(); window.scrollTo(0, 0); break;
     case 'undo-hide': hiddenUndo = undoTop(); $('shop-toast').hidden = true; render(); break;
     case 'undo': { const l = undo(); toast(l ? `Undone: ${l}.` : 'Nothing to undo.'); break; }
-    case 'layer-close': if (ev.target === btn || btn.tagName === 'BUTTON') closeLayer(); break;
     // lists
     case 'list-pick': listId = btn.dataset.id!; typed = ''; render(); break;
     case 'list-new': openNewList(); break;

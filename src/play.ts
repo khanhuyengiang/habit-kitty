@@ -88,7 +88,7 @@ function status() {
 
 // ===================== Heatmap =====================
 const px = (code: number) => `\x1b[48;5;${code}m  \x1b[0m`;
-const PIXEL: Record<DayKind, string> = { fed: px(34), missed: px(124), today: px(178), sitter: px(25), none: px(236) };
+const PIXEL: Record<DayKind, string> = { fed: px(34), missed: px(124), today: px(178), sitter: px(25), habit: px(34), none: px(236) };   // a habit day looks like a fed day here
 
 function heatmap(cat: Cat, year: number, month: number, today: number) {
   const { title, lead, days, count, tracked } = monthGrid(cat, year, month, today);
