@@ -5,7 +5,7 @@
 import { IDB_PREFIX, isLocalRef } from '../achievement/storage.ts';
 import { newId, type Data, type PlayerGender } from '../achievement/model.ts';
 import { emptyData, updateProfile, type Errors } from '../achievement/ops.ts';
-import { platformRepo } from '../achievement/web/snapshot.ts';
+import { platformRepo } from '../achievement/save.ts';
 
 // The saved records, or a fresh set (not saved yet) when there are none. Throws when storage can't be read.
 export async function loadPlayerData(): Promise<Data> {

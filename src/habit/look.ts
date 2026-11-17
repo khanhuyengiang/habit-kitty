@@ -1,6 +1,6 @@
 // Settings → Look: light or dark (or follow the device), and the fancy background (sparkles, clouds and hearts over a dotted
 // backdrop, after the pictures in inspo/). Both are kept on this device; src/shared/ui.ts reads them before the first paint.
-import { fancyOn, setFancy, setThemeMode, themeMode, type ThemeMode } from './ui.ts';
+import { fancyOn, setFancy, setThemeMode, themeMode, type ThemeMode } from '../shared/ui.ts';
 
 const MODES: [ThemeMode, string][] = [['device', 'Like the device'], ['light', 'Light'], ['dark', 'Dark']];
 

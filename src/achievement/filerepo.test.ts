@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { emptyData, saveMainQuest } from '../ops.ts';
+import { emptyData, saveMainQuest } from './ops.ts';
 
-vi.mock('@capacitor/filesystem', async () => (await import('../../test/fsmock.ts')).fsModule);
-const { fs: files, put } = await import('../../test/fsmock.ts');
+vi.mock('@capacitor/filesystem', async () => (await import('../test/fsmock.ts')).fsModule);
+const { fs: files, put } = await import('../test/fsmock.ts');
 const { FileRepo } = await import('./filerepo.ts');
 
 describe('FileRepo', () => {

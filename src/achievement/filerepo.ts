@@ -4,9 +4,9 @@
 //   achievement-kitty/photos/<id>.jpg
 // data.json is written to a temp file and renamed over the old one, so a crash mid-save never leaves half a file.
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
-import type { Data } from '../model.ts';
-import { IDB_PREFIX, type Repo } from '../storage.ts';
-import { fromBase64, toBase64 } from '../../shared/files.ts';
+import type { Data } from './model.ts';
+import { IDB_PREFIX, type Repo } from './storage.ts';
+import { fromBase64, toBase64 } from '../shared/files.ts';
 
 const dir = Directory.Data;
 const ROOT = 'achievement-kitty';

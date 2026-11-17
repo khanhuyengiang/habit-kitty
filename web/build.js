@@ -18,7 +18,7 @@ async function bundle(isApp) {
     minify: true,
     write: false,
     loader: { '.md': 'text' },
-    define: { __APP__: String(isApp), __SOUNDS__: JSON.stringify(soundUrls(isApp)) },
+    define: { __SOUNDS__: JSON.stringify(soundUrls(isApp)) },
   });
   return outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 }

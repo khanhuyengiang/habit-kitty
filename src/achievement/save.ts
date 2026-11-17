@@ -1,9 +1,9 @@
 // Kitty Achievement's save, read and written without the app being open: Habit Kitty's combined backup needs it
 // (the app itself only starts the first time it is shown).
 import { Capacitor } from '@capacitor/core';
-import { packBackup, unpackBackup } from '../backup.ts';
-import { migrate } from '../ops.ts';
-import { IndexedDbRepo, type Repo } from '../storage.ts';
+import { packBackup, unpackBackup } from './backup.ts';
+import { migrate } from './ops.ts';
+import { IndexedDbRepo, type Repo } from './storage.ts';
 import { FileRepo } from './filerepo.ts';
 
 export const platformRepo = (): Repo => (Capacitor.isNativePlatform() ? new FileRepo() : new IndexedDbRepo());

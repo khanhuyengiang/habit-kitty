@@ -3,30 +3,30 @@
 import {
   PLAYER_GENDERS, PLAYER_GENDER_LABEL, RARITIES, RARITY_LABEL, SIDE_COLORS, inkFor, isColor, newId, todayStr,
   type Achievement, type Data, type PlayerGender, type Rarity, type Status,
-} from '../model.ts';
+} from './model.ts';
 import {
   LIMITS, activeMainQuests, allTags, archivedMainQuests, collection, counts, deleteAchievement, deleteMainQuest, deleteSideQuest, emptyData,
   levelOf, migrate, monthOf, moveSideQuest, photosOf, pickColor, progressOf, saveAchievement, stepProgress, saveMainQuest, saveSideQuest, setMainQuestArchived,
   setSideQuestArchived, sideQuestsOf, titleFor, updateProfile, type AchievementInput, type Errors, type Filter,
-} from '../ops.ts';
-import { IDB_PREFIX, MemoryRepo, Saver, isLocalRef, type Repo } from '../storage.ts';
+} from './ops.ts';
+import { IDB_PREFIX, MemoryRepo, Saver, isLocalRef, type Repo } from './storage.ts';
 import { Capacitor } from '@capacitor/core';
-import { unpackBackup } from '../backup.ts';
-import { BACKUP_PREFIX, backupStatus, markDirty, nativeBackups, saveBackupToDevice, shareBackup } from '../../shared/backupfolder.ts';
-import { platformRepo } from './snapshot.ts';
-import { onAppShown, onShown, shownApp } from '../../shared/apps.ts';
-import { $, esc, plural } from '../../shared/html.ts';
-import { homeButton, moveButtons, playerButton, refocusMove, settingsButton, showToast, titleBar } from '../../shared/ui.ts';
-import { meterHtml } from '../../shared/meter.ts';
-import { lvLine } from '../../shared/stat-lines.ts';
-import { paintBackdrop } from '../../shared/backdrop.ts';
-import { music } from '../../shared/music.ts';
-import { PHOTO_MAX_BYTES, compressPhoto } from '../../shared/photo.ts';
-import { sharePicture } from '../../shared/snapshot.ts';
-import { getLocal, setLocal } from '../../shared/local.ts';
+import { unpackBackup } from './backup.ts';
+import { BACKUP_PREFIX, backupStatus, markDirty, nativeBackups, saveBackupToDevice, shareBackup } from '../shared/backupfolder.ts';
+import { platformRepo } from './save.ts';
+import { onAppShown, onShown, shownApp } from '../shared/apps.ts';
+import { $, esc, plural } from '../shared/html.ts';
+import { homeButton, moveButtons, playerButton, refocusMove, settingsButton, showToast, titleBar } from '../shared/ui.ts';
+import { meterHtml } from '../shared/meter.ts';
+import { lvLine } from '../shared/stat-lines.ts';
+import { paintBackdrop } from '../shared/backdrop.ts';
+import { music } from '../shared/music.ts';
+import { PHOTO_MAX_BYTES, compressPhoto } from '../shared/photo.ts';
+import { sharePicture } from '../shared/snapshot.ts';
+import { getLocal, setLocal } from '../shared/local.ts';
 import {
   PICKER_ICONS, PICKER_ICON_NAMES, avatarSvg, iconLabel, pickable, groupedPicks, burstSvg, cornerSvg, flowerSvg, cardHeartSvg, uiIconSvg, starsSvg, stickerSvg,
-} from '../../shared/stickers.ts';
+} from '../shared/stickers.ts';
 
 // Queries stay inside this app's part of the page, so they never find Habit Kitty's elements.
 const appRoot: ParentNode = document.querySelector('[data-app-root="achievement"]') ?? document;

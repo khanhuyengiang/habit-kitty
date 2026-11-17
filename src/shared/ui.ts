@@ -7,7 +7,7 @@ import { getLocal, setLocal } from './local.ts';
 import { paintBackdrop } from './backdrop.ts';
 
 // ---- the look: light or dark (follows the device until one is chosen), and the fancy background. Kept on this device. ----
-// Chosen in Settings → Look (src/shared/look.ts); read here first, so the first paint is already right.
+// Chosen in Settings → Look (src/habit/look.ts); read here first, so the first paint is already right.
 // The fancy background is on until it is turned off (stored as '0').
 const THEME_KEY = 'hk-theme', FANCY_KEY = 'hk-fancy';
 export type ThemeMode = 'device' | 'light' | 'dark';
