@@ -1,6 +1,6 @@
 // The Diary's options (Meteorokinesis, Teleportation, Titles, Starry Nights, emotion names), drawn into the Settings screen under "Diary".
 // They listen on their own container, so they work whichever screen is showing.
-import type { Mood } from '../store.ts';
+import type { Mood } from './model.ts';
 import { diaryExtras, diaryInitialised, diaryReady, onDiary, updateExtras } from './data.ts';
 import { MOODS, MOOD_KEYS, moodSprite } from './moods.ts';
 import { esc } from '../shared/html.ts';

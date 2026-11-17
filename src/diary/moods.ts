@@ -2,7 +2,7 @@
 // warm for good feelings, cool for bad ones.
 import { miniSvg, type Face } from '../shared/pixelcat.ts';
 import { monoSvg } from '../shared/pixelart.ts';
-import type { Mood, Star } from '../store.ts';
+import type { Mood, Star } from './model.ts';
 
 export const MOODS: Record<Mood, { label: string; face: Face; fur: string }> = {
   joyful:   { label: 'Joyful',   face: 'happy',    fur: '#ffb3d0' },

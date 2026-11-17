@@ -19,7 +19,7 @@ import { habitStats } from '../shared/stats.ts';
 import { allNotes, noteOf } from '../notes/data.ts';
 import { noteDate, parseNote } from '../notes/model.ts';
 import { tint, winBar } from '../notes/window.ts';
-import { MAX_PHOTOS, dayName, monthKey, type DiaryEntry, type Mood, type Person, type Star, type Weather } from '../store.ts';
+import { MAX_PHOTOS, dayName, monthKey, type DiaryEntry, type Mood, type Person, type Star, type Weather } from './model.ts';
 import {
   dayCount, diaryEntries, diaryExtras, diaryInitialised, diaryReady, entryOf, getPhoto, hasPageOn, onDiary, reflectionOf, saveEntry,
   saveReflection, updateExtras,

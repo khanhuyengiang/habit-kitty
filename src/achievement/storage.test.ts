@@ -12,7 +12,7 @@ describe('Saver', () => {
   });
   it('reports a failed save and retries it', async () => {
     let fail = true;
-    const repo: Repo = { ...new MemoryRepo(), load: async () => ({ data: null, photos: new Map() }), putPhoto: async () => {}, deletePhotos: async () => {}, replaceAll: async () => {},
+    const repo: Repo = { ...new MemoryRepo(), load: async () => ({ data: null, photos: new Map() }), loadData: async () => null, getPhoto: async () => null, putPhoto: async () => {}, deletePhotos: async () => {}, replaceAll: async () => {},
       saveData: async () => { if (fail) throw new Error('disk full'); } };
     const s = new Saver(repo);
     expect(await s.save(emptyData())).toBe(false);

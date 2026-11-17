@@ -15,7 +15,7 @@
 // that from your items), achievements, reminders (they need the phone's permission, and their times are personal),
 // and your own music.
 import { CONFIG } from './rules.ts';
-import { sanitizeExtras, type DiaryExtras } from './store.ts';
+import { sanitizeExtras, type DiaryExtras } from './diary/model.ts';
 import { sanitize as sanitizeShop, type MartSettings } from './shopping/model.ts';
 import { sanitize as sanitizePixel, type PixelIcon } from './pixel/model.ts';
 

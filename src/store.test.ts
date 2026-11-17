@@ -1,7 +1,8 @@
 import { dayOf } from './calendar.ts';
 import { describe, expect, it } from 'vitest';
 import { zipSync, strToU8 } from 'fflate';
-import { dayFromName, dayName, entryFromMarkdown, entryToMarkdown, isZip, monthFromKey, monthKey, packBackup, sanitizeExtras, unpackBackup, type DiaryEntry } from './store.ts';
+import { isZip, packBackup, unpackBackup } from './store.ts';
+import { dayFromName, dayName, entryFromMarkdown, entryToMarkdown, monthFromKey, monthKey, sanitizeExtras, type DiaryEntry } from './diary/model.ts';
 
 const day = Math.round(Date.UTC(2026, 9, 12) / 86_400_000);
 

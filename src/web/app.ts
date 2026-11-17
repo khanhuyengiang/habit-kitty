@@ -18,10 +18,8 @@ import { entriesSince, parseChangelog, type ChangeEntry } from '../changelog.ts'
 import { VERSION } from '../version.ts';
 import CHANGELOG_MD from '../../CHANGELOG.md';
 import { pickThought, type ThoughtKind } from '../thoughts.ts';
-import {
-  isZip, packBackup, unpackBackup,
-  type Backup, type DiaryEntry, type Mood,
-} from '../store.ts';
+import { isZip, packBackup, unpackBackup, type Backup } from '../store.ts';
+import type { DiaryEntry, Mood } from '../diary/model.ts';
 import { CONFETTI_COLORS, TRAITS, notifyIconName, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
 import { GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, heartSvg, iconSvg, markSvg, outdoorSvg, roomSvg, sceneVersion } from '../pixelart.ts';
 import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, trophyIcon, type AppName } from '../shared/apps.ts';

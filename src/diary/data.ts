@@ -13,7 +13,7 @@ import { ROOT, at, fileBytes, fileNames, removeFile, stagedReplace, toBase64, wr
 import {
   EXTRAS_FILE, MAX_PHOTOS, dayFromName, diaryPath, entryFromMarkdown, entryToMarkdown, monthFromKey, photoPath, reflectionPath, sanitizeExtras,
   type DiaryEntry, type DiaryExtras, type Reflection,
-} from '../store.ts';
+} from './model.ts';
 import { compressPhoto } from '../shared/photo.ts';
 import { BACKUP_PREFIX, markDirty } from '../shared/backupfolder.ts';
 import { publishHabitStats } from '../shared/stats.ts';

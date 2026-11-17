@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dayOf } from '../calendar.ts';
-import type { Person } from '../store.ts';
+import type { Person } from './model.ts';
 import { birthdaysOn, daysUntil, personErrors, personFrom, turning, upcoming, whenText } from './people.ts';
 
 const P = (name: string, month: number, day: number, year?: number): Person => ({ id: name, name, month, day, ...(year !== undefined && { year }) });

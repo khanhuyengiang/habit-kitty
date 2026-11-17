@@ -1,6 +1,6 @@
 // Birthdays, pure so they can be tested. Days are calendar-day indices (see ../calendar.ts), so there are no time zones in here.
 import { dateOf, dayOf } from '../calendar.ts';
-import type { Person } from '../store.ts';
+import type { Person } from './model.ts';
 
 export const MAX_PEOPLE = 200;
 const NAME_MAX = 40, NOTE_MAX = 200;
