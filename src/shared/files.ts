@@ -24,3 +24,18 @@ export async function removeFile(path: string, root = ROOT) { try { await Filesy
 export async function writeOk(run: () => Promise<unknown>): Promise<boolean> {
   try { await run(); return true; } catch { return false; }
 }
+
+// Deletes a whole folder; true when it is gone (or was never there).
+export async function clearFolder(root: string): Promise<boolean> {
+  if (await writeOk(() => Filesystem.rmdir({ path: root, directory: Directory.Data, recursive: true }))) return true;
+  return !await writeOk(() => Filesystem.readdir({ path: root, directory: Directory.Data }));
+}
+
+// Replaces the folder `root` with what `write` puts in `stage`: it is written next to the live folder and swapped in only
+// when complete, so a failure leaves the old one untouched. Resolves to false when it failed.
+export async function stagedReplace(root: string, stage: string, write: () => Promise<void>): Promise<boolean> {
+  await clearFolder(stage);
+  const staged = await writeOk(async () => { await Filesystem.mkdir({ path: stage, directory: Directory.Data, recursive: true }); await write(); });
+  if (!staged || !await clearFolder(root)) { await clearFolder(stage); return false; }
+  return writeOk(() => Filesystem.rename({ from: stage, to: root, directory: Directory.Data, toDirectory: Directory.Data }));
+}

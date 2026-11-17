@@ -1,25 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-// An in-memory stand-in for Capacitor's Filesystem: files keyed by path (with a modified time), folders implied.
-const fs = new Map<string, { data: Buffer; mtime: number }>();
-let clock = 1000;
-vi.mock('@capacitor/filesystem', () => ({
-  Directory: { Data: 'DATA', Cache: 'CACHE' },
-  Encoding: { UTF8: 'utf8' },
-  Filesystem: {
-    async writeFile({ path, data, encoding }: { path: string; data: string; encoding?: string }) { fs.set(path, { data: Buffer.from(data, encoding === 'utf8' ? 'utf8' : 'base64'), mtime: ++clock }); return { uri: path }; },
-    async readFile({ path }: { path: string }) { const f = fs.get(path); if (!f) throw new Error('File does not exist'); return { data: f.data.toString('base64') }; },
-    async readdir({ path }: { path: string }) {
-      const p = path.replace(/\/+$/, '');
-      const files = [...fs.entries()].filter(([k]) => k.startsWith(`${p}/`) && !k.slice(p.length + 1).includes('/')).map(([k, f]) => ({ name: k.slice(p.length + 1), type: 'file', mtime: f.mtime }));
-      if (!files.length) throw new Error('Folder does not exist');
-      return { files };
-    },
-    async deleteFile({ path }: { path: string }) { if (!fs.delete(path)) throw new Error('File does not exist'); },
-    async rmdir({ path }: { path: string }) { const p = path.replace(/\/+$/, ''); for (const k of [...fs.keys()]) if (k === p || k.startsWith(`${p}/`)) fs.delete(k); },
-    async rename({ from, to }: { from: string; to: string }) { for (const [k, v] of [...fs.entries()]) if (k.startsWith(`${from}/`)) { fs.delete(k); fs.set(`${to}${k.slice(from.length)}`, v); } },
-  },
-}));
+vi.mock('@capacitor/filesystem', async () => (await import('../test/fsmock.ts')).fsModule);
+const { fs } = await import('../test/fsmock.ts');
 
 const data = await import('./data.ts');
 const names = () => data.allNotes().map((n) => n.name).sort();

@@ -1,34 +1,16 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-// An in-memory stand-in for Capacitor's Filesystem: files keyed by path, folders implied by the paths.
-const fs = new Map<string, Buffer>();
-vi.mock('@capacitor/filesystem', () => ({
-  Directory: { Data: 'DATA', Cache: 'CACHE' },
-  Encoding: { UTF8: 'utf8' },
-  Filesystem: {
-    async writeFile({ path, data, encoding }: { path: string; data: string; encoding?: string }) { fs.set(path, Buffer.from(data, encoding === 'utf8' ? 'utf8' : 'base64')); return { uri: path }; },
-    async readFile({ path }: { path: string }) { const b = fs.get(path); if (!b) throw new Error('File does not exist'); return { data: b.toString('base64') }; },
-    async readdir({ path }: { path: string }) {
-      const names = [...fs.keys()].filter((k) => k.startsWith(`${path}/`) && !k.slice(path.length + 1).includes('/')).map((k) => ({ name: k.slice(path.length + 1) }));
-      if (!names.length) throw new Error('Folder does not exist');
-      return { files: names };
-    },
-    async deleteFile({ path }: { path: string }) { if (!fs.delete(path)) throw new Error('File does not exist'); },
-    async mkdir() {},
-    async rmdir({ path }: { path: string }) { const p = path.replace(/\/+$/, ''); for (const k of [...fs.keys()]) if (k === p || k.startsWith(`${p}/`)) fs.delete(k); },
-    async rename({ from, to }: { from: string; to: string }) { for (const [k, v] of [...fs.entries()]) if (k.startsWith(`${from}/`)) { fs.delete(k); fs.set(`${to}${k.slice(from.length)}`, v); } },
-  },
-}));
+vi.mock('@capacitor/filesystem', async () => (await import('../test/fsmock.ts')).fsModule);
+const { fs, put, text } = await import('../test/fsmock.ts');
 
 const data = await import('./data.ts');
 const { dayOf } = await import('../calendar.ts');
 const day = dayOf(2026, 9, 12);
-const text = (path: string) => fs.get(path)?.toString('utf8');
 
 describe('diary data', () => {
   beforeAll(async () => {
     // an old save: one page inside it, and the diary settings that used to live in the game
-    fs.set('habit-kitty/diary/2026-10-01.md', Buffer.from('---\nmood: calm\nupdated: 1\n---\nAlready a file\n'));
+    put('habit-kitty/diary/2026-10-01.md', Buffer.from('---\nmood: calm\nupdated: 1\n---\nAlready a file\n'));
     expect(await data.initDiary({ diary: { [day]: { text: 'From the old save', updated: 5 } }, trackamaniac: true, moodNames: { joyful: 'Yay' } })).toBe(true);
   });
 

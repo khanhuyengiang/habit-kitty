@@ -8,8 +8,8 @@
 //
 // Habit Kitty starts this once (initDiary); the Diary screen and the backup read and write through here. Everything is
 // kept in memory too, so screens draw at once.
-import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
-import { ROOT, at, fileBytes, fileNames, removeFile, toBase64, writeOk } from '../shared/files.ts';
+import { Encoding, Filesystem } from '@capacitor/filesystem';
+import { ROOT, at, fileBytes, fileNames, removeFile, stagedReplace, toBase64, writeOk } from '../shared/files.ts';
 import {
   EXTRAS_FILE, MAX_PHOTOS, dayFromName, diaryPath, entryFromMarkdown, entryToMarkdown, monthFromKey, photoPath, reflectionPath, sanitizeExtras,
   type DiaryEntry, type DiaryExtras, type Reflection,
@@ -23,7 +23,6 @@ const writeText = (path: string, text: string, root = ROOT) =>
   writeOk(() => Filesystem.writeFile({ ...at(path, root), data: text, encoding: Encoding.UTF8, recursive: true }));
 const writeBytes = (path: string, bytes: Uint8Array, root = ROOT) =>
   writeOk(() => Filesystem.writeFile({ ...at(path, root), data: toBase64(bytes), recursive: true }));
-const clearFiles = (root = ROOT) => writeOk(() => Filesystem.rmdir({ ...at('', root), recursive: true }));
 
 const writeEntry = (day: number, e: DiaryEntry, root = ROOT) => writeText(diaryPath(day), entryToMarkdown(e), root);
 const writePhoto = (day: number, bytes: Uint8Array, root = ROOT, i = 0) => writeBytes(photoPath(day, i), bytes, root);
@@ -225,10 +224,7 @@ export async function collectDiary() {
 // Replaces everything on disk with a backup's diary. `fallback`: settings from an older backup that kept them in the game.
 export async function restoreDiary(b: { diary: Record<number, DiaryEntry>; photos: Record<number, Uint8Array>; morePhotos?: Record<number, Uint8Array[]>; reflections?: Record<string, Reflection>; extras?: DiaryExtras }, fallback: Legacy = {}): Promise<boolean> {
   const x = b.extras && Object.keys(b.extras).length ? b.extras : sanitizeExtras({ trackamaniac: fallback.trackamaniac, moodNames: fallback.moodNames });
-  // Written next to the live folder and swapped in only when complete, so a failure leaves the old diary untouched.
-  await clearFiles(STAGE);
-  const staged = await writeOk(async () => {
-    await Filesystem.mkdir({ ...at('', STAGE), recursive: true });
+  const ok = await stagedReplace(ROOT, STAGE, async () => {
     for (const [k, e] of Object.entries(b.diary)) {
       const day = Number(k);
       if (!await writeEntry(day, e, STAGE)) throw new Error('write');
@@ -238,9 +234,7 @@ export async function restoreDiary(b: { diary: Record<number, DiaryEntry>; photo
     for (const [key, r] of Object.entries(b.reflections ?? {})) if (!await writeReflection(key, r, STAGE)) throw new Error('write');
     if (Object.keys(x).length && !await writeExtras(x, STAGE)) throw new Error('write');
   });
-  if (!staged) { await clearFiles(STAGE); return false; }
-  if (!await clearFiles()) { await clearFiles(STAGE); return false; }
-  if (!await writeOk(() => Filesystem.rename({ from: STAGE, to: ROOT, directory: Directory.Data, toDirectory: Directory.Data }))) return false;
+  if (!ok) return false;
   entries = { ...b.diary };
   reflections = { ...(b.reflections ?? {}) };
   extras = x;

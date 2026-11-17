@@ -5,7 +5,7 @@
 // (Its own folder, so restoring the diary never touches it.) Everything is kept in memory too, so screens draw at once.
 // Habit Kitty starts this (initNotes) because the backup needs it; the Notes screen and the folder sync read and write here.
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
-import { fromBase64, writeOk } from '../shared/files.ts';
+import { fromBase64, stagedReplace, writeOk } from '../shared/files.ts';
 import { BACKUP_PREFIX, markDirty } from '../shared/backupfolder.ts';
 import { MAX_NOTES, MAX_TEXT, safeName, sortNotes, uniqueName, type Note } from './model.ts';
 
@@ -124,13 +124,10 @@ export const collectNotes = (): Record<string, string> => Object.fromEntries(not
 
 // Replaces every note with these. Written next to the live folder and swapped in only when complete.
 export async function restoreNotes(map: Record<string, string>): Promise<boolean> {
-  await writeOk(() => Filesystem.rmdir({ ...dir(STAGE), recursive: true }));
-  const staged = await writeOk(async () => {
+  const ok = await stagedReplace(ROOT, STAGE, async () => {
     for (const [name, text] of Object.entries(map)) if (!await writeText(name, text, STAGE)) throw new Error('write');
   });
-  if (!staged) { await writeOk(() => Filesystem.rmdir({ ...dir(STAGE), recursive: true })); return false; }
-  await writeOk(() => Filesystem.rmdir({ ...dir(), recursive: true }));
-  if (Object.keys(map).length && !await writeOk(() => Filesystem.rename({ from: STAGE, to: ROOT, directory: Directory.Data, toDirectory: Directory.Data }))) return false;
+  if (!ok) return false;
   const now = Date.now();
   notes = Object.entries(map).map(([name, text]) => ({ name, text, mtime: now }));
   ready = true;
