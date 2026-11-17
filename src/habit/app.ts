@@ -4,11 +4,10 @@ import {
   doMindfulTask, setTaskDay, setCatDay, replay, rewind, genderOf, daysUntilReady, removeMindfulTask, setHabitSchedule, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, idHash, dayIndex, dayStartHour, setDayStart, nextReset, levelProgress, hunger, sitterCooldownLeft,
   type ActionResult, type AppState, type Cat, type CatMode, type CatGender, type CatLook, type CatTrait, type GameEvent, type MindfulTask, type Reason, type TaskKind,
 } from './rules.ts';
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 import { BACKUP_EXT, BACKUP_PREFIX, backupNow, backupStatus, chooseFolder, folderBackups, markDirty, nativeBackups, onBackupStatus, readFolderBackup, refreshFolder, registerBackupSource, saveBackupToDevice, saveToDevice, shareBackup as shareBackupFile, shareFile, stopBackups } from '../shared/backupfolder.ts';
 import { achievementCount, restoreAchievement, snapshotAchievement } from '../achievement/web/snapshot.ts';
 import { PICKER_ICONS, iconLabel, stickerSvg } from '../shared/stickers.ts';
-import { Directory, Filesystem } from '@capacitor/filesystem';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { anyReminder, catAlarmsOn, defaultReminder, planReminders, type LastCall, type ReminderSettings } from './reminders.ts';
 import { allCatsDiary, catDiary, clock } from './catdiary.ts';
@@ -43,6 +42,7 @@ import { makeLayer } from '../shared/layer.ts';
 import { readJson, writeJson } from '../shared/local.ts';
 import { pickerHtml } from '../shared/picker.ts';
 import { backButton, closeX, fancyOn, homeButton, playerButton, setFancy, setThemeMode, settingsButton, showToast, themeMode, titleBar } from '../shared/ui.ts';
+import { initWidget, openWidgetTab, queueWidget, type WidgetPhase } from './widget.ts';
 import { initSound, playSound, renderSound, syncMusic, toggleMute, useDefaultMusic, type SoundKind } from './sound.ts';
 import { firstDay, habitStreak, monthGrid, streak, weekRow, type DayKind, type Trackable } from './calendar.ts';
 import { dateOf, dayOf } from '../shared/dates.ts';
@@ -738,20 +738,19 @@ function zoomies() {
 }
 setInterval(zoomies, 7000);
 
-// ---- home-screen widget (Android): the room as three pictures, one per time of day ----
-// The native widget (RoomWidgetProvider) picks the file that matches the clock. Cats sit where they are in the room now.
-const RoomWidget = registerPlugin<{ refresh(): Promise<void>; pendingTab(): Promise<{ tab: string }> }>('RoomWidget');
+// ---- home-screen widget (Android, see ./widget.ts): the room as three pictures, one per time of day ----
+// Cats sit where they are in the room now.
 const WIDGET_Y = 8, WIDGET_PX = 3;   // crop off the ceiling trim; 3 pixels per room unit
 
 // One thought bubble per hour, so the picture holds still between pushes (the room itself rolls them live).
-function widgetThought(phase: 'day' | 'dusk' | 'night') {
+function widgetThought(phase: WidgetPhase) {
   if (phase === 'night') return null;
   let a = today() * 24 + now().getHours();
   const seeded = () => { a = (Math.imul(a, 1103515245) + 12345) >>> 0; return (a / 4294967296) * 0.12; };   // low rolls: the widget shows one when anyone has someone on their mind
   return pickThought(save.state.cats, today(), save.returned ?? {}, () => true, seeded);
 }
 
-function roomPicture(phase: 'day' | 'dusk' | 'night'): string {
+function roomPicture(phase: WidgetPhase): string {
   const t = today();
   const thought = widgetThought(phase);
   const cats = homeCats().map((c, i) => {
@@ -778,46 +777,7 @@ function roomPicture(phase: 'day' | 'dusk' | 'night'): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 ${WIDGET_Y} ${ROOM_W} ${ROOM_H - WIDGET_Y}" shape-rendering="crispEdges">${bg}${cats}</svg>`;
 }
 
-async function pictureData(svg: string): Promise<string> {
-  const img = new Image();
-  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-  await img.decode();
-  const canvas = document.createElement('canvas');
-  canvas.width = ROOM_W * WIDGET_PX; canvas.height = (ROOM_H - WIDGET_Y) * WIDGET_PX;
-  const g = canvas.getContext('2d')!;
-  g.imageSmoothingEnabled = false;
-  g.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/png').split(',')[1];
-}
-
-let widgetSig = '', widgetTimer = 0;
-function queueWidget() {
-  // The home screen only shows the picture while the app is in the background, and going there pushes it (see visibilitychange).
-  if (!Capacitor.isNativePlatform() || !document.hidden) return;
-  clearTimeout(widgetTimer);
-  widgetTimer = window.setTimeout(pushWidget, 3000);
-}
-async function pushWidget() {
-  clearTimeout(widgetTimer);
-  const phases = ['day', 'dusk', 'night'] as const;
-  const svgs = phases.map(roomPicture);
-  const sig = svgs.join('');
-  if (sig === widgetSig) return;
-  widgetSig = sig;
-  try {
-    for (const [i, ph] of phases.entries()) {
-      await Filesystem.writeFile({ path: `room-widget-${ph}.png`, directory: Directory.Data, data: await pictureData(svgs[i]) });
-    }
-    await RoomWidget.refresh();
-  } catch { widgetSig = ''; /* try again next time */ }
-}
-document.addEventListener('visibilitychange', () => { if (document.hidden) pushWidget(); else openWidgetTab(); });
-
-// Tapping the widget asks for the Room tab.
-async function openWidgetTab() {
-  if (!Capacitor.isNativePlatform()) return;
-  try { if ((await RoomWidget.pendingTab()).tab === 'room') document.dispatchEvent(new CustomEvent(GO_EVENT, { detail: { to: 'habit', tab: 'room' } })); } catch { /* no widget plugin */ }
-}
+initWidget((phase) => ({ svg: roomPicture(phase), w: ROOM_W, h: ROOM_H - WIDGET_Y, px: WIDGET_PX }));
 
 // ---- thought bubbles: a cat at home now and then thinks of one that is away or gone ----
 // Rolled every few seconds; at most one bubble at a time, with a gap between bubbles and a rest for each thinker.
