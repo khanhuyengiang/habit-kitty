@@ -5,8 +5,6 @@ node_modules/
 dist/
 app-www/
 
-# Dev preview server output (`npm run preview`)
-.preview/
 
 # Android build output and machine-specific files are ignored in android/.gitignore
 *.apk

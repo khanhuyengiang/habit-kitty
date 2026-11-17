@@ -271,7 +271,7 @@ export function bodySvg(face: Face, look: CatLook, seed = 0): string {
 }
 
 // ---- the curled-up napping cat (any size): head tucked on its paws, tail wrapped round the front ----
-// EDIT ME: one character per pixel, rows should be the same width. `npm run preview` shows the change as you save.
+// EDIT ME: one character per pixel, rows should be the same width. `npm run editor` shows and edits it.
 //   o outline   f main colour   s belly shade   W paws, muzzle  (patches and stripes live in ./coats.ts)
 //   T, D tail (light, dark stripe)   p ear pink   e closed eye   n nose   c blush   . empty
 export const NAP = [
