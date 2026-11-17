@@ -11,11 +11,11 @@ export const toBase64 = (bytes: Uint8Array) => {
 };
 export const fromBase64 = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
+// What Filesystem.readFile gives back (base64 on the phone, a Blob on the web) as bytes.
+export const dataBytes = async (data: string | Blob) => typeof data === 'string' ? fromBase64(data) : new Uint8Array(await data.arrayBuffer());
+
 export async function fileBytes(path: string, root = ROOT): Promise<Uint8Array | undefined> {
-  try {
-    const r = await Filesystem.readFile(at(path, root));
-    return typeof r.data === 'string' ? fromBase64(r.data) : new Uint8Array(await r.data.arrayBuffer());
-  } catch { return undefined; }
+  try { return await dataBytes((await Filesystem.readFile(at(path, root))).data); } catch { return undefined; }
 }
 export async function fileNames(dir: string, root = ROOT): Promise<string[]> {
   try { return (await Filesystem.readdir(at(dir, root))).files.map((f) => f.name); } catch { return []; }

@@ -7,7 +7,9 @@
 //   photos/2026-10-12.jpg
 //   gallery.json             Kitty Gallery's icons (your drawings and changes), as kept on the device
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
-import { dateOf, dayOf } from './calendar.ts';
+import { dateOf, dayOf, two } from './shared/dates.ts';
+import { ACHIEVEMENT_ENTRY, ACHIEVEMENT_MAX, COMBINED_APP, isZip } from './shared/backupformat.ts';
+export { ACHIEVEMENT_ENTRY, isZip };
 import { PHOTO_MAX_BYTES } from './shared/photo.ts';
 import { MAX_NOTES, MAX_TEXT, safeName } from './notes/model.ts';
 
@@ -39,8 +41,6 @@ export interface Reflection { text: string; updated: number }
 export interface DiaryExtras { trackamaniac?: boolean; teleportation?: boolean; photographer?: boolean; titles?: boolean; starry?: boolean; moodNames?: Partial<Record<Mood, string>>; people?: Person[] }
 
 export const BACKUP_FORMAT = 2;
-export const ACHIEVEMENT_ENTRY = 'achievement.achkitty';
-const ACHIEVEMENT_MAX = 128_000_000;
 // Every photo (on the phone and in a backup) is scaled to fit under PHOTO_MAX_BYTES, so a backup stays small.
 export { PHOTO_MAX_BYTES, PHOTO_MAX_SIDE } from './shared/photo.ts';
 
@@ -54,7 +54,6 @@ export function dayFromName(name: string): number | null {
 export const diaryPath = (day: number) => `diary/${dayName(day)}.md`;
 export const photoPath = (day: number, i = 0) => `photos/${dayName(day)}${i ? `-${i + 1}` : ''}.jpg`;   // i: 0 for the first photo
 
-const two = (n: number) => String(n).padStart(2, '0');
 export const monthKey = (y: number, m: number) => `${y}-${two(m + 1)}`;                 // m is 0-based, like Date
 export const reflectionPath = (key: string) => `reflections/${key}.md`;
 export const monthFromKey = (key: string): { y: number; m: number } | null => {
@@ -138,7 +137,7 @@ export interface Backup {
 
 export function packBackup(b: Backup, exportedAt = Date.now()): Uint8Array {
   const files: Record<string, Uint8Array | [Uint8Array, { level: 0 }]> = {
-    'manifest.json': strToU8(JSON.stringify({ app: 'habit-kitty', format: BACKUP_FORMAT, exportedAt })),
+    'manifest.json': strToU8(JSON.stringify({ app: COMBINED_APP, format: BACKUP_FORMAT, exportedAt })),
     'game.json': strToU8(JSON.stringify(b.game)),
   };
   for (const [key, r] of Object.entries(b.reflections ?? {})) {
@@ -162,8 +161,6 @@ export function packBackup(b: Backup, exportedAt = Date.now()): Uint8Array {
   return zipSync(files);
 }
 
-export const isZip = (bytes: Uint8Array) => bytes.length > 3 && bytes[0] === 0x50 && bytes[1] === 0x4b;
-
 // Throws when the bytes are not a Habit Kitty backup.
 export function unpackBackup(bytes: Uint8Array): Backup {
   let total = 0;
@@ -176,7 +173,7 @@ export function unpackBackup(bytes: Uint8Array): Backup {
   const manifest = JSON.parse(strFromU8(files['manifest.json']));
   // An Kitty Achievement save on its own (the older separate file): there is no game in it.
   if (manifest?.app === 'achievement-kitty') return { game: null, diary: {}, photos: {}, achievement: bytes };
-  if (!files['game.json'] || manifest?.app !== 'habit-kitty' || ![1, BACKUP_FORMAT].includes(manifest.format)) throw new Error('unsupported backup');
+  if (!files['game.json'] || manifest?.app !== COMBINED_APP || ![1, BACKUP_FORMAT].includes(manifest.format)) throw new Error('unsupported backup');
   const diary: Record<number, DiaryEntry> = {};
   const photos: Record<number, Uint8Array> = {};
   const morePhotos: Record<number, Uint8Array[]> = {};

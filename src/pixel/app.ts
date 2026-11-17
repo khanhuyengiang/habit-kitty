@@ -13,6 +13,7 @@ import { iconSvg } from '../pixelart.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { onAppShown, onShown } from '../shared/apps.ts';
 import { esc, plural } from '../shared/html.ts';
+import { localDateKey } from '../shared/dates.ts';
 import { PALETTE, PALETTE_GROUPS } from '../shared/palette.ts';
 import { saveToDevice } from '../shared/backupfolder.ts';
 import { homeButton, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
@@ -790,7 +791,7 @@ function setZoom(z: number) {
 }
 
 // ---- export and import ----
-const today = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
+const today = () => localDateKey();
 async function exportIcons() {
   if (!pixelData().icons.length) { toast('Nothing to export yet.'); return; }
   const day = today();

@@ -7,6 +7,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import { dataBytes, toBase64 } from './files.ts';
 import { KEEP_BACKUPS, backupName, backupsOf, isDue, toPrune } from '../backup-schedule.ts';
 
 interface FolderState { chosen: boolean; ok: boolean; name?: string }
@@ -23,28 +24,33 @@ interface BackupFolderPlugin {
 const Plugin = registerPlugin<BackupFolderPlugin>('BackupFolder');
 export const nativeBackups = Capacitor.isNativePlatform();
 
-export function bytesToBase64(bytes: Uint8Array): string {
-  let s = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(s);
-}
-const base64ToBytes = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 const isCancel = (e: unknown) => /cancel/i.test(String((e as Error)?.message ?? e));
 
 async function toCache(name: string, bytes: Uint8Array) {
-  await Filesystem.writeFile({ path: name, data: bytesToBase64(bytes), directory: Directory.Cache });
+  await Filesystem.writeFile({ path: name, data: toBase64(bytes), directory: Directory.Cache });
 }
 const dropCache = (name: string) => Filesystem.deleteFile({ path: name, directory: Directory.Cache }).catch(() => { /* already gone */ });
+// Copy a file from the backup folder (or a subfolder of it) into the cache, read it and drop the copy.
+async function fetchBytes(name: string, cache: string, dir?: string): Promise<Uint8Array> {
+  await Plugin.fetch({ name, cache, dir });
+  try { return await dataBytes((await Filesystem.readFile({ path: cache, directory: Directory.Cache })).data); }
+  finally { await dropCache(cache); }
+}
+
+// A normal browser download.
+export function downloadBlob(name: string, blob: Blob) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+}
 
 // ---- save as ----
 // Resolves to where it went ('' when only a download), or null when the user backed out. Throws when saving failed.
 export async function saveToDevice(name: string, bytes: Uint8Array): Promise<string | null> {
   if (!nativeBackups) {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/octet-stream' }));
-    a.download = name;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+    downloadBlob(name, new Blob([bytes as BlobPart], { type: 'application/octet-stream' }));
     return '';
   }
   await toCache(name, bytes);
@@ -181,14 +187,7 @@ export async function putInSubfolder(dir: string, name: string, bytes: Uint8Arra
   await toCache(cache, bytes);
   try { await Plugin.put({ cache, name, dir }); } finally { await dropCache(cache); }
 }
-export async function readFromSubfolder(dir: string, name: string): Promise<Uint8Array> {
-  const cache = `get-${Math.random().toString(36).slice(2)}`;
-  await Plugin.fetch({ name, cache, dir });
-  try {
-    const r = await Filesystem.readFile({ path: cache, directory: Directory.Cache });
-    return typeof r.data === 'string' ? base64ToBytes(r.data) : new Uint8Array(await r.data.arrayBuffer());
-  } finally { await dropCache(cache); }
-}
+export const readFromSubfolder = (dir: string, name: string) => fetchBytes(name, `get-${Math.random().toString(36).slice(2)}`, dir);
 export const removeFromSubfolder = (dir: string, name: string) => Plugin.remove({ name, dir });
 // True when a backup folder was chosen and can be written to.
 export const folderUsable = async () => { await refreshFolder(); return status.folder.chosen && status.folder.ok; };
@@ -197,14 +196,7 @@ export const folderUsable = async () => { await refreshFolder(); return status.f
 export async function folderBackups(prefix: string, ext: string): Promise<string[]> {
   return backupsOf((await Plugin.list()).files.map((f) => f.name), prefix, ext);
 }
-export async function readFolderBackup(name: string): Promise<Uint8Array> {
-  const cache = `restore-${name}`;
-  await Plugin.fetch({ name, cache });
-  try {
-    const r = await Filesystem.readFile({ path: cache, directory: Directory.Cache });
-    return typeof r.data === 'string' ? base64ToBytes(r.data) : new Uint8Array(await r.data.arrayBuffer());
-  } finally { await dropCache(cache); }
-}
+export const readFolderBackup = (name: string) => fetchBytes(name, `restore-${name}`);
 
 if (nativeBackups) {
   // Leaving the app is the moment to back up: the phone may close it for good right after.

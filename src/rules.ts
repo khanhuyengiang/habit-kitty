@@ -650,9 +650,7 @@ export function hunger(cat: Cat, today: number): Hunger {
   if (cat.missed === 1) return 'hungry';
   return cat.lastFedDay === today ? 'fed' : 'peckish';
 }
-export const activeCats = (s: AppState) => s.cats.filter((c) => c.status === 'alive' || c.status === 'sitter');
 export const graveyard = (s: AppState) => s.cats.filter((c) => c.status === 'dead');
 export const runaways = (s: AppState) => s.cats.filter((c) => c.status === 'ranAway');
 export const leftForever = (s: AppState) => s.cats.filter((c) => c.status === 'leftForever');
-export const shelterCats = (s: AppState) => s.cats.filter((c) => c.status === 'shelter');
 export const leftWithSitter = (s: AppState) => s.cats.filter((c) => c.status === 'gone');

@@ -1,15 +1,14 @@
 // Auto-backup rules, pure so they can be tested: what the files are called, when a backup is due and which old ones to delete.
 // The folder itself is handled by src/shared/backupfolder.ts and the BackupFolder plugin on Android.
+import { localDateKey } from './shared/dates.ts';
 
 export const KEEP_BACKUPS = 7;                 // newest files kept per app; the rest are deleted
 export const MIN_GAP_MS = 15 * 60_000;         // after a change, wait at least this long since the last backup
 export const STALE_MS = 24 * 3_600_000;        // with no change at all, still refresh a backup this old when the app opens
 
-const two = (n: number) => String(n).padStart(2, '0');
-
 // habit-kitty-2026-11-05.kitty (the local date, so one file per day: a second backup the same day replaces it).
 export const backupName = (prefix: string, ext: string, d = new Date()) =>
-  `${prefix}-${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}.${ext}`;
+  `${prefix}-${localDateKey(d)}.${ext}`;
 
 // `last` is 0 when there has never been a backup.
 export function isDue(o: { dirty: boolean; last: number; now: number; launch?: boolean }): boolean {

@@ -41,6 +41,7 @@ import { meterHtml } from '../shared/meter.ts';
 import { hpLine } from '../player.ts';
 import { collectDiary, diaryExtras, diaryInitialised, initDiary, pageCount, restoreDiary, updateExtras } from '../diary/data.ts';
 import { esc, plural } from '../shared/html.ts';
+import { newId } from '../shared/id.ts';
 import { backButton, fancyOn, homeButton, playerButton, setFancy, setThemeMode, settingsButton, showToast, themeMode, titleBar } from '../shared/ui.ts';
 import { provideMusic } from '../shared/music.ts';
 import { compressPhoto } from '../shared/photo.ts';
@@ -146,7 +147,6 @@ const today = () => dayIndex(now());
 
 // ===================== Helpers =====================
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
-const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
 const catName = (id: string) => save.state.cats.find((c) => c.id === id)?.name ?? 'Your cat';
 const fmtDay = (day: number) =>
   dateOf(day).toLocaleDateString('en', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -2000,7 +2000,7 @@ onShown('habit', 'click', (ev) => {
     case 'release-yes': {
       const name = cat?.name ?? 'Your cat';
       closeModal();
-      act((s, at) => releaseToColony(s, id, uid(), at), `${name} joined the stray colony. Find them in ${outdoorName()}, or adopt them again.`, cat);
+      act((s, at) => releaseToColony(s, id, newId(), at), `${name} joined the stray colony. Find them in ${outdoorName()}, or adopt them again.`, cat);
       break;
     }
     case 'randomise':
@@ -2336,7 +2336,7 @@ onShown('habit', 'submit', (ev) => {
     const name = ($('adopt-name') as HTMLInputElement).value;
     const habit = ($('adopt-habit') as HTMLInputElement).value;
     const mode = (form.querySelector('input[name="mode"]:checked') as HTMLInputElement).value as CatMode;
-    const input = { id: uid(), name, mode, look: draftLook, gender: draftGender, unlimited: !!save.unlimited };
+    const input = { id: newId(), name, mode, look: draftLook, gender: draftGender, unlimited: !!save.unlimited };
     const r = adoptFrom ? habitToCat(save.state, adoptFrom, input, now()) : adoptCat(save.state, { ...input, habit }, now());
     save.state = r.state;
     logEvents(r.events);
@@ -2392,7 +2392,7 @@ onShown('habit', 'submit', (ev) => {
     if (rep === 'weekdays' && !weekdays.length) { toast('Pick at least one weekday.'); return; }
     const days = rep === 'custom' ? Number(($('task-days') as HTMLInputElement).value) : Number(rep);
     save.state = addMindfulTask(save.state, {
-      id: uid(), name: input.value, kind, nickname: ($('task-nick') as HTMLInputElement).value, xp: Number(($('task-xp') as HTMLInputElement).value) || 1, cooldownDays: days || 1, weekdays,
+      id: newId(), name: input.value, kind, nickname: ($('task-nick') as HTMLInputElement).value, xp: Number(($('task-xp') as HTMLInputElement).value) || 1, cooldownDays: days || 1, weekdays,
     }, now());
     input.value = '';
     ($('task-nick') as HTMLInputElement).value = '';

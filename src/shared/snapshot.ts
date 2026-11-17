@@ -2,10 +2,8 @@
 // share sheet on the phone, the browser's share where it can take files, else downloaded. The picture is drawn by
 // html-to-image, which copies the page's styles, fonts and pictures into it.
 import { Capacitor } from '@capacitor/core';
-import { Directory, Filesystem } from '@capacitor/filesystem';
-import { Share } from '@capacitor/share';
 import { toCanvas } from 'html-to-image';
-import { bytesToBase64 } from './backupfolder.ts';
+import { downloadBlob, shareFile } from './backupfolder.ts';
 
 const MARGIN = 16;   // CSS pixels of background around the picture
 
@@ -38,10 +36,7 @@ export async function sharePicture(el: HTMLElement, title: string): Promise<'sha
   const name = pictureName(title);
   try {
     if (Capacitor.isNativePlatform()) {
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      await Filesystem.writeFile({ path: name, data: bytesToBase64(bytes), directory: Directory.Cache });
-      const { uri } = await Filesystem.getUri({ path: name, directory: Directory.Cache });
-      await Share.share({ title, files: [uri], dialogTitle: `Share ${title}` });
+      await shareFile(name, new Uint8Array(await blob.arrayBuffer()), title, `Share ${title}`);
       return 'shared';
     }
     const file = new File([blob], name, { type: 'image/png' });
@@ -50,10 +45,6 @@ export async function sharePicture(el: HTMLElement, title: string): Promise<'sha
     if (isCancel(e)) return 'cancelled';
     throw e;
   }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+  downloadBlob(name, blob);
   return 'saved';
 }

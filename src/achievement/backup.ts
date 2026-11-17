@@ -6,12 +6,12 @@ import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import type { Data } from './model.ts';
 import { IDB_PREFIX } from './storage.ts';
 import { migrate } from './ops.ts';
+import { ACHIEVEMENT_ENTRY, ACHIEVEMENT_MAX, COMBINED_APP, isZip } from '../shared/backupformat.ts';
 
 export const BACKUP_FORMAT = 1;
 export const BACKUP_EXT = 'achkitty';
 const MAX_FILE = 8_000_000, MAX_TOTAL = 256_000_000;
 
-export const isZip = (b: Uint8Array) => b.length > 3 && b[0] === 0x50 && b[1] === 0x4b;
 export const photoFile = (ref: string) => `photos/${ref.slice(IDB_PREFIX.length)}.jpg`;
 
 export async function packBackup(d: Data, photos: Map<string, Blob>, exportedAt = Date.now()): Promise<Uint8Array> {
@@ -33,10 +33,10 @@ const looksValid = (d: any): d is Data => !!d && d.version === 1 && !!d.user && 
 export function unpackBackup(bytes: Uint8Array): { data: Data; photos: Map<string, Blob> } {
   if (!isZip(bytes)) throw new Error('not a backup');
   // A combined .kitty backup carries this app's save as one entry: use that.
-  const peek = unzipSync(bytes, { filter: (f) => (f.name === 'manifest.json' && f.originalSize < 1_000_000) || (f.name === 'achievement.achkitty' && f.originalSize < 128_000_000) });
-  if (peek['manifest.json'] && JSON.parse(strFromU8(peek['manifest.json']))?.app === 'habit-kitty') {
-    if (!peek['achievement.achkitty']) throw new Error('no achievements in this file');
-    return unpackBackup(peek['achievement.achkitty']);
+  const peek = unzipSync(bytes, { filter: (f) => (f.name === 'manifest.json' && f.originalSize < 1_000_000) || (f.name === ACHIEVEMENT_ENTRY && f.originalSize < ACHIEVEMENT_MAX) });
+  if (peek['manifest.json'] && JSON.parse(strFromU8(peek['manifest.json']))?.app === COMBINED_APP) {
+    if (!peek[ACHIEVEMENT_ENTRY]) throw new Error('no achievements in this file');
+    return unpackBackup(peek[ACHIEVEMENT_ENTRY]);
   }
   let total = 0;
   const files = unzipSync(bytes, { filter: (f) => { total += f.originalSize; return f.originalSize < MAX_FILE && total < MAX_TOTAL; } });   // refuse zip bombs

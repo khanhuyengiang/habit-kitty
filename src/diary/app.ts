@@ -7,6 +7,7 @@ import { mpLine } from '../player.ts';
 import { dayIndex } from '../rules.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { esc } from '../shared/html.ts';
+import { newId } from '../shared/id.ts';
 import { homeButton, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
 import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
 import { meterHtml } from '../shared/meter.ts';
@@ -433,7 +434,7 @@ async function submitPerson(form: HTMLFormElement) {
   const errors = personErrors(input, dateOf(today()).getUTCFullYear());
   if (!existing && people().length >= MAX_PEOPLE) errors.name = `That is the most birthdays (${MAX_PEOPLE}).`;
   if (Object.keys(errors).length) { openPerson(existing, errors, { name: f('name'), month: f('month'), day: f('day'), year: f('year'), note: f('note') }); return; }
-  const person = personFrom(input, existing?.id ?? (globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`));
+  const person = personFrom(input, existing?.id ?? newId());
   const next = existing ? people().map((p) => (p.id === id ? person : p)) : [...people(), person];
   if (!await updateExtras({ people: next })) { toast("Couldn't store that on the device. Try again."); return; }
   closeModal();

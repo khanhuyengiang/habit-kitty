@@ -1,5 +1,6 @@
 // Notes, pure so they can be tested. A note is one Markdown file; its name is its title (so Obsidian shows it the same way).
 import { esc } from '../shared/html.ts';
+import { localDateKey } from '../shared/dates.ts';
 
 export interface Note { name: string; text: string; mtime: number }   // name without ".md"
 
@@ -76,8 +77,7 @@ export const isDateText = (v: string | undefined): v is string => {
 export function noteDate(n: { text: string; mtime: number }): string {
   const d = parseNote(n.text).date;
   if (d) return d;
-  const t = new Date(n.mtime);
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  return localDateKey(n.mtime);
 }
 
 export function parseNote(text: string): ParsedNote {

@@ -3,6 +3,8 @@
 //
 // Photos are never inside these records: an `imageUrl` is a reference ("idb:<id>" for a photo kept on this device,
 // or any normal URL once a server hosts them).
+import { localDateKey } from '../shared/dates.ts';
+import { newId } from '../shared/id.ts';
 
 export const RARITIES = ['normal', 'uncommon', 'rare', 'mythical', 'legendary'] as const;
 export type Rarity = typeof RARITIES[number];
@@ -90,8 +92,7 @@ export interface Data {
   photos: AchievementPhoto[];
 }
 
-export const newId = (): string =>
-  globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+export { newId };
 
 // Colours people can pick for a side quest (they can also choose any colour). Mid tones, so an icon in this colour
 // reads on both the light and the dark page.
@@ -99,8 +100,7 @@ export const SIDE_COLORS = [
   '#f26fa3', '#f0506e', '#e8a04c', '#f2b705', '#45c27a', '#2fb8b0', '#4a9bea', '#6a6de8', '#a45be0', '#a07250',
 ];
 
-export const todayStr = (d = new Date()): string =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+export const todayStr = (d = new Date()): string => localDateKey(d);
 
 export function isValidDate(s: string): boolean {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);

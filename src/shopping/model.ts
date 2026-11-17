@@ -1,6 +1,8 @@
 // Kitty Mart's data and every rule it follows, with no screen and no storage: the shopping lists (one per supermarket),
 // the regulars (what you buy, how often, reminders), the recipes and the pantry (stuff you have). ./data.ts keeps it on
 // the device, ./app.ts draws it.
+import { localDateKey } from '../shared/dates.ts';
+import { newId } from '../shared/id.ts';
 
 // ---- categories: the user's own, each with sub-categories (used to sort the pantry), a picture and a colour ----
 // A category is known by its id everywhere. The starting ones keep the ids they always had, so older data fits them.
@@ -60,7 +62,7 @@ const DAY = 86_400_000;
 export const emptyData = (): ShopData => ({
   v: 2, lists: [], regulars: {}, recipes: [], pantry: [], cats: defaultCats(), places: {}, had: {}, dismissed: {}, opts: { sink: true, learn: true, toPantry: false, showEmpty: true },
 });
-export const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+export { newId };
 
 // ---- names ----
 export const cleanName = (s: string) => s.replace(/\s+/g, ' ').trim().slice(0, LIMITS.name);
@@ -220,7 +222,7 @@ export function resetListOrder(d: ShopData, listId: string): ShopData {
 }
 
 // ---- days ----
-export const dayKey = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+export const dayKey = (t: number) => localDateKey(t);
 export const isDay = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
 export const dayTime = (key: string) => new Date(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, Number(key.slice(8, 10))).getTime();
 export const addDays = (key: string, n: number) => { const d = new Date(dayTime(key)); d.setDate(d.getDate() + n); return dayKey(d.getTime()); };

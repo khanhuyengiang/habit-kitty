@@ -6,6 +6,7 @@ import { PICKER_ICONS, groupedPicks, iconLabel, iconSvg as uiIcon, pickable, sti
 import { monoSvg } from '../shared/pixelart.ts';
 import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
 import { esc } from '../shared/html.ts';
+import { localDateKey } from '../shared/dates.ts';
 import { compressPhoto } from '../shared/photo.ts';
 import { sharePicture } from '../shared/snapshot.ts';
 import { homeButton, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
@@ -142,8 +143,7 @@ function renderEditor() {
 }
 // What the date box shows when no date was set: the day the note was last changed (today, for a new one).
 function dateInputValue(): string {
-  const t = new Date(cur?.name ? noteOf(cur.name)?.mtime ?? Date.now() : Date.now());
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  return localDateKey(cur?.name ? noteOf(cur.name)?.mtime ?? Date.now() : Date.now());
 }
 const previewHtml = () => (cur ? cardHtml(nameOf(cur), textOf(cur), null, { preview: true }) : '');
 function coverFieldHtml(): string {

@@ -1,9 +1,8 @@
 // Month calendar / heatmap data, shared by the terminal playground and the web page.
 import type { Cat } from './rules.ts';
 
-// Day indices count local calendar days since 1970-01-01, so UTC getters recover the date.
-export const dateOf = (day: number) => new Date(day * 86_400_000);
-export const dayOf = (y: number, m: number, d: number) => Math.round(Date.UTC(y, m, d) / 86_400_000);
+import { dateOf, dayOf } from './shared/dates.ts';
+export { dateOf, dayOf };
 
 export type DayKind = 'fed' | 'missed' | 'today' | 'sitter' | 'habit' | 'none';
 
