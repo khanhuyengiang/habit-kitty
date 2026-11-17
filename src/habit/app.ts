@@ -4,12 +4,10 @@ import {
   doMindfulTask, setTaskDay, setCatDay, replay, rewind, genderOf, daysUntilReady, removeMindfulTask, setHabitSchedule, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, idHash, dayIndex, dayStartHour, setDayStart, nextReset, levelProgress, hunger, sitterCooldownLeft,
   type ActionResult, type AppState, type Cat, type CatMode, type CatGender, type CatLook, type CatTrait, type GameEvent, type MindfulTask, type Reason, type TaskKind,
 } from './rules.ts';
-import { Capacitor } from '@capacitor/core';
 import { BACKUP_EXT, BACKUP_PREFIX, backupNow, backupStatus, chooseFolder, folderBackups, markDirty, nativeBackups, onBackupStatus, readFolderBackup, refreshFolder, registerBackupSource, saveBackupToDevice, saveToDevice, shareBackup as shareBackupFile, shareFile, stopBackups } from '../shared/backupfolder.ts';
 import { achievementCount, restoreAchievement, snapshotAchievement } from '../achievement/web/snapshot.ts';
 import { PICKER_ICONS, iconLabel, stickerSvg } from '../shared/stickers.ts';
-import { LocalNotifications } from '@capacitor/local-notifications';
-import { anyReminder, catAlarmsOn, defaultReminder, planReminders, type LastCall, type ReminderSettings } from './reminders.ts';
+import type { LastCall, ReminderSettings } from './reminders.ts';
 import { allCatsDiary, catDiary, clock } from './catdiary.ts';
 import { fedMessage } from './encourage.ts';
 import { accomplishments } from './accomplishments.ts';
@@ -19,7 +17,7 @@ import CHANGELOG_MD from '../../CHANGELOG.md';
 import { pickThought, type ThoughtKind } from './thoughts.ts';
 import { isZip, packBackup, unpackBackup, type Backup } from '../backup.ts';
 import type { DiaryEntry, Mood } from '../diary/model.ts';
-import { CONFETTI_COLORS, TRAITS, notifyIconName, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
+import { CONFETTI_COLORS, TRAITS, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
 import { GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, petHeartSvg, iconSvg, markSvg, outdoorSvg, roomSvg, sceneVersion } from '../shared/art.ts';
 import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, trophyIcon, type AppName } from '../shared/apps.ts';
 import { mountDiarySettings } from '../diary/settings.ts';
@@ -42,6 +40,7 @@ import { makeLayer } from '../shared/layer.ts';
 import { readJson, writeJson } from '../shared/local.ts';
 import { pickerHtml } from '../shared/picker.ts';
 import { backButton, closeX, fancyOn, homeButton, playerButton, setFancy, setThemeMode, settingsButton, showToast, themeMode, titleBar } from '../shared/ui.ts';
+import { ensureNotifications, initReminders, queueReminderSync, reminderSettings, renderReminder, setReminderEnabled, setReminders } from './notify.ts';
 import { initWidget, openWidgetTab, queueWidget, type WidgetPhase } from './widget.ts';
 import { initSound, playSound, renderSound, syncMusic, toggleMute, useDefaultMusic, type SoundKind } from './sound.ts';
 import { firstDay, habitStreak, monthGrid, streak, weekRow, type DayKind, type Trackable } from './calendar.ts';
@@ -1220,140 +1219,8 @@ async function readSettingsFile(f: File | undefined) {
   catch (e) { err.textContent = (e as Error).message || "That isn't a settings file."; err.hidden = false; }
 }
 
-// ===================== Feeding reminders =====================
-const NATIVE = Capacitor.isNativePlatform();
-type Perm = 'granted' | 'denied' | 'prompt' | 'unsupported';
-const reminderSettings = (): ReminderSettings => save.reminder ?? defaultReminder();
-let reminderInfo: { perm: Perm; next: Date | null; error?: boolean } = { perm: 'prompt', next: null };
-
-async function notifPermission(ask: boolean): Promise<Perm> {
-  try {
-    if (NATIVE) {
-      const r = await (ask ? LocalNotifications.requestPermissions() : LocalNotifications.checkPermissions());
-      return r.display === 'granted' ? 'granted' : r.display === 'denied' ? 'denied' : 'prompt';
-    }
-    if (typeof Notification === 'undefined') return 'unsupported';
-    const p = ask && Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission;
-    return p === 'granted' ? 'granted' : p === 'denied' ? 'denied' : 'prompt';
-  } catch { return 'unsupported'; }
-}
-
-// The notification shows the kitty it is about, in its own fur and in the mood the reminder describes.
-function notifyLargeIcon(p: { catId?: string; face: Face }): { largeIcon?: string } {
-  const c = save.state.cats.find((k) => k.id === p.catId);
-  return c ? { largeIcon: notifyIconName(lookFor(c), p.face) } : {};
-}
-
-let webTimer = 0;
-let planSig = '';   // what is currently scheduled; an unchanged plan needs no native calls
-let syncing: Promise<void> = Promise.resolve();
-let syncDebounce = 0;
-const queueReminderSync = () => {
-  clearTimeout(syncDebounce);
-  syncDebounce = window.setTimeout(() => { syncing = syncing.then(syncReminders); }, 400);
-};
-
-// Rebuilds every pending reminder from the current state. Each reminder has one id per date, so running
-// this any number of times never leaves duplicates. Called after every change and every time the app opens.
-async function syncReminders() {
-  const r = reminderSettings();
-  try {
-    const perm = await notifPermission(false);
-    const on = anyReminder(r) && perm === 'granted';
-    const { plan, picks } = on ? planReminders(save.state, r, now()) : { plan: [], picks: {} as Record<string, string> };
-    // The playtest clock shifts game time away from real time; notifications fire in real time.
-    const real = plan.map((p) => ({ ...p, at: new Date(p.at.getTime() - save.offsetHours * 3_600_000) }));
-    const sig = JSON.stringify(real.map((p) => [p.id, p.at.getTime(), p.body, p.catId, p.face, notifyLargeIcon(p).largeIcon]));
-    reminderInfo = { perm, next: real[0]?.at ?? null };
-    if (sig === planSig) { renderReminder(); return; }
-    clearTimeout(webTimer);
-    if (NATIVE) {
-      const pending = await LocalNotifications.getPending();
-      if (pending.notifications.length) await LocalNotifications.cancel({ notifications: pending.notifications.map((n) => ({ id: n.id })) });
-    }
-    if (on) {
-      if (JSON.stringify(picks) !== JSON.stringify(r.picks ?? {})) {
-        save.reminder = { ...r, picks };
-        writeJson(KEY, gameOnly());
-      }
-      if (NATIVE) {
-        if (real.length) await LocalNotifications.schedule({ notifications: real.map((p) => ({
-          id: p.id, title: p.title, body: p.body, schedule: { at: p.at, allowWhileIdle: true }, smallIcon: 'ic_stat_notify',
-          ...notifyLargeIcon(p),
-        })) });
-      } else if (real[0]) {
-        // The web page can only remind you while it is open.
-        const first = real[0];
-        webTimer = window.setTimeout(() => {
-          if (save.reminder?.lastFired === first.id) return;   // already shown for this date
-          try { new Notification(first.title, { body: first.body }); } catch { /* ignore */ }
-          save.reminder = { ...reminderSettings(), lastFired: first.id };
-          persist();
-        }, Math.min(2_000_000_000, Math.max(0, first.at.getTime() - Date.now())));
-      }
-    }
-    planSig = sig;
-  } catch { planSig = ''; reminderInfo = { ...reminderInfo, error: true }; }
-  renderReminder();
-}
-
-const hhmm = (a: { hour: number; minute: number }) => `${String(a.hour).padStart(2, '0')}:${String(a.minute).padStart(2, '0')}`;
-
-function renderReminder() {
-  const r = reminderSettings();
-  ($('reminder-on') as HTMLInputElement).checked = r.enabled;
-  ($('reminder-time') as HTMLInputElement).value = hhmm(r);
-  ($('reminder-time') as HTMLInputElement).disabled = !r.enabled;
-  ($('last-call') as HTMLSelectElement).value = r.lastCall ?? 'off';
-  const home = save.state.cats.filter((c) => c.status === 'alive');
-  const alarmsOn = catAlarmsOn(r);
-  ($('cat-alarms-on') as HTMLInputElement).checked = alarmsOn;
-  $('cat-alarms-fold').hidden = !alarmsOn;
-  const set = home.filter((c) => r.catAlarms?.[c.id]).length;
-  $('cat-alarms-sum').textContent = home.length ? `Kitty alarms (${set} of ${home.length} set)` : 'Kitty alarms';
-  $('cat-alarms').innerHTML = home.length ? home.map((c) => {
-    const a = r.catAlarms?.[c.id];
-    return `<li><span class="nm">${esc(c.name)}</span><span class="when"><input type="time" data-cat-alarm="${c.id}" value="${a ? hhmm(a) : ''}" aria-label="Feeding alarm for ${esc(c.name)}">
-      <button class="btn small" type="button" data-action="cat-alarm-clear" data-id="${c.id}" ${a ? '' : 'disabled'} aria-label="Remove alarm for ${esc(c.name)}">${iconSvg('x')}</button></span></li>`;
-  }).join('') : '<li class="muted">No kitties at home.</li>';
-  const { perm, next, error } = reminderInfo;
-  const el = $('reminder-status');
-  const on = anyReminder(r);
-  let text = 'Off. Turn on the daily reminder, last-call alerts, or give a kitty its own alarm.';
-  let bad = false;
-  if (perm === 'unsupported') { text = "Notifications aren't available here."; bad = true; }
-  else if (on && perm !== 'granted') {
-    text = "Reminders are on, but notifications are blocked. Allow them for Habit Kitty in your phone's settings (Apps → Habit Kitty → Notifications), then reopen the app."; bad = true;
-  } else if (error) { text = "Couldn't schedule reminders. Try again in a moment."; bad = true; }
-  else if (on) {
-    const when = next?.toLocaleString('en', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
-    text = (next ? `On. Next reminder: ${when} (your local time).` : 'On. Add a kitty and reminders start.') +
-      (NATIVE ? '' : ' In a browser it only works while this page is open.');
-  } else if (perm === 'denied') { text = "Off. Notifications are blocked for Habit Kitty, so you'll be asked to allow them in your phone's settings."; }
-  el.textContent = text;
-  el.classList.toggle('bad', bad);
-}
-
-// Asks for notification permission when something is being switched on. Says why when it can't have it.
-async function ensureNotifications(): Promise<boolean> {
-  const perm = await notifPermission(true);
-  reminderInfo = { ...reminderInfo, perm };
-  if (perm === 'granted') return true;
-  toast(perm === 'denied' ? 'Notifications are blocked. Allow them in your phone settings first.' : "Notifications aren't available here.");
-  return false;
-}
-
-function setReminders(next: Partial<ReminderSettings>) {
-  save.reminder = { ...reminderSettings(), ...next };
-  persist(); renderReminder();
-}
-
-async function setReminderEnabled(on: boolean) {
-  if (on && !await ensureNotifications()) { setReminders({ enabled: false }); return; }
-  const r = reminderSettings();
-  setReminders({ enabled: on });
-  toast(on ? `Reminders on, every day at ${hhmm(r)}.` : 'Reminders off.');
-}
+// ===================== Feeding reminders (./notify.ts) =====================
+initReminders({ save: () => save, now, persist, storeQuietly: () => writeJson(KEY, gameOnly()), toast });
 
 // ===================== Tabs & modal =====================
 const TABS = ['room', 'mindful', 'today', 'heat', 'settings'];
