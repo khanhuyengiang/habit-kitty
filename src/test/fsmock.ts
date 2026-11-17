@@ -1,7 +1,7 @@
 // An in-memory stand-in for Capacitor's Filesystem, for tests: files keyed by path (with a modified time), folders implied
 // by the paths. In a test file:
-//   vi.mock('@capacitor/filesystem', async () => (await import('../test/fsmock.ts')).fsModule);
-//   const { fs, put, text } = await import('../test/fsmock.ts');
+//   vi.mock('@capacitor/filesystem', async () => (await import('./fsmock.ts')).fsModule);
+//   const { fs, put, text } = await import('./fsmock.ts');
 export interface MemFile { data: Buffer; mtime: number }
 export const fs = new Map<string, MemFile>();
 let clock = 1000;

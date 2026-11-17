@@ -3,8 +3,8 @@
 //
 // Each scene is drawn once in its daytime colours; dusk and night lay a see-through wash over it (see WASH), so a new object
 // never needs three colourings. The sky, the stars and the glow of lamps and fireflies are drawn per time of day.
-import { PAL } from './shared/pixelart.ts';
-import { PALETTE } from './shared/palette.ts';
+import { PAL } from './pixelart.ts';
+import { PALETTE } from './palette.ts';
 
 export const ROOM_W = 240, ROOM_H = 320;
 export type Phase = 'day' | 'dusk' | 'night';

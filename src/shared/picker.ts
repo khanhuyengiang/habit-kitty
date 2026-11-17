@@ -1,6 +1,6 @@
 // The month and year picker (Habit Kitty's heatmaps, the diary's calendar): a grid of months, or of years, in a small
 // dialog (./layer.ts). Months count as y * 12 + m (m 0-based); no month after `cur`, nor before `first`, can be picked.
-import { iconSvg } from '../pixelart.ts';
+import { iconSvg } from './art.ts';
 import { closeX } from './ui.ts';
 
 export const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => new Date(Date.UTC(2000, i, 1)).toLocaleString('en', { month: 'short', timeZone: 'UTC' }));

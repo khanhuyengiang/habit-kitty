@@ -1,8 +1,8 @@
 // The Notes screen: the notes as little window cards, two to a row, with a search box. A card opens the note to read;
 // Edit turns it into the form (title, the card's picture, the text), which saves as you type.
 // The data is in ./data.ts (Habit Kitty starts it), the pure parts in ./model.ts. Drawn with Habit Kitty's stylesheet, in web/notes.html.
-import { iconSvg } from '../pixelart.ts';
-import { PICKER_ICONS, groupedPicks, iconLabel, iconSvg as uiIcon, pickable, stickerSvg } from '../achievement/pixelart.ts';
+import { iconSvg } from '../shared/art.ts';
+import { PICKER_ICONS, groupedPicks, iconLabel, uiIconSvg, pickable, stickerSvg } from '../shared/stickers.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
 import { $, esc } from '../shared/html.ts';
@@ -107,7 +107,7 @@ function renderRead() {
       <span class="grow"></span>
       <button class="btn small" type="button" data-action="note-copy">Copy</button>
       <button class="btn small" type="button" data-action="note-share">Share</button>
-      <button class="btn small primary" type="button" data-action="note-edit">${uiIcon('pencil')} Edit</button>
+      <button class="btn small primary" type="button" data-action="note-edit">${uiIconSvg('pencil')} Edit</button>
       <button class="btn small" type="button" data-action="note-delete" ${cur.name === null ? 'disabled' : ''}>Delete</button></div>
     <article class="nwin nread" style="${tint(cur.color)}">${winBar(nameOf(cur), cur.face)}<div class="nwin-screen">${decoHtml(cur.doodle)}${coverHtml(c)}
       <div class="md">${renderMarkdown(cur.body) || (c ? '' : '<p class="muted">Nothing written yet. Tap Edit.</p>')}</div>
@@ -160,7 +160,7 @@ function iconFold(id: string, name: string, sel: string, open: boolean, none: bo
   if (!(none && sel === 'none')) sel = pickable(sel);
   const label = sel === 'none' ? 'None' : iconLabel(sel);
   const pick = (n: string, text: string, art: string) => `<label title="${text}"><input type="radio" name="${name}" value="${n}" ${n === sel ? 'checked' : ''} aria-label="${text}"><span>${art}</span></label>`;
-  return `<details class="icon-fold" id="${id}" ${open ? 'open' : ''}><summary class="fold-sum" aria-label="${esc(label)}. Change">${sel === 'none' ? '' : stickerSvg(sel, 1)}<span class="fold-name">${esc(label)}</span><span class="fold-chev">${uiIcon('chev')}</span></summary>
+  return `<details class="icon-fold" id="${id}" ${open ? 'open' : ''}><summary class="fold-sum" aria-label="${esc(label)}. Change">${sel === 'none' ? '' : stickerSvg(sel, 1)}<span class="fold-name">${esc(label)}</span><span class="fold-chev">${uiIconSvg('chev')}</span></summary>
     <div class="icon-pick">${none ? pick('none', 'None', 'None') : ''}${groupedPicks((n) => pick(n, PICKER_ICONS[n].label, stickerSvg(n, 1)))}</div></details>`;
 }
 const doodleFieldHtml = () => (cur ? iconFold('note-doodle-fold', 'note-doodle', cur.doodle, cur.doodleOpen, true) : '');

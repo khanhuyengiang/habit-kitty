@@ -2,7 +2,7 @@
 // The data lives in ./data.ts (Habit Kitty starts it); the pure parts are in ../store.ts and ./people.ts.
 // Drawn with Habit Kitty's stylesheet, in web/diary.html's root.
 import { dateOf, dayOf } from '../calendar.ts';
-import { WEATHER, iconSvg, weatherLabel, weatherSvg } from '../pixelart.ts';
+import { WEATHER, iconSvg, weatherLabel, weatherSvg } from '../shared/art.ts';
 import { mpLine } from '../player.ts';
 import { dayIndex } from '../rules.ts';
 import { monoSvg } from '../shared/pixelart.ts';
@@ -14,7 +14,7 @@ import { closeX, homeButton, playerButton, settingsButton, showToast, titleBar }
 import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
 import { meterHtml } from '../shared/meter.ts';
 import { compressPhoto } from '../shared/photo.ts';
-import { groupedPicks, iconLabel, iconSvg as uiIcon, pickable, stickerSvg, PICKER_ICONS } from '../achievement/pixelart.ts';
+import { groupedPicks, iconLabel, uiIconSvg, pickable, stickerSvg, PICKER_ICONS } from '../shared/stickers.ts';
 import { habitStats } from '../shared/stats.ts';
 import { allNotes, noteOf } from '../notes/data.ts';
 import { noteDate, parseNote } from '../notes/model.ts';
@@ -226,7 +226,7 @@ function drawDraftPhoto() {
 function iconFieldHtml(): string {
   if (!draft) return '';
   const sel = draft.icon;
-  return `<details class="icon-fold" id="diary-icon-fold" ${draft.iconOpen ? 'open' : ''}><summary class="fold-sum" aria-label="${esc(iconLabel(sel))}. Change">${stickerSvg(sel, 1)}<span class="fold-name">${esc(iconLabel(sel))}</span><span class="fold-chev">${uiIcon('chev')}</span></summary>
+  return `<details class="icon-fold" id="diary-icon-fold" ${draft.iconOpen ? 'open' : ''}><summary class="fold-sum" aria-label="${esc(iconLabel(sel))}. Change">${stickerSvg(sel, 1)}<span class="fold-name">${esc(iconLabel(sel))}</span><span class="fold-chev">${uiIconSvg('chev')}</span></summary>
     <div class="icon-pick">${groupedPicks((n) => `<label title="${esc(PICKER_ICONS[n].label)}"><input type="radio" name="diary-icon" value="${n}" ${n === sel ? 'checked' : ''} aria-label="${esc(PICKER_ICONS[n].label)}"><span>${stickerSvg(n, 1)}</span></label>`)}</div></details>
     ${draft.photos.length || entryOf(draft.day)?.photo ? '<p class="muted">Saving with an icon removes this page\'s photos.</p>' : ''}`;
 }

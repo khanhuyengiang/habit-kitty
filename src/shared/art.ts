@@ -1,8 +1,8 @@
-// Habit Kitty's pictures: icons, weather, the heart and the room, drawn on the shared grid (shared/pixelart.ts).
+// The app's button icons, weather, calendar marks, decorations, Habit Kitty's heart and the scenes (./scene.ts), drawn on the shared grid (./pixelart.ts).
 // Pure functions that return SVG strings.
-import { artSvg, monoSvg } from './shared/pixelart.ts';
-import { fineSvg } from './achievement/pixelart.ts';
-export { PAL, artSvg } from './shared/pixelart.ts';
+import { artSvg, monoSvg } from './pixelart.ts';
+import { fineSvg } from './stickers.ts';
+export { PAL, artSvg } from './pixelart.ts';
 
 // The official button icons; ICONS below has Kitty Gallery's changes put over them (src/pixel/live.ts).
 export const OFFICIAL_ICONS: Readonly<Record<string, string[]>> = {
@@ -52,7 +52,7 @@ export const ICONS: Record<string, string[]> = { ...OFFICIAL_ICONS };
 
 export const iconSvg = (name: string, cls = '') => monoSvg(ICONS[name], cls);
 
-// ---- weather, for the Meteorokinesis diary option (13 x 10, Kitty Gallery's letters: see FINE in achievement/pixelart.ts) ----
+// ---- weather, for the Meteorokinesis diary option (13 x 10, Kitty Gallery's letters: see FINE in ./stickers.ts) ----
 // The official weather, in the diary's order; WEATHER has Kitty Gallery's changes and new weather put over it (src/pixel/live.ts).
 export const OFFICIAL_WEATHER: Readonly<Record<string, { label: string; art: string[] }>> = {
   sunny: { label: 'Sunny', art: ['......y......', '.y....y....y.', '..y.@@@@@.y..', '....@yyy@....', '.y.@yyyyy@.y.', 'yyy@yyyyy@yyy', '.y.@yyyyy@.y.', '....@yyy@....', '..y.@@@@@.y..', '......y......'] },
@@ -70,7 +70,7 @@ export const weatherLabel = (k: string) => WEATHER[k]?.label ?? k.charAt(0).toUp
 
 // ---- the petting heart ----
 const HEART_ART = ['.oo..oo.', 'orroorro', 'orwrrrro', 'orrrrrro', '.orrrro.', '..orro..', '...oo...'];
-export const heartSvg = () => artSvg(HEART_ART, 'heart-art', { o: '#c23f7c', r: '#ff7d9f', w: '#ffe3ee' });
+export const petHeartSvg = () => artSvg(HEART_ART, 'heart-art', { o: '#c23f7c', r: '#ff7d9f', w: '#ffe3ee' });
 
 // ---- the little symbol at the end of a thought bubble ----
 export const MARKS: Record<string, string[]> = {
@@ -82,7 +82,7 @@ export const MARKS: Record<string, string[]> = {
 export const markSvg = (name: string) => artSvg(MARKS[name], 'mark');
 
 // ---- the diary book and the trophy ----
-// (Cat food is any sticker the kitties can eat: PICKER_ICONS with food: true, in achievement/icons.ts.)
+// (Cat food is any sticker the kitties can eat: PICKER_ICONS with food: true, in ./sticker-icons.ts.)
 
 // Decorations: the official pictures that are drawn in one place only. DECOS has Kitty Gallery's changes put over them.
 // The wing beside the chosen app on the home screen (after inspo/menu.jpg): the tip up and out, three tiers of feathers

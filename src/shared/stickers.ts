@@ -1,11 +1,11 @@
-import { faceSvg } from '../shared/pixelcat.ts';
-import { monoSvg } from '../shared/pixelart.ts';
-import { PALETTE, type PaletteName } from '../shared/palette.ts';
+import { faceSvg } from './pixelcat.ts';
+import { monoSvg, runPaths } from './pixelart.ts';
+import { PALETTE, type PaletteName } from './palette.ts';
 
-// Kitty Achievement's pictures, drawn on the shared grid (shared/pixelart.ts). Pure functions that return SVG strings.
+// The stickers (the icons on achievements, notes, diary pages, Kitty Mart...), the interface icons and Kitty Achievement's card pictures, drawn on the shared grid (./pixelart.ts). Pure functions that return SVG strings.
 
-export { OFFICIAL_PICKER_ICONS, PICKER_ICONS, PICKER_ICON_NAMES, PICKER_ICON_GROUPS, refreshPickerOrder } from './icons.ts';
-import { PICKER_ICONS, PICKER_ICON_GROUPS } from './icons.ts';
+export { OFFICIAL_PICKER_ICONS, PICKER_ICONS, PICKER_ICON_NAMES, PICKER_ICON_GROUPS, refreshPickerOrder } from './sticker-icons.ts';
+import { PICKER_ICONS, PICKER_ICON_GROUPS } from './sticker-icons.ts';
 
 // A picker's choices with a heading over each group (the heading spans the picker's grid or row), so a long list is easy to look through.
 export const groupedPicks = (pick: (name: string) => string): string => PICKER_ICON_GROUPS.map(([g, names]) =>
@@ -35,7 +35,7 @@ export const pickable = (name: string) => (hasIcon(name) ? name : 'heart');
 export const iconLabel = (name: string) => PICKER_ICONS[pickable(name)]?.label ?? 'Heart';
 
 // An interface icon in the text colour; an achievement icon is drawn as a sticker on the fine grid instead.
-export function iconSvg(name: string, cls = ''): string {
+export function uiIconSvg(name: string, cls = ''): string {
   if (!UI_ICONS[name]) return stickerSvg(name, 1, `ico ${cls}`);
   return monoSvg(UI_ICONS[name], cls);
 }
@@ -81,18 +81,7 @@ function litShaded(pairs: Record<string, string>, base: Record<string, string>):
 // Rows of letters to one path per colour (runs merged), so a picture is a handful of elements however dense it is.
 export function fineSvg(art: string[], cls = ''): string {
   const w = Math.max(...art.map((r) => r.length));
-  const paths: Record<string, string> = {};
-  art.forEach((row, y) => {
-    for (let x = 0; x < row.length; x++) {
-      const ch = row[x];
-      if (!FINE[ch]) continue;
-      let n = 1;
-      while (row[x + n] === ch) n++;
-      paths[ch] = (paths[ch] ?? '') + `M${x} ${y}h${n}v1h-${n}z`;
-      x += n - 1;
-    }
-  });
-  const body = Object.entries(paths).map(([ch, d]) => `<path style="fill:${FINE[ch]}" d="${d}"/>`).join('');
+  const body = Object.entries(runPaths(art, (ch) => !!FINE[ch])).map(([ch, d]) => `<path style="fill:${FINE[ch]}" d="${d}"/>`).join('');
   return `<svg class="pxs fine ${cls}" style="--w:${w};--h:${art.length}" viewBox="0 0 ${w} ${art.length}" aria-hidden="true" shape-rendering="crispEdges">${body}</svg>`;
 }
 
@@ -212,7 +201,7 @@ export const OFFICIAL_CARD_FRIENDS: Readonly<Record<string, { label: string; art
   flower: { label: 'Flower', art: ['...ooo...', '..orrro..', '.oorrroo.', 'orrooorro', 'orroyorro', 'orrooorro', '.oorrroo.', '..orrro..', '...ooo...'] },
 };
 export const CARD_FRIENDS: Record<string, { label: string; art: string[] }> = { ...OFFICIAL_CARD_FRIENDS };
-export const heartSvg = () => fineSvg(CARD_FRIENDS.heart.art);
+export const cardHeartSvg = () => fineSvg(CARD_FRIENDS.heart.art);
 export const flowerSvg = () => fineSvg(CARD_FRIENDS.flower.art);
 
 // The default avatar: a Habit Kitty face.

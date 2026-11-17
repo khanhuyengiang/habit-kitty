@@ -8,8 +8,8 @@
 //   Colours  every colour of the app's palette (src/shared/palette.ts), and which letter draws it
 // The rules and the export file are in ./model.ts, kept on the device by ./data.ts. Drawn with Habit Kitty's stylesheet and
 // its own, in web/pixel.html.
-import { FINE, UI_ICONS, bakeSticker, fineSvg, stickerArtSvg } from '../achievement/pixelart.ts';
-import { iconSvg } from '../pixelart.ts';
+import { FINE, UI_ICONS, bakeSticker, fineSvg, stickerArtSvg } from '../shared/stickers.ts';
+import { iconSvg } from '../shared/art.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { onAppShown, onShown } from '../shared/apps.ts';
 import { $, esc, plural } from '../shared/html.ts';
@@ -23,7 +23,7 @@ import { COLOR } from '../notes/window.ts';
 import type { NoteColor } from '../notes/model.ts';
 import { initPixel, pixelData, pixelReady, setPixelData } from './data.ts';
 import { scenePng } from './live.ts';
-import { BOOK_ART, TROPHY_ART, ROOM_H, ROOM_W, type Spot } from '../scene.ts';
+import { BOOK_ART, TROPHY_ART, ROOM_H, ROOM_W, type Spot } from '../shared/scene.ts';
 import { PAL, artSvg } from '../shared/pixelart.ts';
 import { FURS, bodySvg } from '../shared/pixelcat.ts';
 import {

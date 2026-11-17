@@ -1,4 +1,4 @@
-// The icons people can put on an achievement or a side quest, drawn at 18×18 on the fine grid (see pixelart.ts).
+// The icons people can put on an achievement or a side quest, drawn at 18×18 on the fine grid (see fineSvg in ./stickers.ts).
 // Letters: s the side-quest colour (lit and shaded at the edges for you; l and d paint it lit or shaded by hand), o a dark line, w white, y/Y yellow/gold,
 // r pink, R red, g/G green, b/B blue, n/N brown, k/K grey, c cream, v lavender, f peach, x lime; each note colour lit/shaded:
 // p/P pink, a/A lavender, i/I sky, m/M mint, j/J sun, u/U peach, z/Z lime; '.' is empty. The dark outline is part of the

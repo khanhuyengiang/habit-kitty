@@ -7,7 +7,7 @@ import {
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { BACKUP_EXT, BACKUP_PREFIX, backupNow, backupStatus, chooseFolder, folderBackups, markDirty, nativeBackups, onBackupStatus, readFolderBackup, refreshFolder, registerBackupSource, saveBackupToDevice, saveToDevice, shareBackup as shareBackupFile, shareFile, stopBackups } from '../shared/backupfolder.ts';
 import { achievementCount, restoreAchievement, snapshotAchievement } from '../achievement/web/snapshot.ts';
-import { PICKER_ICONS, iconLabel, stickerSvg } from '../achievement/pixelart.ts';
+import { PICKER_ICONS, iconLabel, stickerSvg } from '../shared/stickers.ts';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { anyReminder, catAlarmsOn, defaultReminder, planReminders, type LastCall, type ReminderSettings } from '../reminders.ts';
@@ -21,7 +21,7 @@ import { pickThought, type ThoughtKind } from '../thoughts.ts';
 import { isZip, packBackup, unpackBackup, type Backup } from '../store.ts';
 import type { DiaryEntry, Mood } from '../diary/model.ts';
 import { CONFETTI_COLORS, TRAITS, notifyIconName, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
-import { GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, heartSvg, iconSvg, markSvg, outdoorSvg, roomSvg, sceneVersion } from '../pixelart.ts';
+import { GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, petHeartSvg, iconSvg, markSvg, outdoorSvg, roomSvg, sceneVersion } from '../shared/art.ts';
 import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, trophyIcon, type AppName } from '../shared/apps.ts';
 import { mountDiarySettings } from '../diary/settings.ts';
 import { collectNotes, initNotes, restoreNotes } from '../notes/data.ts';
@@ -253,7 +253,7 @@ const lookFor = lookOf;
 const hash = idHash;
 
 // Pixel heart for petting.
-const HEART = heartSvg();
+const HEART = petHeartSvg();
 
 document.documentElement.style.setProperty('--face-w', String(FACE_W));   // the cat card's picture column follows the art
 

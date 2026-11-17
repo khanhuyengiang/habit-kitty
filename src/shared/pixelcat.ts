@@ -3,6 +3,7 @@
 // LEFT half and mirrored, so every coat is the same shape recoloured. Pure functions that return SVG.
 import { COAT_MINI, COAT_NAP, COAT_SIT } from './coats.ts';
 import { toPalette } from './palette.ts';
+import { cellRects, rect } from './pixelart.ts';
 
 export type CatPattern = 'plain' | 'stripes' | 'patch' | 'mask' | 'calico' | 'point';
 export type CatTrait = 'playful' | 'curious' | 'cuddly' | 'lazy' | 'shy' | 'grumpy';
@@ -217,7 +218,7 @@ function colors(look: CatLook, coat: Coat, dead: boolean): Record<string, string
 type Grid = string[][];
 const mirror = (half: string[]): Grid => half.map((row) => { const r = [...row.padEnd(HALF_W, '.')]; return [...r, ...r.slice(0, -1).reverse()]; });
 
-// Lay a coat layer (rows of slot letters, from src/coats.ts) over a grid: a letter repaints fur, shade and white cells.
+// Lay a coat layer (rows of slot letters, from ./coats.ts) over a grid: a letter repaints fur, shade and white cells.
 function applyLayer(grid: Grid, layer: string[] | undefined, over = 'fsW', maxRow = Infinity) {
   layer?.forEach((row, y) => {
     if (y >= maxRow) return;
@@ -249,13 +250,7 @@ function build(face: Face, look: CatLook, sitting: boolean): { grid: Grid; coat:
   return { grid, coat, blink };
 }
 
-const rect = (x: number, y: number, fill: string) => `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${fill}"/>`;
-
-function draw(grid: Grid, pal: Record<string, string>): string {
-  let out = '';
-  grid.forEach((row, y) => row.forEach((ch, x) => { if (pal[ch]) out += rect(x, y, pal[ch]); }));
-  return out;
-}
+const draw = cellRects;
 
 // The round face on its own (cards, moods, thought bubbles, previews).
 export function faceSvg(face: Face, look: CatLook, faded = false): string {
@@ -277,7 +272,7 @@ export function bodySvg(face: Face, look: CatLook, seed = 0): string {
 
 // ---- the curled-up napping cat (any size): head tucked on its paws, tail wrapped round the front ----
 // EDIT ME: one character per pixel, rows should be the same width. `npm run preview` shows the change as you save.
-//   o outline   f main colour   s belly shade   W paws, muzzle  (patches and stripes live in src/coats.ts)
+//   o outline   f main colour   s belly shade   W paws, muzzle  (patches and stripes live in ./coats.ts)
 //   T, D tail (light, dark stripe)   p ear pink   e closed eye   n nose   c blush   . empty
 export const NAP = [
   '.....................o...............',

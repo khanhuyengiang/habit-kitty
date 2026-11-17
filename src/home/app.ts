@@ -3,9 +3,9 @@
 // (see ../player.ts). Moving between screens is the shell's job (src/web/shell.ts): the menu buttons are data-action="go".
 import { PLAYER_GENDERS, PLAYER_GENDER_LABEL, type Data, type PlayerGender } from '../achievement/model.ts';
 import { LIMITS, ageOf, levelOf, titleFor } from '../achievement/ops.ts';
-import { avatarSvg } from '../achievement/pixelart.ts';
-import { DECOS, iconSvg } from '../pixelart.ts';
-import { fineSvg } from '../achievement/pixelart.ts';
+import { avatarSvg } from '../shared/stickers.ts';
+import { DECOS, iconSvg } from '../shared/art.ts';
+import { fineSvg } from '../shared/stickers.ts';
 import { hpLine, lvLine, mpLine, shortId } from '../player.ts';
 import { meterHtml } from '../shared/meter.ts';
 import { lastApp, onAppShown } from '../shared/apps.ts';

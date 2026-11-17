@@ -6,7 +6,7 @@ import { dateOf, dayOf, two } from '../shared/dates.ts';
 export const MOOD_KEYS = ['joyful', 'calm', 'tired', 'sad', 'stressed'] as const;
 export type Mood = typeof MOOD_KEYS[number];
 // One diary page per day, keyed by day index. `photo` says whether photos/<date>.jpg exists.
-// A weather is the id of one in WEATHER (src/pixelart.ts): the official ones, or one drawn in Kitty Gallery.
+// A weather is the id of one in WEATHER (src/shared/art.ts): the official ones, or one drawn in Kitty Gallery.
 export type Weather = string;
 const WEATHER_ID = /^[a-z][a-z0-9]{0,31}$/i;
 // `mood2` is an optional second emotion (the kitty is drawn half and half); `feeling` is the user's own word for it and

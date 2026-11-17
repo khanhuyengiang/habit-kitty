@@ -2,10 +2,10 @@
 // lists (stickers, some of them cat food, card friends, button icons, the diary's weather) and the scenes (the cosy room and the garden), so every app draws and offers them as if they had always been in the code.
 // It starts from the official icons each time, so an icon you delete is gone again (a changed official one is back as it
 // was), and an official sticker or weather you deleted is taken out; anything still holding a deleted sticker's name is
-// drawn as a heart (see pickable in achievement/pixelart.ts), and a deleted weather is no longer drawn.
-import { CARD_FRIENDS, OFFICIAL_CARD_FRIENDS, OFFICIAL_PICKER_ICONS, OFFICIAL_UI_ICONS, PICKER_ICONS, UI_ICONS, refreshPickerOrder } from '../achievement/pixelart.ts';
-import { DECOS, ICONS, OFFICIAL_DECOS, OFFICIAL_ICONS, OFFICIAL_WEATHER, WEATHER } from '../pixelart.ts';
-import { useScene, type SceneId } from '../scene.ts';
+// drawn as a heart (see pickable in shared/stickers.ts), and a deleted weather is no longer drawn.
+import { CARD_FRIENDS, OFFICIAL_CARD_FRIENDS, OFFICIAL_PICKER_ICONS, OFFICIAL_UI_ICONS, PICKER_ICONS, UI_ICONS, refreshPickerOrder } from '../shared/stickers.ts';
+import { DECOS, ICONS, OFFICIAL_DECOS, OFFICIAL_ICONS, OFFICIAL_WEATHER, WEATHER } from '../shared/art.ts';
+import { useScene, type SceneId } from '../shared/scene.ts';
 import { DEFAULT_GROUP, SCENES, iconsOf, sceneColors, type PixelData } from './model.ts';
 
 const reset = <T>(live: Record<string, T>, official: Readonly<Record<string, T>>) => {

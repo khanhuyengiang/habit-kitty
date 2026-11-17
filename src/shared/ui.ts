@@ -1,6 +1,6 @@
 // The parts every screen draws the same way: the title bar with its square buttons, the look (light or dark, fancy background), and the toast.
-import { iconSvg } from '../pixelart.ts';
-import { UI_ICONS } from '../achievement/pixelart.ts';
+import { iconSvg } from './art.ts';
+import { UI_ICONS } from './stickers.ts';
 import { monoSvg } from './pixelart.ts';
 import { esc } from './html.ts';
 import { getLocal, setLocal } from './local.ts';

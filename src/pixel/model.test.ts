@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { PICKER_ICONS, PICKER_ICON_NAMES } from '../achievement/icons.ts';
+import { PICKER_ICONS, PICKER_ICON_NAMES } from '../shared/sticker-icons.ts';
 import {
   BASE_ROWS, INK_ROWS, MORE_INKS, byHue, categoryOf, paletteLabel,
   CATEGORIES, DEFAULT_GROUP, EXPORT_FORMAT, LETTERS, USER_GROUP, blankGrid, cleanArt, dropIcon, emptyData, exportText, floodFill,
   borderAll, oldStickers, byName, canDeleteOfficial, deleteOfficial, liveIcons, restoreIcon, countMine, dropCount, dropFloat, dropIcons, groupsOf, setFood, resetIcons, iconsOf, importClashes, importIcons, nameTaken, uniqueNames, inRect, liftArea, linePoints, moveIcons, rectOf, newId, officials, putIcon, readExport, renameGroup, sanitize, shiftGrid, sizeOf, toArt, toGrid,
 } from './model.ts';
 import { PALETTE, type PaletteName } from '../shared/palette.ts';
-import { FINE } from '../achievement/pixelart.ts';
+import { FINE } from '../shared/stickers.ts';
 
 const blank18 = () => Array.from({ length: 18 }, () => '.'.repeat(18));
 const teapot = () => { const a = blank18(); a[8] = '.....ssssssss.....'; return a; };

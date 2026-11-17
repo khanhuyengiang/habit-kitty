@@ -1,17 +1,17 @@
 // Kitty Gallery, pure so it can be tested: the kinds of picture you can draw, the official ones that ship with the app,
 // your own drawings and changes, their groups, and the export file.
 //
-// An icon is rows of letters, like the art in the code (see src/achievement/icons.ts). Each category has a fixed size
+// An icon is rows of letters, like the art in the code (see src/shared/sticker-icons.ts). Each category has a fixed size
 // and its own letters. In a sticker or a card friend, `s` is the BASE COLOUR: it is not one colour but whatever colour
 // the card, note or category it sits on has (that is why the heart turns from pink to blue with its note).
 //
 // What you draw is used everywhere in the app straight away (see ./live.ts), as if it were official. The backup and the
 // settings file carry it to another phone; to make it official, Export writes a file (the format is below) to put in the
 // repo, and its icons are then copied into the code by hand.
-import { OFFICIAL_CARD_FRIENDS, OFFICIAL_PICKER_ICONS, OFFICIAL_UI_ICONS, PALETTE_INKS, bakeSticker } from '../achievement/pixelart.ts';
-import { OFFICIAL_DECOS, OFFICIAL_ICONS, OFFICIAL_WEATHER } from '../pixelart.ts';
+import { OFFICIAL_CARD_FRIENDS, OFFICIAL_PICKER_ICONS, OFFICIAL_UI_ICONS, PALETTE_INKS, bakeSticker } from '../shared/stickers.ts';
+import { OFFICIAL_DECOS, OFFICIAL_ICONS, OFFICIAL_WEATHER } from '../shared/art.ts';
 import { PALETTE, type PaletteName } from '../shared/palette.ts';
-import { OFFICIAL_GARDEN_SPOTS, OFFICIAL_PROPS, OFFICIAL_ROOM_SPOTS, ROOM_H, ROOM_W, officialSceneGrid, type SceneId, type Spot } from '../scene.ts';
+import { OFFICIAL_GARDEN_SPOTS, OFFICIAL_PROPS, OFFICIAL_ROOM_SPOTS, ROOM_H, ROOM_W, officialSceneGrid, type SceneId, type Spot } from '../shared/scene.ts';
 
 export type CategoryId = 'sticker' | 'friend' | 'button' | 'weather' | 'deco' | 'scene';
 export interface Category {

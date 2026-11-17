@@ -9,8 +9,8 @@
 // Kitty's stylesheet and its own, in web/shopping.html.
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
-import { iconSvg } from '../pixelart.ts';
-import { PICKER_ICONS, groupedPicks, pickable, stickerSvg } from '../achievement/pixelart.ts';
+import { iconSvg } from '../shared/art.ts';
+import { PICKER_ICONS, groupedPicks, pickable, stickerSvg } from '../shared/stickers.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { onAppShown, onShown } from '../shared/apps.ts';
 import { $, esc, plural } from '../shared/html.ts';

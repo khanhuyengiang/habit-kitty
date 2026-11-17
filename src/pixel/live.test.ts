@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { CARD_FRIENDS, PICKER_ICONS, PICKER_ICON_NAMES, PICKER_ICON_GROUPS, UI_ICONS, iconLabel, pickable, stickerSvg } from '../achievement/pixelart.ts';
-import { ICONS, OFFICIAL_WEATHER, WEATHER, weatherLabel, weatherSvg } from '../pixelart.ts';
+import { CARD_FRIENDS, PICKER_ICONS, PICKER_ICON_NAMES, PICKER_ICON_GROUPS, UI_ICONS, iconLabel, pickable, stickerSvg } from '../shared/stickers.ts';
+import { ICONS, OFFICIAL_WEATHER, WEATHER, weatherLabel, weatherSvg } from '../shared/art.ts';
 import { applyIcons } from './live.ts';
-import { GARDEN_SPOTS, ROOM_SPOTS, SHELF_BOOK, roomSvg } from '../scene.ts';
+import { GARDEN_SPOTS, ROOM_SPOTS, SHELF_BOOK, roomSvg } from '../shared/scene.ts';
 import { emptyData, officials, type PixelData } from './model.ts';
 
 const blank18 = Array.from({ length: 18 }, () => '..................');

@@ -25,8 +25,8 @@ import { PHOTO_MAX_BYTES, compressPhoto } from '../../shared/photo.ts';
 import { sharePicture } from '../../shared/snapshot.ts';
 import { getLocal, setLocal } from '../../shared/local.ts';
 import {
-  PICKER_ICONS, PICKER_ICON_NAMES, avatarSvg, iconLabel, pickable, groupedPicks, burstSvg, cornerSvg, flowerSvg, heartSvg, iconSvg, starsSvg, stickerSvg,
-} from '../pixelart.ts';
+  PICKER_ICONS, PICKER_ICON_NAMES, avatarSvg, iconLabel, pickable, groupedPicks, burstSvg, cornerSvg, flowerSvg, cardHeartSvg, uiIconSvg, starsSvg, stickerSvg,
+} from '../../shared/stickers.ts';
 
 // Queries stay inside this app's part of the page, so they never find Habit Kitty's elements.
 const appRoot: ParentNode = document.querySelector('[data-app-root="achievement"]') ?? document;
@@ -174,7 +174,7 @@ function cardHtml(v: CardView, o: { static?: boolean; unlock?: boolean; big?: bo
   const inner = `${(['tl', 'tr', 'bl', 'br'] as const).map((c) => cornerSvg(c, o.big)).join('')}${rim}${starsSvg(planned ? 0 : RARITIES.indexOf(v.rarity) + 1)}<span class="card-in">
     <span class="card-head">${stickerSvg(v.icon, 1)}<span class="card-title">${esc(v.title || 'Untitled')}</span></span>
     <span class="card-screen"><span class="card-row">${goal}<span class="card-count">${esc(date)}</span></span>
-      <span class="card-art${v.photo ? ' has-photo' : ''}">${art}<span class="card-deco">${heartSvg()}${flowerSvg()}</span>${planned ? `<span class="lockmark">${iconSvg('lock')}</span>` : ''}</span>
+      <span class="card-art${v.photo ? ' has-photo' : ''}">${art}<span class="card-deco">${cardHeartSvg()}${flowerSvg()}</span>${planned ? `<span class="lockmark">${uiIconSvg('lock')}</span>` : ''}</span>
       ${v.description ? `<span class="card-desc">${esc(v.description)}</span>` : ''}</span>
     <span class="card-foot">${stickerSvg(v.sideIcon, 1)}<span class="card-place">${v.location ? esc(v.location) : esc(v.side)}</span></span></span>`;
   if (o.static) return `<div class="${cls}" style="${style}">${inner}</div>`;
@@ -215,7 +215,7 @@ function blockHtml(a: Achievement, color: string): string {
   const p = progressOf(a);
   const label = `${a.title}, ${p ? `${p.n} of ${p.goal}, ` : ''}${planned ? 'locked' : 'unlocked'}`;
   const fill = p ? `<i class="blk-goal" style="--p:${Math.min(1, p.n / p.goal)}"></i>` : '';
-  return `<button class="block${planned ? ' planned' : ''}" style="--c:${color}" title="${esc(p ? `${a.title} (${p.n}/${p.goal})` : a.title)}" aria-label="${esc(label)}" data-action="open-card" data-id="${a.id}" data-main="${a.mainQuestId}">${iconSvg(a.icon)}${fill}</button>`;
+  return `<button class="block${planned ? ' planned' : ''}" style="--c:${color}" title="${esc(p ? `${a.title} (${p.n}/${p.goal})` : a.title)}" aria-label="${esc(label)}" data-action="open-card" data-id="${a.id}" data-main="${a.mainQuestId}">${uiIconSvg(a.icon)}${fill}</button>`;
 }
 
 // A main quest on the main page. Open: its side quests (and the cards directly in it) as rows of blocks, with buttons to
@@ -227,20 +227,20 @@ function questSection(q: Data['mainQuests'][number]): string {
   const box = (title: string, icon: string, col: string, sideId: string | null) => {
     const list = collection(data, q.id, { side: sideId ?? 'none', status: 'all' });
     const sc = counts(data, q.id, sideId);
-    return `<div class="side-box" style="--c:${col}"><h4><span class="side-ico" style="color:${col}">${iconSvg(icon)}</span>${esc(title)}<span class="n">${sc.done}/${sc.done + sc.planned}</span></h4>
-      <div class="blocks">${list.map((a) => blockHtml(a, col)).join('')}<button class="block add" data-action="add-card" data-status="completed" data-main="${q.id}" data-side="${sideId ?? ''}" aria-label="New achievement in ${esc(title)}">${iconSvg('plus')}</button></div></div>`;
+    return `<div class="side-box" style="--c:${col}"><h4><span class="side-ico" style="color:${col}">${uiIconSvg(icon)}</span>${esc(title)}<span class="n">${sc.done}/${sc.done + sc.planned}</span></h4>
+      <div class="blocks">${list.map((a) => blockHtml(a, col)).join('')}<button class="block add" data-action="add-card" data-status="completed" data-main="${q.id}" data-side="${sideId ?? ''}" aria-label="New achievement in ${esc(title)}">${uiIconSvg('plus')}</button></div></div>`;
   };
   const loose = counts(data, q.id, null);
   const boxes = (loose.done + loose.planned ? box('No side quest', 'trophy', DEFAULT_COLOR, null) : '') + sides.map((s) => box(s.title, s.icon, colorOf(s), s.id)).join('');
   return `<section class="panel quest" data-quest="${q.id}" data-action="open-quest" data-id="${q.id}" aria-labelledby="q-${q.id}">
     <div class="quest-info"><div class="quest-head"><button class="quest-title" id="q-${q.id}" data-action="open-quest" data-id="${q.id}">${esc(q.title)}</button>
-      ${open ? '' : `<button class="btn small primary quick-add" data-action="add-card" data-status="completed" data-main="${q.id}" aria-label="New achievement in ${esc(q.title)}">${iconSvg('plus')} Achievement</button>`}
-      <button class="toggle" data-action="toggle-quest" data-id="${q.id}" aria-expanded="${open}" aria-label="${open ? 'Collapse' : 'Expand'} ${esc(q.title)}">${iconSvg('chev')}</button></div>
+      ${open ? '' : `<button class="btn small primary quick-add" data-action="add-card" data-status="completed" data-main="${q.id}" aria-label="New achievement in ${esc(q.title)}">${uiIconSvg('plus')} Achievement</button>`}
+      <button class="toggle" data-action="toggle-quest" data-id="${q.id}" aria-expanded="${open}" aria-label="${open ? 'Collapse' : 'Expand'} ${esc(q.title)}">${uiIconSvg('chev')}</button></div>
     <p class="sub">${plural(sides.length, 'side quest')} · ${c.done} unlocked · ${c.planned} locked</p>
     ${open && q.description ? `<p class="sub">${esc(q.description)}</p>` : ''}</div>
     ${open ? `${boxes ? `<div class="sides">${boxes}</div>` : '<p class="muted">Nothing here yet. Add achievements straight to this quest, or sort them into side quests like Food or Sightseeing.</p>'}
-      <div class="btns"><button class="btn small" data-action="new-side" data-main="${q.id}">${iconSvg('plus')} Side quest</button>
-      <button class="btn small primary" data-action="add-card" data-status="completed" data-main="${q.id}">${iconSvg('plus')} Achievement</button></div>` : ''}</section>`;
+      <div class="btns"><button class="btn small" data-action="new-side" data-main="${q.id}">${uiIconSvg('plus')} Side quest</button>
+      <button class="btn small primary" data-action="add-card" data-status="completed" data-main="${q.id}">${uiIconSvg('plus')} Achievement</button></div>` : ''}</section>`;
 }
 
 function homeHtml(): string {
@@ -248,15 +248,15 @@ function homeHtml(): string {
   const archived = archivedMainQuests(data);
   const body = active.length
     ? `<div class="quests">${active.map(questSection).join('')}</div>
-      <button class="btn primary new-quest" data-action="new-quest">${iconSvg('plus')} New main quest</button>`
+      <button class="btn primary new-quest" data-action="new-quest">${uiIconSvg('plus')} New main quest</button>`
     : `<section class="panel empty"><h3>Your adventure starts here</h3>
         <p>${archived.length ? 'All your quests are archived.' : 'A main quest is a big theme or journey, like “Discover Thailand”. Create your first one, then collect achievement cards in it.'}</p>
-        <button class="btn primary" data-action="new-quest">${iconSvg('plus')} Create your first main quest</button></section>`;
+        <button class="btn primary" data-action="new-quest">${uiIconSvg('plus')} Create your first main quest</button></section>`;
   const arch = archived.length
     ? `<details class="panel"><summary><b>Archived quests (${archived.length})</b></summary><ul class="manage">${archived.map((q) => `
       <li><span class="nm">${esc(q.title)}</span><div class="btns"><button class="btn small" data-action="open-quest" data-id="${q.id}">View</button>
       <button class="btn small" data-action="restore-quest" data-id="${q.id}">Restore</button>
-      <button class="btn small danger" data-action="delete-quest" data-id="${q.id}">${iconSvg('trash')} Delete</button></div></li>`).join('')}</ul></details>` : '';
+      <button class="btn small danger" data-action="delete-quest" data-id="${q.id}">${uiIconSvg('trash')} Delete</button></div></li>`).join('')}</ul></details>` : '';
   return `${profileHtml()}${viewSwitch('home')}
     <div class="section-head"><h2>Main quests</h2>${active.length ? '<span class="sub">Long-press a quest or your card for more</span>' : ''}</div>${body}${arch}`;
 }
@@ -287,7 +287,7 @@ function questHtml(id: string): string {
   const list = collection(data, id, view);
   const grid = (cards: Achievement[]) => `<div class="cards">${cards.map((a) => cardHtml(cardView(a), { unlock: a.id === unlocked })).join('')}</div>`;
   const section = (title: string, icon: string, col: string, cards: Achievement[], n: string) =>
-    `<section class="side-sec" style="--c:${col}" aria-label="${esc(title)}"><h3>${iconSvg(icon)}<span>${esc(title)}</span><span class="n">${n}</span></h3>
+    `<section class="side-sec" style="--c:${col}" aria-label="${esc(title)}"><h3>${uiIconSvg(icon)}<span>${esc(title)}</span><span class="n">${n}</span></h3>
       ${cards.length ? grid(cards) : '<p class="muted">Nothing here yet.</p>'}</section>`;
   const narrowed = view.status !== 'all' || view.tag !== 'all' || view.side !== 'all';
   // the cards directly in a quest first, then each side quest; an empty one shows only when nothing is filtered out
@@ -304,8 +304,8 @@ function questHtml(id: string): string {
   let body: string;
   if (!data.achievements.some((a) => (id ? a.mainQuestId === id : quests.some((m) => m.id === a.mainQuestId)))) {
     body = `<section class="panel empty"><h3>No achievements yet</h3><p>Add something you have already done, or one to unlock later. Locked achievements stay greyed out until you unlock them.</p>
-      ${id || quests.length ? `<div class="btns"><button class="btn primary" data-action="add-card" data-status="completed">${iconSvg('plus')} Unlocked achievement</button>
-      <button class="btn" data-action="add-card" data-status="planned">${iconSvg('lock')} Locked achievement</button></div>` : ''}</section>`;
+      ${id || quests.length ? `<div class="btns"><button class="btn primary" data-action="add-card" data-status="completed">${uiIconSvg('plus')} Unlocked achievement</button>
+      <button class="btn" data-action="add-card" data-status="planned">${uiIconSvg('lock')} Locked achievement</button></div>` : ''}</section>`;
   } else if (!list.length) {
     body = `<section class="panel empty"><h3>Nothing matches these filters</h3><p>Try another quest, side quest, tag or status.</p><button class="btn" data-action="clear-filters">Show everything</button></section>`;
   } else if (view.group === 'month') {
@@ -341,18 +341,18 @@ function questHtml(id: string): string {
         <p class="hint">Uses these settings on every page, and remembers them next time.</p></div>
       <div class="btns end"><button class="btn small" data-action="clear-filters" ${changed ? '' : 'disabled'}>Reset</button><button class="btn small primary" data-action="toggle-filter">Done</button></div></div>` : '';
   const head = q
-    ? `<div class="qbar"><button class="btn small" data-action="back">${iconSvg('prev')} Back</button>
+    ? `<div class="qbar"><button class="btn small" data-action="back">${uiIconSvg('prev')} Back</button>
       <details class="menu"><summary class="btn small">Options</summary><div class="menu-list">
-        <button class="btn small" data-action="edit-quest" data-id="${id}">${iconSvg('pencil')} Edit quest</button>
-        <button class="btn small" data-action="new-side" data-main="${id}">${iconSvg('plus')} New side quest</button>
+        <button class="btn small" data-action="edit-quest" data-id="${id}">${uiIconSvg('pencil')} Edit quest</button>
+        <button class="btn small" data-action="new-side" data-main="${id}">${uiIconSvg('plus')} New side quest</button>
         ${allSides.length ? `<button class="btn small" data-action="manage-sides" data-id="${id}">Manage side quests</button>` : ''}
-        ${q.archivedAt ? `<button class="btn small" data-action="restore-quest" data-id="${id}">Restore quest</button>` : `<button class="btn small" data-action="archive-quest" data-id="${id}">${iconSvg('archive')} Archive quest</button>`}
-        <button class="btn small danger" data-action="delete-quest" data-id="${id}">${iconSvg('trash')} Delete quest</button></div></details></div>
+        ${q.archivedAt ? `<button class="btn small" data-action="restore-quest" data-id="${id}">Restore quest</button>` : `<button class="btn small" data-action="archive-quest" data-id="${id}">${uiIconSvg('archive')} Archive quest</button>`}
+        <button class="btn small danger" data-action="delete-quest" data-id="${id}">${uiIconSvg('trash')} Delete quest</button></div></details></div>
     <section class="qhead"><h2 class="big">${esc(q.title)}</h2>${q.description ? `<p>${esc(q.description)}</p>` : ''}${q.archivedAt ? '<p class="sub">Archived</p>' : ''}</section>`
     : `${profileHtml()}${viewSwitch('all')}<section class="qhead"><h2 class="big">All achievements</h2></section>`;
   return `${head}
-    <div class="tools"><div class="toolbar"><button class="btn${changed ? ' on' : ''}" data-action="toggle-filter" aria-expanded="${filterFor === key}" aria-controls="filter-panel">${iconSvg('filter')} Filter${changed ? ` (${changed})` : ''}</button>
-      ${id || quests.length ? `<button class="btn primary" data-action="add-card" data-status="completed">${iconSvg('plus')} Achievement</button>` : ''}</div>
+    <div class="tools"><div class="toolbar"><button class="btn${changed ? ' on' : ''}" data-action="toggle-filter" aria-expanded="${filterFor === key}" aria-controls="filter-panel">${uiIconSvg('filter')} Filter${changed ? ` (${changed})` : ''}</button>
+      ${id || quests.length ? `<button class="btn primary" data-action="add-card" data-status="completed">${uiIconSvg('plus')} Achievement</button>` : ''}</div>
     ${panel}</div>
     ${body}`;
 }
@@ -369,11 +369,11 @@ function cardPageHtml(a: Achievement): string {
   const p = progressOf(a);
   const when = planned ? ['Target date', a.plannedDate ? fmtDate(a.plannedDate) : 'No date set'] : ['Unlocked on', a.completionDate ? fmtDate(a.completionDate) : 'No date set'];
   return `<div class="ctools">
-      <button class="btn small" data-action="close-detail">${iconSvg('prev')} Back</button><span class="grow"></span>
-      ${planned ? `<button class="btn small primary" data-action="complete-card" data-id="${a.id}">${iconSvg('trophy')} Unlock it</button>` : ''}
+      <button class="btn small" data-action="close-detail">${uiIconSvg('prev')} Back</button><span class="grow"></span>
+      ${planned ? `<button class="btn small primary" data-action="complete-card" data-id="${a.id}">${uiIconSvg('trophy')} Unlock it</button>` : ''}
       <button class="btn small" data-action="share-card" data-id="${a.id}">Share</button>
-      <button class="btn small" data-action="edit-card" data-id="${a.id}">${iconSvg('pencil')} Edit</button>
-      <button class="btn small danger" data-action="delete-card" data-id="${a.id}">${iconSvg('trash')} Delete</button></div>
+      <button class="btn small" data-action="edit-card" data-id="${a.id}">${uiIconSvg('pencil')} Edit</button>
+      <button class="btn small danger" data-action="delete-card" data-id="${a.id}">${uiIconSvg('trash')} Delete</button></div>
     <h2 class="sr">${esc(a.title)}</h2>
     ${p ? `<section class="panel goal-panel" aria-label="Progress"><p class="goal-big" aria-live="polite"><b class="num">${p.n}</b> <span class="muted">/ ${p.goal}</span>${p.done ? ' <span class="tag">Goal reached</span>' : ''}</p>
       <div class="btns"><button class="btn" data-action="goal-down" data-id="${a.id}" aria-label="Count one less" ${p.n ? '' : 'disabled'}>−1</button>
@@ -382,7 +382,7 @@ function cardPageHtml(a: Achievement): string {
     ${photos.length > 1 ? `<div class="gallery" role="group" aria-label="Photos">${photos.map((p, n) => `<button data-action="gallery" data-i="${n}" aria-current="${n === i}" aria-label="Photo ${n + 1}"><img src="${esc(src(p.imageUrl))}" alt=""></button>`).join('')}</div>` : ''}
     <section class="panel facts" aria-label="Details"><dl>
       <dt>Main quest</dt><dd>${esc(main?.title ?? '')}</dd>
-      <dt>Side quest</dt><dd>${side ? `<span class="side-ico" style="color:${colorOf(side)}">${iconSvg(side.icon)}</span>${esc(side.title)}` : 'None'}</dd>
+      <dt>Side quest</dt><dd>${side ? `<span class="side-ico" style="color:${colorOf(side)}">${uiIconSvg(side.icon)}</span>${esc(side.title)}` : 'None'}</dd>
       <dt>Status</dt><dd>${planned ? 'Locked' : 'Unlocked'}</dd>
       ${p ? `<dt>Progress</dt><dd>${p.n} of ${p.goal}</dd>` : ''}
       ${planned ? '' : `<dt>Rarity</dt><dd>${RARITY_LABEL[a.rarity]}</dd>`}
@@ -413,13 +413,13 @@ const top = () => modals[modals.length - 1];
 function field(label: string, name: string, control: string, hint = '', required = false): string {
   return `<div class="field"><label for="f-${name}">${label}${required ? ' <span aria-hidden="true">*</span>' : ''}</label>${control}<p class="hint" id="h-${name}">${hint}</p><p class="err" data-err="${name}" role="alert"></p></div>`;
 }
-const iconSummary = (n: string) => `${stickerSvg(n, 1)}<span class="fold-name">${esc(iconLabel(n))}</span><span class="fold-chev">${iconSvg('chev')}</span>`;
+const iconSummary = (n: string) => `${stickerSvg(n, 1)}<span class="fold-name">${esc(iconLabel(n))}</span><span class="fold-chev">${uiIconSvg('chev')}</span>`;
 // The icon list folds away once an icon is chosen; the chosen icon (in the summary) opens it again. An icon that is gone
 // (deleted in Kitty Gallery) is a heart, here as on the card, so the heart is the one chosen.
 const iconPicker = (sel: string, open: boolean, name = 'icon') => (sel = pickable(sel), `<div class="field"><fieldset class="field"><legend>Icon <span aria-hidden="true">*</span></legend>
   <details class="icon-fold" ${open ? 'open' : ''}><summary class="fold-sum" aria-label="Icon: ${esc(iconLabel(sel))}. Change">${iconSummary(sel)}</summary>
   <div class="icon-pick">${groupedPicks((n) =>
-  `<label title="${PICKER_ICONS[n].label}"><input type="radio" name="${name}" value="${n}" ${n === sel ? 'checked' : ''} aria-label="${PICKER_ICONS[n].label}"><span>${iconSvg(n)}</span></label>`)}</div></details></fieldset><p class="err" data-err="${name}" role="alert"></p></div>`);
+  `<label title="${PICKER_ICONS[n].label}"><input type="radio" name="${name}" value="${n}" ${n === sel ? 'checked' : ''} aria-label="${PICKER_ICONS[n].label}"><span>${uiIconSvg(n)}</span></label>`)}</div></details></fieldset><p class="err" data-err="${name}" role="alert"></p></div>`);
 
 function photosField(m: { photos: FormPhoto[] }, label = 'Photos'): string {
   return `<div class="field"><label for="f-photos">${label}</label>
@@ -428,7 +428,7 @@ function photosField(m: { photos: FormPhoto[] }, label = 'Photos'): string {
     <p class="hint">Pictures are scaled down and kept on this device.</p><p class="err" data-err="photos" role="alert"></p></div>`;
 }
 const photoListHtml = (photos: FormPhoto[]) => photos.map((p, i) =>
-  `<div class="photo"><img src="${esc(src(p.imageUrl))}" alt="Photo ${i + 1}"><button type="button" data-action="photo-remove" data-i="${i}" aria-label="Remove photo ${i + 1}">${iconSvg('x')}</button></div>`).join('');
+  `<div class="photo"><img src="${esc(src(p.imageUrl))}" alt="Photo ${i + 1}"><button type="button" data-action="photo-remove" data-i="${i}" aria-label="Remove photo ${i + 1}">${uiIconSvg('x')}</button></div>`).join('');
 
 function sideOptions(mainId: string, selected: string, keep?: string): string {
   const sides = sideQuestsOf(data, mainId).filter((s) => !s.archivedAt || s.id === keep);
@@ -454,7 +454,7 @@ function achievementForm(m: Extract<Modal, { kind: 'achievement' | 'complete' }>
       ${field('Side quest', 'sideQuestId', `<select id="f-sideQuestId" name="sideQuestId">${sideOptions(v.mainQuestId, v.sideQuestId, v.sideQuestId)}</select>`, '<button type="button" class="linkish" data-action="form-add-side">Add a side quest</button>')}</div>`;
   const status = complete ? '' : `<fieldset class="field"><legend>Status <span aria-hidden="true">*</span></legend><div class="chips">
       <label><input type="radio" name="status" value="completed" ${v.status === 'completed' ? 'checked' : ''}><span>Unlocked</span></label>
-      <label><input type="radio" name="status" value="planned" ${v.status === 'planned' ? 'checked' : ''}><span>${iconSvg('lock')} Locked</span></label></div><p class="err" data-err="status" role="alert"></p></fieldset>`;
+      <label><input type="radio" name="status" value="planned" ${v.status === 'planned' ? 'checked' : ''}><span>${uiIconSvg('lock')} Locked</span></label></div><p class="err" data-err="status" role="alert"></p></fieldset>`;
   const title = complete ? 'Unlock achievement' : editing ? 'Edit achievement' : v.status === 'planned' ? 'New locked achievement' : 'New achievement';
   const suggest = allTags(data).slice(0, 12).map((t) => `<button type="button" class="tag-sug" data-action="tag-add" data-tag="${esc(t)}">#${esc(t)}</button>`).join('');
   const tagsField = field('Tags', 'tags', `<input id="f-tags" name="tags" value="${esc(v.tags)}" placeholder="street food, friends" autocomplete="off">`,
@@ -486,13 +486,13 @@ function previewView(v: FormValues, photos: FormPhoto[]): CardView {
 
 function modalHtml(m: Modal): string {
   switch (m.kind) {
-case 'achievement': case 'complete': return `<div class="panel wide form-panel" role="dialog" aria-modal="true" aria-labelledby="mt"><button class="x-close" data-action="close-modal" aria-label="Close">${iconSvg('x')}</button>${achievementForm(m)}</div>`;
-    case 'quest': return `<div class="panel" role="dialog" aria-modal="true" aria-labelledby="mt"><button class="x-close" data-action="close-modal" aria-label="Close">${iconSvg('x')}</button>
+case 'achievement': case 'complete': return `<div class="panel wide form-panel" role="dialog" aria-modal="true" aria-labelledby="mt"><button class="x-close" data-action="close-modal" aria-label="Close">${uiIconSvg('x')}</button>${achievementForm(m)}</div>`;
+    case 'quest': return `<div class="panel" role="dialog" aria-modal="true" aria-labelledby="mt"><button class="x-close" data-action="close-modal" aria-label="Close">${uiIconSvg('x')}</button>
       <form data-form="quest" novalidate><h3 id="mt">${m.id ? 'Edit main quest' : 'New main quest'}</h3>
       ${field('Name', 'title', `<input id="f-title" name="title" maxlength="60" value="${esc(m.title)}" placeholder="Discover Thailand" autocomplete="off" required>`, '', true)}
       ${field('Description', 'description', `<textarea id="f-description" name="description" maxlength="2000" rows="3">${esc(m.description)}</textarea>`, 'Optional')}
       <div class="btns end"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn primary">Save</button></div></form></div>`;
-    case 'side': return `<div class="panel" role="dialog" aria-modal="true" aria-labelledby="mt"><button class="x-close" data-action="close-modal" aria-label="Close">${iconSvg('x')}</button>
+    case 'side': return `<div class="panel" role="dialog" aria-modal="true" aria-labelledby="mt"><button class="x-close" data-action="close-modal" aria-label="Close">${uiIconSvg('x')}</button>
       <form data-form="side" novalidate><h3 id="mt">${m.id ? 'Edit side quest' : 'New side quest'}</h3>
       ${field('Name', 'title', `<input id="f-title" name="title" maxlength="60" value="${esc(m.title)}" placeholder="Food" autocomplete="off" required>`, '', true)}
       <div class="field"><fieldset class="field"><legend>Colour <span aria-hidden="true">*</span></legend><div class="swatches">${SIDE_COLORS.map((c) => `<label><input type="radio" name="color" value="${c}" aria-label="${c}" ${c === m.color.toLowerCase() ? 'checked' : ''}><span class="swatch" style="--c:${c}"></span></label>`).join('')}
@@ -503,31 +503,31 @@ case 'achievement': case 'complete': return `<div class="panel wide form-panel" 
       const q = data.mainQuests.find((x) => x.id === m.mainId)!;
       const all = sideQuestsOf(data, m.mainId, true);
       const visible = all.filter((s) => !s.archivedAt);
-      return `<div class="panel" role="dialog" aria-modal="true" aria-labelledby="mt"><button class="x-close" data-action="close-modal" aria-label="Close">${iconSvg('x')}</button>
+      return `<div class="panel" role="dialog" aria-modal="true" aria-labelledby="mt"><button class="x-close" data-action="close-modal" aria-label="Close">${uiIconSvg('x')}</button>
         <h3 id="mt">Side quests in ${esc(q.title)}</h3>
         <ul class="manage">${all.map((s) => { const i = visible.indexOf(s); return `<li class="${s.archivedAt ? 'arch' : ''}" style="--c:${isColor(s.color) ? s.color : '#8f78d0'}">
-          <span class="nm">${iconSvg(s.icon)}${esc(s.title)}${s.archivedAt ? ' <span class="tag">Archived</span>' : ''}</span>
-          <div class="btns"><button class="btn small" data-action="side-edit" data-id="${s.id}">${iconSvg('pencil')} Edit</button>
+          <span class="nm">${uiIconSvg(s.icon)}${esc(s.title)}${s.archivedAt ? ' <span class="tag">Archived</span>' : ''}</span>
+          <div class="btns"><button class="btn small" data-action="side-edit" data-id="${s.id}">${uiIconSvg('pencil')} Edit</button>
           ${s.archivedAt ? `<button class="btn small" data-action="side-restore" data-id="${s.id}">Restore</button>` : `${moveButtons('side-move', s.id, s.title, i === 0, i === visible.length - 1)}
-          <button class="btn small" data-action="side-archive" data-id="${s.id}">${iconSvg('archive')} Archive</button>`}
-          <button class="btn small danger" data-action="side-delete" data-id="${s.id}">${iconSvg('trash')}<span class="sr">Delete ${esc(s.title)}</span></button></div></li>`; }).join('')}</ul>
-        <div class="btns end"><button class="btn" data-action="new-side" data-main="${m.mainId}">${iconSvg('plus')} Side quest</button><button class="btn primary" data-action="close-modal">Done</button></div></div>`;
+          <button class="btn small" data-action="side-archive" data-id="${s.id}">${uiIconSvg('archive')} Archive</button>`}
+          <button class="btn small danger" data-action="side-delete" data-id="${s.id}">${uiIconSvg('trash')}<span class="sr">Delete ${esc(s.title)}</span></button></div></li>`; }).join('')}</ul>
+        <div class="btns end"><button class="btn" data-action="new-side" data-main="${m.mainId}">${uiIconSvg('plus')} Side quest</button><button class="btn primary" data-action="close-modal">Done</button></div></div>`;
     }
     case 'quest-menu': {
       const q = data.mainQuests.find((x) => x.id === m.id)!;
-      return `<div class="panel" role="dialog" aria-modal="true" aria-labelledby="mt"><button class="x-close" data-action="close-modal" aria-label="Close">${iconSvg('x')}</button>
+      return `<div class="panel" role="dialog" aria-modal="true" aria-labelledby="mt"><button class="x-close" data-action="close-modal" aria-label="Close">${uiIconSvg('x')}</button>
         <h3 id="mt">${esc(q.title)}</h3><div class="menu-sheet">
-        <button class="btn" data-action="open-quest" data-id="${q.id}">${iconSvg('next')} Open quest</button>
-        <button class="btn" data-action="add-card" data-status="completed" data-main="${q.id}">${iconSvg('plus')} Achievement</button>
-        <button class="btn" data-action="new-side" data-main="${q.id}">${iconSvg('plus')} Side quest</button>
-        <button class="btn" data-action="edit-quest" data-id="${q.id}">${iconSvg('pencil')} Edit quest</button>
+        <button class="btn" data-action="open-quest" data-id="${q.id}">${uiIconSvg('next')} Open quest</button>
+        <button class="btn" data-action="add-card" data-status="completed" data-main="${q.id}">${uiIconSvg('plus')} Achievement</button>
+        <button class="btn" data-action="new-side" data-main="${q.id}">${uiIconSvg('plus')} Side quest</button>
+        <button class="btn" data-action="edit-quest" data-id="${q.id}">${uiIconSvg('pencil')} Edit quest</button>
         ${sideQuestsOf(data, q.id, true).length ? `<button class="btn" data-action="manage-sides" data-id="${q.id}">Manage side quests</button>` : ''}
-        <button class="btn" data-action="archive-quest" data-id="${q.id}">${iconSvg('archive')} Archive quest</button>
-        <button class="btn danger" data-action="delete-quest" data-id="${q.id}">${iconSvg('trash')} Delete quest</button></div></div>`;
+        <button class="btn" data-action="archive-quest" data-id="${q.id}">${uiIconSvg('archive')} Archive quest</button>
+        <button class="btn danger" data-action="delete-quest" data-id="${q.id}">${uiIconSvg('trash')} Delete quest</button></div></div>`;
     }
     case 'profile': {
       const av = m.avatar && src(m.avatar) ? `<img src="${esc(src(m.avatar))}" alt="">` : avatarSvg();
-      return `<div class="panel" role="dialog" aria-modal="true" aria-labelledby="mt"><button class="x-close" data-action="close-modal" aria-label="Close">${iconSvg('x')}</button>
+      return `<div class="panel" role="dialog" aria-modal="true" aria-labelledby="mt"><button class="x-close" data-action="close-modal" aria-label="Close">${uiIconSvg('x')}</button>
         <form data-form="profile" novalidate><h3 id="mt">Your profile</h3>
         <div class="avatar-row"><div class="avatar" id="avatar-prev">${av}</div>
           <div class="avatar-btns"><label class="btn small">Choose picture<input class="sr" type="file" accept="image/*" data-upload="avatar"></label>
@@ -537,7 +537,7 @@ case 'achievement': case 'complete': return `<div class="panel wide form-panel" 
         ${field('Year of birth', 'birthYear', `<input id="f-birthYear" name="birthYear" type="number" inputmode="numeric" min="1900" max="${new Date().getFullYear()}" step="1" value="${esc(m.birthYear)}" placeholder="e.g. 1998">`, 'Your age is worked out from it and goes up every new year.')}
         <div class="btns end"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn primary">Save</button></div></form></div>`;
     }
-    case 'settings': return `<div class="panel" role="dialog" aria-modal="true" aria-labelledby="mt"><button class="x-close" data-action="close-modal" aria-label="Close">${iconSvg('x')}</button>
+    case 'settings': return `<div class="panel" role="dialog" aria-modal="true" aria-labelledby="mt"><button class="x-close" data-action="close-modal" aria-label="Close">${uiIconSvg('x')}</button>
       <h3 id="mt">Settings</h3>
       ${musicHtml()}
       <h4 class="sub">Save and load</h4>

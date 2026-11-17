@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BOOK_ART, ICONS, MARKS, PAL, ROOM_H, ROOM_W, TROPHY_ART, artSvg, iconSvg, outdoorSvg, roomSvg } from './pixelart.ts';
-import { BODY_H, BODY_W, FACE_W, FURS, MINI_W, PATTERNS, bodySvg, faceSvg, miniSvg, popperSvg } from './shared/pixelcat.ts';
+import { BOOK_ART, ICONS, MARKS, PAL, ROOM_H, ROOM_W, TROPHY_ART, artSvg, iconSvg, outdoorSvg, roomSvg } from './art.ts';
+import { BODY_H, BODY_W, FACE_W, FURS, MINI_W, PATTERNS, bodySvg, faceSvg, miniSvg, popperSvg } from './pixelcat.ts';
 
 // (the cat food is drawn on the fine grid with Kitty Gallery's letters: src/pixel/model.test.ts checks it)
 const arts: Record<string, string[]> = { book: BOOK_ART, trophy: TROPHY_ART, ...MARKS };
@@ -46,7 +46,7 @@ describe('one pixel grid', () => {
 
 describe('napping cat', () => {
   it('draws at its own pixel size for every coat, and shares the sitting cat colour slots', async () => {
-    const { napSvg, NAP, NAP_W, NAP_H } = await import('./shared/pixelcat.ts');
+    const { napSvg, NAP, NAP_W, NAP_H } = await import('./pixelcat.ts');
     NAP.forEach((row, i) => expect(row.length, `nap row ${i}`).toBeLessThanOrEqual(NAP_W));
     for (const pattern of PATTERNS) {
       const svg = napSvg({ fur: FURS[0], pattern });

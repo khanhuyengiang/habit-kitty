@@ -4,7 +4,7 @@ import {
   PLAYER_GENDERS, RARITIES, SIDE_COLORS, isColor, isValidDate, newId,
   type Achievement, type AchievementPhoto, type Data, type MainQuest, type PlayerGender, type Rarity, type SideQuest, type Status,
 } from './model.ts';
-import { PICKER_ICON_NAMES } from './pixelart.ts';
+import { PICKER_ICON_NAMES } from '../shared/stickers.ts';
 import { toPalette } from '../shared/palette.ts';
 
 export const LIMITS = { title: 80, location: 60, description: 2000, name: 30, quest: 60, tags: 10, tag: 24, goal: 100000 };
