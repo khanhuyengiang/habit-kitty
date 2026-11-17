@@ -15,7 +15,7 @@ import { unpackBackup } from '../backup.ts';
 import { BACKUP_PREFIX, backupStatus, markDirty, nativeBackups, saveBackupToDevice, shareBackup } from '../../shared/backupfolder.ts';
 import { platformRepo } from './snapshot.ts';
 import { onAppShown, onShown, shownApp } from '../../shared/apps.ts';
-import { esc, plural } from '../../shared/html.ts';
+import { $, esc, plural } from '../../shared/html.ts';
 import { homeButton, moveButtons, playerButton, refocusMove, settingsButton, showToast, titleBar } from '../../shared/ui.ts';
 import { meterHtml } from '../../shared/meter.ts';
 import { lvLine } from '../../player.ts';
@@ -23,11 +23,11 @@ import { paintBackdrop } from '../../shared/backdrop.ts';
 import { music } from '../../shared/music.ts';
 import { PHOTO_MAX_BYTES, compressPhoto } from '../../shared/photo.ts';
 import { sharePicture } from '../../shared/snapshot.ts';
+import { getLocal, setLocal } from '../../shared/local.ts';
 import {
   PICKER_ICONS, PICKER_ICON_NAMES, avatarSvg, iconLabel, pickable, groupedPicks, burstSvg, cornerSvg, flowerSvg, heartSvg, iconSvg, starsSvg, stickerSvg,
 } from '../pixelart.ts';
 
-const $ = (id: string) => document.getElementById(id) as HTMLElement;
 // Queries stay inside this app's part of the page, so they never find Habit Kitty's elements.
 const appRoot: ParentNode = document.querySelector('[data-app-root="achievement"]') ?? document;
 const DEFAULT_COLOR = '#8f78d0';   // for cards without a side quest (or with a broken colour)
@@ -77,9 +77,10 @@ let detailPhoto = 0;
 let openedInApp = false;
 let ready = false;
 
-function readStore(k: string): string | null { try { return localStorage.getItem(k); } catch { return null; } }
-function writeStore(k: string, v: string) { try { localStorage.setItem(k, v); } catch { /* private mode: it just will not be remembered */ } }
-function dropStore(k: string) { try { localStorage.removeItem(k); } catch { /* nothing to forget */ } }
+// Not stored (private mode): it just will not be remembered.
+function readStore(k: string) { return getLocal(k); }
+function writeStore(k: string, v: string) { setLocal(k, v); }
+function dropStore(k: string) { setLocal(k, null); }
 
 // ---------- saving ----------
 

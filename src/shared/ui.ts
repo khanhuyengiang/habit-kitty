@@ -3,6 +3,7 @@ import { iconSvg } from '../pixelart.ts';
 import { UI_ICONS } from '../achievement/pixelart.ts';
 import { monoSvg } from './pixelart.ts';
 import { esc } from './html.ts';
+import { getLocal, setLocal } from './local.ts';
 import { paintBackdrop } from './backdrop.ts';
 
 // ---- the look: light or dark (follows the device until one is chosen), and the fancy background. Kept on this device. ----
@@ -10,8 +11,7 @@ import { paintBackdrop } from './backdrop.ts';
 // The fancy background is on until it is turned off (stored as '0').
 const THEME_KEY = 'hk-theme', FANCY_KEY = 'hk-fancy';
 export type ThemeMode = 'device' | 'light' | 'dark';
-const stored = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };   // storage blocked: the defaults
-const store = (k: string, v: string | null) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* not remembered */ } };
+const stored = getLocal, store = setLocal;   // storage blocked: the defaults, and not remembered
 {
   const t = stored(THEME_KEY);
   if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;

@@ -4,12 +4,12 @@ import { folderUsable, listSubfolder, nativeBackups, putInSubfolder, readFromSub
 import { MAX_TEXT, safeName, uniqueName } from './model.ts';
 import { allNotes, noteOf, notesReady, onNoteRemoved, onNotes, putRaw, reload, statNotes } from './data.ts';
 import { planSync, type SyncState } from './sync.ts';
+import { readJson, writeJson } from '../shared/local.ts';
 
 const SUBFOLDER = 'Notes';
 const KEY_ON = 'kitty-notes-sync', KEY_STATE = 'kitty-notes-sync-state', KEY_LAST = 'kitty-notes-sync-last';
 
-const read = (k: string) => { try { return JSON.parse(localStorage.getItem(k) ?? 'null'); } catch { return null; } };
-const write = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* it just syncs from scratch next time */ } };
+const read = readJson, write = writeJson;   // not stored: it just syncs from scratch next time
 
 export interface NotesSyncStatus { available: boolean; on: boolean; running: boolean; last: number; error: string; summary: string }
 let status: NotesSyncStatus = { available: nativeBackups, on: !!read(KEY_ON), running: false, last: Number(read(KEY_LAST)) || 0, error: '', summary: '' };

@@ -39,9 +39,10 @@ import { publishHabitStats } from '../shared/stats.ts';
 import { meterHtml } from '../shared/meter.ts';
 import { hpLine } from '../player.ts';
 import { collectDiary, diaryExtras, diaryInitialised, initDiary, pageCount, restoreDiary, updateExtras } from '../diary/data.ts';
-import { esc, plural } from '../shared/html.ts';
+import { $, esc, plural } from '../shared/html.ts';
 import { newId } from '../shared/id.ts';
 import { makeLayer } from '../shared/layer.ts';
+import { readJson, setLocal, writeJson } from '../shared/local.ts';
 import { pickerHtml } from '../shared/picker.ts';
 import { backButton, closeX, fancyOn, homeButton, playerButton, setFancy, setThemeMode, settingsButton, showToast, themeMode, titleBar } from '../shared/ui.ts';
 import { provideMusic } from '../shared/music.ts';
@@ -71,12 +72,7 @@ interface Save {
 const KEY = 'habit-kitty-save-v1';
 const fresh = (): Save => ({ v: 1, state: newState(), offsetHours: 0, log: [], savedAt: 0, accomplished: {}, seenVersion: VERSION });
 
-function readLocal(): Save | null {
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
+function readLocal() { return readJson<Save>(KEY); }
 
 // Older saves: every mindful item was a repeating habit with no history, and accomplishments were "achieved".
 function normalize(sv: Save & { achieved?: Record<string, number> }): Save {
@@ -113,7 +109,7 @@ function persist() {
   markDirty(BACKUP_PREFIX);
   publishStats();
   queueReminderSync();
-  try { localStorage.setItem(KEY, JSON.stringify(gameOnly())); } catch { /* private mode: keep playing in memory */ }
+  writeJson(KEY, gameOnly());   // private mode: keep playing in memory
   if (remote) {
     const ref = remote;
     const body = JSON.parse(JSON.stringify(gameOnly()));
@@ -133,7 +129,7 @@ async function connectAccount() {
     const theirs = snap.exists ? (snap.data() as Save) : null;
     if (theirs?.state && theirs.savedAt > save.savedAt) {
       save = normalize(theirs);
-      try { localStorage.setItem(KEY, JSON.stringify(gameOnly())); } catch { /* ignore */ }
+      writeJson(KEY, gameOnly());
     }
     remote = ref;
     if (!theirs || theirs.savedAt < save.savedAt) persist();
@@ -146,7 +142,6 @@ const now = () => new Date(Date.now() + save.offsetHours * 3_600_000);
 const today = () => dayIndex(now());
 
 // ===================== Helpers =====================
-const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const catName = (id: string) => save.state.cats.find((c) => c.id === id)?.name ?? 'Your cat';
 const fmtDay = (day: number) =>
   dateOf(day).toLocaleDateString('en', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -880,9 +875,7 @@ interface OwnMusic { name: string; type: string; gain: number }
 const MUSIC_KEY = 'hk-music', MUSIC_DIR = 'habit-kitty-music', MUSIC_FILE = 'bgm';
 const MUSIC_MAX_BYTES = 20_000_000;
 const MUSIC_TARGET_DB = -20;   // RMS level of Strawberry Walk, which matches the meows and purrs
-let ownMusic: OwnMusic | null = (() => {
-  try { return JSON.parse(localStorage.getItem(MUSIC_KEY) ?? 'null'); } catch { return null; }
-})();
+let ownMusic = readJson<OwnMusic>(MUSIC_KEY);
 let musicUrl: string | null = null;   // what plays: an object URL for the user's own file, else Strawberry Walk; null while loading
 
 function syncMusic() {
@@ -927,14 +920,14 @@ async function useOwnMusic(file: File) {
   const ok = await writeOk(() => Filesystem.writeFile({ ...at(MUSIC_FILE, MUSIC_DIR), data: toBase64(bytes), recursive: true }));
   if (!ok) { toast("Couldn't store that song on the device. Try again."); return; }
   ownMusic = { name: file.name.replace(/\.[^.]+$/, '') || 'Your music', type: file.type || 'audio/mpeg', gain };
-  try { localStorage.setItem(MUSIC_KEY, JSON.stringify(ownMusic)); } catch { /* plays until the app closes */ }
+  writeJson(MUSIC_KEY, ownMusic);   // not stored: plays until the app closes
   await loadMusic();
   toast(`Now playing ${ownMusic.name}.`);
 }
 
 async function useDefaultMusic() {
   ownMusic = null;
-  try { localStorage.removeItem(MUSIC_KEY); } catch { /* ignore */ }
+  setLocal(MUSIC_KEY, null);
   await removeFile(MUSIC_FILE, MUSIC_DIR);
   await loadMusic();
   toast('Back to Strawberry Walk.');
@@ -1458,7 +1451,7 @@ async function syncReminders() {
     if (on) {
       if (JSON.stringify(picks) !== JSON.stringify(r.picks ?? {})) {
         save.reminder = { ...r, picks };
-        try { localStorage.setItem(KEY, JSON.stringify(gameOnly())); } catch { /* ignore */ }
+        writeJson(KEY, gameOnly());
       }
       if (NATIVE) {
         if (real.length) await LocalNotifications.schedule({ notifications: real.map((p) => ({

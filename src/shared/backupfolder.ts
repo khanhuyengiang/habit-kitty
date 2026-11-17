@@ -8,6 +8,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { dataBytes, toBase64 } from './files.ts';
+import { readJson, writeJson } from './local.ts';
 import { KEEP_BACKUPS, backupName, backupsOf, isDue, toPrune } from '../backup-schedule.ts';
 
 interface FolderState { chosen: boolean; ok: boolean; name?: string }
@@ -97,8 +98,8 @@ const KEY_LAST = 'kitty-backup-last', KEY_DIRTY = 'kitty-backup-dirty';
 const listeners = new Set<() => void>();
 let status: BackupStatus = { native: nativeBackups, folder: { chosen: false, ok: false }, last: 0, error: '', running: false };
 
-const read = (k: string) => { try { return JSON.parse(localStorage.getItem(k) ?? 'null'); } catch { return null; } };
-const write = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* the backup still runs; it just may repeat after a restart */ } };
+// Maps from a backup's prefix to a value. Not stored: the backup still runs; it just may repeat after a restart.
+const read = (k: string) => readJson<Record<string, number | boolean>>(k), write = writeJson;
 const lastOf = (p: string): number => Number((read(KEY_LAST) ?? {})[p]) || 0;
 const dirtyOf = (p: string): boolean => !!(read(KEY_DIRTY) ?? {})[p];
 function setMap(key: string, p: string, v: number | boolean | null) {

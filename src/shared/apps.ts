@@ -3,6 +3,7 @@
 // listeners on the document ignore events while it is hidden, so the two never act on each other's buttons.
 import { monoSvg } from './pixelart.ts';
 import { miniSvg } from './pixelcat.ts';
+import { getLocal, setLocal } from './local.ts';
 
 // The home page, the diary and the notes (the Journal's two tabs), Kitty Mart, Kitty Gallery and the two apps: <html data-app> says which one is showing. (Habit Kitty's styles also serve the home page, the diary and the notes.)
 export type AppName = 'home' | 'habit' | 'diary' | 'notes' | 'achievement' | 'shopping' | 'pixel';
@@ -18,11 +19,10 @@ export const shownApp = (): AppName => {
 const LAST_KEY = 'hk-last-app';
 export const rememberApp = (app: AppName) => {
   if (app === 'home') return;
-  try { localStorage.setItem(LAST_KEY, app === 'notes' ? 'diary' : app); } catch { /* not remembered: Habit Kitty stays marked */ }
+  setLocal(LAST_KEY, app === 'notes' ? 'diary' : app);   // not remembered: Habit Kitty stays marked
 };
 export const lastApp = (): AppName => {
-  let a: string | null = null;
-  try { a = localStorage.getItem(LAST_KEY); } catch { /* storage blocked */ }
+  const a = getLocal(LAST_KEY);
   return a === 'diary' || a === 'achievement' || a === 'shopping' || a === 'pixel' ? a : 'habit';
 };
 

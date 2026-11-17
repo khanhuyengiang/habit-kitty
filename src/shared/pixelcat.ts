@@ -186,7 +186,7 @@ const EXPRESSION: Record<Face, (mouthRow: number) => [number, number, string][]>
   dead: () => [[10, 8, 'f'], [10, 9, 'f'], [9, 8, 'e'], [11, 8, 'e'], [10, 9, 'e'], [11, 1, 'h'], [12, 1, 'h'], [13, 1, 'h']],
 };
 
-// ---- coats: the base colours of each pattern. Where the accent colours (a, b) go is drawn in src/coats.ts ----
+// ---- coats: the base colours of each pattern. Where the accent colours (a, b) go is drawn in ./coats.ts ----
 interface Coat { f: string; s: string; W: string; a: string; b: string; tail?: string }
 
 const shade = (hex: string, f: number) =>

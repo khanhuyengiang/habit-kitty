@@ -12,9 +12,10 @@ import { FINE, UI_ICONS, bakeSticker, fineSvg, stickerArtSvg } from '../achievem
 import { iconSvg } from '../pixelart.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { onAppShown, onShown } from '../shared/apps.ts';
-import { esc, plural } from '../shared/html.ts';
+import { $, esc, plural } from '../shared/html.ts';
 import { localDateKey } from '../shared/dates.ts';
 import { makeLayer } from '../shared/layer.ts';
+import { readJson, writeJson } from '../shared/local.ts';
 import { PALETTE, PALETTE_GROUPS } from '../shared/palette.ts';
 import { saveToDevice } from '../shared/backupfolder.ts';
 import { closeX, homeButton, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
@@ -33,7 +34,6 @@ import {
   type Rect, type Shown, CAT_SIZE, isFixed, MAX_SPOTS, SCENE_INKS, clampProp, clampSpot, sceneColors, type Props,
 } from './model.ts';
 
-const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const toast = (text: string) => showToast($('pixel-toast'), text);
 
 type Tab = 'icons' | 'draw' | 'colours';
@@ -144,16 +144,14 @@ function inksHtml(c: CategoryId): string {
 // The palette colours picked with "Choose a colour", latest first (kept on this device).
 const RECENT_KEY = 'hk-pixel-recent', RECENT_MAX = 9;
 function recentInks(): string[] {
-  try {
-    const v: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]');
-    return Array.isArray(v) ? v.filter((ch): ch is string => typeof ch === 'string' && ch.length === 1 && MORE_INKS.includes(ch)).slice(0, RECENT_MAX) : [];
-  } catch { return []; }
+  const v = readJson(RECENT_KEY);
+  return Array.isArray(v) ? v.filter((ch): ch is string => typeof ch === 'string' && ch.length === 1 && MORE_INKS.includes(ch)).slice(0, RECENT_MAX) : [];
 }
 // Draws with a colour from now on (one from "Choose a colour" goes to the top of Previously used).
 function useInk(ch: string) {
   ink = ch;
   if (ch.length !== 1 || !MORE_INKS.includes(ch)) return;
-  try { localStorage.setItem(RECENT_KEY, JSON.stringify([ch, ...recentInks().filter((r) => r !== ch)].slice(0, RECENT_MAX))); } catch { /* not kept: fine */ }
+  writeJson(RECENT_KEY, [ch, ...recentInks().filter((r) => r !== ch)].slice(0, RECENT_MAX));   // not kept: fine
 }
 function openInks() {
   if (!draft) return;

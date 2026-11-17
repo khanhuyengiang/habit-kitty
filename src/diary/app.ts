@@ -6,7 +6,7 @@ import { WEATHER, iconSvg, weatherLabel, weatherSvg } from '../pixelart.ts';
 import { mpLine } from '../player.ts';
 import { dayIndex } from '../rules.ts';
 import { monoSvg } from '../shared/pixelart.ts';
-import { esc } from '../shared/html.ts';
+import { $, esc } from '../shared/html.ts';
 import { newId } from '../shared/id.ts';
 import { makeLayer } from '../shared/layer.ts';
 import { MONTH_NAMES, pickerHtml } from '../shared/picker.ts';
@@ -27,7 +27,6 @@ import {
 import { MOOD_KEYS, STAR_LABEL, feelingText, moodName, moodSprite, moodsSprite, pinSvg, starSvg } from './moods.ts';
 import { MAX_PEOPLE, birthdaysOn, personErrors, personFrom, upcoming, whenText } from './people.ts';
 
-const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
 // ---- the clock: the same day as Habit Kitty (its day start, and its playtest clock) ----
 const now = () => new Date(Date.now() + habitStats().offsetHours * 3_600_000);

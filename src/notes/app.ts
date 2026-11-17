@@ -5,7 +5,7 @@ import { iconSvg } from '../pixelart.ts';
 import { PICKER_ICONS, groupedPicks, iconLabel, iconSvg as uiIcon, pickable, stickerSvg } from '../achievement/pixelart.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
-import { esc } from '../shared/html.ts';
+import { $, esc } from '../shared/html.ts';
 import { localDateKey } from '../shared/dates.ts';
 import { makeLayer } from '../shared/layer.ts';
 import { compressPhoto } from '../shared/photo.ts';
@@ -15,7 +15,6 @@ import { COLOR, faceSvg, tint, winBar } from './window.ts';
 import { allNotes, deleteNote, noteOf, notesInitialised, notesReady, onNotes, saveNote } from './data.ts';
 import { MAX_NOTES, MAX_TEXT, NOTE_COLORS, NOTE_FACES, composeNote, continueList, excerpt, isDateText, parseNote, plainText, renderMarkdown, searchNotes, titleFromText, type Cover, type Note, type NoteColor, type NoteDoodle, type NoteFace } from './model.ts';
 
-const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const toast = (text: string) => showToast($('notes-toast'), text);
 
 // ---- header ----

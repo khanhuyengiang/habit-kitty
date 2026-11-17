@@ -5,3 +5,6 @@ export const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt
 
 // "1 kitty", "3 kitties": `many` defaults to adding an s.
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+// The element with this id (every screen's markup is in the page, so it is there).
+export const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;

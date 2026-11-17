@@ -13,7 +13,7 @@ import { iconSvg } from '../pixelart.ts';
 import { PICKER_ICONS, groupedPicks, pickable, stickerSvg } from '../achievement/pixelart.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { onAppShown, onShown } from '../shared/apps.ts';
-import { esc, plural } from '../shared/html.ts';
+import { $, esc, plural } from '../shared/html.ts';
 import { makeLayer } from '../shared/layer.ts';
 import { closeX, homeButton, orderList, playerButton, refocusMove, settingsButton, titleBar } from '../shared/ui.ts';
 import { COLOR, tint, winBar } from '../notes/window.ts';
@@ -27,7 +27,6 @@ import {
   type Cat, type CatColor, type Category, type Had, type Have, type Item, type Recipe, type Regular, type Rule, type Suggestion,
 } from './model.ts';
 
-const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const STAR = ['...o...', '..ooo..', 'ooooooo', '.ooooo.', '..ooooo', '.oo.oo.', 'oo...oo'];
 const star = () => monoSvg(STAR, 'star');
 

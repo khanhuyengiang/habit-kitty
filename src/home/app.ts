@@ -12,12 +12,11 @@ import { lastApp, onAppShown } from '../shared/apps.ts';
 import { compressPhoto } from '../shared/photo.ts';
 import { avatarUrlOf, loadPlayerData, savePlayer } from '../shared/player.ts';
 import { napSvg } from '../shared/pixelcat.ts';
-import { esc } from '../shared/html.ts';
+import { $, esc } from '../shared/html.ts';
 import { appName, closeX, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
 import { habitStats, onHabitStats } from '../shared/stats.ts';
 import { VERSION } from '../version.ts';
 
-const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
 let data: Data | null = null;     // the saved player and achievements (null until read)
 let avatar = '';                  // object URL of the player's picture
