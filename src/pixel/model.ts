@@ -287,15 +287,8 @@ export function setFood(data: PixelData, ids: string[], food: boolean, now = Dat
   return next;
 }
 
-// ---- TEMPORARY: stickers grew from 16×16 to 18×18 ----
-// A 16×16 sticker of yours (or in an export) is kept as it is until "Add border to all" turns it into an 18×18 one.
-const OLD_STICKER: [number, number] = [16, 16];
-const isOldSticker = (i: { category: CategoryId; art: string[] }) => i.category === 'sticker' && i.art.length === OLD_STICKER[1] && i.art.every((r) => r.length === OLD_STICKER[0]);
-export const oldStickers = (data: PixelData) => data.icons.filter(isOldSticker).length;
-// Every 16×16 sticker of yours gets an empty pixel around it, then the dark outline and the lit and shaded edges as they
-// used to be added for it (see bakeSticker), so it looks just as before.
-export const borderAll = (data: PixelData, now = Date.now()): PixelData =>
-  ({ ...data, icons: data.icons.map((i) => (isOldSticker(i) ? { ...i, art: bakeSticker(i.art), updated: now } : i)) });
+// A 16×16 sticker from before stickers were 18×18 (in an old save or export) gets its border drawn in as it loads.
+const oldSticker = (art: unknown) => { const a = cleanArt(art, 'sticker', [16, 16]); return a && bakeSticker(a); };
 
 // What is kept on the device, read back: anything broken is left out.
 export function sanitize(raw: unknown): PixelData {
@@ -315,7 +308,7 @@ function checkIcon(i: unknown): Omit<PixelIcon, 'updated'> | null {
   const v = i as Partial<PixelIcon> | null;
   if (!v || !isCategory(v.category) || typeof v.id !== 'string' || !/^[a-z][a-z0-9]{0,31}$/i.test(v.id)) return null;
   if (isFixed(v.category) && !officialOf(v.category, v.id)) return null;   // only the official ones
-  const art = cleanArt(v.art, v.category, sizeOf(v.category, v.id)) ?? (v.category === 'sticker' ? cleanArt(v.art, v.category, OLD_STICKER) : null);
+  const art = cleanArt(v.art, v.category, sizeOf(v.category, v.id)) ?? (v.category === 'sticker' ? oldSticker(v.art) : null);
   if (!art) return null;
   const icon: Omit<PixelIcon, 'updated'> = { category: v.category, id: v.id, name: cleanName(String(v.name ?? ''), v.id), group: cleanGroup(String(v.group ?? '')), art };
   if (v.category === 'sticker' && typeof v.food === 'boolean') icon.food = v.food;

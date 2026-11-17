@@ -8,7 +8,7 @@
 //   Colours  every colour of the app's palette (src/shared/palette.ts), and which letter draws it
 // The rules and the export file are in ./model.ts, kept on the device by ./data.ts. Drawn with Habit Kitty's stylesheet and
 // its own, in web/pixel.html.
-import { FINE, UI_ICONS, bakeSticker, fineSvg, stickerArtSvg } from '../shared/stickers.ts';
+import { FINE, UI_ICONS, fineSvg, stickerArtSvg } from '../shared/stickers.ts';
 import { iconSvg } from '../shared/art.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { onAppShown, onShown } from '../shared/apps.ts';
@@ -30,7 +30,7 @@ import {
   BASE_ROWS, INK_ROWS, MORE_INKS, byHue,
   CATEGORIES, DEFAULT_GROUP, byName, LETTERS, LIMITS, USER_GROUP, blankGrid, categoryOf, cleanGroup, cleanName, dropCount, dropFloat, dropIcon, dropIcons,
   exportName, exportText, flipGrid, floodFill, groupsOf, iconsOf, liveIcons, canDeleteOfficial, deleteOfficial, restoreIcon, importClashes, importIcons, inRect, nameTaken, type PixelIcon, isBlank, letterName, liftArea, linePoints,
-  moveIcons, newId, officialOf, putIcon, readExport, rectOf, renameGroup, setFood, shiftGrid, borderAll, oldStickers, sizeOf, toArt, toGrid, type CategoryId, type Grid,
+  moveIcons, newId, officialOf, putIcon, readExport, rectOf, renameGroup, setFood, shiftGrid, sizeOf, toArt, toGrid, type CategoryId, type Grid,
   type Rect, type Shown, CAT_SIZE, isFixed, MAX_SPOTS, SCENE_INKS, clampProp, clampSpot, sceneColors, type Props,
 } from './model.ts';
 
@@ -209,7 +209,6 @@ function iconsHtml(): string {
         : isFixed(c.id) ? ''
         : `<div class="btns flow"><button class="btn primary" type="button" data-action="pix-new">${iconSvg('pencil')} New ${esc(c.label.toLowerCase())}</button>
         <button class="btn${organise ? ' on' : ''}" type="button" data-action="pix-organise" aria-pressed="${organise}">Organise</button></div>`}
-      ${c.id === 'sticker' ? borderButton() : ''}
       ${organise ? `<p class="muted pix-note">Tap icons to pick them, then move them to another group${cat === 'sticker' ? ', make them cat food or not,' : ''} or delete them below.</p>` : ''}
     </div>
     ${groups.map((g) => groupHtml(g, list.filter((i) => i.group === g).sort(byName))).join('')}
@@ -248,20 +247,6 @@ function goneHtml(list: Shown[]): string {
     <p class="muted">Official ${cat === 'weather' ? 'weather' : `${esc(categoryOf(cat).label.toLowerCase())}s`} you deleted: the app no longer shows or uses them. Tap one to bring it back.</p>
     <div class="pix-tiles" style="${baseStyle(cat)}">${list.map((i) => `<button class="pix-tile" type="button" data-action="pix-view" data-id="${esc(i.id)}" title="${esc(i.name)}">
       <span class="pix-pic">${pictureSvg(cat, i.art)}</span><span class="pix-tname">${esc(i.name)}</span></button>`).join('')}</div></section>`;
-}
-
-// TEMPORARY (stickers grew from 16×16 to 18×18): gives every 16×16 sticker of yours its empty pixel, dark outline and
-// lit edges, so it looks as it did. To go in the next patch, with borderAll and oldStickers in ./model.ts.
-function borderButton(): string {
-  const n = oldStickers(pixelData());
-  return `<p class="muted pix-note">Stickers are 18 × 18 now, with the dark outline drawn in. ${n ? `${plural(n, 'sticker')} of yours ${n === 1 ? 'is' : 'are'} still 16 × 16.` : 'All of yours are 18 × 18.'}</p>
-    <div class="btns flow"><button class="btn" type="button" data-action="pix-border-all" ${n ? '' : 'disabled'}>Add border to all</button></div>`;
-}
-async function addBorders() {
-  const n = oldStickers(pixelData());
-  if (!await setPixelData(borderAll(pixelData()))) { toast("Couldn't add the borders. Try again."); return; }
-  toast(`Added a border to ${plural(n, 'sticker')}.`);
-  render();
 }
 
 // Organising: the bar that stays at the bottom, with what is picked and where it goes.
@@ -325,9 +310,7 @@ async function movePicked() {
 function startDraft(c: CategoryId, id: string | null, asCopy = false) {
   const shown = id ? iconsOf(pixelData(), c).find((i) => i.id === id) : undefined;
   const [w, h] = sizeOf(c, shown && !asCopy ? shown.id : null);
-  // TEMPORARY: a 16×16 sticker of yours opens with its border added, as "Add border to all" would
-  const art = shown && c === 'sticker' && shown.art.length === 16 ? bakeSticker(shown.art) : shown?.art;
-  const grid = art ? toGrid(art.map((r) => r.padEnd(w, '.').slice(0, w))) : blankGrid(w, h);
+  const grid = shown ? toGrid(shown.art.map((r) => r.padEnd(w, '.').slice(0, w))) : blankGrid(w, h);
   while (grid.length < h) grid.push(Array<string>(w).fill('.'));
   draft = { cat: c, id: shown ? shown.id : null, name: shown?.name ?? '', group: shown?.group ?? USER_GROUP, grid: grid.slice(0, h), saved: '' };
   if (c === 'sticker') draft.food = !!shown?.food;
@@ -904,7 +887,6 @@ onShown('pixel', 'click', (ev) => {
     }
     case 'pix-unpick': picked.clear(); render(); break;
     case 'pix-move': movePicked(); break;
-    case 'pix-border-all': addBorders(); break;
     case 'pix-food-set': foodPicked(b.dataset.food === '1'); break;
     case 'pix-del-picked': askDeletePicked(); break;
     case 'pix-del-confirm': deletePicked(); break;

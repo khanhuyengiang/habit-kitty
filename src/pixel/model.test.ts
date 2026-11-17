@@ -3,7 +3,7 @@ import { PICKER_ICONS, PICKER_ICON_NAMES } from '../shared/sticker-icons.ts';
 import {
   BASE_ROWS, INK_ROWS, MORE_INKS, byHue, categoryOf, paletteLabel,
   CATEGORIES, DEFAULT_GROUP, EXPORT_FORMAT, LETTERS, USER_GROUP, blankGrid, cleanArt, dropIcon, emptyData, exportText, floodFill,
-  borderAll, oldStickers, byName, canDeleteOfficial, deleteOfficial, liveIcons, restoreIcon, countMine, dropCount, dropFloat, dropIcons, groupsOf, setFood, resetIcons, iconsOf, importClashes, importIcons, nameTaken, uniqueNames, inRect, liftArea, linePoints, moveIcons, rectOf, newId, officials, putIcon, readExport, renameGroup, sanitize, shiftGrid, sizeOf, toArt, toGrid,
+  byName, canDeleteOfficial, deleteOfficial, liveIcons, restoreIcon, countMine, dropCount, dropFloat, dropIcons, groupsOf, setFood, resetIcons, iconsOf, importClashes, importIcons, nameTaken, uniqueNames, inRect, liftArea, linePoints, moveIcons, rectOf, newId, officials, putIcon, readExport, renameGroup, sanitize, shiftGrid, sizeOf, toArt, toGrid,
 } from './model.ts';
 import { PALETTE, type PaletteName } from '../shared/palette.ts';
 import { FINE } from '../shared/stickers.ts';
@@ -183,16 +183,13 @@ describe('moveIcons', () => {
   });
 });
 
-describe('stickers at 18 × 18 (TEMPORARY: Add border to all)', () => {
+describe('stickers at 18 × 18', () => {
   it('has every official sticker at 18 × 18', () => {
     for (const o of officials('sticker')) expect([o.art.length, ...new Set(o.art.map((r) => r.length))], o.id).toEqual([18, 18]);
   });
-  it('keeps a 16 × 16 sticker of yours until it gets its border, which looks just as it used to', () => {
+  it('gives an old 16 × 16 sticker its border as it loads, looking just as it used to', () => {
     const old = Array.from({ length: 16 }, (_, y) => (y === 8 ? '....ssssssss....' : '.'.repeat(16)));
-    let d = sanitize({ version: 1, icons: [{ category: 'sticker', id: 'teapot', name: 'Teapot', group: USER_GROUP, art: old, updated: 1 }] });
-    expect(oldStickers(d)).toBe(1);
-    d = borderAll(d, 7);
-    expect(oldStickers(d)).toBe(0);
+    const d = sanitize({ version: 1, icons: [{ category: 'sticker', id: 'teapot', name: 'Teapot', group: USER_GROUP, art: old, updated: 1 }] });
     const empty = '.'.repeat(18);   // one row of base colour: lit along its top, with the dark line around it
     expect(d.icons[0].art).toEqual([...Array(8).fill(empty), '.....oooooooo.....', '....ollllllllo....', '.....oooooooo.....', ...Array(7).fill(empty)]);
     expect(sanitize(d).icons[0].art).toEqual(d.icons[0].art);

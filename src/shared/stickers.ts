@@ -118,7 +118,7 @@ function stickerRows(icon: string[], s: 1 | 2): string[] {
 
 // A 16×16 sticker as it was drawn before stickers were 18×18: an empty pixel around it, then the dark outline (touching
 // it side-on only, so its outer corners stay empty) and the lit and shaded edges written into the art, exactly as they
-// used to be added when it was drawn. TEMPORARY: for Kitty Gallery's "Add border to all" button.
+// used to be added when it was drawn. Kitty Gallery still turns an old 16×16 sticker into an 18×18 one with it.
 export function bakeSticker(icon: string[]): string[] {
   const at = (x: number, y: number) => icon[y]?.[x] ?? '.', on = (x: number, y: number) => at(x, y) !== '.';
   const rows: string[] = [];
