@@ -5,25 +5,21 @@ const { fs, put, text } = await import('../test/fsmock.ts');
 
 const data = await import('./data.ts');
 const { dayOf } = await import('../shared/dates.ts');
-const day = dayOf(2026, 9, 12);
 
 describe('diary data', () => {
   beforeAll(async () => {
-    // an old save: one page inside it, and the diary settings that used to live in the game
     put('habit-kitty/diary/2026-10-01.md', Buffer.from('---\nmood: calm\nupdated: 1\n---\nAlready a file\n'));
-    expect(await data.initDiary({ diary: { [day]: { text: 'From the old save', updated: 5 } }, trackamaniac: true, moodNames: { joyful: 'Yay' } })).toBe(true);
+    await data.initDiary();
   });
 
-  it('moves an old save\'s pages into files and keeps the pages already there', () => {
+  it('reads the pages already there', () => {
     expect(data.diaryReady()).toBe(true);
-    expect(data.entryOf(day)?.text).toBe('From the old save');
     expect(data.entryOf(dayOf(2026, 9, 1))?.mood).toBe('calm');
-    expect(text(`habit-kitty/diary/2026-10-12.md`)).toContain('From the old save');
-    expect(data.dayCount()).toBe(2);
+    expect(data.dayCount()).toBe(1);
   });
 
-  it('starts a new diary with every option on, and the emotion names the old save had, in diary.json', () => {
-    const want = { trackamaniac: true, teleportation: true, photographer: true, titles: true, starry: true, moodNames: { joyful: 'Yay' } };
+  it('starts a new diary with every option on, in diary.json', () => {
+    const want = { trackamaniac: true, teleportation: true, photographer: true, titles: true, starry: true };
     expect(data.diaryExtras()).toEqual(want);
     expect(JSON.parse(text('habit-kitty/diary.json')!)).toEqual(want);
   });
@@ -34,7 +30,7 @@ describe('diary data', () => {
     expect(data.hasPageOn(d)).toBe(true);
     expect(fs.has('habit-kitty/photos/2026-10-20.jpg')).toBe(true);
     expect([...(await (await data.getPhoto(d))!.arrayBuffer().then((b) => new Uint8Array(b)))]).toEqual([1, 2, 3]);
-    expect(data.pageCount()).toBe(3);
+    expect(data.pageCount()).toBe(2);
     expect(await data.saveEntry(d, null, 'none')).toBe(true);
     expect(data.entryOf(d)).toBeUndefined();
     expect(fs.has('habit-kitty/diary/2026-10-20.md')).toBe(false);
@@ -81,7 +77,7 @@ describe('diary data', () => {
   it('backs up and restores everything, replacing what was there', async () => {
     await data.saveReflection('2026-09', 'September');
     const b = await data.collectDiary();
-    expect(Object.keys(b.diary).length).toBe(2);
+    expect(Object.keys(b.diary).length).toBe(1);
     expect(b.reflections['2026-09'].text).toBe('September');
     expect(b.extras.people?.[0].name).toBe('Mum');
 

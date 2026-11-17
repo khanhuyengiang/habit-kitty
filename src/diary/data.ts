@@ -14,7 +14,6 @@ import {
   EXTRAS_FILE, MAX_PHOTOS, dayFromName, diaryPath, entryFromMarkdown, entryToMarkdown, monthFromKey, photoPath, reflectionPath, sanitizeExtras,
   type DiaryEntry, type DiaryExtras, type Reflection,
 } from './model.ts';
-import { compressPhoto } from '../shared/photo.ts';
 import { BACKUP_PREFIX, markDirty } from '../shared/backupfolder.ts';
 import { publishHabitStats } from '../shared/stats.ts';
 
@@ -63,43 +62,6 @@ async function readExtras(): Promise<DiaryExtras | null> {
   try { return sanitizeExtras(JSON.parse(new TextDecoder().decode(bytes))); } catch { return {}; }
 }
 
-// ---- the old ways: the diary text inside the save, the photos in IndexedDB ----
-function legacyPhotos(): Promise<Record<number, Blob>> {
-  return new Promise((resolve) => {
-    const out: Record<number, Blob> = {};
-    try {
-      const req = indexedDB.open('habit-kitty-photos', 1);
-      req.onupgradeneeded = () => { req.transaction?.abort(); };   // nothing was ever stored
-      req.onerror = () => resolve(out);
-      req.onsuccess = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains('photos')) { db.close(); resolve(out); return; }
-        const cur = db.transaction('photos').objectStore('photos').openCursor();
-        cur.onsuccess = () => {
-          const c = cur.result;
-          if (c) { out[Number(c.key)] = c.value; c.continue(); } else { db.close(); resolve(out); }
-        };
-        cur.onerror = () => { db.close(); resolve(out); };
-      };
-    } catch { resolve(out); }
-  });
-}
-
-async function migrateLegacyDiary(old: [string, DiaryEntry][]): Promise<boolean> {
-  if (!old.length) return true;
-  const photos = await legacyPhotos();
-  for (const [k, e] of old) {
-    const day = Number(k);
-    if (!await writeEntry(day, e)) return false;
-    if (e.photo && photos[day]) {
-      const small = await compressPhoto(photos[day]).catch(() => null);
-      if (small && !await writePhoto(day, new Uint8Array(await small.arrayBuffer()))) return false;
-    }
-  }
-  try { indexedDB.deleteDatabase('habit-kitty-photos'); } catch { /* ignore */ }
-  return true;
-}
-
 // ---- in memory ----
 let entries: Record<number, DiaryEntry> = {};
 let reflections: Record<string, Reflection> = {};
@@ -128,31 +90,26 @@ function changed() {
 }
 
 // ---- start ----
-let started: Promise<boolean> | null = null;
+let started: Promise<void> | null = null;
 let resolveInit: () => void = () => {};
 // Resolves once Habit Kitty has started the diary (whether or not the files could be read).
 export const diaryInitialised = new Promise<void>((r) => { resolveInit = r; });
 
-export interface Legacy { diary?: Record<string, DiaryEntry>; trackamaniac?: boolean; moodNames?: DiaryExtras['moodNames'] }
+// The diary settings a v0.5.0 backup kept in the game instead.
+export interface Legacy { trackamaniac?: boolean; moodNames?: DiaryExtras['moodNames'] }
 
-// Reads everything; first moves anything old versions kept elsewhere (`legacy`) into files. Resolves false when that failed:
-// the caller keeps the old copy and it is tried again next launch.
-export function initDiary(legacy: Legacy = {}): Promise<boolean> {
+// Reads everything (a new diary starts with every option on).
+export function initDiary(): Promise<void> {
   started ??= (async () => {
-    if (!await migrateLegacyDiary(Object.entries(legacy.diary ?? {}))) { resolveInit(); return false; }
     entries = await readEntries();
     reflections = await readReflections();
     const stored = await readExtras();
     if (stored) extras = stored;
-    else {   // a new diary starts with every option on; the emotion names used to live in Habit Kitty's save
-      extras = sanitizeExtras({ ...ALL_ON, moodNames: legacy.moodNames });
-      await writeExtras(extras);
-    }
+    else { extras = { ...ALL_ON }; await writeExtras(extras); }
     ready = true;
     resolveInit();
     publishHabitStats({ diaryDays: dayCount() });
     for (const l of listeners) l();
-    return true;
   })();
   return started;
 }

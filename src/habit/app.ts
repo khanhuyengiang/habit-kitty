@@ -5,7 +5,7 @@ import {
   type ActionResult, type AppState, type Cat, type CatMode, type CatGender, type CatLook, type CatTrait, type GameEvent, type MindfulTask, type Reason, type TaskKind,
 } from './rules.ts';
 import { BACKUP_EXT, BACKUP_PREFIX, backupNow, backupStatus, chooseFolder, folderBackups, markDirty, nativeBackups, onBackupStatus, readFolderBackup, refreshFolder, registerBackupSource, saveBackupToDevice, saveToDevice, shareBackup as shareBackupFile, shareFile, stopBackups } from '../shared/backupfolder.ts';
-import { achievementCount, restoreAchievement, snapshotAchievement } from '../achievement/web/snapshot.ts';
+import { achievementCount, restoreAchievement, snapshotAchievement } from '../achievement/save.ts';
 import { PICKER_ICONS, iconLabel, stickerSvg } from '../shared/stickers.ts';
 import type { LastCall, ReminderSettings } from './reminders.ts';
 import { allCatsDiary, catDiary, clock } from './catdiary.ts';
@@ -16,7 +16,7 @@ import { VERSION } from '../shared/version.ts';
 import CHANGELOG_MD from '../../CHANGELOG.md';
 import { pickThought, type ThoughtKind } from './thoughts.ts';
 import { isZip, packBackup, unpackBackup, type Backup } from '../backup.ts';
-import type { DiaryEntry, Mood } from '../diary/model.ts';
+import type { Mood } from '../diary/model.ts';
 import { CONFETTI_COLORS, TRAITS, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
 import { GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, petHeartSvg, iconSvg, markSvg, outdoorSvg, roomSvg, sceneVersion } from '../shared/art.ts';
 import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, trophyIcon, type AppName } from '../shared/apps.ts';
@@ -29,7 +29,7 @@ import { applyMartSettings, martSettingsOf } from '../shopping/model.ts';
 import { collectPixel, initPixel, restorePixel, setPixelData } from '../pixel/data.ts';
 import { PARTS, SETTINGS_EXT, SETTINGS_PREFIX, cleanDiary, isSettingsText, readSettings, settingsText, type HabitSettings, type Part, type SettingsFile } from '../settings-file.ts';
 import { backupName } from '../shared/backup-schedule.ts';
-import { mountLookSettings } from '../shared/look.ts';
+import { mountLookSettings } from './look.ts';
 import { publishHabitStats } from '../shared/stats.ts';
 import { meterHtml } from '../shared/meter.ts';
 import { hpLine } from '../shared/stat-lines.ts';
@@ -50,9 +50,8 @@ import { dateOf, dayOf } from '../shared/dates.ts';
 interface LogLine { at: number; text: string }
 interface Save {
   v: 1; state: AppState; offsetHours: number; log: LogLine[]; savedAt: number; logHidden?: boolean; unlimited?: boolean; roomName?: string; outdoorName?: string; allowRename?: boolean; showClock?: boolean;
-  trackamaniac?: boolean;              // Meteorokinesis (kept under its old name): adds a weather choice to every diary page
-  moodNames?: Partial<Record<Mood, string>>;   // the user's own names for the five emotions
-  diary?: Record<string, DiaryEntry>;   // in memory only: each page lives in its own file (see "Diary files")
+  trackamaniac?: boolean;              // only in v0.5.0 backups, which kept the diary settings here (restoreDiary takes them)
+  moodNames?: Partial<Record<Mood, string>>;   // likewise
   reminder?: ReminderSettings;
   returned?: Record<string, number>;   // cat id -> day it last came home (feeds the "welcome back" thoughts)
   timeTravel?: boolean;                // lets kitties, stray kitties and treats be marked fed or done on past days
@@ -71,22 +70,10 @@ const fresh = (): Save => ({ v: 1, state: newState(), offsetHours: 0, log: [], s
 
 function readLocal() { return readJson<Save>(KEY); }
 
-// Older saves: every mindful item was a repeating habit with no history, and accomplishments were "achieved".
-function normalize(sv: Save & { achieved?: Record<string, number> }): Save {
-  const { achieved, ...rest } = sv;
-  if (achieved && !rest.accomplished) rest.accomplished = achieved;
-  sv = rest;
-  setDayStart(sv.dayStart);   // every day index from here on, this one included, follows the save's day start
-  const day = dayIndex(new Date(Date.now() + (Number(sv.offsetHours) || 0) * 3_600_000));
-  const tasks = (sv.state.tasks ?? []).map((k) => {
-    const kind: TaskKind = k.kind ?? 'habit';
-    const doneDays = k.doneDays ?? (k.lastDoneDay === null || k.lastDoneDay === undefined ? [] : [k.lastDoneDay]);
-    return {
-      ...k, kind, doneDays,
-      xp: Math.min(kind === 'task' ? CONFIG.taskMaxXp : CONFIG.habitMaxXp, k.xp),
-      createdDay: k.createdDay ?? doneDays[0] ?? day,
-    };
-  });
+// Every day index from here on follows the save's day start; and a task's XP never goes over the most it can be.
+function normalize(sv: Save): Save {
+  setDayStart(sv.dayStart);
+  const tasks = (sv.state.tasks ?? []).map((k) => ({ ...k, xp: Math.min(k.kind === 'task' ? CONFIG.taskMaxXp : CONFIG.habitMaxXp, k.xp) }));
   return { ...sv, state: { ...sv.state, tasks } };
 }
 
@@ -97,19 +84,15 @@ type DocRef = { get(): Promise<{ exists: boolean; data(): unknown }>; set(d: obj
 let remote: DocRef | null = null;
 let writing: Promise<void> = Promise.resolve();
 
-// The game part of a save. Until the diary has been moved into files, the old copy in localStorage is kept so nothing is lost.
-let diaryReady = false;
-const gameOnly = (): Save => { const { diary, ...game } = save; return diaryReady ? game : save; };
-
 function persist() {
   save.savedAt = Date.now();
   markDirty(BACKUP_PREFIX);
   publishStats();
   queueReminderSync();
-  writeJson(KEY, gameOnly());   // private mode: keep playing in memory
+  writeJson(KEY, save);   // private mode: keep playing in memory
   if (remote) {
     const ref = remote;
-    const body = JSON.parse(JSON.stringify(gameOnly()));
+    const body = JSON.parse(JSON.stringify(save));
     writing = writing.then(() => ref.set(body)).catch(() => { remote = null; renderSaved(); });
   }
 }
@@ -126,7 +109,7 @@ async function connectAccount() {
     const theirs = snap.exists ? (snap.data() as Save) : null;
     if (theirs?.state && theirs.savedAt > save.savedAt) {
       save = normalize(theirs);
-      writeJson(KEY, gameOnly());
+      writeJson(KEY, save);
     }
     remote = ref;
     if (!theirs || theirs.savedAt < save.savedAt) persist();
@@ -1002,20 +985,15 @@ function renderSaved() {
 
 // ===================== Diary data =====================
 // The Diary screen (src/diary/) owns the diary. Habit Kitty starts its data, because the backup and the accomplishments need it.
-// Old saves kept the diary text inside the save (and the settings in it): hand those over once, then drop them from the save.
 async function loadDiary() {
-  const ok = await initDiary({ diary: save.diary, trackamaniac: save.trackamaniac, moodNames: save.moodNames });
-  if (!ok) return;   // keep the old copy in the save and try again next launch
-  diaryReady = true;
-  delete save.diary; delete save.trackamaniac; delete save.moodNames;
-  persist();   // from now on the save no longer carries the diary
+  await initDiary();
   checkAccomplishments();
 }
 
 // ---- Backup: one .kitty file (a zip) holding the game, every diary page and every photo ----
 async function collectBackup(): Promise<Backup> {
   await initPixel();
-  return { game: gameOnly(), ...await collectDiary(), notes: collectNotes(), shopping: collectShopping(), gallery: collectPixel(), achievement: await snapshotAchievement() };
+  return { game: save, ...await collectDiary(), notes: collectNotes(), shopping: collectShopping(), gallery: collectPixel(), achievement: await snapshotAchievement() };
 }
 
 registerBackupSource({ prefix: BACKUP_PREFIX, ext: BACKUP_EXT, pack: async () => packBackup(await collectBackup()) });
@@ -1114,7 +1092,6 @@ async function restoreBackup() {
     const { trackamaniac, moodNames, ...rest } = g;   // older backups kept the diary settings here (restoreDiary took them)
     save = normalize(rest);
     lastLevel = null;
-    diaryReady = true;
     persist(); settle(); renderAll();
   }
   closeModal();
@@ -1220,7 +1197,7 @@ async function readSettingsFile(f: File | undefined) {
 }
 
 // ===================== Feeding reminders (./notify.ts) =====================
-initReminders({ save: () => save, now, persist, storeQuietly: () => writeJson(KEY, gameOnly()), toast });
+initReminders({ save: () => save, now, persist, storeQuietly: () => writeJson(KEY, save), toast });
 
 // ===================== Tabs & modal =====================
 const TABS = ['room', 'mindful', 'today', 'heat', 'settings'];
@@ -1798,7 +1775,7 @@ onShown('habit', 'click', (ev) => {
     case 'settings-load': $('settings-file').click(); break;
     case 'settings-yes': loadSettings(); break;
     case 'save-copy': {
-      const text = JSON.stringify(gameOnly());
+      const text = JSON.stringify(save);
       ($('save-text') as HTMLTextAreaElement).value = text;
       navigator.clipboard?.writeText(text).then(() => toast('Copied. Paste it somewhere safe.'), () => toast('Select the text below and copy it.'));
       break;
