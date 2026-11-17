@@ -1,8 +1,8 @@
 // The stat line at the top of each screen, drawn the same everywhere (Habit Kitty's style): one row of text over one bar.
 //   HP 397                97/300 to lvl 3
 //   [■■■■■■■■□□]
-// The look is in web/page.html (.meter); the numbers come from player.ts.
-import type { StatLine } from '../player.ts';
+// The look is in web/page.html (.meter); the numbers come from ./stat-lines.ts.
+import type { StatLine } from './stat-lines.ts';
 import { esc } from './html.ts';
 
 

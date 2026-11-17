@@ -1,10 +1,10 @@
 // The Diary screen: a month calendar of pages (tap a day to write one), a reflection for the month, and birthdays.
-// The data lives in ./data.ts (Habit Kitty starts it); the pure parts are in ../store.ts and ./people.ts.
+// The data lives in ./data.ts (Habit Kitty starts it); the pure parts are in ./model.ts and ./people.ts.
 // Drawn with Habit Kitty's stylesheet, in web/diary.html's root.
-import { dateOf, dayOf } from '../calendar.ts';
+import { dateOf, dayOf } from '../shared/dates.ts';
 import { WEATHER, iconSvg, weatherLabel, weatherSvg } from '../shared/art.ts';
-import { mpLine } from '../player.ts';
-import { dayIndex } from '../rules.ts';
+import { mpLine } from '../shared/stat-lines.ts';
+import { dayIndex } from '../habit/rules.ts';
 import { monoSvg } from '../shared/pixelart.ts';
 import { $, esc } from '../shared/html.ts';
 import { newId } from '../shared/id.ts';

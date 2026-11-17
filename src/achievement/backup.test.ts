@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { packBackup, unpackBackup } from './backup.ts';
-import { packBackup as packKitty } from '../store.ts';
+import { packBackup as packKitty } from '../backup.ts';
 import { emptyData, saveAchievement, saveMainQuest, saveSideQuest } from './ops.ts';
 import { strToU8, zipSync } from 'fflate';
 

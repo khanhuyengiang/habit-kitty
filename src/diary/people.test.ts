@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayOf } from '../calendar.ts';
+import { dayOf } from '../shared/dates.ts';
 import type { Person } from './model.ts';
 import { birthdaysOn, daysUntil, personErrors, personFrom, turning, upcoming, whenText } from './people.ts';
 

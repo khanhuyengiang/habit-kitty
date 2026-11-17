@@ -1,6 +1,6 @@
 // Auto-backup rules, pure so they can be tested: what the files are called, when a backup is due and which old ones to delete.
 // The folder itself is handled by src/shared/backupfolder.ts and the BackupFolder plugin on Android.
-import { localDateKey } from './shared/dates.ts';
+import { localDateKey } from './dates.ts';
 
 export const KEEP_BACKUPS = 7;                 // newest files kept per app; the rest are deleted
 export const MIN_GAP_MS = 15 * 60_000;         // after a change, wait at least this long since the last backup

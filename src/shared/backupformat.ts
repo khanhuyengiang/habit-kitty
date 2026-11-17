@@ -1,4 +1,4 @@
-// The few facts about the combined .kitty backup that both Habit Kitty (store.ts, which writes it) and Kitty Achievement
+// The few facts about the combined .kitty backup that both Habit Kitty (src/backup.ts, which writes it) and Kitty Achievement
 // (achievement/backup.ts, which can read its own save back out of one) need. Kept apart so neither pulls in the other.
 export const COMBINED_APP = 'habit-kitty';                 // manifest.json's `app` in a combined backup
 export const ACHIEVEMENT_ENTRY = 'achievement.achkitty';   // Kitty Achievement's whole save, as one entry

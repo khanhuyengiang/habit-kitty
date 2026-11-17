@@ -1,6 +1,6 @@
 // The diary's data: a page per day (kept as Markdown with a small frontmatter), the monthly reflections, the people whose
 // birthdays it reminds you of and its own settings (diary.json), with the file names they are kept under, on the phone
-// and inside a .kitty backup (see ../store.ts). No screen and no storage here: ./data.ts keeps it on the device.
+// and inside a .kitty backup (see ../backup.ts). No screen and no storage here: ./data.ts keeps it on the device.
 import { dateOf, dayOf, two } from '../shared/dates.ts';
 
 export const MOOD_KEYS = ['joyful', 'calm', 'tired', 'sad', 'stressed'] as const;

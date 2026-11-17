@@ -8,7 +8,8 @@ import {
   addMindfulTask, doMindfulTask, dayIndex, levelProgress, hunger, sitterCooldownLeft,
   type ActionResult, type AppState, type Cat, type GameEvent,
 } from './rules.ts';
-import { dateOf, monthGrid, streak, type DayKind } from './calendar.ts';
+import { monthGrid, streak, type DayKind } from './calendar.ts';
+import { dateOf } from '../shared/dates.ts';
 
 const SAVE = 'save.json';
 type Save = { state: AppState; offsetHours: number };

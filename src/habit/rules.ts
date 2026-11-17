@@ -27,8 +27,8 @@ export type CatMode = 'classic' | 'lighthearted';
 export type CatStatus =
   | 'alive' | 'sitter' | 'dead' | 'ranAway' | 'leftForever' | 'gone' | 'shelter';
 
-import type { CatLook } from './shared/pixelcat.ts';
-export type { CatLook, CatPattern, CatTrait } from './shared/pixelcat.ts';
+import type { CatLook } from '../shared/pixelcat.ts';
+export type { CatLook, CatPattern, CatTrait } from '../shared/pixelcat.ts';
 export type CatGender = 'girl' | 'boy';
 
 export interface Cat {

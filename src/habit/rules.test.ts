@@ -3,7 +3,7 @@ import {
   newState, adoptCat, feedCat, startSitter, resumeCat, settleAll,
   addMindfulTask, setHabitSchedule, doMindfulTask, removeMindfulTask, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, STRAY_NAMES, dayIndex, setDayStart, levelFor, levelProgress,
   graveyard, runaways, hunger, setTaskDay, setCatDay, replay, rewind, genderOf, type ActionResult, type AppState, type CatMode,
-} from './rules';
+} from './rules.ts';
 
 // day n at a given hour (all test dates are local time)
 const at = (day: number, hour = 12) => new Date(2026, 0, 5 + day, hour, 0, 0);

@@ -2,7 +2,7 @@
 //   Level  from Kitty Achievement (levelOf in achievement/ops.ts: unlocked achievements)
 //   HP     from Habit Kitty's affection (levelProgress in rules.ts)
 //   MP     from filling the diary: 10 days to leave level 1, 20 to leave level 2, 30 to leave level 3, and so on
-import { levelProgress } from './rules.ts';
+import { levelProgress } from '../habit/rules.ts';
 
 export const diaryDaysToLeave = (level: number) => 10 * level;
 

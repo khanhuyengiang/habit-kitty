@@ -3,22 +3,22 @@ import {
   CONFIG, newState, adoptCat, feedCat, startSitter, resumeCat, settleAll, addMindfulTask,
   doMindfulTask, setTaskDay, setCatDay, replay, rewind, genderOf, daysUntilReady, removeMindfulTask, setHabitSchedule, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, idHash, dayIndex, dayStartHour, setDayStart, nextReset, levelProgress, hunger, sitterCooldownLeft,
   type ActionResult, type AppState, type Cat, type CatMode, type CatGender, type CatLook, type CatTrait, type GameEvent, type MindfulTask, type Reason, type TaskKind,
-} from '../rules.ts';
+} from './rules.ts';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { BACKUP_EXT, BACKUP_PREFIX, backupNow, backupStatus, chooseFolder, folderBackups, markDirty, nativeBackups, onBackupStatus, readFolderBackup, refreshFolder, registerBackupSource, saveBackupToDevice, saveToDevice, shareBackup as shareBackupFile, shareFile, stopBackups } from '../shared/backupfolder.ts';
 import { achievementCount, restoreAchievement, snapshotAchievement } from '../achievement/web/snapshot.ts';
 import { PICKER_ICONS, iconLabel, stickerSvg } from '../shared/stickers.ts';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { anyReminder, catAlarmsOn, defaultReminder, planReminders, type LastCall, type ReminderSettings } from '../reminders.ts';
-import { allCatsDiary, catDiary, clock } from '../catdiary.ts';
-import { fedMessage } from '../encourage.ts';
-import { accomplishments } from '../accomplishments.ts';
-import { entriesSince, parseChangelog, type ChangeEntry } from '../changelog.ts';
-import { VERSION } from '../version.ts';
+import { anyReminder, catAlarmsOn, defaultReminder, planReminders, type LastCall, type ReminderSettings } from './reminders.ts';
+import { allCatsDiary, catDiary, clock } from './catdiary.ts';
+import { fedMessage } from './encourage.ts';
+import { accomplishments } from './accomplishments.ts';
+import { entriesSince, parseChangelog, type ChangeEntry } from './changelog.ts';
+import { VERSION } from '../shared/version.ts';
 import CHANGELOG_MD from '../../CHANGELOG.md';
-import { pickThought, type ThoughtKind } from '../thoughts.ts';
-import { isZip, packBackup, unpackBackup, type Backup } from '../store.ts';
+import { pickThought, type ThoughtKind } from './thoughts.ts';
+import { isZip, packBackup, unpackBackup, type Backup } from '../backup.ts';
 import type { DiaryEntry, Mood } from '../diary/model.ts';
 import { CONFETTI_COLORS, TRAITS, notifyIconName, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
 import { GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, petHeartSvg, iconSvg, markSvg, outdoorSvg, roomSvg, sceneVersion } from '../shared/art.ts';
@@ -31,11 +31,11 @@ import { change as changeShop, collectShopping, initShopping, restoreShopping, s
 import { applyMartSettings, martSettingsOf } from '../shopping/model.ts';
 import { collectPixel, initPixel, restorePixel, setPixelData } from '../pixel/data.ts';
 import { PARTS, SETTINGS_EXT, SETTINGS_PREFIX, cleanDiary, isSettingsText, readSettings, settingsText, type HabitSettings, type Part, type SettingsFile } from '../settings-file.ts';
-import { backupName } from '../backup-schedule.ts';
+import { backupName } from '../shared/backup-schedule.ts';
 import { mountLookSettings } from '../shared/look.ts';
 import { publishHabitStats } from '../shared/stats.ts';
 import { meterHtml } from '../shared/meter.ts';
-import { hpLine } from '../player.ts';
+import { hpLine } from '../shared/stat-lines.ts';
 import { collectDiary, diaryExtras, diaryInitialised, initDiary, pageCount, restoreDiary, updateExtras } from '../diary/data.ts';
 import { $, esc, plural } from '../shared/html.ts';
 import { newId } from '../shared/id.ts';
@@ -45,7 +45,8 @@ import { pickerHtml } from '../shared/picker.ts';
 import { backButton, closeX, fancyOn, homeButton, playerButton, setFancy, setThemeMode, settingsButton, showToast, themeMode, titleBar } from '../shared/ui.ts';
 import { provideMusic } from '../shared/music.ts';
 import { at, fileBytes, removeFile, toBase64, writeOk } from '../shared/files.ts';
-import { dateOf, dayOf, firstDay, habitStreak, monthGrid, streak, weekRow, type DayKind, type Trackable } from '../calendar.ts';
+import { firstDay, habitStreak, monthGrid, streak, weekRow, type DayKind, type Trackable } from './calendar.ts';
+import { dateOf, dayOf } from '../shared/dates.ts';
 
 // ===================== Save =====================
 interface LogLine { at: number; text: string }

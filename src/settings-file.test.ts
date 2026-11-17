@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SETTINGS_FORMAT, isSettingsText, readSettings, settingsText, type SettingsFile } from './settings-file.ts';
 import { applyMartSettings, emptyData, martSettingsOf, sanitize as sanitizeShop } from './shopping/model.ts';
-import { isZip, packBackup, unpackBackup } from './store.ts';
+import { isZip, packBackup, unpackBackup } from './backup.ts';
 
 const blank18 = () => Array.from({ length: 18 }, () => '.'.repeat(18));
 const teapot = () => { const a = blank18(); a[8] = '.....ssssssss.....'; return a; };

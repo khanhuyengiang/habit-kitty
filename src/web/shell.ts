@@ -13,7 +13,7 @@ const started = new Set<AppName>();
 function start(app: AppName) {
   if (started.has(app)) return;
   started.add(app);
-  if (app === 'habit') import('./app.ts');
+  if (app === 'habit') import('../habit/app.ts');
   else if (app === 'achievement') import('../achievement/web/app.ts');
   else if (app === 'diary') import('../diary/app.ts');
   else if (app === 'notes') import('../notes/app.ts');

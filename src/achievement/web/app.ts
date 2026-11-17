@@ -18,7 +18,7 @@ import { onAppShown, onShown, shownApp } from '../../shared/apps.ts';
 import { $, esc, plural } from '../../shared/html.ts';
 import { homeButton, moveButtons, playerButton, refocusMove, settingsButton, showToast, titleBar } from '../../shared/ui.ts';
 import { meterHtml } from '../../shared/meter.ts';
-import { lvLine } from '../../player.ts';
+import { lvLine } from '../../shared/stat-lines.ts';
 import { paintBackdrop } from '../../shared/backdrop.ts';
 import { music } from '../../shared/music.ts';
 import { PHOTO_MAX_BYTES, compressPhoto } from '../../shared/photo.ts';

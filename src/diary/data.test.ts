@@ -4,7 +4,7 @@ vi.mock('@capacitor/filesystem', async () => (await import('../test/fsmock.ts'))
 const { fs, put, text } = await import('../test/fsmock.ts');
 
 const data = await import('./data.ts');
-const { dayOf } = await import('../calendar.ts');
+const { dayOf } = await import('../shared/dates.ts');
 const day = dayOf(2026, 9, 12);
 
 describe('diary data', () => {

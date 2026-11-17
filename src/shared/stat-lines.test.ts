@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diaryDaysToLeave, hpLine, litSegments, lvLine, mpLine, mpProgress, shortId } from './player.ts';
+import { diaryDaysToLeave, hpLine, litSegments, lvLine, mpLine, mpProgress, shortId } from './stat-lines.ts';
 
 describe('MP level', () => {
   it('needs 10 days for level 1, 20 for level 2, and so on', () => {

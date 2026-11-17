@@ -1,7 +1,7 @@
 // Backups you can find on the phone, for both apps:
 //   saveToDevice()   "save as": the system picker asks where one file goes (on the web it is a normal download)
 //   auto-backup      one folder, picked once; a fresh dated file per app lands there whenever you leave the app after changes,
-//                    and the newest few are kept (rules in ../backup-schedule.ts)
+//                    and the newest few are kept (rules in ./backup-schedule.ts)
 // Android only (the BackupFolder plugin). There is one backup file for both apps: Habit Kitty registers it (registerBackupSource)
 // and builds it, with Kitty Achievement's save inside.
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -9,7 +9,7 @@ import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { dataBytes, toBase64 } from './files.ts';
 import { readJson, writeJson } from './local.ts';
-import { KEEP_BACKUPS, backupName, backupsOf, isDue, toPrune } from '../backup-schedule.ts';
+import { KEEP_BACKUPS, backupName, backupsOf, isDue, toPrune } from './backup-schedule.ts';
 
 interface FolderState { chosen: boolean; ok: boolean; name?: string }
 interface BackupFolderPlugin {

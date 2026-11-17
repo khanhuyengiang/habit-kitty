@@ -1,8 +1,7 @@
 // Month calendar / heatmap data, shared by the terminal playground and the web page.
 import type { Cat } from './rules.ts';
 
-import { dateOf, dayOf } from './shared/dates.ts';
-export { dateOf, dayOf };
+import { dateOf, dayOf } from '../shared/dates.ts';
 
 export type DayKind = 'fed' | 'missed' | 'today' | 'sitter' | 'habit' | 'none';
 

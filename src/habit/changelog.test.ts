@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { compareVersions, entriesSince, parseChangelog } from './changelog.ts';
-import { VERSION } from './version.ts';
+import { VERSION } from '../shared/version.ts';
 
 const md = `# Change log
 

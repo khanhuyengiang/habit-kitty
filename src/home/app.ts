@@ -1,12 +1,12 @@
 // The home page: the menu to everything else, including Player Stat, which opens the player card (name, picture, ID and the three levels).
 // The levels come from the three apps: Level from Kitty Achievement, HP from Habit Kitty's affection, MP from diary days
-// (see ../player.ts). Moving between screens is the shell's job (src/web/shell.ts): the menu buttons are data-action="go".
+// (see ../shared/stat-lines.ts). Moving between screens is the shell's job (src/web/shell.ts): the menu buttons are data-action="go".
 import { PLAYER_GENDERS, PLAYER_GENDER_LABEL, type Data, type PlayerGender } from '../achievement/model.ts';
 import { LIMITS, ageOf, levelOf, titleFor } from '../achievement/ops.ts';
 import { avatarSvg } from '../shared/stickers.ts';
 import { DECOS, iconSvg } from '../shared/art.ts';
 import { fineSvg } from '../shared/stickers.ts';
-import { hpLine, lvLine, mpLine, shortId } from '../player.ts';
+import { hpLine, lvLine, mpLine, shortId } from '../shared/stat-lines.ts';
 import { meterHtml } from '../shared/meter.ts';
 import { lastApp, onAppShown } from '../shared/apps.ts';
 import { compressPhoto } from '../shared/photo.ts';
@@ -15,7 +15,7 @@ import { napSvg } from '../shared/pixelcat.ts';
 import { $, esc } from '../shared/html.ts';
 import { appName, closeX, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
 import { habitStats, onHabitStats } from '../shared/stats.ts';
-import { VERSION } from '../version.ts';
+import { VERSION } from '../shared/version.ts';
 
 
 let data: Data | null = null;     // the saved player and achievements (null until read)
