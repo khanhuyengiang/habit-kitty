@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { composeNote, continueList, excerpt, noteDate, parseNote, renderMarkdown, titleFromText, safeName, searchNotes, sortNotes, uniqueName, type Note } from './model.ts';
+import { bookName, cardLines, composeNote, continueList, excerpt, noteDate, parseNote, plainText, renderMarkdown, titleFromText, safeName, searchNotes, sortNotes, toggleTask, uniqueName, withBook, type Note } from './model.ts';
+import { booksOf, dropBook, emptyBooks, looseNotes, moveBook, notesIn, putBook, sanitizeBooks } from './books.ts';
 import { planSync } from './sync.ts';
 
 describe('file names', () => {
@@ -57,7 +58,9 @@ describe('markdown', () => {
   it('renders lists, tasks, quotes and rules', () => {
     expect(renderMarkdown('- a\n- b')).toBe('<ul><li>a</li><li>b</li></ul>');
     expect(renderMarkdown('1. a\n2. b')).toBe('<ol><li>a</li><li>b</li></ol>');
-    expect(renderMarkdown('- [x] done\n- [ ] todo')).toContain('<li class="task"><input type="checkbox" disabled checked> done</li>');
+    expect(renderMarkdown('- [x] done\n- [ ] todo')).toContain('<li class="task done"><input type="checkbox" disabled checked> done</li>');
+    expect(renderMarkdown('# Shop\n- [ ] eggs\n- [x] milk', { tasks: true })).toContain('<input type="checkbox" data-line="1" >');
+    expect(renderMarkdown('# Shop\n- [ ] eggs\n- [x] milk', { tasks: true })).toContain('<input type="checkbox" data-line="2" checked>');
     expect(renderMarkdown('> quoted\n> more')).toBe('<blockquote>quoted more</blockquote>');
     expect(renderMarkdown('a\n---\nb')).toBe('<p>a</p>\n<hr>\n<p>b</p>');
   });
@@ -133,5 +136,50 @@ describe('a note\'s date', () => {
     expect(composeNote(parseNote(t))).toBe(t);
     expect(parseNote('---\nkitty-date: 2026-02-30\n---\nhi').date).toBeUndefined();
     expect(noteDate({ text: t, mtime: 0 })).toBe('2026-11-06');
+  });
+});
+
+describe('tasks', () => {
+  it('ticks and unticks one line', () => {
+    expect(toggleTask('Shop\n- [ ] eggs\n  * [x] milk', 1)).toBe('Shop\n- [x] eggs\n  * [x] milk');
+    expect(toggleTask('Shop\n- [ ] eggs\n  * [x] milk', 2)).toBe('Shop\n- [ ] eggs\n  * [ ] milk');
+    expect(toggleTask('1. [X] call', 0)).toBe('1. [ ] call');
+    expect(toggleTask('Shop\n- eggs', 1)).toBeNull();
+    expect(toggleTask('Shop', 5)).toBeNull();
+  });
+  it('keeps the boxes on a card', () => {
+    expect(cardLines('# Shop\n- [ ] eggs\n- [x] milk\nsoon')).toEqual([{ text: 'Shop' }, { text: 'eggs', task: false }, { text: 'milk', task: true }, { text: 'soon' }]);
+    expect(plainText('- [ ] eggs\nmilk')).toBe('eggs\nmilk');
+  });
+});
+
+describe('notebooks', () => {
+  it('is kept in the frontmatter, quoted', () => {
+    const t = withBook('hello', 'Trips: 2026');
+    expect(t).toBe('---\nkitty-notebook: "Trips: 2026"\n---\nhello');
+    expect(parseNote(t).book).toBe('Trips: 2026');
+    expect(withBook(t, '')).toBe('hello');
+    expect(parseNote('---\nkitty-notebook: Ideas\n---\nx').book).toBe('Ideas');
+    expect(bookName('  a "b"\n c ')).toBe('a b c');
+  });
+  const notes: Note[] = [
+    { name: 'A', text: withBook('a', 'Recipes'), mtime: 1 }, { name: 'B', text: withBook('b', 'recipes'), mtime: 2 },
+    { name: 'C', text: withBook('c', 'Zoo'), mtime: 3 }, { name: 'D', text: 'd', mtime: 4 },
+  ];
+  it('lists the file\'s notebooks, then those only notes name', () => {
+    const d = sanitizeBooks({ books: [{ name: 'Zoo', icon: 'cat', color: 'blue' }, { name: 'Empty', icon: '<x>', color: 'red' }, { name: 'zoo' }] });
+    expect(d.books).toEqual([{ name: 'Zoo', icon: 'cat', color: 'blue' }, { name: 'Empty', icon: 'book', color: 'lavender' }]);
+    expect(booksOf(d, notes).map((b) => b.name)).toEqual(['Zoo', 'Empty', 'Recipes']);
+    expect(notesIn(notes, 'RECIPES').map((n) => n.name)).toEqual(['A', 'B']);
+    expect(looseNotes(notes).map((n) => n.name)).toEqual(['D']);
+  });
+  it('adds, changes, moves and drops one', () => {
+    const all = booksOf(emptyBooks(), notes);
+    const d = putBook(emptyBooks(), all, null, { name: 'New', icon: 'star', color: 'mint' });
+    expect(d.books.map((b) => b.name)).toEqual(['Recipes', 'Zoo', 'New']);
+    expect(putBook(d, d.books, 'zoo', { name: 'Animals', icon: 'dog', color: 'pink' }).books[1]).toEqual({ name: 'Animals', icon: 'dog', color: 'pink' });
+    expect(moveBook(d.books, 'New', -1).books.map((b) => b.name)).toEqual(['Recipes', 'New', 'Zoo']);
+    expect(moveBook(d.books, 'Recipes', -1).books.map((b) => b.name)).toEqual(['Recipes', 'Zoo', 'New']);
+    expect(dropBook(d.books, 'zoo').books.map((b) => b.name)).toEqual(['Recipes', 'New']);
   });
 });

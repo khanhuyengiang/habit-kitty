@@ -47,6 +47,7 @@ export function searchNotes(notes: Note[], query: string): Note[] {
 //   kitty-doodle: paw            the little picture in the bottom corner, an icon from the achievement picker (a heart when not set; "none" for none)
 //   kitty-face: sleepy           the mini kitty in the title bar, outline only (happy when not set)
 //   kitty-date: 2026-11-06       the date the note is about (the day it was last changed when not set)
+//   kitty-notebook: "Recipes"    the notebook it is in (none when not set; the notebooks' looks are in ./books.ts)
 //   ---
 //
 // Any other frontmatter (Obsidian's tags, aliases...) is kept as it is. Only what differs from the default is written.
@@ -58,10 +59,10 @@ export const NOTE_FACES = ['happy', 'open', 'sleepy', 'sad', 'starving'] as cons
 export type NoteColor = typeof NOTE_COLORS[number];
 export type NoteDoodle = string;
 export type NoteFace = typeof NOTE_FACES[number];
-export interface ParsedNote { front: string[]; cover: Cover; color: NoteColor; doodle: NoteDoodle; face: NoteFace; date?: string; body: string }
+export interface ParsedNote { front: string[]; cover: Cover; color: NoteColor; doodle: NoteDoodle; face: NoteFace; date?: string; book?: string; body: string }
 
 const FRONT = /^---[ \t]*\r?\n([\s\S]*?)\r?\n?---[ \t]*(?:\r?\n|$)/;
-const KEY = /^kitty-(icon|image|color|doodle|face|date):\s*(.*)$/;
+const KEY = /^kitty-(icon|image|color|doodle|face|date|notebook):\s*(.*)$/;
 const unquote = (v: string) => v.trim().replace(/^(["'])(.*)\1$/, '$2').trim();
 const IMAGE_SRC = /^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 const oneOf = <T extends string>(list: readonly T[], v: string | undefined, fallback: T): T => (list as readonly string[]).includes(v ?? '') ? v as T : fallback;
@@ -92,11 +93,11 @@ export function parseNote(text: string): ParsedNote {
   }
   const cover: Cover = IMAGE_SRC.test(v.image ?? '') ? { kind: 'image', src: v.image } : /^[\w-]{1,40}$/.test(v.icon ?? '') ? { kind: 'icon', name: v.icon } : null;
   return { front, cover, color: oneOf(NOTE_COLORS, v.color, 'pink'), doodle: DOODLE.test(v.doodle ?? '') ? v.doodle : 'heart', face: oneOf(NOTE_FACES, v.face, 'happy'),
-    ...(isDateText(v.date) && { date: v.date }), body: text.slice(m[0].length) };
+    ...(isDateText(v.date) && { date: v.date }), ...(bookName(v.notebook ?? '') && { book: bookName(v.notebook) }), body: text.slice(m[0].length) };
 }
 
 // The note's text again, with this look (no frontmatter at all when there is nothing to put in it).
-export function composeNote({ front, cover, color, doodle, face, date, body }: ParsedNote): string {
+export function composeNote({ front, cover, color, doodle, face, date, book, body }: ParsedNote): string {
   const lines = [...front];
   if (cover?.kind === 'icon') lines.push(`kitty-icon: ${cover.name}`);
   else if (cover?.kind === 'image') lines.push(`kitty-image: ${cover.src}`);
@@ -104,7 +105,27 @@ export function composeNote({ front, cover, color, doodle, face, date, body }: P
   if (doodle !== 'heart') lines.push(`kitty-doodle: ${doodle}`);
   if (face !== 'happy') lines.push(`kitty-face: ${face}`);
   if (date) lines.push(`kitty-date: ${date}`);
+  if (book && bookName(book)) lines.push(`kitty-notebook: "${bookName(book)}"`);   // quoted, so Obsidian reads any name as text
   return lines.some((l) => l.trim()) ? `---\n${lines.join('\n')}\n---\n${body}` : body;
+}
+
+// A notebook's name as it is kept: one line, no quotes or control characters, at most 40 characters ('' when nothing is left).
+export const MAX_BOOK_NAME = 40;
+export const bookName = (raw: string): string =>
+  raw.normalize('NFC').replace(/["\\\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, MAX_BOOK_NAME).trim();
+export const sameBook = (a: string | undefined, b: string | undefined) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
+
+// The note's notebook changed (or taken away with ''), everything else kept as it is.
+export const withBook = (text: string, book: string): string => composeNote({ ...parseNote(text), book: book || undefined });
+
+// A task line ("- [ ] milk") ticked or unticked: `line` counts the body's lines from 0. Null when that line is not a task.
+const TASK = /^(\s*(?:[-*+]|\d+[.)])\s+\[)([ xX])(\]\s)/;
+export function toggleTask(body: string, line: number): string | null {
+  const lines = body.split('\n');
+  const m = TASK.exec(lines[line] ?? '');
+  if (!m) return null;
+  lines[line] = `${m[1]}${m[2] === ' ' ? 'x' : ' '}${m[3]}${lines[line].slice(m[0].length)}`;
+  return lines.join('\n');
 }
 
 // A line without its Markdown marks ('' for a rule or a code fence).
@@ -121,8 +142,22 @@ export function excerpt(text: string, max = 90): string {
 }
 
 // The start of the text as plain lines (a card that has no picture shows this).
-export const plainText = (text: string, max = 280): string =>
-  cut(text.split('\n').map(cleanLine).filter(Boolean).join('\n'), max);
+export const plainText = (text: string, max = 280): string => cardLines(text, max).map((l) => l.text).join('\n');
+
+// The same, line by line, with a task line's tick: true (done) or false (to do); none on any other line.
+export function cardLines(text: string, max = 280): { text: string; task?: boolean }[] {
+  const out: { text: string; task?: boolean }[] = [];
+  let left = max;
+  for (const raw of text.split('\n')) {
+    const t = cleanLine(raw);
+    if (!t) continue;
+    if (left <= 0) { const last = out[out.length - 1]; if (last && !last.text.endsWith('…')) last.text = `${last.text.trimEnd()}…`; break; }
+    const box = TASK.exec(raw);
+    out.push({ text: cut(t, left), ...(box && { task: box[2] !== ' ' }) });
+    left -= t.length + 1;
+  }
+  return out;
+}
 
 // ---- Markdown to HTML: the common parts, with everything escaped first, so a note can never inject markup ----
 
@@ -139,7 +174,8 @@ function inline(raw: string): string {
   return s.replace(/\u0000(\d+)\u0000/g, (_, i: string) => `<code>${codes[Number(i)]}</code>`);
 }
 
-export function renderMarkdown(md: string): string {
+// `tasks`: the task boxes can be ticked (each says which line it is, data-line, see toggleTask); otherwise they are only shown.
+export function renderMarkdown(md: string, o: { tasks?: boolean } = {}): string {
   const lines = md.replace(/\r\n/g, '\n').split('\n');
   const out: string[] = [];
   let i = 0;
@@ -173,7 +209,9 @@ export function renderMarkdown(md: string): string {
         if (!m || /\d/.test(m[1]) !== ordered) break;
         const task = /^\[([ xX])\]\s+(.*)$/.exec(m[2]);
         items.push(task
-          ? `<li class="task"><input type="checkbox" disabled ${task[1] === ' ' ? '' : 'checked'}> ${inline(task[2])}</li>`
+          ? (o.tasks
+            ? `<li class="task${task[1] === ' ' ? '' : ' done'}"><label><input type="checkbox" data-line="${i}" ${task[1] === ' ' ? '' : 'checked'}> <span>${inline(task[2])}</span></label></li>`
+            : `<li class="task${task[1] === ' ' ? '' : ' done'}"><input type="checkbox" disabled ${task[1] === ' ' ? '' : 'checked'}> ${inline(task[2])}</li>`)
           : `<li>${inline(m[2])}</li>`);
       }
       out.push(`<${ordered ? 'ol' : 'ul'}>${items.join('')}</${ordered ? 'ol' : 'ul'}>`);

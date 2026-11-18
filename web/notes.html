@@ -67,9 +67,43 @@ button.ncard:focus-visible .nwin-screen { box-shadow: inset 0 0 0 var(--bw) var(
 .nread .md :is(h1, h2, h3, h4, h5, h6) { text-align: center; }
 .nread .ncard-foot { margin-top: auto; padding-top: var(--s4); }
 .nedit-fields { display: grid; gap: var(--s3); }
-/* a linked note in a diary page: just its title bar, as a small window */
-.nlink { width: 100%; box-sizing: border-box; aspect-ratio: auto; padding: calc(3 * var(--px)); justify-self: stretch; }
+/* a linked note in a diary page: just its title bar, as a small window; tap it to open the note */
+.nlink { width: 100%; box-sizing: border-box; aspect-ratio: auto; padding: calc(3 * var(--px)); justify-self: stretch; cursor: pointer; }
 .nlink .nwin-bar { padding: var(--px); }
+button.nlink:hover { --nw-frame: color-mix(in srgb, var(--nc) 75%, var(--surface)); }
+button.nlink:active { transform: translateY(var(--px)); }
+button.nlink:focus-visible { outline: var(--bw) solid var(--accent-text); outline-offset: var(--bw); }
+/* a task's box on a card (only to see) */
+.ntask { display: inline-block; vertical-align: -.1em; margin-right: var(--s1); color: var(--nw-dk); }
+.ntask.on { color: color-mix(in srgb, var(--nc) 45%, var(--nw-dk)); }
+/* A notebook's cover: a note card's size, in the notebook's colour, with a dark spine and its rings down the left and a
+   light label with the name, over the picture. */
+.nbook { flex-direction: row; padding: 0; --nw-frame: color-mix(in srgb, var(--nc) 85%, var(--surface)); }
+.nbook-spine { position: relative; flex: none; width: calc(9 * var(--px)); background: color-mix(in srgb, var(--nc) 45%, var(--nw-dk));
+  box-shadow: inset calc(-1 * var(--px)) 0 0 var(--nw-dk); }
+.nbook-spine::before { content: ""; position: absolute; left: calc(3 * var(--px)); width: calc(3 * var(--px)); top: calc(6 * var(--px)); bottom: calc(6 * var(--px));
+  background: repeating-linear-gradient(180deg, var(--nw-hi) 0 calc(3 * var(--px)), transparent 0 calc(10 * var(--px))); }
+.nbook-face { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s3);
+  padding: var(--s4) var(--s3) var(--s3); box-shadow: inset calc(-1 * var(--px)) 0 0 var(--nw-dk), inset 0 var(--px) 0 var(--nw-dk), inset 0 calc(-1 * var(--px)) 0 var(--nw-dk), inset var(--px) var(--px) 0 calc(var(--px)) var(--nw-hi); }
+.nbook-label { align-self: stretch; padding: var(--s1) var(--s2); background: color-mix(in srgb, var(--nc) 12%, var(--surface)); box-shadow: inset 0 0 0 var(--px) var(--nw-dk);
+  font: 700 20px/1.1 var(--font); color: var(--nw-dk); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.nbook .nart { width: 46%; }
+.nbook .ncard-foot { margin-top: 0; color: var(--nw-dk); }
+.nbook .ncard-foot::after { display: none; }
+button.nbook:hover { --nw-frame: color-mix(in srgb, var(--nc) 95%, var(--surface)); }
+button.nbook:focus-visible .nbook-face { box-shadow: inset 0 0 0 var(--bw) var(--accent-text); }
+/* a notebook's heading (its page, and a section of the cards) */
+.nsec-head { display: flex; align-items: center; gap: var(--s3); }
+.nsec-head h3 { flex: 1; min-width: 0; }
+.notes .pcat-title { font: 700 24px/1.1 var(--font); margin: 0; }
+.notes h2.pcat-title { font-size: 28px; text-transform: none; letter-spacing: normal; color: var(--ink); }
+.notes .pcat-title .n { font-size: 18px; font-weight: 400; color: var(--muted); }
+.notes .pcat-title .nart .sticker { display: block; }
+.toolbar .grow { flex: 1; }
+/* a task on the note's page: the box and its words can be tapped; a done one is greyed */
+.md li.task label { cursor: pointer; }
+.md li.task input { accent-color: color-mix(in srgb, var(--nc) 55%, var(--nw-dk, #231d44)); width: 20px; height: 20px; vertical-align: -3px; margin: 0; cursor: pointer; }
+.md li.task.done > label > span, .md li.task.done { color: var(--muted); }
 /* The form: the card as it will look next to the title, then what goes on it. */
 .nedit-top { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s4); align-items: end; }
 .nkinds { display: flex; flex-wrap: wrap; gap: var(--s2); }

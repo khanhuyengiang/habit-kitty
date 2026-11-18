@@ -6,6 +6,7 @@
 //   diary/2026-10-12.md      frontmatter (mood, mood2, feeling, weather, photo, updated) + the text as plain Markdown
 //   photos/2026-10-12.jpg
 //   gallery.json             Kitty Gallery's icons (your drawings and changes), as kept on the device
+//   notebooks.json           the notebooks' pictures, colours and order (the notes say which one they are in)
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
 import { ACHIEVEMENT_ENTRY, ACHIEVEMENT_MAX, COMBINED_APP, isZip } from './shared/backupformat.ts';
 export { ACHIEVEMENT_ENTRY, isZip };
@@ -34,6 +35,7 @@ export interface Backup {
   notes?: Record<string, string>;     // the notes, by name (notes/<name>.md in the file)
   shopping?: string;                  // Kitty Mart's data, as JSON (shopping.json in the file)
   gallery?: string;                   // Kitty Gallery's icons, as JSON (gallery.json in the file); none in a backup from before it
+  notebooks?: string;                 // the notebooks, as JSON (notebooks.json in the file)
 }
 
 export function packBackup(b: Backup, exportedAt = Date.now()): Uint8Array {
@@ -47,6 +49,7 @@ export function packBackup(b: Backup, exportedAt = Date.now()): Uint8Array {
   for (const [name, text] of Object.entries(b.notes ?? {})) if (name === safeName(name) && text.length <= MAX_TEXT) files[`notes/${name}.md`] = strToU8(text);
   if (b.shopping) files['shopping.json'] = strToU8(b.shopping);
   if (b.gallery) files['gallery.json'] = strToU8(b.gallery);
+  if (b.notebooks) files['notebooks.json'] = strToU8(b.notebooks);
   const extras = sanitizeExtras(b.extras);
   if (Object.keys(extras).length) files[EXTRAS_FILE] = strToU8(JSON.stringify(extras));
   if (b.achievement) files[ACHIEVEMENT_ENTRY] = [b.achievement, { level: 0 }];   // photos inside are JPEGs already
@@ -112,5 +115,5 @@ export function unpackBackup(bytes: Uint8Array): Backup {
   }
   let extras: DiaryExtras = {};
   try { if (files[EXTRAS_FILE]) extras = sanitizeExtras(JSON.parse(strFromU8(files[EXTRAS_FILE]))); } catch { /* ignore a damaged settings file */ }
-  return { game: JSON.parse(strFromU8(files['game.json'])), diary, photos, morePhotos, reflections, extras, notes, ...(files['shopping.json'] && { shopping: strFromU8(files['shopping.json']) }), ...(files['gallery.json'] && { gallery: strFromU8(files['gallery.json']) }), ...(files[ACHIEVEMENT_ENTRY] && { achievement: files[ACHIEVEMENT_ENTRY] }) };
+  return { game: JSON.parse(strFromU8(files['game.json'])), diary, photos, morePhotos, reflections, extras, notes, ...(files['shopping.json'] && { shopping: strFromU8(files['shopping.json']) }), ...(files['gallery.json'] && { gallery: strFromU8(files['gallery.json']) }), ...(files['notebooks.json'] && { notebooks: strFromU8(files['notebooks.json']) }), ...(files[ACHIEVEMENT_ENTRY] && { achievement: files[ACHIEVEMENT_ENTRY] }) };
 }

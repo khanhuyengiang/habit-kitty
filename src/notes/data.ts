@@ -7,7 +7,9 @@
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { fromBase64, stagedReplace, writeOk } from '../shared/files.ts';
 import { BACKUP_PREFIX, markDirty } from '../shared/backupfolder.ts';
-import { MAX_NOTES, MAX_TEXT, safeName, sortNotes, uniqueName, type Note } from './model.ts';
+import { MAX_NOTES, MAX_TEXT, parseNote, safeName, sameBook, sortNotes, uniqueName, withBook, type Note } from './model.ts';
+import { jsonFile } from '../shared/jsonfile.ts';
+import { booksOf, dropBook, emptyBooks, moveBook as moveIn, putBook, sanitizeBooks, type BookData, type Notebook } from './books.ts';
 
 const ROOT = 'habit-kitty-notes';
 const STAGE = 'habit-kitty-notes-restore';   // a restore is written here first, then swapped in
@@ -57,7 +59,7 @@ let resolveInit: () => void = () => {};
 export const notesInitialised = new Promise<void>((r) => { resolveInit = r; });
 
 export function initNotes(): Promise<void> {
-  started ??= (async () => { await reload(); ready = true; resolveInit(); for (const l of listeners) l(); })();
+  started ??= (async () => { books = await bookFile.read(); await reload(); ready = true; resolveInit(); for (const l of listeners) l(); })();
   return started;
 }
 
@@ -119,7 +121,50 @@ export async function putRaw(name: string, text: string): Promise<boolean> {
   return true;
 }
 
+// ---- notebooks (see ./books.ts) ----
+// Their look and order, in their own folder so restoring the notes (a swap of the notes folder) leaves it alone.
+const bookFile = jsonFile('habit-kitty-notebooks/notebooks.json', sanitizeBooks, emptyBooks);
+let books: BookData = emptyBooks();
+export const allBooks = (): Notebook[] => booksOf(books, notes);
+const setBooks = async (next: BookData) => { books = next; const ok = await bookFile.write(books); changed(); return ok; };
+
+// Writes these notes' new text (their names stay), for a notebook renamed or deleted.
+async function rewrite(edits: { name: string; text: string }[]): Promise<boolean> {
+  let ok = true;
+  for (const e of edits) {
+    if (!await writeText(e.name, e.text)) { ok = false; continue; }
+    notes = [...notes.filter((n) => n.name !== e.name), { name: e.name, text: e.text, mtime: Date.now() }];
+  }
+  return ok;
+}
+const membersOf = (name: string) => notes.filter((n) => sameBook(parseNote(n.text).book, name));
+
+// Makes a notebook (`prev` null) or changes one; a new name is written into each of its notes. False when the name is taken.
+export async function saveBook(prev: string | null, b: Notebook): Promise<boolean> {
+  const all = allBooks();
+  if (all.some((x) => sameBook(x.name, b.name) && !sameBook(x.name, prev ?? ''))) return false;
+  if (prev !== null && prev !== b.name) await rewrite(membersOf(prev).map((n) => ({ name: n.name, text: withBook(n.text, b.name) })));
+  return setBooks(putBook(books, all, prev, b));
+}
+// Deletes a notebook; its notes are kept, in no notebook.
+export async function deleteBook(name: string): Promise<boolean> {
+  const all = allBooks();
+  const ok = await rewrite(membersOf(name).map((n) => ({ name: n.name, text: withBook(n.text, '') })));
+  return await setBooks(dropBook(all, name)) && ok;
+}
+export const moveBook = (name: string, by: number) => setBooks(moveIn(allBooks(), name, by));
+
+// Another screen asks for a note to be opened (the diary's linked note): the Notes screen takes it when it shows.
+let asked: { name: string; from: string } | null = null;
+export const askToOpen = (name: string, from: string) => { asked = { name, from }; };
+export const takeAsked = () => { const a = asked; asked = null; return a; };
+
 // ---- backup ----
+export const collectBooks = (): string | undefined => (books.books.length ? JSON.stringify(books) : undefined);
+export async function restoreBooks(text: string): Promise<boolean> {
+  const next = bookFile.parse(text);
+  return next ? setBooks(next) : false;
+}
 export const collectNotes = (): Record<string, string> => Object.fromEntries(notes.map((n) => [n.name, n.text]));
 
 // Replaces every note with these. Written next to the live folder and swapped in only when complete.

@@ -21,7 +21,7 @@ import { CONFETTI_COLORS, TRAITS, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP
 import { GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, petHeartSvg, iconSvg, markSvg, outdoorSvg, roomSvg, sceneVersion } from '../shared/art.ts';
 import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, trophyIcon, type AppName } from '../shared/apps.ts';
 import { mountDiarySettings } from '../diary/settings.ts';
-import { collectNotes, initNotes, restoreNotes } from '../notes/data.ts';
+import { collectBooks, collectNotes, initNotes, restoreBooks, restoreNotes } from '../notes/data.ts';
 import { mountNotesSettings } from '../notes/settings.ts';
 import { mountPixelSettings } from '../pixel/settings.ts';
 import { change as changeShop, collectShopping, initShopping, restoreShopping, shopData, shopInitialised } from '../shopping/data.ts';
@@ -993,7 +993,7 @@ async function loadDiary() {
 // ---- Backup: one .kitty file (a zip) holding the game, every diary page and every photo ----
 async function collectBackup(): Promise<Backup> {
   await initPixel();
-  return { game: save, ...await collectDiary(), notes: collectNotes(), shopping: collectShopping(), gallery: collectPixel(), achievement: await snapshotAchievement() };
+  return { game: save, ...await collectDiary(), notes: collectNotes(), notebooks: collectBooks(), shopping: collectShopping(), gallery: collectPixel(), achievement: await snapshotAchievement() };
 }
 
 registerBackupSource({ prefix: BACKUP_PREFIX, ext: BACKUP_EXT, pack: async () => packBackup(await collectBackup()) });
@@ -1086,6 +1086,7 @@ async function restoreBackup() {
   if (g) {
     if (!await restoreDiary(b, g)) { closeModal(); toast("Couldn't restore the kitties and diary. Achievements were restored."); return; }
     if (b.notes && Object.keys(b.notes).length && !await restoreNotes(b.notes)) toast("Couldn't restore the notes. Everything else was restored.");   // a backup from before notes leaves yours alone
+    if (b.notebooks && !await restoreBooks(b.notebooks)) toast("Couldn't restore the notebooks. Everything else was restored.");
     if (b.shopping && !await restoreShopping(b.shopping)) toast("Couldn't restore the shopping lists. Everything else was restored.");   // likewise for one from before Kitty Mart
     if (b.gallery && !await restorePixel(b.gallery)) toast("Couldn't restore the Kitty Gallery icons. Everything else was restored.");   // and for one from before the icons were in it
     else if (b.gallery) redrawPixelSettings();
