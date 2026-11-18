@@ -2,6 +2,7 @@
 // cat with a curled tail (cozy room). Each is one hand-cleaned template made of colour slots, drawn as the
 // LEFT half and mirrored, so every coat is the same shape recoloured. Pure functions that return SVG.
 import { COAT_MINI, COAT_NAP, COAT_SIT } from './coats.ts';
+import { COAT_JUMP_CHIBI, COAT_JUMP_CHONKY, COAT_RUN_CHIBI, COAT_RUN_CHONKY } from './coats-run.ts';
 import { toPalette } from './palette.ts';
 import { cellRects, rect } from './pixelart.ts';
 
@@ -315,6 +316,657 @@ export function napSvg(look: CatLook): string {
   const grid: Grid = NAP.map((row) => [...row.padEnd(NAP_W, '.')]);
   applyLayer(grid, COAT_NAP[look.pattern], 'fsWT');
   return `<svg class="sprite nap" style="--w:${NAP_W}" viewBox="0 0 ${NAP_W} ${NAP_H}" aria-hidden="true" shape-rendering="crispEdges">${draw(grid, napColors(look))}</svg>`;
+}
+
+// ---- the running cats (side view, facing right): two styles, each a 4-frame gallop played 1 → 2 → 3 → 4 → 1 ----
+// EDIT ME: one character per pixel. Within a style every frame must be the same size (the widest row and the tallest
+// frame set it), so the cat doesn't jump around while it runs; the paws rest on the same bottom row. Unlike the sitting
+// cat these are drawn whole, not as mirrored halves; runSvg flips them for running left. Stripes and patches for each
+// style live in src/shared/coats-run.ts.
+//   o outline   f main colour   s belly shade + far-side legs   W paws, muzzle, chest   T, D tail (light, dark stripe)
+//   p ear pink   e pupil   E iris (the cat's eye colour)   w eye shine   n nose   m mouth   c blush   . empty
+
+// Chibi: a big face turned to you, short round body, thick tail held up (42 x 27).
+export const RUN_CHIBI: string[][] = [
+  // stretch: in the air, legs reaching out
+  [
+    '..........................................',
+    '...oooo...................................',
+    '..oTTTTo................o..........o......',
+    '..oTTTTo...............ofo........ofo.....',
+    '..oTTTTo...............opfo......ofpo.....',
+    '..oTTTTo...............oppfoooooofppo.....',
+    '..oTTTTTo.............ofppffffffffppfo....',
+    '..oDDDDTDo............offffffffffffffo....',
+    '..oDDDDTDo............offffffffffffffo....',
+    '..oTTTTTDTo......o.....offfffffffffffo....',
+    '...oTTTTDTToooooofooooofffffffffffffffo...',
+    '....oDDDDTToffffffffffffffweffffffewffo...',
+    '....oTTTTTffffffffffffffffEeffffffeEffo...',
+    '.....oTTTfffffffffffffffccfffWnnWfffccoo..',
+    '......oTfffffoofffffffffffffWmWWmWfffo....',
+    '.......offffffofffffffffffffffmmffffoo....',
+    '.......offffffoffffffffffffffWWWWfoo......',
+    '.....oooffffffosssssssssssooWWWWWWo.......',
+    '...oossoffffffosssssssssooffoWWWWWoo......',
+    '..osssoofffffoosssssssssoffffossssssoo....',
+    '..oWWoffffffosssssssssssofffffooossssso...',
+    '..oWofffffffooossssssooooffffffffooWWWWo..',
+    '...offfffffo...oooooo....offfffffffoWWWo..',
+    '...oWWWWfoo...............offfffWWWWooo...',
+    '...oWWWWo..................oooffWWWWo.....',
+    '....oooo......................oooooo......',
+    '..........................................',
+  ],
+  // land: front paws touch down, back legs swing forward
+  [
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '...oooo.................o..........o......',
+    '..oTTTTo...............ofo........ofo.....',
+    '..oTTTTo...............opfo......ofpo.....',
+    '..oTTTTo...............oppfoooooofppo.....',
+    '..oTTTTo..............ofppffffffffppfo....',
+    '..oTTTTo..............offffffffffffffo....',
+    '..oDDDDTo.............offffffffffffffo....',
+    '..oDDDDTTo.....ooooo...offfffffffffffo....',
+    '..oTTTTTTTo.ooofffffooofffffffffffffffo...',
+    '...oTTTTTTToffffffffffffffweffffffewffo...',
+    '...oDDDDTTffffffffffffffffEeffffffeEffo...',
+    '....oTTTTfffffffffffffffccfffWnnWfffccoo..',
+    '.....oTTfffffoofffffffffffffWmWWmWfffo....',
+    '......ooffffffofffffffffffffffmmffffoo....',
+    '.......offffffoffffffffffffffWWWWfoo......',
+    '.......offffffosssssssssssooWWWWWWo.......',
+    '.......offffffosssssssssoofoWWWWWWo.......',
+    '.......ossffffosssssssssofffosoooo........',
+    '........oofffffoosssssssofffosso..........',
+    '..........offffffoosssooffffossso.........',
+    '...........offffWWWooo..offfossso.........',
+    '............ooofWWWWo...oWWWWoWWWo........',
+    '...............ooooo....oWWWWoWWWo........',
+    '.........................oooo.ooo.........',
+  ],
+  // gather: back up, all four legs bunched under the tummy
+  [
+    '..........................................',
+    '........oooo..............................',
+    '.......oTTTTo.............................',
+    '......oTTTTTo.............................',
+    '.....oDTTTTTo...........o..........o......',
+    '.....oDTTTTTo..........ofo........ofo.....',
+    '.....oDTTTTTo..........opfo......ofpo.....',
+    '.....oDDDDDo...........oppfoooooofppo.....',
+    '.....oDDDDo...........ofppffffffffppfo....',
+    '.....oTTTTTo..oooooooooffffffffffffffo....',
+    '.....oTTTTTToofffffffffffffffffffffffo....',
+    '.....oDDDDTTfffffffffffffffffffffffffo....',
+    '.....oTTTTTfffffffffffffffffffffffffffo...',
+    '......oTTTffffffffffffffffweffffffewffo...',
+    '.......oTfffffooffffffffffEeffffffeEffo...',
+    '........offffffoffffffffccfffWnnWfffccoo..',
+    '........offffffoffffffffffffWmWWmWfffo....',
+    '........offffffosssssssssfffffmmffffoo....',
+    '........offffffosssssssssssffWWWWfoo......',
+    '........osssfffossssssssooooWWWWWWo.......',
+    '.........oosffffossssssofffoWWWWWWo.......',
+    '...........ooffffoosssoffffooooooo........',
+    '.............offfffoooffffo...............',
+    '..............offfWWfffffo................',
+    '...............oofWWWWWWoWo...............',
+    '.................oooWWWWoo................',
+    '....................oooo..................',
+  ],
+  // push-off: back paws drive, front legs reach ahead
+  [
+    '..........................................',
+    '..........................................',
+    '........................o..........o......',
+    '.......................ofo........ofo.....',
+    '..oooo.................opfo......ofpo.....',
+    '.oTTTTo................oppfoooooofppo.....',
+    '.oTTTTo...............ofppffffffffppfo....',
+    '.oTTTTo...............offffffffffffffo....',
+    '.oTTTTo...............offffffffffffffo....',
+    '.oTTTTToo......ooooo...offfffffffffffo....',
+    '.oDDDDTDTo..ooofffffooofffffffffffffffo...',
+    '.oDDDDTDTTooffffffffffffffweffffffewffo...',
+    '..oTTTTDTTffffffffffffffffEeffffffeEffo...',
+    '...oDDDDTfffffffffffffffccfffWnnWfffccoo..',
+    '....oTTTfffffoofffffffffffffWmWWmWfffo....',
+    '.....oTTffffffofffffffffffffffmmffffoo....',
+    '......ooffffffoffffffffffffffWWWWfoo......',
+    '.......offffffosssssssssssooWWWWWWooo.....',
+    '.......offffffosssssssssooffooWWWWssso....',
+    '.......ossfffoosssssssssofffffoossWWWWo...',
+    '......osooffosssssssssssofffffffooWWWWo...',
+    '......ossofffossssssssooofffffffffoooo....',
+    '.....osssofffooooooooo...ooffffWWWWo......',
+    '.....osssofffo.............ooofWWWWo......',
+    '.....oWWWoWWWWo...............ooooo.......',
+    '.....oWWWoWWWWo...........................',
+    '......ooo.oooo............................',
+  ],
+];
+
+// Chonky: side-on face, round loaf body, big haunch, short stubby legs (48 x 25).
+export const RUN_CHONKY: string[][] = [
+  // stretch: in the air, legs reaching out
+  [
+    '................................o......o........',
+    '...............................ofo....ofo.......',
+    '..oo..........................offo...ofpo.......',
+    '.oTTo.........................offfooofppfo......',
+    '.oTTo.........................offfffffppfo......',
+    '.oTTTooo...........ooooooooo..offfffffpppfoo....',
+    '.oDTTDTToo.......oofffffffffooffffffffffffffo...',
+    '.oDDDDTTTDoo...ooffffffffffffffffffffffffffffo..',
+    '..oDDDTTTDTTo.offffffffffffffffffffffffewffffo..',
+    '...oooTTTDTTTofffffffffffffffffffffffffeEffffo..',
+    '......ooTTTTfffffffffffffffffffffffffffeEfffffo.',
+    '........ooTTfffffffofffffffffffffffffffffWWnno..',
+    '.........oofffffffffofffffffffffffffffccWWWWWo..',
+    '....ooooosofffffffffofffffffoffffffffffWWWWWWo..',
+    '..oosssssoofffffffffosssssssooffffffffffWWWWo...',
+    '.ossssooofffffffffffosssssssofofffffffffffoo....',
+    '.ossooffffffffffsssossssssssofofffofffffooso....',
+    '.osoffffffffffffsssosssssssssofooofooooofoso....',
+    '.oWofffffffffffsssossssssssso.offffffffffoWWo...',
+    '.oWofffffffffooooo.ooooooooo...offfffffffoWWo...',
+    '..ooWWWWWfooo...................oooffWWWWWoo....',
+    '...oWWWWWo.........................ooWWWWWo.....',
+    '....ooooo............................ooooo......',
+    '................................................',
+    '................................................',
+  ],
+  // land: front paws touch down, back legs swing forward
+  [
+    '................................................',
+    '....oo.........................o......o.........',
+    '...oDDo.......................ofo....ofo........',
+    '...oDDo......................offo...ofpo........',
+    '...oTTo......................offfooofppfo.......',
+    '...oTTDo.....................offfffffppfo.......',
+    '...oDDDTo..........ooooooooo.offfffffpppfoo.....',
+    '...oDDDToo......ooofffffffffoffffffffffffffo....',
+    '...oDDDTTDoo...offffffffffffffffffffffffffffo...',
+    '....oTTTTDTTo.offfffffffffffffffffffffewffffo...',
+    '.....oTTTDTTToffffffffffffffffffffffffeEffffo...',
+    '......ooTTTTffffffffffffffffffffffffffeEfffffo..',
+    '........ooTTfffffffoffffffffffffffffffffWWnno...',
+    '..........offfffffffoffffffffffffffffccWWWWWo...',
+    '..........offfffffffoffffffoffffffffffWWWWWWo...',
+    '..........offfffffffofffffffoffffffffffWWWWo....',
+    '..........offfffffffosssssssoofffffffffffoo.....',
+    '...........osfffffffosssssssoofffofooofoo.......',
+    '...........osffffffffoosssssofooofoWWWo.........',
+    '............ooffffffffosssssooffffoWWoso........',
+    '............osoffffffffooooo.offfffoosso........',
+    '.............osooofWWWWWo....offfffossso........',
+    '..............oWWWoWWWWWo.....oWWWWWoWWWo.......',
+    '...............ooo.ooooo......oWWWWWoWWWo.......',
+    '...............................ooooo.ooo........',
+  ],
+  // gather: back up, all four legs bunched under the tummy
+  [
+    '.......oo.......................................',
+    '......oTTo......................................',
+    '.....oTTTo......................o......o........',
+    '.....oTTTo.....................ofo....ofo.......',
+    '.....oDDDTo...........ooooo...offo...ofpo.......',
+    '.....oDDDTo........ooofffffoooofffooofppfo......',
+    '.....oTTTTDo.....oofffffffffffofffffffppfo......',
+    '......oTTTDTo...offfffffffffffffffffffpppfoo....',
+    '.......oDDDTTo.offffffffffffffffffffffffffffo...',
+    '........oTTTTToffffffffffffffffffffffffffffffo..',
+    '.........oTTTffffffffffffffffffffffffffewffffo..',
+    '..........oTTfffffffoffffffffffffffffffeEffffo..',
+    '...........offfffffffofffffffffffffffffeEfffffo.',
+    '...........offfffffffofffffffffffffffffffWWnno..',
+    '...........offfffffffoffffffofffffffffccWWWWWo..',
+    '...........offfffffffosssssofffffffffffWWWWWWo..',
+    '............ossfffffosssssofooffffffffffWWWWo...',
+    '............ossffffffoosssofffofffofffffffoo....',
+    '.............oosfffffffoooffffofooWoooofoo......',
+    '...............ooffffffffffffofoWWWWWWWo........',
+    '.................offffffffffffosoWWWWWo.........',
+    '..................oofWWWfffffoWWoooWoo..........',
+    '....................oWWWWWWWWoWWo..o............',
+    '.....................oooWWWWWooo................',
+    '........................ooooo...................',
+  ],
+  // push-off: back paws drive, front legs reach ahead
+  [
+    '................................o......o........',
+    '...............................ofo....ofo.......',
+    '..............................offo...ofpo.......',
+    '..............................offfooofppfo......',
+    '..oo..........................offfffffppfo......',
+    '.oTTo..............ooooooooo..offfffffpppfoo....',
+    '.oTTo...........ooofffffffffooffffffffffffffo...',
+    '.oTTTooo.......offfffffffffffffffffffffffffffo..',
+    '.oDTTDTToooo..offffffffffffffffffffffffewffffo..',
+    '.oDDDDTTDTTToofffffffffffffffffffffffffeEffffo..',
+    '..oDDDTTDTTTfffffffffffffffffffffffffffeEfffffo.',
+    '...oooDDDTTTfffffffofffffffffffffffffffffWWnno..',
+    '......ooooTfffffffffofffffffffffffffffccWWWWWo..',
+    '..........offfffffffofffffffoffffffffffWWWWWWo..',
+    '..........offfffffffofffffffooffffffffffWWWWo...',
+    '..........offfffffffosssssssofofffffffffffoo....',
+    '..........oofffffssossssssssofofffofffffooWo....',
+    '.........osofffffssosssssssssofooofoooooWWWo....',
+    '........ossofffffsossssssssso.offffffffoooo.....',
+    '........ossofffffo.ooooooooo...ooofWWWWWo.......',
+    '........ossoffffo.................oWWWWWo.......',
+    '........ossoffffo..................ooooo........',
+    '........oWWoWWWWWo..............................',
+    '........oWWoWWWWWo..............................',
+    '.........oo.ooooo...............................',
+  ],
+];
+
+export type RunStyle = 'chibi' | 'chonky';
+export const RUN_STYLES: RunStyle[] = ['chibi', 'chonky'];
+const RUN_FRAMES: Record<RunStyle, string[][]> = { chibi: RUN_CHIBI, chonky: RUN_CHONKY };
+const RUN_COATS: Record<RunStyle, Record<string, string[][]>> = { chibi: COAT_RUN_CHIBI, chonky: COAT_RUN_CHONKY };
+export const RUN = RUN_CHIBI;   // the default style, kept under its old name
+export const RUN_FRAME_MS = 100;   // ~90-110 ms reads as a run, ~70 ms as a sprint
+
+// How big a style is, in pixels. The size follows the art, so redrawing a style can change it.
+export function runSize(style: RunStyle = 'chibi'): { w: number; h: number } {
+  const frames = RUN_FRAMES[style];
+  return { w: Math.max(...frames.flat().map((r) => r.length)), h: Math.max(...frames.map((f) => f.length)) };
+}
+export const RUN_W = runSize('chibi').w;
+export const RUN_H = runSize('chibi').h;
+
+// The running cat. With no frame it draws all four frames, and CSS shows one at a time (see page.html);
+// pass frame to draw just that one (e.g. to step it yourself), flip to run left instead of right,
+// and style to pick the chibi (default) or the chonky cat.
+export function runSvg(look: CatLook, opts: { style?: RunStyle; frame?: number; flip?: boolean } = {}): string {
+  const style = opts.style ?? 'chibi';
+  const frames = RUN_FRAMES[style];
+  const { w, h } = runSize(style);
+  const frame = (i: number) => poseArt(frames, RUN_COATS[style], look, i, w, h);
+  const n = frames.length;
+  const art = opts.frame !== undefined ? frame(((opts.frame % n) + n) % n)
+    : frames.map((_, i) => `<g class="run-frame" style="animation-delay:${(i - n) * RUN_FRAME_MS}ms">${frame(i)}</g>`).join('');
+  const flip = opts.flip ? ` transform="translate(${w} 0) scale(-1 1)"` : '';
+  return `<svg class="sprite run ${style}" style="--w:${w};--run:${n * RUN_FRAME_MS}ms" viewBox="0 0 ${w} ${h}" aria-hidden="true" shape-rendering="crispEdges"><g${flip}>${art}</g></svg>`;
+}
+
+// ---- the jumping cats: five frames per style, played once per jump (see src/habit/moves.ts for when each one shows) ----
+// EDIT ME: same letters and rules as the running cats. Each jump canvas is its style's run canvas with 4 extra rows on
+// top for the leap, so the paws stand on the same bottom row and swapping run for jump never shifts the cat.
+
+// Chibi (42 x 31).
+export const JUMP_CHIBI: string[][] = [
+  // crouch: winding up, body low, legs folded under
+  [
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '....oooo..................................',
+    '...oTTTTo...............o..........o......',
+    '...oTTTTo..............ofo........ofo.....',
+    '..oDTTTTo..............opfo......ofpo.....',
+    '..oDTTTTo..............oppfoooooofppo.....',
+    '..oDTTTTo.............ofppffffffffppfo....',
+    '..oDDDDDo.............offffffffffffffo....',
+    '..oDDDDTTo............offffffffffffffo....',
+    '..oTTTTTTTo..ooooooooo.offfffffffffffo....',
+    '...oTTTTTTToofffffffffofffffffffffffffo...',
+    '...oDDDDTTTfffffffffffffffweffffffewffo...',
+    '....oTTTTfffffffffffffffffEeffffffeEffo...',
+    '.....oTTTfffooffffffffffccfffWnnWfffccoo..',
+    '......ooffffffofffffffffffffWmWWmWfffo....',
+    '.......offffffofffffffffffffffmmffffoo....',
+    '......offffffffoffffffffffoffWWWWfoo......',
+    '.......offffffosssssssssssooWWWWWWo.......',
+    '.......ossffffosssssssssoofoWWWWWWo.......',
+    '........osfffffossssssssofffossooo........',
+    '.........oofffffossssssofffffosso.........',
+    '.........osoffWWWoooooo.ofWWWWoWWo........',
+    '..........oWofWWWWo......oWWWWoWWo........',
+    '...........o.ooooo........oooo.oo.........',
+  ],
+  // take-off: back legs push off, front legs reach up
+  [
+    '..........................................',
+    '..........................................',
+    '.........................o..........o.....',
+    '........................ofo........ofo....',
+    '........................opfo......ofpo....',
+    '........................oppfoooooofppo....',
+    '.......................ofppffffffffppfo...',
+    '.......................offffffffffffffo...',
+    '.......................offffffffffffffo...',
+    '........................offfffffffffffo...',
+    '.......................offfffffffffffffo..',
+    '..................oooooofffweffffffewffo..',
+    '...............ooofffffffffEeffffffeEffo..',
+    '..............offffffffffccfffWnnWfffccoo.',
+    '............oofffffffffffffffWmWWmWfffo...',
+    '...........offfffffffffffofffffmmffffoo...',
+    '..........offfffffffffffofooffWWWWfoo.....',
+    '.......ooooffffffffffffsofffooWWWWWo......',
+    '......oTTTffffoofffffsssooffoWWWWWWo......',
+    '.....oTTTTffffffofssssssssoo.oooooo.......',
+    '....oDDDDTfffffffossssssso................',
+    '...oTTTTDTfffffffosssssso.................',
+    '..oDDDDTDTfffffsosssssso..................',
+    '.oDDDDDTDfffffssosssooo...................',
+    '.oDDDDDToffffsssoooo......................',
+    '.oDDDDDsoffffooo..........................',
+    '.oDDDDDoffffo.............................',
+    '.oDDDDWoffffo.............................',
+    '..oooWWoWWWWo.............................',
+    '.....oooWWWWo.............................',
+    '........oooo..............................',
+  ],
+  // flight: stretched out and level, legs tucked
+  [
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '.........................o..........o.....',
+    '........................ofo........ofo....',
+    '..oooo..................opfo......ofpo....',
+    '.oTTTTo.................oppfoooooofppo....',
+    '.oTTTTo................ofppffffffffppfo...',
+    '.oTTTTo................offffffffffffffo...',
+    '.oTTTTo...........o....offffffffffffffo...',
+    '.oDDDDToo....ooooofoooooofffffffffffffo...',
+    '.oDDDDTDTooooffffffffffffffffffffffffffo..',
+    '.oTTTTTDTTTffffffffffffffffweffffffewffo..',
+    '..oTTTTDTTfffofffffffffffffEeffffffeEffo..',
+    '...oDDDDTfffffoofffffffffccfffWnnWfffccoo.',
+    '....ooTTTffffffofffffffffffffWmWWmWfffo...',
+    '......oooffffffofffffffffffffffmmffffoo...',
+    '....oossoffffffosssssssssssoffWWWWfoo.....',
+    '..oosssofffffffossssssssooofoWWWWWWo......',
+    '.osssooffffffsoossssssssoffffooooWWso.....',
+    '.oWoofffffffsossssssssssoffffffffooWWo....',
+    '..offffffffoo.oossssssoooffffffffffoWo....',
+    '..oWWWWfffo.....oooooo...oofffffWWWWo.....',
+    '..oWWWWfoo.................oooffWWWWo.....',
+    '...ooooo......................oooooo......',
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '..........................................',
+  ],
+  // descent: nose down, front legs reach for the landing
+  [
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '.......oooo...............................',
+    '......oTTTTo..............................',
+    '.....oDTTTTo..............................',
+    '....oDDTTTTo..............................',
+    '....oDDTTTTo..............................',
+    '....oDDDDDo..............o..........o.....',
+    '....oDDDDo..............ofo........ofo....',
+    '....oTTTTTo.............opfo......ofpo....',
+    '..oooTTTTTToooooooo.....oppfoooooofppo....',
+    '.osssDDDDTTofffffffooo.ofppffffffffppfo...',
+    '.oWWWTTTTTffooffffffffooffffffffffffffo...',
+    '.oWoooTTTfffffofffffffffffffffffffffffo...',
+    '..offffffffffffoffffffffffffffffffffffo...',
+    '..oWWWWffffffffofffffffffffffffffffffffo..',
+    '..oWWWWffffffffofffffffffffweffffffewffo..',
+    '...oooooossffffofffffffffffEeffffffeEffo..',
+    '........osssssossssffffffccfffWnnWfffccoo.',
+    '.........oossossssssssfffffffWmWWmWfffo...',
+    '...........oosssssssssssoofffffmmffffoo...',
+    '.............ossssssssssofooffWWWWfoo.....',
+    '..............ooosssssssofffooWWWWWo......',
+    '.................ooooooofffffoWWWWWo......',
+    '........................offffosssoo.......',
+    '.........................offffosso........',
+    '.........................offffoWWWo.......',
+    '..........................oWWWWoWWo.......',
+    '..........................oWWWWooo........',
+    '...........................oooo...........',
+  ],
+  // landing: front paws down and soaking it up, back legs swinging under
+  [
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '..........................................',
+    '...oooo...................................',
+    '..oTTTTo..................................',
+    '..oTTTTo................o..........o......',
+    '..oTTTTo...............ofo........ofo.....',
+    '..oTTTTo...............opfo......ofpo.....',
+    '..oTTTTo...............oppfoooooofppo.....',
+    '..oDDDDTo.............ofppffffffffppfo....',
+    '..oDDDDTTo............offffffffffffffo....',
+    '..oTTTTTTTooooooooooo.offffffffffffffo....',
+    '...oTTTTTTTffffffffffooofffffffffffffo....',
+    '...oDDDDTTffffffffffffffffffffffffffffo...',
+    '....oTTTTffoooffffffffffffweffffffewffo...',
+    '.....oTTffffffofffffffffffEeffffffeEffo...',
+    '......ooffffffofffffffffccfffWnnWfffccoo..',
+    '......offfffffofffffffffffffWmWWmWfffo....',
+    '......offfffffofffffffffffffffmmffffoo....',
+    '.......ossffffosssssssffffoffWWWWfoo......',
+    '........osffffosssssssssoofoWWWWWWo.......',
+    '.........ooffffoosssssssofffoWWWWWo.......',
+    '...........offfffossssssofffosssoo........',
+    '............offWWWossooofffffosso.........',
+    '.............ofWWWWoo...ofWWWWoWWo........',
+    '..............ooooo......oWWWWoWWo........',
+    '..........................oooo.oo.........',
+  ],
+];
+
+// Chonky (48 x 29).
+export const JUMP_CHONKY: string[][] = [
+  // crouch: winding up, body low, legs folded under
+  [
+    '................................................',
+    '................................................',
+    '................................................',
+    '................................................',
+    '................................................',
+    '................................................',
+    '................................................',
+    '....oo.........................o......o.........',
+    '...oDDo.......................ofo....ofo........',
+    '...oDDo......................offo...ofpo........',
+    '...oTTo......................offfooofppfo.......',
+    '...oTTDo.....................offfffffppfo.......',
+    '...oDDDTo..........ooooooooo.offfffffpppfoo.....',
+    '...oDDDToo......ooofffffffffoffffffffffffffo....',
+    '...oDDDTTDoo...offffffffffffffffffffffffffffo...',
+    '....oTTTTDTTo.offfffffffffffffffffffffewffffo...',
+    '.....oTTTDTTToffffffffffffffffffffffffeEffffo...',
+    '......ooTTTTffffffooffffffffffffffffffeEfffffo..',
+    '........ooTTfffffffoffffffffffffffffffffWWnno...',
+    '..........offfffffffoffffffffffffffffccWWWWWo...',
+    '..........offfffffffoffffffoffffffffffWWWWWWo...',
+    '..........offfffffffofffffffoffffffffffWWWWo....',
+    '..........offfffffffosssssssoofffffffffffoo.....',
+    '...........osfffffffosssssssoofffooooofoo.......',
+    '...........ossffffffosssssssofooooWWWWo.........',
+    '............oosfffffosssssssoofffoWWWo..........',
+    '..............oofWWWWooooooo.oWWWWoooWo.........',
+    '.............oWWoWWWWWo......oWWWWWoWWo.........',
+    '..............oo.ooooo........ooooo.oo..........',
+  ],
+  // take-off: back legs push off, front legs reach up
+  [
+    '................................o......o........',
+    '...............................ofo....ofo.......',
+    '..............................offo...ofpo.......',
+    '..............................offfooofppfo......',
+    '..............................offfffffppfo......',
+    '..............................offfffffpppfoo....',
+    '........................ooooooffffffffffffffo...',
+    '.....................ooofffffofffffffffffffffo..',
+    '...................ooffffffffffffffffffewffffo..',
+    '.................ooffffffffffffffffffffeEffffo..',
+    '................offffffffffffffffffffffeEfffffo.',
+    '...............offfffffffffffffffffffffffWWnno..',
+    '..............offfffffffffffffffffffffccWWWWWo..',
+    '..............offfffffffffffoffffffffffWWWWWWo..',
+    '.............offfffffffffffffoffffffffffWWWWo...',
+    '...........oofffffffofffffsssoofffofffffffoo....',
+    '........ooosoffffffffoffsssssssoooWoooofoo......',
+    '......ooTTTTfffffffffossssssssooWWWWWWWo........',
+    '....ooDDDDTTfffffffffosssssssso.oWWWWWo.........',
+    '...oTTTTTDTffffffffffossssssoo...ooWoo..........',
+    '..oDDDDTTDffffffffsssossssoo.......o............',
+    '..oDDDDTTfffffffssssossooo......................',
+    '.oTTTDDoffffffffssssooo.........................',
+    '.oTTTssoffffffoossoo............................',
+    '.oTTossoffffffo.oo..............................',
+    '..oooWWofffffo..................................',
+    '....oWWoWWWWWo..................................',
+    '.....oooWWWWWo..................................',
+    '........ooooo...................................',
+  ],
+  // flight: stretched out and level, legs tucked
+  [
+    '................................o......o........',
+    '...............................ofo....ofo.......',
+    '..............................offo...ofpo.......',
+    '..............................offfooofppfo......',
+    '..oo..........................offfffffppfo......',
+    '.oTTo.........................offfffffpppfoo....',
+    '.oTTo..............ooooooooo.offffffffffffffo...',
+    '.oTTTooo.........oofffffffffoofffffffffffffffo..',
+    '.oDTTDTToo.....ooffffffffffffffffffffffewffffo..',
+    '.oDDDDTTTDoo..offffffffffffffffffffffffeEffffo..',
+    '..oDDDTTTDTToofffffffffffffffffffffffffeEfffffo.',
+    '...oooTTTDTTffffffoofffffffffffffffffffffWWnno..',
+    '......ooTTTTfffffffoffffffffffffffffffccWWWWWo..',
+    '....ooooosTfffffffffofffffffoofffffffffWWWWWWo..',
+    '..oosssssoofffffffffofffffffffofffffffffWWWWo...',
+    '.osssoooofffffffffffosssssssooofffffffffffoo....',
+    '.osoofffffffffffffffosssssssofofffofffffoo......',
+    '..offfffffffffffsssossssssssoofooofooooofoo.....',
+    '..offffffffffffssssossssssssofoffffffffffoWo....',
+    '..offfffffffoossssosssssssssoffffffffffffoWo....',
+    '..oWWWWWfooo..oooo.ooooooooo.ooofffffWWWWWo.....',
+    '..oWWWWWo.......................oooooWWWWWo.....',
+    '...ooooo.............................ooooo......',
+    '................................................',
+    '................................................',
+    '................................................',
+    '................................................',
+    '................................................',
+    '................................................',
+  ],
+  // descent: nose down, front legs reach for the landing
+  [
+    '................................................',
+    '.........oo.....................................',
+    '........oTTo....................................',
+    '.......oTTTo....................................',
+    '......oDTTo.....................................',
+    '......oDDDo.....................o......o........',
+    '..oooooDDDo....................ofo....ofo.......',
+    '.osssssTTTo...................offo...ofpo.......',
+    '.osooooTTTTo....oooooooooo....offfooofppfo......',
+    '..offffffDTTooooffffffffffooo.offfffffppfo......',
+    '..offffffffffffffffffffffffffoofffffffpppfoo....',
+    '..offfffffffffffffofffffffffffffffffffffffffo...',
+    '..oWWWWWfffffffffffofffffffffffffffffffffffffo..',
+    '..oWWWWWffffffffffffoffffffffffffffffffewffffo..',
+    '...oooooooffffffffffoffffffffffffffffffeEffffo..',
+    '..........offfffffffoffffffffffffffffffeEfffffo.',
+    '..........osssffffffofffffffoofffffffffffWWnno..',
+    '...........osssssffosssfffffofffffffffccWWWWWo..',
+    '............osssssossssssssfoffffffffffWWWWWWo..',
+    '.............oossossssssssssooffffffffffWWWWo...',
+    '...............ooossssssssssofofffffffffffoo....',
+    '..................ooossssssssoofffofooofoo......',
+    '.....................ooooooooofooofoWWWo........',
+    '..............................offffoWWoso.......',
+    '..............................offfffoosso.......',
+    '...............................offffoWWWWo......',
+    '...............................oWWWWWoWWWo......',
+    '...............................oWWWWWoooo.......',
+    '................................ooooo...........',
+  ],
+  // landing: front paws down and soaking it up, back legs swinging under
+  [
+    '................................................',
+    '................................................',
+    '................................................',
+    '................................................',
+    '................................................',
+    '................................................',
+    '....oo.........................o......o.........',
+    '...oDDo.......................ofo....ofo........',
+    '...oDDo......................offo...ofpo........',
+    '...oTTo......................offfooofppfo.......',
+    '...oTTDo.....................offfffffppfo.......',
+    '...oDDDTo.........oooooooooo.offfffffpppfoo.....',
+    '...oDDDToo......ooffffffffffoffffffffffffffo....',
+    '...oDDDTTDoo..ooffffffffffffffffffffffffffffo...',
+    '....oTTTTDTTooffffffffffffffffffffffffewffffo...',
+    '.....oTTTDTTTffffoofffffffffffffffffffeEffffo...',
+    '......ooTTTTfffffffoffffffffffffffffffeEfffffo..',
+    '........ooTfffffffffofffffffffffffffffffWWnno...',
+    '..........offfffffffoffffffffffffffffccWWWWWo...',
+    '..........offfffffffoffffffoffffffffffWWWWWWo...',
+    '..........offfffffffossfffffoffffffffffWWWWo....',
+    '..........ossfffffffosssssssoofffffffffffoo.....',
+    '...........ossfffffffossssssoofffofooofoo.......',
+    '............oosffffffosssssssoooofoWWWo.........',
+    '..............oofffffosssssssoffffoWWo..........',
+    '..............oWofWWWWoooooooofffffooso.........',
+    '..............oWWoWWWWWo......oWWWWWoWWo........',
+    '...............oo.ooooo.......oWWWWWoWWo........',
+    '...............................ooooo.oo.........',
+  ],
+];
+
+const JUMP_FRAMES: Record<RunStyle, string[][]> = { chibi: JUMP_CHIBI, chonky: JUMP_CHONKY };
+const JUMP_COATS: Record<RunStyle, Record<string, string[][]>> = { chibi: COAT_JUMP_CHIBI, chonky: COAT_JUMP_CHONKY };
+
+export function jumpSize(style: RunStyle = 'chibi'): { w: number; h: number } {
+  const frames = JUMP_FRAMES[style];
+  return { w: Math.max(...frames.flat().map((r) => r.length)), h: Math.max(...frames.map((f) => f.length)) };
+}
+
+// Draws one frame of a sprite set with a coat on it (shared by the run and jump sprites).
+function poseArt(frames: string[][], coats: Record<string, string[][]>, look: CatLook, i: number, w: number, h: number): string {
+  const grid: Grid = Array.from({ length: h }, (_, y) => [...(frames[i][y] ?? '').padEnd(w, '.')]);
+  applyLayer(grid, coats[look.pattern]?.[i], 'fsWTD');
+  return draw(grid, { ...napColors(look), w: WHITE });
+}
+
+// One frame of the jump (0 crouch, 1 take-off, 2 flight, 3 descent, 4 landing). A jump plays once, so there is no
+// CSS loop: src/habit/moves.ts says which frame to show at each moment of the leap.
+export function jumpSvg(look: CatLook, opts: { style?: RunStyle; frame?: number; flip?: boolean } = {}): string {
+  const style = opts.style ?? 'chibi', frames = JUMP_FRAMES[style], { w, h } = jumpSize(style);
+  const i = Math.max(0, Math.min(frames.length - 1, opts.frame ?? 0));
+  const flip = opts.flip ? ` transform="translate(${w} 0) scale(-1 1)"` : '';
+  return `<svg class="sprite jump ${style}" style="--w:${w}" viewBox="0 0 ${w} ${h}" aria-hidden="true" shape-rendering="crispEdges"><g${flip}>${poseArt(frames, JUMP_COATS[style], look, i, w, h)}</g></svg>`;
+}
+
+// Where to put a run or jump sprite so the cat's paws stand at (x, y) in room pixels: x is the middle of the
+// sprite and y the line the paws rest on. Both sprite sets keep their paws on the second-to-last row.
+export function spriteBox(anim: 'run' | 'jump', style: RunStyle, x: number, y: number) {
+  const { w, h } = anim === 'run' ? runSize(style) : jumpSize(style);
+  return { left: x - w / 2, top: y - (h - 1), w, h };
 }
 
 // The mini face (13 x 10 pixels) is for small spots: thought bubbles, moods, legends. It is drawn on the same

@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { FACE_HALF, HALF_W, PATTERNS, SIT_HALF, WIDTH, bodySvg, faceSvg, lookOf, randomLook, notifyIconName, NOTIFY_FACES, FURS, type Face } from './pixelcat.ts';
+import { FACE_HALF, HALF_W, PATTERNS, SIT_HALF, WIDTH, bodySvg, faceSvg, lookOf, randomLook, notifyIconName, NOTIFY_FACES, FURS, RUN_STYLES, jumpSize, jumpSvg, runSize, runSvg, spriteBox, type Face } from './pixelcat.ts';
 
 const FACES: Face[] = ['open', 'happy', 'sleepy', 'sad', 'starving', 'dead'];
 const look = { fur: '#ffb98a', pattern: 'plain' as const };
@@ -50,5 +50,33 @@ describe('notification icons', () => {
   });
   it('has a drawn PNG for every fur and face (run `npm run icons` if this fails)', () => {
     FURS.forEach((_, i) => NOTIFY_FACES.forEach((f) => expect(existsSync(`android/app/src/main/res/drawable-nodpi/notif_${i}_${f}.png`)).toBe(true)));
+  });
+
+  it('draws every running style in all four frames, for every coat, and flips it to run left', () => {
+    for (const style of RUN_STYLES) {
+      const { w } = runSize(style);
+      for (const pattern of PATTERNS) {
+        const svg = runSvg({ fur: '#ffb98a', pattern }, { style });
+        expect(svg.match(/class="run-frame"/g)).toHaveLength(4);
+        expect(svg).toContain(`--w:${w}`);
+      }
+      expect(runSvg(look, { style, flip: true })).toContain('scale(-1 1)');
+      expect(runSvg(look, { style, frame: 2 })).not.toContain('run-frame');
+    }
+  });
+
+  it('draws all five jump frames for every style and coat, and keeps the paws on the same line as the run sprite', () => {
+    for (const style of RUN_STYLES) {
+      for (const pattern of PATTERNS) for (let frame = 0; frame < 5; frame++) {
+        expect(jumpSvg({ fur: '#ffb98a', pattern }, { style, frame })).toContain('class="sprite jump');
+      }
+      expect(jumpSvg(look, { style, frame: 1, flip: true })).toContain('scale(-1 1)');
+      const run = spriteBox('run', style, 100, 200), jump = spriteBox('jump', style, 100, 200);
+      expect(run.top + run.h - 1).toBe(200);
+      expect(jump.top + jump.h - 1).toBe(200);
+      expect(jump.h).toBeGreaterThanOrEqual(runSize(style).h);
+      expect(jump.left + jump.w / 2).toBe(100);
+    }
+    expect(jumpSize('chibi').w).toBeGreaterThan(0);
   });
 });

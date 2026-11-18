@@ -17,7 +17,10 @@ import CHANGELOG_MD from '../../CHANGELOG.md';
 import { pickThought, type ThoughtKind } from './thoughts.ts';
 import { isZip, packBackup, unpackBackup, type Backup } from '../backup.ts';
 import type { Mood } from '../diary/model.ts';
-import { CONFETTI_COLORS, TRAITS, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
+import { CONFETTI_COLORS, TRAITS, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, runSvg, jumpSvg, spriteBox, RUN_STYLES, lookOf, popperSvg, randomLook, type Face, type RunStyle } from '../shared/pixelcat.ts';
+import type { Spot } from '../shared/scene.ts';
+import { CatMover, routeBetween } from './moves.ts';
+import { surfacesFromSpots } from './surfaces.ts';
 import { GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, petHeartSvg, iconSvg, markSvg, outdoorSvg, roomSvg, sceneVersion } from '../shared/art.ts';
 import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, trophyIcon, type AppName } from '../shared/apps.ts';
 import { mountDiarySettings } from '../diary/settings.ts';
@@ -660,6 +663,95 @@ function setNap(el: HTMLElement, on: boolean) {
   el.style.left = `calc(${on ? napLeft(fx) : fx} * var(--px))`;
 }
 
+// A cat that crosses the room runs along whatever it stands on and jumps between surfaces (floor, rug, sofa, cat tree...), with
+// the running and jumping sprites standing in for it until it arrives. The surfaces come from the kitty spots (./surfaces.ts),
+// the movement from ./moves.ts. Each cat always has the same style (chibi or chonky), picked from its id.
+const runStyleOf = (id: string): RunStyle => RUN_STYLES[hash(id) % RUN_STYLES.length];
+const spotMid = (s: Spot) => s[0] + PET_W / 2;   // a spot is the cat's left edge; a cat in motion is placed by its middle
+const nearestSpot = (x: number, y: number) => SPOTS.reduce((best, s, i) => (Math.hypot(s[0] - x, s[1] - y) < Math.hypot(SPOTS[best][0] - x, SPOTS[best][1] - y) ? i : best), 0);
+const spotOf = (el: HTMLElement) => nearestSpot(Number(el.dataset.fx), Number(el.dataset.fy));
+function canReach(from: number, to: number) {
+  const { surfaces, surfaceOf } = surfacesFromSpots(SPOTS, PET_W);
+  return surfaceOf[from] === surfaceOf[to] || !!routeBetween(surfaces, surfaceOf[from], surfaceOf[to]);
+}
+
+// Put a cat at a spot at once, with no walk there.
+function placeAt(el: HTMLElement, at: [number, number]) {
+  el.dataset.fx = String(at[0]);
+  el.dataset.fy = String(at[1]);
+  el.setAttribute('style', petStyle(at) + ';transition:none');
+  void el.offsetWidth;
+  el.style.removeProperty('transition');
+}
+
+interface Mover { el: HTMLElement; mover: CatMover; style: RunStyle; look: CatLook; shown: string; done: () => void }
+const movers = new Set<Mover>();
+let lastFrame = 0;
+
+// Draw the cat's pose: swap the sprite when the frame changes, and put its paws where the mover says.
+function showPose(mv: Mover, pose: ReturnType<CatMover['update']>) {
+  if (pose.anim === 'idle') return;
+  const { el } = mv, key = `${pose.anim}${pose.frame}${pose.flip ? 'L' : 'R'}`;
+  if (key !== mv.shown) {
+    const old = el.querySelector('svg.sprite');
+    if (!old) return;
+    const tpl = document.createElement('template');
+    const opts = { style: mv.style, frame: pose.frame, flip: pose.flip };
+    tpl.innerHTML = pose.anim === 'run' ? runSvg(mv.look, opts) : jumpSvg(mv.look, opts);
+    old.replaceWith(tpl.content.firstElementChild as Element);
+    el.classList.add('running');
+    mv.shown = key;
+  }
+  const box = spriteBox(pose.anim, mv.style, pose.x, pose.y);
+  el.style.left = `calc(${Math.round(box.left)} * var(--px))`;
+  el.style.top = `calc(${Math.round(box.top)} * var(--px))`;
+  el.style.zIndex = String(Math.round(pose.y));
+}
+
+function pump(t: number) {
+  const dt = Math.min(100, t - lastFrame);
+  lastFrame = t;
+  for (const mv of movers) {
+    if (!mv.el.isConnected) { movers.delete(mv); mv.done(); continue; }
+    showPose(mv, mv.mover.update(dt));
+    if (!mv.mover.busy) { movers.delete(mv); mv.done(); }
+  }
+  if (movers.size) requestAnimationFrame(pump);
+}
+
+// Send a cat to a spot. It resolves when the cat has got there (at once if there is no way there), still in its running
+// pose: endRun sits it down, so a chain of moves doesn't flicker back to sitting between legs.
+function moveTo(el: HTMLElement, to: Spot, speed = 1): Promise<void> {
+  const c = save.state.cats.find((k) => k.id === el.dataset.id);
+  const { surfaces, surfaceOf } = surfacesFromSpots(SPOTS, PET_W);
+  const from = spotOf(el), dest = nearestSpot(to[0], to[1]);
+  if (!c) return Promise.resolve();
+  const mover = new CatMover(surfaces, { surface: surfaceOf[from], x: spotMid(SPOTS[from]) }, null);
+  if (surfaceOf[from] === surfaceOf[dest] && from === dest) return Promise.resolve();
+  mover.speed = speed;
+  if (!mover.goTo(surfaceOf[dest], spotMid(SPOTS[dest]))) return Promise.resolve();
+  el.classList.add('running');
+  return new Promise((resolve) => {
+    const mv: Mover = { el, mover, style: runStyleOf(c.id), look: lookFor(c), shown: '', done: () => { el.dataset.fx = String(SPOTS[dest][0]); el.dataset.fy = String(SPOTS[dest][1]); resolve(); } };
+    if (!movers.size) { lastFrame = performance.now(); requestAnimationFrame(pump); }
+    movers.add(mv);
+  });
+}
+
+// Sit back down where the cat stopped: swap the running or jumping sprite for the sitting one.
+function endRun(el: HTMLElement) {
+  if (!el.classList.contains('running')) return;
+  const c = save.state.cats.find((k) => k.id === el.dataset.id);
+  const old = el.querySelector('svg.sprite');
+  if (c && old) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = bodySvg(catStatus(c, today()).face, lookFor(c), hash(c.id));
+    old.replaceWith(tpl.content.firstElementChild as Element);
+  }
+  el.classList.remove('running');
+  placeAt(el, [Number(el.dataset.fx), Number(el.dataset.fy)]);
+}
+
 const NAP_CHANCE: Record<CatTrait, number> = { lazy: 0.12, grumpy: 0.05, cuddly: 0.05, shy: 0.04, curious: 0.02, playful: 0.012 };
 
 function wander() {
@@ -672,7 +764,7 @@ function wander() {
       if ((napUntil.get(id) ?? 0) <= Date.now()) { napUntil.delete(id); setNap(el, false); }
       return;
     }
-    if (el.classList.contains('thinking') || el.classList.contains('zooming')) return;
+    if (el.classList.contains('thinking') || el.classList.contains('zooming') || el.classList.contains('running')) return;
     if (Math.random() < NAP_CHANCE[traitOf(id)]) {
       napUntil.set(id, Date.now() + (30 + Math.random() * 60) * 1000);
       setNap(el, true);
@@ -680,16 +772,13 @@ function wander() {
     }
     if (Math.random() > MOVE_CHANCE[traitOf(id)]) return;
     const from = roomPos.get(id) ?? 0;
-    const free = SPOTS.map((_, i) => i).filter((i) => !taken.has(i));
+    const free = SPOTS.map((_, i) => i).filter((i) => !taken.has(i) && canReach(spotOf(el), i));
     if (!free.length) return;
     const to = free[Math.floor(Math.random() * free.length)];
     taken.delete(from); taken.add(to);
     roomPos.set(id, to);
-    el.dataset.fx = String(SPOTS[to][0]);
-    el.dataset.fy = String(SPOTS[to][1]);
-    el.setAttribute('style', petStyle(SPOTS[to]));
     el.classList.add('walking');
-    setTimeout(() => el.classList.remove('walking'), 2600);
+    moveTo(el, SPOTS[to]).then(() => { el.classList.remove('walking'); endRun(el); });
   });
   queueWidget();
 }
@@ -699,6 +788,7 @@ setInterval(wander, WANDER_MS);
 // Zoomies: at dusk and in the night a cat wakes with a burst of energy, races round the room, then curls up again.
 const ZOOM_CHANCE: Record<CatTrait, number> = { playful: 0.9, curious: 0.5, cuddly: 0.3, grumpy: 0.25, shy: 0.15, lazy: 0.1 };
 let zooming = false;
+const ZOOM_SPEED = 2.5;   // zoomies run this many times faster than a stroll across the room
 function zoomies() {
   const phase = skyPhase();
   if (phase === 'day' || tab !== 'room' || roomView !== 'indoor' || document.hidden || zooming || Math.random() > 0.4) return;
@@ -706,17 +796,20 @@ function zoomies() {
   const el = els[Math.floor(Math.random() * els.length)];
   if (!el || Math.random() > ZOOM_CHANCE[traitOf(el.dataset.id ?? '')]) return;
   zooming = true;
-  const home = el.getAttribute('style') ?? '', homeFx = el.dataset.fx ?? '0', homeFy = el.dataset.fy ?? '0', wasNap = el.dataset.nap === '1';
+  const home: Spot = [Number(el.dataset.fx), Number(el.dataset.fy)], wasNap = el.dataset.nap === '1';
   el.classList.add('zooming', 'walking');
   if (wasNap) setNap(el, false);
-  const route = [...SPOTS].sort(() => Math.random() - 0.5).slice(0, 5);
-  route.forEach(([x, y], i) => setTimeout(() => { el.dataset.fx = String(x); el.dataset.fy = String(y); el.setAttribute('style', petStyle([x, y])); }, 150 + i * 420));
-  setTimeout(() => { el.dataset.fx = homeFx; el.dataset.fy = homeFy; el.setAttribute('style', home); }, 150 + route.length * 420);
-  setTimeout(() => {
-    el.classList.remove('zooming', 'walking');
-    if (wasNap) setNap(el, true);
-    zooming = false;
-  }, 150 + route.length * 420 + 700);
+  const here = spotOf(el);
+  const route = SPOTS.filter((_, i) => canReach(here, i)).sort(() => Math.random() - 0.5).slice(0, 5);
+  (async () => {
+    try { for (const spot of [...route, home]) { if (!el.isConnected) break; await moveTo(el, spot, ZOOM_SPEED); } }
+    finally {
+      el.classList.remove('zooming', 'walking');
+      endRun(el);
+      if (wasNap) setNap(el, true);
+      zooming = false;
+    }
+  })();
 }
 setInterval(zoomies, 7000);
 

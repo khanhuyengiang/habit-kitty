@@ -324,6 +324,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .sprite.mini { width: calc(var(--w, 13) * var(--px)); }
 .sprite.body { width: calc(var(--w, 28) * var(--px)); }
 .sprite.nap { width: calc(var(--w) * var(--px)); }
+.sprite.run, .sprite.jump { width: calc(var(--w) * var(--px)); }
 .sprite.faded { opacity: .28; }
 .pixart.dim { opacity: .3; filter: grayscale(1); }
 
@@ -492,6 +493,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .room.night .pet { transition: none; }
 .room .pet.zooming, .room.night .pet.zooming { transition: left .4s steps(5), top .4s steps(5); }
 .room .pet.napping { width: auto; }
+.room .pet.running { animation: none; transition: none; }   /* moved by src/habit/app.ts, one frame at a time */
 .room .pet em { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); font: 700 16px/1 var(--font); white-space: nowrap; color: #4a3a78; font-style: normal;
   paint-order: stroke fill; -webkit-text-stroke: 4px #fffafd; }
 .room .zz { position: absolute; right: calc(-3 * var(--px)); top: calc(-3 * var(--px)); font: 700 16px/1 var(--font); color: #fffafd; text-shadow: var(--px) var(--px) 0 var(--edge); }
@@ -512,6 +514,11 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
   .room .pet .sprite.nap { animation: breathe 3s steps(2) infinite; }
   .room .pet.zooming .sprite.body { animation: hop .2s steps(2) infinite; }
 }
+/* running kitties: four frames of a gallop, one visible at a time (src/shared/pixelcat.ts, runSvg) */
+.sprite.run .run-frame { visibility: hidden; }
+.sprite.run .run-frame:first-child { visibility: visible; }
+@media (prefers-reduced-motion: no-preference) { .sprite.run .run-frame { animation: run-frame var(--run) steps(1) infinite; } }
+@keyframes run-frame { 0%, 24.9% { visibility: visible; } 25%, 100% { visibility: hidden; } }
 @keyframes tail-a { 0%, 49.9% { visibility: visible; } 50%, 100% { visibility: hidden; } }
 @keyframes tail-b { 0%, 49.9% { visibility: hidden; } 50%, 100% { visibility: visible; } }
 @keyframes blink { 0%, 93% { visibility: hidden; } 93.1%, 100% { visibility: visible; } }

@@ -1,6 +1,7 @@
 // Habit Kitty's sound: Strawberry Walk loops in the background, kitties in the room meow now and then, and a petted kitty may purr or meow.
-// Browsers only play sound after the first tap or key press, so the music starts then. It pauses while the app is hidden.
+// Browsers only play sound after the first tap or key press, so the music starts then (in the Android app it starts at once). It pauses while the app is hidden.
 // The volumes live in the save (ctx.save()); the user's own music file stays on this device only.
+import { Capacitor } from '@capacitor/core';
 import { Filesystem } from '@capacitor/filesystem';
 import { $ } from '../shared/html.ts';
 import { at, fileBytes, removeFile, toBase64, writeOk } from '../shared/files.ts';
@@ -22,7 +23,7 @@ const SOUND_DEFAULTS: Record<SoundKind, number> = { bgm: 40, meow: 70, purr: 70 
 const MEOW_EVERY_MS = 15_000, MEOW_CHANCE = 0.12;      // a random meow about every two minutes in the room
 const levelOf = (k: SoundKind) => Math.min(100, Math.max(0, ctx.save().sound?.[k] ?? SOUND_DEFAULTS[k]));   // the slider
 const volumeOf = (k: SoundKind) => (ctx.save().muted ? 0 : levelOf(k));                                     // what plays
-let soundOk = false;
+let soundOk = Capacitor.isNativePlatform();   // the Android WebView allows sound at once; a browser waits for the first tap
 let music: HTMLAudioElement | null = null;
 let purring: HTMLAudioElement | null = null;
 
