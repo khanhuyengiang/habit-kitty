@@ -193,6 +193,14 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .brand h1 .kitty { color: var(--accent-text); }
 .brand-r { display: flex; align-items: center; gap: var(--s3); }
 /* a list to put in order (shared/ui.ts orderList): a row per thing, its name and the up and down buttons */
+/* A Filter button and its panel, and the sections a page is grouped into (Kitty Achievement's collection, the notes). */
+.btn.on { background: var(--accent-soft); border-color: var(--accent-edge); }
+.tools { display: grid; gap: var(--s4); }
+.toolbar { display: flex; flex-wrap: wrap; gap: var(--s4); align-items: center; justify-content: space-between; }
+.filter-grid { display: grid; gap: var(--s4); grid-template-columns: repeat(auto-fill, minmax(calc(40 * var(--u)), 1fr)); }
+.side-sec { display: grid; gap: var(--s5); }
+.side-sec h3 { font: 700 24px/1.1 var(--font); display: flex; align-items: center; gap: var(--s3); padding-top: var(--s3); }
+.side-sec h3 .n { font-size: 18px; font-weight: 400; color: var(--muted); }
 .order-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
 .order-list li { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s3); border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); background: var(--surface2); }
 .order-list .nm { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s3); font-weight: 700; overflow-wrap: anywhere; color: var(--ink); }

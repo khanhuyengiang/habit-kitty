@@ -69,6 +69,13 @@ export function showToast(el: HTMLElement, text: string) {
 export const moveButtons = (action: string, id: string, label: string, first: boolean, last: boolean) =>
   `<button class="btn small" type="button" data-action="${action}" data-id="${esc(id)}" data-by="-1" aria-label="Move ${esc(label)} up" ${first ? 'disabled' : ''}>${monoSvg(UI_ICONS.up)}</button>`
   + `<button class="btn small" type="button" data-action="${action}" data-id="${esc(id)}" data-by="1" aria-label="Move ${esc(label)} down" ${last ? 'disabled' : ''}>${monoSvg(UI_ICONS.down)}</button>`;
+// The Filter button (with how many settings differ from the default) and a choice in its panel, a <select> that carries
+// data-filter="name". Kitty Achievement's collection and the notes use them; the panel is .filter-panel / .filter-grid (page.html).
+export const filterButton = (open: boolean, changed: number, action = 'toggle-filter') =>
+  `<button class="btn${changed ? ' on' : ''}" type="button" data-action="${action}" aria-expanded="${open}" aria-controls="filter-panel">${monoSvg(UI_ICONS.filter)} Filter${changed ? ` (${changed})` : ''}</button>`;
+export const filterSelect = (name: string, label: string, opts: [string, string][], cur: string) =>
+  `<div class="field"><label for="v-${name}">${label}</label><select id="v-${name}" data-filter="${name}">${opts.map(([v, t]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
+
 // A list to put in order: each row's name (and picture), with its up and down buttons (see moveButtons).
 export const orderList = (action: string, rows: { id: string; name: string; pic?: string; style?: string }[]) =>
   `<ul class="order-list">${rows.map((r, i) => `<li${r.style ? ` style="${r.style}"` : ''}><span class="nm">${r.pic ?? ''}${esc(r.name)}</span>

@@ -10,14 +10,12 @@
 
 .icon-pick span, .swatch, .tag { border: var(--bw) solid var(--edge); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); }
 
-.btn.on { background: var(--accent-soft); border-color: var(--accent-edge); }
 .btns { flex-wrap: wrap; }
 .btns.end { justify-content: flex-end; }
 .btns .grow { flex: 1 1 auto; }
 label.btn { cursor: pointer; }
 
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); flex-wrap: wrap; margin-bottom: calc(-1 * var(--s3)); }   /* a heading sits closer to what it names than the blocks do to each other */
-.tools { display: grid; gap: var(--s4); }
 .save-filter { display: grid; gap: var(--s2); }
 .check { align-items: center; font-size: 18px; font-weight: 600; }
 
@@ -65,12 +63,7 @@ label.btn { cursor: pointer; }
 .menu-list { position: absolute; right: 0; top: calc(100% + var(--s1)); z-index: 5; min-width: calc(48 * var(--u)); display: grid; gap: var(--s2); padding: var(--s3); background: var(--surface); border: var(--bw) solid var(--edge); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); }
 .menu-list .btn, .menu-sheet .btn { justify-content: flex-start; }
 .menu-sheet { display: grid; gap: var(--s3); }
-.toolbar { display: flex; flex-wrap: wrap; gap: var(--s4); align-items: center; justify-content: space-between; }
-.filter-grid { display: grid; gap: var(--s4); grid-template-columns: repeat(auto-fill, minmax(calc(40 * var(--u)), 1fr)); }
-.side-sec { display: grid; gap: var(--s5); }
-.side-sec h3 { font: 700 24px/1.1 var(--font); display: flex; align-items: center; gap: var(--s3); padding-top: var(--s3); }
 .side-sec h3 .pxs { color: var(--c); }
-.side-sec h3 .n { font-size: 18px; font-weight: 400; color: var(--muted); }
 .tag { display: inline-block; padding: var(--s1) var(--s3); font-size: 14px; line-height: 1.3; border-color: var(--line); background: var(--surface2); color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .tag-sugs { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s2); }
 .tag-sug { padding: var(--s1) var(--s3); font-size: 16px; background: var(--surface2); color: var(--muted); border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); }

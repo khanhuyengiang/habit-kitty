@@ -16,7 +16,7 @@ import { BACKUP_PREFIX, backupStatus, markDirty, nativeBackups, saveBackupToDevi
 import { platformRepo } from './save.ts';
 import { onAppShown, onShown, shownApp } from '../shared/apps.ts';
 import { $, esc, plural } from '../shared/html.ts';
-import { homeButton, moveButtons, playerButton, refocusMove, settingsButton, showToast, titleBar } from '../shared/ui.ts';
+import { filterButton, filterSelect, homeButton, moveButtons, playerButton, refocusMove, settingsButton, showToast, titleBar } from '../shared/ui.ts';
 import { meterHtml } from '../shared/meter.ts';
 import { lvLine } from '../shared/stat-lines.ts';
 import { paintBackdrop } from '../shared/backdrop.ts';
@@ -328,8 +328,7 @@ function questHtml(id: string): string {
     body = quests.map((m) => sideGroups(m, `${m.title} · `)).join('');
   }
   const changed = (Object.keys(DEFAULT_VIEW) as (keyof Filter)[]).filter((k) => view[k] !== DEFAULT_VIEW[k]).length;
-  const sel = (name: string, label: string, opts: [string, string][], cur: string) =>
-    `<div class="field"><label for="v-${name}">${label}</label><select id="v-${name}" data-filter="${name}">${opts.map(([v, t]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
+  const sel = filterSelect;
   const panel = filterFor === key ? `<div class="panel filter-panel" id="filter-panel"><div class="filter-grid">
       ${sel('status', 'Show', [['all', 'Everything'], ['completed', 'Unlocked'], ['planned', 'Locked']], view.status)}
       ${sel('quest', 'Main quest', [['', 'All main quests'], ...quests.map((m): [string, string] => [m.id, m.title]), ...(q?.archivedAt ? [[q.id, `${q.title} (archived)`] as [string, string]] : [])], id)}
@@ -351,7 +350,7 @@ function questHtml(id: string): string {
     <section class="qhead"><h2 class="big">${esc(q.title)}</h2>${q.description ? `<p>${esc(q.description)}</p>` : ''}${q.archivedAt ? '<p class="sub">Archived</p>' : ''}</section>`
     : `${profileHtml()}${viewSwitch('all')}<section class="qhead"><h2 class="big">All achievements</h2></section>`;
   return `${head}
-    <div class="tools"><div class="toolbar"><button class="btn${changed ? ' on' : ''}" data-action="toggle-filter" aria-expanded="${filterFor === key}" aria-controls="filter-panel">${uiIconSvg('filter')} Filter${changed ? ` (${changed})` : ''}</button>
+    <div class="tools"><div class="toolbar">${filterButton(filterFor === key, changed)}
       ${id || quests.length ? `<button class="btn primary" data-action="add-card" data-status="completed">${uiIconSvg('plus')} Achievement</button>` : ''}</div>
     ${panel}</div>
     ${body}`;
