@@ -11,12 +11,12 @@ import { newId } from '../shared/id.ts';
 import { makeLayer } from '../shared/layer.ts';
 import { MONTH_NAMES, pickerHtml } from '../shared/picker.ts';
 import { closeX, homeButton, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
-import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
+import { goTo, journalTabs, onAppShown, onShown } from '../shared/apps.ts';
 import { meterHtml } from '../shared/meter.ts';
 import { compressPhoto } from '../shared/photo.ts';
 import { groupedPicks, iconLabel, uiIconSvg, pickable, stickerSvg, PICKER_ICONS } from '../shared/stickers.ts';
 import { habitStats } from '../shared/stats.ts';
-import { allNotes, noteOf } from '../notes/data.ts';
+import { allNotes, askToOpen, noteOf } from '../notes/data.ts';
 import { noteDate, parseNote } from '../notes/model.ts';
 import { tint, winBar } from '../notes/window.ts';
 import { MAX_PHOTOS, dayName, monthKey, type DiaryEntry, type Mood, type Person, type Star, type Weather } from './model.ts';
@@ -287,7 +287,7 @@ function openDiary(day: number, edit = false) {
         e.weather ? `<span class="mood-now">${weatherSvg(e.weather)}<span>${esc(weatherLabel(e.weather))}</span></span>` : ''}</span><button class="btn small" type="button" data-action="diary-edit">Edit</button></div>
       ${settings().teleportation && e.location?.trim() ? `<span class="mood-now where">${pinSvg()}<span>${esc(e.location.trim())}</span></span>` : ''}
       <p class="diary-read">${esc(e.text)}</p>
-      ${linked && p ? `<div class="nwin nlink" style="${tint(p.color)}" role="note" aria-label="Linked note: ${esc(linked.name)}">${winBar(linked.name, p.face)}</div>` : ''}
+      ${linked && p ? `<button type="button" class="nwin nlink" style="${tint(p.color)}" data-action="diary-note-open" data-name="${esc(linked.name)}" aria-label="Open the linked note: ${esc(linked.name)}">${winBar(linked.name, p.face)}</button>` : ''}
       <div id="diary-photo" class="diary-photo">${!e.photo && e.icon ? `<div class="diary-icon" role="img" aria-label="${esc(iconLabel(e.icon))}">${stickerSvg(e.icon, 1)}</div>` : ''}</div>
     </div>`);
     if (e.photo) draft.loaded = loadPhotos(day, e.photos ?? 1).then((r) => { if (draft?.day === day && !draft.photos.length) { draft.photos = r.photos; draft.busy = undefined; drawDraftPhoto(); } else r.photos.forEach((p) => URL.revokeObjectURL(p.url)); });
@@ -472,6 +472,7 @@ onShown('diary', 'click', (ev) => {
       if (draft) { draft.weather = draft.weather === btn.dataset.weather ? undefined : (btn.dataset.weather as Weather); markMood(); }
       break;
     case 'diary-star': if (draft) { draft.star = draft.star === btn.dataset.star ? undefined : (btn.dataset.star as Star); markMood(); } break;
+    case 'diary-note-open': closeModal(); askToOpen(btn.dataset.name ?? '', 'diary'); goTo('notes'); break;
     case 'diary-note': if (draft) { draft.note = draft.note === btn.dataset.name ? undefined : btn.dataset.name; drawNoteLink(); } break;
     case 'diary-photo-add': $('diary-file').click(); break;
     case 'diary-photo-remove':
