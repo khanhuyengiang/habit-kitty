@@ -97,7 +97,7 @@ dd.tags .tag { text-transform: none; letter-spacing: 0; font-size: 16px; }
 .icon-pick label > span, .swatch, .tag, .side-box, .block, .tag-sug, .chip, .icon-fold > summary, .gallery button, .manage li { position: relative; }
 .icon-pick label > span::after, .swatch::after, .tag::after, .side-box::after, .block::after, .menu-list::after, .tag-sug::after, .chip::after, .photo::after, .icon-fold > summary::after, .gallery button::after, .manage li::after {
   content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; border: var(--bw) solid; border-color: inherit;
-  -webkit-mask-box-image: var(--patch-box); }
+  -webkit-mask-box-image: var(--patch-box); mask: var(--patch-m); }
 /* the frame is its own layer: the glow (a drop-shadow on the card) follows the frame's notched outline, which a clip-path on the card itself would cut off */
 .card::before { content: ""; position: absolute; inset: 0; background: var(--frame); box-shadow: inset 0 0 0 var(--cu) var(--dk), inset 0 0 0 calc(2 * var(--cu)) var(--inner); clip-path: var(--fnotch); }
 .card > span { display: block; }
