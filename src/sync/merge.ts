@@ -162,3 +162,30 @@ export async function mergeBackups(base: Backup | null, mine: Backup, theirs: Ba
     achievement: await mergeAchievement(base?.achievement, mine.achievement, theirs.achievement),
   };
 }
+
+// ---- what a merge changed ----
+// The parts of a save, as the app restores them.
+export type Part = 'game' | 'diary' | 'notes' | 'notebooks' | 'shopping' | 'gallery' | 'achievement';
+
+// A page as it is restored: whether it has photos follows the photos themselves.
+const diaryView = (b: Backup) => ({
+  pages: [...pagesOf(b)].map(([k, { e, pics }]) => [k, { ...e, photo: undefined, photos: undefined }, pics]),
+  reflections: b.reflections ?? {},
+  extras: b.extras ?? {},
+});
+const jsonView = (s: string | undefined) => { try { return s === undefined ? undefined : JSON.parse(s); } catch { return s; } };
+function achievementView(bytes: Uint8Array | undefined) {
+  if (!bytes) return undefined;
+  try { const { data, photos } = unpackAchievement(bytes); return { data, photos: [...photos.keys()].sort() }; } catch { return null; }
+}
+
+// The parts that differ between two saves (the same data written in a different order is not a difference).
+export function changedParts(a: Backup, b: Backup): Set<Part> {
+  const out = new Set<Part>();
+  if (!equal(a.game, b.game)) out.add('game');
+  if (!equal(diaryView(a), diaryView(b))) out.add('diary');
+  if (!equal(a.notes ?? {}, b.notes ?? {})) out.add('notes');
+  for (const k of ['notebooks', 'shopping', 'gallery'] as const) if (!equal(jsonView(a[k]), jsonView(b[k]))) out.add(k);
+  if (!equal(achievementView(a.achievement), achievementView(b.achievement))) out.add('achievement');
+  return out;
+}

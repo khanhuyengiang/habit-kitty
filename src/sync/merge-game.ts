@@ -20,7 +20,7 @@ export interface GameSave {
 
 // Kept as they are on each device: sound is a per-device choice, so are the reminders (they are that device's
 // notifications), the playtest clock belongs to the device it runs on, and each device shows the change log once for itself.
-const DEVICE_ONLY = ['sound', 'muted', 'reminder', 'offsetHours', 'seenVersion'] as const;
+export const DEVICE_ONLY = ['sound', 'muted', 'reminder', 'offsetHours', 'seenVersion'] as const;
 const LOG_MAX = 8;
 
 // What replay works out again, so it is not part of the record.

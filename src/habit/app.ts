@@ -16,6 +16,8 @@ import { VERSION } from '../shared/version.ts';
 import CHANGELOG_MD from '../../CHANGELOG.md';
 import { pickThought, type ThoughtKind } from './thoughts.ts';
 import { isZip, packBackup, unpackBackup, type Backup } from '../backup.ts';
+import { connectDropbox, disconnectDropbox, isLocalCopy, onSyncStatus, returnAddress, registerSyncTarget, requestSync, syncStatus } from '../sync/sync.ts';
+import type { Part } from '../sync/merge.ts';
 import type { Mood } from '../diary/model.ts';
 import { CONFETTI_COLORS, TRAITS, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
 import { GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, petHeartSvg, iconSvg, markSvg, outdoorSvg, roomSvg, sceneVersion } from '../shared/art.ts';
@@ -983,6 +985,7 @@ function renderSaved() {
   renderDaySetting();
   renderSound();
   renderAutoBackup();
+  renderSync();
   $('version').textContent = `v${VERSION}`;
   $('clock-pop').hidden = !save.showClock;
   if (!save.showClock) $('clock-pop').classList.remove('open');
@@ -1045,6 +1048,53 @@ function renderAutoBackup() {
       : '<button class="btn primary" type="button" data-action="backup-folder">Choose backup folder</button>'}</div>`;
 }
 onBackupStatus(renderAutoBackup);
+
+// ---- Sync through Dropbox (src/sync/): the same save as a backup, merged with the other devices' ----
+// Only the parts a merge changed are put back, the same way a restore does it.
+async function applySynced(b: Backup, parts: Set<Part>): Promise<boolean> {
+  const g = b.game === null ? null : validGame(b.game);
+  if (parts.has('game') && !g) return false;
+  if (parts.has('achievement') && b.achievement) {
+    try { await restoreAchievement(b.achievement); } catch { return false; }
+  }
+  if (parts.has('diary') && !await restoreDiary(b, g ?? {})) return false;
+  if (parts.has('notes') && !await restoreNotes(b.notes ?? {})) return false;
+  if (parts.has('notebooks') && !await restoreBooks(b.notebooks ?? '{"books":[]}')) return false;
+  if (parts.has('shopping') && b.shopping && !await restoreShopping(b.shopping)) return false;
+  if (parts.has('gallery') && b.gallery) {
+    if (!await restorePixel(b.gallery)) return false;
+    redrawPixelSettings();
+  }
+  if (parts.has('game') && g) {
+    const { trackamaniac, moodNames, ...rest } = g;
+    save = normalize(rest);
+    lastLevel = null;
+    persist(); settle(); renderAll();
+  }
+  if (parts.has('achievement')) {   // that app may be running with the old save: start it again
+    toast('Synced. Reloading…');
+    setTimeout(() => location.reload(), 900);
+  }
+  return true;
+}
+registerSyncTarget({ collect: collectBackup, apply: applySynced });
+
+function renderSync() {
+  const box = $('sync-box');
+  const st = syncStatus();
+  (box.closest('details') as HTMLElement).hidden = !st.available;
+  if (!st.available) return;
+  const what = '<p class="muted">Keep your kitties, diary, notes, Kitty Mart, Kitty Gallery icons and Kitty Achievement the same on your phone, tablet and the website, through your own Dropbox. Itty Bitty Kitty only sees its own folder there (in <b>Apps</b>). Sounds and reminders stay as each device has them.</p>';
+  box.innerHTML = st.connected
+    ? `${what}<p>Dropbox${st.name ? `: <b>${esc(st.name)}</b>` : ''}<br>Last sync: ${st.running ? 'syncing…' : st.last ? ago(st.last) : 'not yet'}${!st.running && st.summary && !st.error ? ` · ${esc(st.summary)}` : ''}</p>
+       ${st.error ? `<p class="form-error">${esc(st.error)}</p>` : ''}
+       <div class="btns flow"><button class="btn primary" type="button" data-action="sync-now" ${st.running ? 'disabled' : ''}>Sync now</button>
+       <button class="btn" type="button" data-action="sync-stop">Disconnect</button></div>`
+    : `${what}${st.error ? `<p class="form-error">${esc(st.error)}</p>` : ''}
+       ${isLocalCopy() ? `<p class="muted">Local copy: add <b>${esc(returnAddress())}</b> to the Dropbox app's redirect URIs.</p>` : ''}
+       <div class="btns flow"><button class="btn primary" type="button" data-action="sync-connect">Connect Dropbox</button></div>`;
+}
+onSyncStatus(renderSync);
 
 async function openFolderRestore() {
   try {
@@ -1772,6 +1822,9 @@ onShown('habit', 'click', (ev) => {
     case 'save-file': saveBackupFile(); break;
     case 'share-file': shareBackup(); break;
     case 'backup-folder': chooseFolder(); break;
+    case 'sync-connect': connectDropbox().catch(() => toast("Couldn't open Dropbox.")); break;
+    case 'sync-now': requestSync().then(() => { const e = syncStatus().error; toast(e || 'Synced.'); }); break;
+    case 'sync-stop': disconnectDropbox().then(() => toast('Dropbox disconnected. Everything stays on this device.')); break;
     case 'backup-now': backupNow().then(() => { const e = backupStatus().error; toast(e || 'Backed up.'); }); break;
     case 'backup-stop': stopBackups().then(() => toast('Auto-backup is off. Your old backups stay in the folder.')); break;
     case 'restore-folder': openFolderRestore(); break;

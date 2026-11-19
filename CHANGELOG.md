@@ -2,6 +2,12 @@
 
 Newest first. The app bundles this file: it shows the latest entry once after an update, and the whole list under Settings → Change log.
 
+## 0.6.2 - 2026-11-19
+
+### New
+- **Sync with Dropbox.** Settings → **Sync** → **Connect Dropbox** keeps your kitties, diary, notes, Kitty Mart, Kitty Gallery icons and Kitty Achievement the same on your phone, tablet and the website. It goes through your own Dropbox, and Itty Bitty Kitty only sees its own folder there (in **Apps**). It syncs when you open or leave the app, shortly after a change, and with **Sync now**.
+- **Sync merges, it doesn't overwrite.** Changes made on different devices are put together: a kitty fed on your phone and another fed on the website both count, and affection is worked out again from all of it. A diary page written on two devices keeps both texts, and a note changed on two devices keeps a "(conflict)" copy. Sounds and reminders stay as each device has them.
+
 ## 0.6.0 - 2026-11-16
 
 ### New
