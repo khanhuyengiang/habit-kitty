@@ -158,6 +158,13 @@ body {
 :root[data-fancy] body { background: var(--backdrop, linear-gradient(var(--bg) 0 34%, var(--bg2) 34% 67%, var(--bg3) 67%)) 0 0 / var(--backdrop-size, auto) fixed; }
 [data-app-root] { image-rendering: auto; }   /* pixelated is for the backdrop; it is inherited, so each app picks its own */
 .wrap { max-width: 480px; margin: 0 auto; padding: var(--s6) var(--s5) calc(24 * var(--u)); display: grid; gap: var(--s6); align-content: start; }
+/* Wide screens (the website on a computer, a tablet on its side): the page is not a phone-wide column in the middle but
+   fills the window (up to a point), and its cards tile across it. Each app's sheet says how its own lists tile, in a block
+   like this one with the same width; dialogs keep their size. --tile is the narrowest a card gets in a tiled list. */
+:root { --tile: calc(100 * var(--u)); }
+@media (min-width: 960px) {
+  .wrap { max-width: 1800px; padding-inline: var(--s8); }
+}
 h1, h2, h3 { margin: 0; text-wrap: balance; }
 h2 { font: 700 18px/1 var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 p { margin: 0; }
@@ -650,6 +657,22 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .pick[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--accent-shade); }
 .pick:active:not(:disabled) { transform: translateY(calc(3 * var(--px))); box-shadow: none; }
 .pick:disabled { background: var(--none); color: var(--muted); border-color: var(--line); box-shadow: none; opacity: .55; cursor: default; }
+
+/* wide screens (see .wrap): the cats and strays tile; the heatmap (one calendar for them all, with its key under it) stays
+   a calendar's size in the middle. On the Stray and Treats tab the add form sits beside the list. Settings' boxes tile too,
+   each heading and the footer on a row of their own. */
+@media (min-width: 960px) {
+  .cats { grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--tile)), 1fr)); align-items: start; }
+  #heat { grid-template-columns: minmax(0, calc(150 * var(--u))); justify-content: center; }
+  #adopt-btn { justify-self: center; width: min(100%, calc(110 * var(--u))); }
+  .room-foot { justify-content: center; }
+  #tab-mindful.on { grid-template-columns: minmax(0, 1fr) minmax(0, calc(110 * var(--u))); grid-template-rows: auto auto 1fr; align-items: start; }
+  #tab-mindful > * { grid-column: 1; }
+  #tab-mindful > #task-form { grid-column: 2; grid-row: 1 / -1; }
+  #tab-settings .set-page { grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--tile)), 1fr)); align-items: start; }
+  #tab-settings .set-page > :not(details) { grid-column: 1 / -1; }
+  .set-apps { grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(70 * var(--u))), 1fr)); }
+}
 </style>
 <div data-app-root="habit">
 

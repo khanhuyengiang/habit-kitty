@@ -4,6 +4,7 @@
    sheet in web/page.html, so it looks like every other screen; layout counts in --u, pictures in --px. */
 [data-app-root="achievement"] { image-rendering: pixelated; }
 .wrap { max-width: calc(250 * var(--u)); }
+@media (min-width: 960px) { .wrap { max-width: 1800px; } }   /* wide screens fill the window, as everywhere (see .wrap in page.html) */
 #page { display: grid; gap: var(--s6); align-content: start; min-width: 0; }   /* the page's own blocks: one even rhythm between them */
 #status:empty { display: none; }
 .saving { font-size: 16px; color: var(--muted); }
