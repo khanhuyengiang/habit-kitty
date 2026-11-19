@@ -117,7 +117,13 @@ export function onBackupStatus(fn: () => void) { listeners.add(fn); return () =>
 
 export function registerBackupSource(s: BackupSource) { sources.push(s); emit({}); }
 // Call after anything the source packs has changed.
-export function markDirty(prefix: string) { setMap(KEY_DIRTY, prefix, true); }
+const dirtyListeners = new Set<(prefix: string) => void>();
+export function markDirty(prefix: string) {
+  setMap(KEY_DIRTY, prefix, true);
+  for (const l of dirtyListeners) l(prefix);
+}
+// Told about every change (cloud sync uses it to know there is something to send).
+export function onDirty(fn: (prefix: string) => void) { dirtyListeners.add(fn); return () => { dirtyListeners.delete(fn); }; }
 
 export async function refreshFolder() {
   if (!nativeBackups) return;

@@ -7,6 +7,7 @@ import { APP_TITLE, GO_EVENT, SHOWN_EVENT, TAB_EVENT, rememberApp, shownApp, typ
 import { paintBackdrop } from '../shared/backdrop.ts';
 import '../shared/ui.ts';   // the saved light/dark choice, before the first paint
 import { initPixel } from '../pixel/data.ts';
+import { handleSignInReturn, initSync } from '../sync/sync.ts';
 
 const started = new Set<AppName>();
 
@@ -66,8 +67,11 @@ if (Capacitor.isNativePlatform()) App.addListener('backButton', ({ canGoBack }) 
 
 // Kitty Gallery's icons are used by every app (see pixel/live.ts), so they are read before the first screen is drawn; should
 // that take too long, the apps start without them and the screen showing is drawn again once they are in.
+// Coming back from signing in to Dropbox for the phone app: this page only passes it on, so nothing starts.
+const passingOn = handleSignInReturn();
+if (!passingOn) initSync();
 const icons = initPixel();
-let booted = false;
+let booted = passingOn;
 const boot = () => { if (booted) return; booted = true; start('habit'); show('home'); };
 icons.then(() => { if (booted) document.dispatchEvent(new CustomEvent(SHOWN_EVENT, { detail: shownApp() })); else boot(); });
 setTimeout(boot, 1000);
