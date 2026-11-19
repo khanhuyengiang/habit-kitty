@@ -13,7 +13,7 @@ import { OFFICIAL_DECOS, OFFICIAL_ICONS, OFFICIAL_WEATHER } from '../shared/art.
 import { PALETTE, type PaletteName } from '../shared/palette.ts';
 import { OFFICIAL_GARDEN_SPOTS, OFFICIAL_PROPS, OFFICIAL_ROOM_SPOTS, ROOM_H, ROOM_W, officialSceneGrid, type SceneId, type Spot } from '../shared/scene.ts';
 
-export type CategoryId = 'sticker' | 'friend' | 'button' | 'weather' | 'deco' | 'scene';
+export type CategoryId = 'sticker' | 'friend' | 'button' | 'weather' | 'deco' | 'kitty' | 'scene';
 export interface Category {
   id: CategoryId;
   label: string;
@@ -22,6 +22,7 @@ export interface Category {
   letters: string;    // the letters you can draw with, in the palette's order
   outline: boolean;   // the lit and shaded edges of the base colour are added for you (the dark outline is drawn with the rest)
   base: string;       // what the base colour (s, l, d) follows, or '' when it has none
+  free?: boolean;     // any size (up to FREE_MAX): each drawing keeps its own, and can be resized on the board
 }
 // The colours of a sticker or a card friend as the drawing board lists them, three to a row: the base colour (it follows the card)
 // on top, then one row per family in rainbow order (by hue), a family never split; a row that has fewer is left short.
@@ -37,6 +38,7 @@ export const CATEGORIES: Category[] = [
   { id: 'button', label: 'Button', where: 'The small one-colour icons on buttons', w: 7, h: 7, letters: 'o', outline: false, base: '' },
   { id: 'weather', label: 'Weather', where: 'The weather choice on a diary page (with Meteorokinesis on)', w: 13, h: 10, letters: FULL_INKS, outline: false, base: '' },
   { id: 'deco', label: 'Decoration', where: 'Pictures drawn in one place only, such as the wings beside the chosen app on the home screen', w: 12, h: 12, letters: FULL_INKS, outline: false, base: '' },
+  { id: 'kitty', label: 'Kitty', where: 'Kitty designs and poses, drawn at any size. The app does not show them yet', w: 32, h: 24, letters: FULL_INKS, outline: false, base: '', free: true },
   { id: 'scene', label: 'Scene', where: "Habit Kitty's cosy room and garden, where the kitties live", w: ROOM_W, h: ROOM_H, letters: '', outline: false, base: '' },
 ];
 // Decorations and scenes are each drawn in their own place: they can be changed, but there are no new ones.
@@ -127,6 +129,7 @@ export function officials(cat: CategoryId): Official[] {
   if (cat === 'friend') return Object.entries(OFFICIAL_CARD_FRIENDS).map(([id, v]) => ({ id, name: v.label, group: DEFAULT_GROUP, art: v.art }));
   if (cat === 'weather') return Object.entries(OFFICIAL_WEATHER).map(([id, v]) => ({ id, name: v.label, group: DEFAULT_GROUP, art: v.art }));
   if (cat === 'deco') return Object.entries(OFFICIAL_DECOS).map(([id, v]) => ({ id, name: v.label, group: DEFAULT_GROUP, art: v.art }));
+  if (cat === 'kitty') return [];   // nothing official yet: every kitty is one you drew
   if (cat === 'scene') return SCENES.map(([id, name]) => ({ id, name, group: DEFAULT_GROUP, art: sceneArt(id), spots: officialSpots(id),
     ...(id === 'room' && { props: { book: [...OFFICIAL_PROPS.book] as Spot, trophy: [...OFFICIAL_PROPS.trophy] as Spot } }) }));
   // Habit Kitty's button icons, then Kitty Achievement's that Habit Kitty has not got
@@ -190,6 +193,14 @@ export function newId(name: string, cat: CategoryId, data: PixelData): string {
   for (let n = 2; ; n++) if (!taken.has(`${base}${n}`)) return `${base}${n}`;
 }
 
+// A drawing of a free-size category (see Category.free) is 1 to FREE_MAX pixels each way.
+export const FREE_MAX = 96;
+// The size of some rows when they make a picture a free-size category can hold, else null.
+export function freeSize(art: unknown): [number, number] | null {
+  if (!Array.isArray(art) || !art.length || typeof art[0] !== 'string') return null;
+  const w = (art[0] as string).length, h = art.length;
+  return w >= 1 && h >= 1 && w <= FREE_MAX && h <= FREE_MAX ? [w, h] : null;
+}
 // The size an icon is drawn at: an official one keeps its own, a new one gets its category's.
 export function sizeOf(cat: CategoryId, id: string | null): [number, number] {
   const o = id ? officialOf(cat, id) : undefined;
@@ -308,7 +319,8 @@ function checkIcon(i: unknown): Omit<PixelIcon, 'updated'> | null {
   const v = i as Partial<PixelIcon> | null;
   if (!v || !isCategory(v.category) || typeof v.id !== 'string' || !/^[a-z][a-z0-9]{0,31}$/i.test(v.id)) return null;
   if (isFixed(v.category) && !officialOf(v.category, v.id)) return null;   // only the official ones
-  const art = cleanArt(v.art, v.category, sizeOf(v.category, v.id)) ?? (v.category === 'sticker' ? oldSticker(v.art) : null);
+  const size = categoryOf(v.category).free ? freeSize(v.art) : sizeOf(v.category, v.id);
+  const art = (size && cleanArt(v.art, v.category, size)) ?? (v.category === 'sticker' ? oldSticker(v.art) : null);
   if (!art) return null;
   const icon: Omit<PixelIcon, 'updated'> = { category: v.category, id: v.id, name: cleanName(String(v.name ?? ''), v.id), group: cleanGroup(String(v.group ?? '')), art };
   if (v.category === 'sticker' && typeof v.food === 'boolean') icon.food = v.food;
@@ -384,7 +396,7 @@ export function importIcons(data: PixelData, icons: Omit<PixelIcon, 'updated'>[]
     if (!clash.has(i)) return putIcon(d, i, now);
     if (i.deleted) return d;   // keep yours: it is there, not deleted
     const [w, h] = sizeOf(i.category, null);
-    if (i.art.length !== h || i.art.some((r) => r.length !== w)) return d;
+    if (!categoryOf(i.category).free && (i.art.length !== h || i.art.some((r) => r.length !== w))) return d;
     return putIcon(d, { ...i, id: newId(i.name, i.category, d), group: i.group === DEFAULT_GROUP ? USER_GROUP : i.group }, now);
   }, data);
   return uniqueNames(next, now);
@@ -456,6 +468,13 @@ export function linePoints([x0, y0]: [number, number], [x1, y1]: [number, number
   }
 }
 export const flipGrid = (g: Grid): Grid => g.map((r) => r.slice().reverse());
+// The drawing on a board of another size: it keeps its top-left corner; new rows and columns are empty, and what no
+// longer fits on the right or at the bottom is cut off.
+export function resizeGrid(g: Grid, w: number, h: number): Grid {
+  const out = blankGrid(w, h);
+  for (let y = 0; y < Math.min(h, g.length); y++) for (let x = 0; x < Math.min(w, g[y].length); x++) out[y][x] = g[y][x];
+  return out;
+}
 // Moves everything by (dx, dy); what goes off the edge is lost.
 export function shiftGrid(g: Grid, dx: number, dy: number): Grid {
   const h = g.length, w = g[0]?.length ?? 0, out = blankGrid(w, h);
