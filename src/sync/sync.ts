@@ -21,7 +21,7 @@ import { DropboxError, authorizeUrl, exchangeCode, randomString, revoke, session
 import { changedParts, mergeBackups, type Part } from './merge.ts';
 import { DEVICE_ONLY } from './merge-game.ts';
 
-export const SITE = 'https://khanhuyengiang.github.io/habit-kitty/';
+export const SITE = 'https://khanhuyengiang.com/habit-kitty/';   // the website (GitHub Pages, on its own domain)
 const APP_LINK = 'ittybittykitty://dropbox';
 const FILE = '/itty-bitty-kitty.kitty';
 const BASE_DIR = 'habit-kitty-sync', BASE_FILE = 'base.kitty';
