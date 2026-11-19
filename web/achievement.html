@@ -8,7 +8,7 @@
 #status:empty { display: none; }
 .saving { font-size: 16px; color: var(--muted); }
 
-.icon-pick span, .swatch, .tag { border: var(--bw) solid var(--edge); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); }
+.icon-pick label > span, .swatch, .tag { border: var(--bw) solid var(--edge); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); }
 
 .btns { flex-wrap: wrap; }
 .btns.end { justify-content: flex-end; }
@@ -94,8 +94,8 @@ dd.tags .tag { text-transform: none; letter-spacing: 0; font-size: 16px; }
   position: relative; display: block; flex: none; width: calc(108 * var(--cu)); height: calc(182.5 * var(--cu)); padding: var(--pad); border: 0; text-align: left; background: none;
   color: var(--txt); cursor: pointer; }
 /* the boxes' corner pixels, so their two-pixel outlines stay two pixels round the corners (see page.html) */
-.icon-pick span, .swatch, .tag, .side-box, .block, .tag-sug, .chip, .icon-fold > summary, .gallery button, .manage li { position: relative; }
-.icon-pick span::after, .swatch::after, .tag::after, .side-box::after, .block::after, .menu-list::after, .tag-sug::after, .chip::after, .photo::after, .icon-fold > summary::after, .gallery button::after, .manage li::after {
+.icon-pick label > span, .swatch, .tag, .side-box, .block, .tag-sug, .chip, .icon-fold > summary, .gallery button, .manage li { position: relative; }
+.icon-pick label > span::after, .swatch::after, .tag::after, .side-box::after, .block::after, .menu-list::after, .tag-sug::after, .chip::after, .photo::after, .icon-fold > summary::after, .gallery button::after, .manage li::after {
   content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; border: var(--bw) solid; border-color: inherit;
   -webkit-mask-box-image: var(--patch-box); }
 /* the frame is its own layer: the glow (a drop-shadow on the card) follows the frame's notched outline, which a clip-path on the card itself would cut off */
@@ -181,8 +181,8 @@ details.panel .manage { margin-top: var(--s4); }
 .icon-pick input, .swatches input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
 .icon-pick input:focus-visible + span, .swatches input:focus-visible + span { outline: var(--bw) solid var(--accent-text); outline-offset: calc(-2 * var(--bw)); }
 .icon-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(14 * var(--u)), 1fr)); gap: var(--s3); }
-.icon-pick span { width: 100%; height: calc(14 * var(--u)); display: grid; place-items: center; border-color: var(--line); background: var(--surface2); color: var(--edge); }
-.icon-pick label:hover span { border-color: var(--edge); }
+.icon-pick label > span { width: 100%; height: calc(14 * var(--u)); display: grid; place-items: center; border-color: var(--line); background: var(--surface2); color: var(--edge); }
+.icon-pick label:hover > span { border-color: var(--edge); }
 .icon-pick input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); }
 .swatches { display: flex; flex-wrap: wrap; gap: var(--s3); align-items: center; }
 .swatch { display: block; width: calc(9 * var(--u)); height: calc(9 * var(--u)); background: var(--c); border-color: var(--line); }
