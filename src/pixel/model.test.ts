@@ -3,7 +3,7 @@ import { PICKER_ICONS, PICKER_ICON_NAMES } from '../shared/sticker-icons.ts';
 import {
   BASE_ROWS, INK_ROWS, MORE_INKS, byHue, categoryOf, paletteLabel,
   CATEGORIES, DEFAULT_GROUP, EXPORT_FORMAT, LETTERS, USER_GROUP, blankGrid, cleanArt, dropIcon, emptyData, exportText, floodFill,
-  byName, canDeleteOfficial, deleteOfficial, liveIcons, restoreIcon, countMine, dropCount, dropFloat, dropIcons, groupsOf, setFood, resetIcons, iconsOf, importClashes, importIcons, nameTaken, uniqueNames, inRect, liftArea, linePoints, moveIcons, rectOf, newId, officials, putIcon, readExport, renameGroup, sanitize, shiftGrid, sizeOf, toArt, toGrid,
+  byName, canDeleteOfficial, deleteOfficial, liveIcons, restoreIcon, countMine, dropCount, dropFloat, dropIcons, groupsOf, setFood, resetIcons, iconsOf, importClashes, importIcons, nameTaken, uniqueNames, inRect, liftArea, linePoints, moveIcons, rectOf, newId, officials, putIcon, readExport, renameGroup, sanitize, shiftGrid, sizeOf, toArt, toGrid, FREE_MAX, freeSize, resizeGrid, ALL_INKS
 } from './model.ts';
 import { PALETTE, type PaletteName } from '../shared/palette.ts';
 import { FINE } from '../shared/stickers.ts';
@@ -384,5 +384,37 @@ describe('scenes', () => {
     expect(d.icons[0].spots).toEqual([[0, 30], [210, 320]]);
     expect(d.icons[0].props).toEqual({ book: [231, 0], trophy: [1, 1] });
     expect(readExport(exportText(d, '2026-11-15'))[0].spots).toEqual([[0, 30], [210, 320]]);
+  });
+});
+
+describe('kitty drawings (any size)', () => {
+  const art = (w: number, h: number) => Array.from({ length: h }, (_, y) => (y === 0 ? 'o' : '.').padEnd(w, '.'));
+  it('keeps each drawing at its own size, up to FREE_MAX each way', () => {
+    expect(categoryOf('kitty').free).toBe(true);
+    expect(officials('kitty')).toEqual([]);
+    expect(freeSize(art(32, 24))).toEqual([32, 24]);
+    expect(freeSize(art(FREE_MAX + 1, 4))).toBeNull();
+    expect(freeSize([])).toBeNull();
+    const d = sanitize({ version: 1, icons: [
+      { category: 'kitty', id: 'loaf', name: 'Loaf', group: 'user', art: art(40, 18), updated: 1 },
+      { category: 'kitty', id: 'tiny', name: 'Tiny', group: 'user', art: art(3, 2), updated: 1 },
+      { category: 'kitty', id: 'ragged', name: 'Ragged', group: 'user', art: ['oo', 'o'], updated: 1 },
+      { category: 'kitty', id: 'huge', name: 'Huge', group: 'user', art: art(FREE_MAX + 1, 2), updated: 1 },
+    ] });
+    expect(d.icons.map((i) => [i.id, i.art[0].length, i.art.length])).toEqual([['loaf', 40, 18], ['tiny', 3, 2]]);
+    expect(readExport(exportText(d, '2026-11-19')).map((i) => i.id)).toEqual(['loaf', 'tiny']);
+  });
+  it('resizes a board from its top-left corner', () => {
+    const g = toGrid(['ab', 'cd']);
+    expect(toArt(resizeGrid(g, 3, 1))).toEqual(['ab.']);
+    expect(toArt(resizeGrid(g, 1, 3))).toEqual(['a', 'c', '.']);
+  });
+});
+
+describe('choosing any colour', () => {
+  it('lists every palette colour once', () => {
+    const hexes = [...ALL_INKS].map((ch) => PALETTE[LETTERS[ch].palette!]);
+    expect(new Set(hexes).size).toBe(hexes.length);
+    expect(new Set(hexes)).toEqual(new Set(Object.values(PALETTE)));
   });
 });

@@ -36,7 +36,7 @@
   --accent: #ff8fb8; --accent-ink: #4d2f68; --accent-edge: #d9608f; --accent-shade: #f26fa3; --accent-text: #c23f7c;
   --accent-soft: #ffe3ee; --accent-pastel: #ffc4da;
   /* Heatmap: every state is a pastel, kept apart by hue AND lightness. */
-  --habit: #8fd0fa; --fed: #8fe0c8; --missed: #ff8fb8; --today: #ffd36e; --sitter: #b9a3f0; --none: #f3ecff;
+  --habit: #8fd0fa; --fed: #8fe0c8; --missed: #ff8fb8; --offering: #f2b705; --today: #ffd36e; --sitter: #b9a3f0; --none: #f3ecff;
   --warn-bg: #fff3d1; --warn-ink: #7a4d09; --bad: #c23f7c; --ok: #2f9e6e;
   --dot1: #ff8fb8; --dot2: #b9a3f0; --dot3: #8fd0fa;
   --font: "Jersey 15", "Courier New", monospace;
@@ -52,7 +52,7 @@
   --edge: #9a8cc8; --line: #4a4084; --bevel: #2b2352;
   --accent: #ff8fb8; --accent-ink: #35244f; --accent-edge: #ffb3d0; --accent-shade: #d9608f; --accent-text: #ff8fb8;
   --accent-soft: #4d2f68; --accent-pastel: #7d3f7f;
-  --habit: #4a9bea; --fed: #5fc7a8; --missed: #f26fa3; --today: #ffd36e; --sitter: #8f78d0; --none: #4a3a78;
+  --habit: #4a9bea; --fed: #5fc7a8; --missed: #f26fa3; --offering: #f2b705; --today: #ffd36e; --sitter: #8f78d0; --none: #4a3a78;
   --warn-bg: #4a3a1c; --warn-ink: #f1cfa0; --bad: #ff7d9f; --ok: #5fc7a8; --hilite: rgba(255, 255, 255, .14); color-scheme: dark;
 } }
 @supports not (-webkit-mask-box-image: none) { :root { --notch-m: linear-gradient(#000 0 0) center / calc(100% - 6 * var(--px)) 100% no-repeat, linear-gradient(#000 0 0) center / calc(100% - 2 * var(--px)) calc(100% - 2 * var(--px)) no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - 6 * var(--px)) no-repeat; --notch-s-m: linear-gradient(#000 0 0) center / calc(100% - 2 * var(--px)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - 2 * var(--px)) no-repeat; --notch-top-m: linear-gradient(#000 0 0) center / calc(100% - 6 * var(--px)) 100% no-repeat, linear-gradient(#000 0 0) bottom / calc(100% - 2 * var(--px)) calc(100% - var(--px)) no-repeat, linear-gradient(#000 0 0) bottom / 100% calc(100% - 3 * var(--px)) no-repeat; --patch-m: linear-gradient(#000 0 0) left top / var(--px) var(--px) no-repeat, linear-gradient(#000 0 0) right top / var(--px) var(--px) no-repeat, linear-gradient(#000 0 0) left bottom / var(--px) var(--px) no-repeat, linear-gradient(#000 0 0) right bottom / var(--px) var(--px) no-repeat; --patch-top-m: linear-gradient(#000 0 0) left top / var(--px) var(--px) no-repeat, linear-gradient(#000 0 0) right top / var(--px) var(--px) no-repeat; --notch-box: none; --notch-s-box: none; --notch-top-box: none; --patch-box: none; } }
@@ -135,7 +135,7 @@
   --edge: #9a8cc8; --line: #4a4084; --bevel: #2b2352;
   --accent: #ff8fb8; --accent-ink: #35244f; --accent-edge: #ffb3d0; --accent-shade: #d9608f; --accent-text: #ff8fb8;
   --accent-soft: #4d2f68; --accent-pastel: #7d3f7f;
-  --habit: #4a9bea; --fed: #5fc7a8; --missed: #f26fa3; --today: #ffd36e; --sitter: #8f78d0; --none: #4a3a78;
+  --habit: #4a9bea; --fed: #5fc7a8; --missed: #f26fa3; --offering: #f2b705; --today: #ffd36e; --sitter: #8f78d0; --none: #4a3a78;
   --warn-bg: #4a3a1c; --warn-ink: #f1cfa0; --bad: #ff7d9f; --ok: #5fc7a8; --hilite: rgba(255, 255, 255, .14); color-scheme: dark;
 }
 
@@ -371,7 +371,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .chip { display: inline-flex; align-items: center; gap: var(--s2); margin-top: var(--s2); font-size: 18px; font-weight: 600; padding: 0 var(--s2); background: var(--surface2); border-color: var(--line); }
 .chip::before { content: ""; width: var(--s3); height: var(--s3); background: var(--chip, var(--muted)); }
 .chip.fed { --chip: var(--fed); } .chip.missed { --chip: var(--missed); } .chip.today { --chip: var(--today); }
-.chip.sitter { --chip: var(--sitter); } .chip.none { --chip: var(--muted); }
+.chip.offering { --chip: var(--offering); } .chip.sitter { --chip: var(--sitter); } .chip.none { --chip: var(--muted); }
 .mode { display: block; font: 500 16px/1.3 var(--font); color: var(--muted); margin-top: var(--s1); }
 .food { margin-right: var(--s2); vertical-align: middle; }
 
@@ -402,6 +402,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .px { background: var(--none); }
 .px.fed { background: var(--fed); border-color: var(--fed); } .px.missed { background: var(--missed); border-color: var(--missed); }
 .px.sitter { background: var(--sitter); border-color: var(--sitter); } .px.habit { background: var(--habit); border-color: var(--habit); }
+.px.offering { background: var(--offering); border-color: var(--offering); }
 .px.blank { background: transparent; border: 0; }
 .cell.now { outline: var(--px) solid var(--today); outline-offset: calc(-1 * var(--px)); z-index: 1; }
 .px.now, .dc.now { box-shadow: inset 0 0 0 var(--px) var(--today); }
@@ -410,14 +411,14 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .legend, .dlegend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); font-size: 18px; color: var(--muted); }
 .legend span, .dlegend span { display: inline-flex; align-items: center; gap: var(--s2); }
 .legend i { width: var(--s4); height: var(--s4); display: inline-block; background: var(--none); }
-.legend i.fed { background: var(--fed); } .legend i.missed { background: var(--missed); } .legend i.habit { background: var(--habit); }
+.legend i.offering { background: var(--offering); } .legend i.fed { background: var(--fed); } .legend i.missed { background: var(--missed); } .legend i.habit { background: var(--habit); }
 .legend i.today { background: transparent; box-shadow: inset 0 0 0 var(--px) var(--today); } .legend i.sitter { background: var(--sitter); }
 .legend i.now { background: var(--fed); box-shadow: inset 0 0 0 var(--px) var(--today); }
 
 /* combined heatmap */
 .cell { display: grid; gap: 1px; }
 .cell .s { background: var(--none); min-width: 0; min-height: 0; }
-.cell .s.fed { background: var(--fed); } .cell .s.missed { background: var(--missed); } .cell .s.sitter { background: var(--sitter); } .cell .s.habit { background: var(--habit); }
+.cell .s.fed { background: var(--fed); } .cell .s.missed { background: var(--missed); } .cell .s.sitter { background: var(--sitter); } .cell .s.habit { background: var(--habit); } .cell .s.offering { background: var(--offering); }
 .cell span { paint-order: stroke fill; -webkit-text-stroke: 3px var(--surface); }
 .slice-key { display: grid; gap: var(--s2) var(--s4); font-size: 18px; justify-content: start; min-width: 0; }
 .slice-key span { display: inline-flex; align-items: center; gap: var(--s2); min-width: 0; overflow-wrap: anywhere; }
@@ -428,7 +429,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .lm > span { font: 600 16px/1 var(--font); color: var(--muted); white-space: nowrap; }
 .lg { display: grid; grid-template-rows: repeat(7, calc(5 * var(--u))); grid-auto-flow: column; grid-auto-columns: calc(5 * var(--u)); gap: var(--px); }
 .lc { background: var(--none); }
-.lc.fed { background: var(--fed); } .lc.missed { background: var(--missed); } .lc.sitter { background: var(--sitter); } .lc.habit { background: var(--habit); }
+.lc.fed { background: var(--fed); } .lc.missed { background: var(--missed); } .lc.sitter { background: var(--sitter); } .lc.habit { background: var(--habit); } .lc.offering { background: var(--offering); }
 .lc.blank { background: transparent; }
 
 /* forms */
@@ -461,6 +462,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .dot { width: calc(6 * var(--u)); height: calc(6 * var(--u)); border-color: var(--line); background: transparent; }
 .dot.fed { background: var(--fed); border-color: var(--fed); } .dot.missed { background: var(--missed); border-color: var(--missed); }
 .dot.sitter { background: var(--sitter); border-color: var(--sitter); } .dot.habit { background: var(--habit); border-color: var(--habit); }
+.dot.offering { background: var(--offering); border-color: var(--offering); }
 .dot.today { border-color: var(--today); }
 .dot.now { border-color: var(--today); box-shadow: inset 0 0 0 var(--px) var(--surface); }
 .hp { display: flex; gap: var(--px); height: calc(5 * var(--u)); width: calc(40 * var(--u)); max-width: 100%; margin-top: var(--s2); padding: var(--px); border-color: var(--line); background: var(--surface2); }
@@ -492,7 +494,14 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
   width: calc(240 * var(--px)); height: calc(320 * var(--px)); margin-inline: auto; overflow: hidden; background: var(--bg3); }
 .room svg.bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .room-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); }
-#outdoor { display: block; }
+#outdoor, #eden { display: block; }
+.sprite.angel { overflow: visible; }
+/* Eden: locked until a kitty has ascended */
+.room .eden-lock { position: absolute; inset: 0; z-index: 400; display: grid; place-content: center; justify-items: center; gap: calc(6 * var(--px)); text-align: center;
+  background: rgba(43, 35, 82, .5); color: #fffafd; padding: calc(12 * var(--px)); }
+.room .eden-lock .pxs { width: calc(var(--w) * var(--px) * 3); height: calc(var(--h) * var(--px) * 3); }
+.room .eden-lock b { font: 700 24px/1 var(--font); }
+.room .eden-lock span { font: 700 16px/1.2 var(--font); }
 /* the diary book and the trophy sit on the shelf in the room; these buttons are their click areas */
 .room .prop { position: absolute; z-index: 200; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .room .prop:hover, .room .prop:focus-visible { box-shadow: 0 0 0 var(--px) var(--today); }
@@ -679,7 +688,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 <div class="wrap">
   <header class="top" id="top"></header>
 
-  <main id="tab-room" class="tab"><div id="room"></div><div id="outdoor" hidden></div><div class="room-foot"><p class="muted" id="room-note"></p><button class="btn small" id="room-rename" type="button" data-action="room-rename">Rename</button></div></main>
+  <main id="tab-room" class="tab"><div id="room"></div><div id="outdoor" hidden></div><div id="eden" hidden></div><div class="room-foot"><p class="muted" id="room-note"></p><button class="btn small" id="room-rename" type="button" data-action="room-rename">Rename</button></div></main>
 
   <main id="tab-mindful" class="tab">
     <section class="cats" id="strays" aria-label="Your stray kitties"></section>

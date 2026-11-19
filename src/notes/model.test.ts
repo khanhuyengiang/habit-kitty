@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bookName, cardLines, composeNote, continueList, excerpt, noteDate, parseNote, plainText, renderMarkdown, titleFromText, safeName, searchNotes, sortNotes, toggleTask, uniqueName, withBook, type Note } from './model.ts';
+import { bookName, cardLines, composeNote, continueList, excerpt, noteDate, parseNote, plainText, renderMarkdown, titleFromText, safeName, searchNotes, sortNotes, indentLines, toggleLineKind, toggleTask, toggleWrap, uniqueName, withBook, type Note } from './model.ts';
 import { booksOf, dropBook, emptyBooks, looseNotes, moveBook, notesIn, putBook, sanitizeBooks } from './books.ts';
 import { planSync } from './sync.ts';
 
@@ -148,7 +148,7 @@ describe('tasks', () => {
     expect(toggleTask('Shop', 5)).toBeNull();
   });
   it('keeps the boxes on a card', () => {
-    expect(cardLines('# Shop\n- [ ] eggs\n- [x] milk\nsoon')).toEqual([{ text: 'Shop' }, { text: 'eggs', task: false }, { text: 'milk', task: true }, { text: 'soon' }]);
+    expect(cardLines('# Shop\n- [ ] eggs\n- [x] milk\nsoon')).toEqual([{ text: 'Shop', head: true }, { text: 'eggs', task: false }, { text: 'milk', task: true }, { text: 'soon' }]);
     expect(plainText('- [ ] eggs\nmilk')).toBe('eggs\nmilk');
   });
 });
@@ -181,5 +181,42 @@ describe('notebooks', () => {
     expect(moveBook(d.books, 'New', -1).books.map((b) => b.name)).toEqual(['Recipes', 'New', 'Zoo']);
     expect(moveBook(d.books, 'Recipes', -1).books.map((b) => b.name)).toEqual(['Recipes', 'Zoo', 'New']);
     expect(dropBook(d.books, 'zoo').books.map((b) => b.name)).toEqual(['Recipes', 'New']);
+  });
+});
+
+describe('editing buttons', () => {
+  it('cycles a line: bullet to checklist to paragraph', () => {
+    const a = toggleLineKind('- milk', 3, 3, 'task');
+    expect(a.text).toBe('- [ ] milk');
+    expect(toggleLineKind(a.text, a.from, a.to, 'task').text).toBe('milk');
+    expect(toggleLineKind('milk', 0, 0, 'h2').text).toBe('## milk');
+    expect(toggleLineKind('# milk', 0, 0, 'h2').text).toBe('## milk');
+    expect(toggleLineKind('1. a\n2. b', 0, 9, 'bullet').text).toBe('- a\n- b');
+  });
+  it('wraps and unwraps', () => {
+    expect(toggleWrap('a word b', 2, 6, '**').text).toBe('a **word** b');
+    expect(toggleWrap('a **word** b', 4, 8, '**').text).toBe('a word b');
+    expect(toggleWrap('a **word** b', 4, 8, '*').text).toBe('a ***word*** b');
+    expect(toggleWrap('a ~~x~~', 4, 5, '~~').text).toBe('a x');
+    expect(toggleWrap('ab', 1, 1, '*')).toEqual({ text: 'a**b', from: 2, to: 2 });
+  });
+});
+
+describe('numbered and nested lists', () => {
+  it('numbers lines and carries on from above', () => {
+    expect(toggleLineKind('a\nb', 0, 3, 'number').text).toBe('1. a\n2. b');
+    expect(toggleLineKind('1. a\n- x\nb', 9, 9, 'number').text).toBe('1. a\n- x\n1. b');
+    expect(toggleLineKind('1. a\nb', 5, 5, 'number').text).toBe('1. a\n2. b');
+  });
+  it('indents one level and back', () => {
+    const r = indentLines('1. a\n- x\ntext', 5, 8, 'in');
+    expect(r.text).toBe('1. a\n   - x\ntext');
+    expect(indentLines(r.text, 5, 5, 'in').text).toBe(r.text);   // no deeper than one level
+    expect(indentLines(r.text, 5, 5, 'out').text).toBe('1. a\n- x\ntext');
+    expect(indentLines('text', 0, 0, 'in').text).toBe('text');
+  });
+  it('shows a list inside a numbered list and carries the numbers on', () => {
+    const h = renderMarkdown('1. a\n   - x\n   - y\n2. b\n   - [ ] t\n3. c');
+    expect(h).toBe('<ol><li>a<ul><li>x</li><li>y</li></ul></li><li>b<ul><li class="task"><input type="checkbox" disabled > t</li></ul></li><li>c</li></ol>');
   });
 });

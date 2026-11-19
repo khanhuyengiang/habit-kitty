@@ -105,4 +105,4 @@ export const OFFICIAL_DECOS: Readonly<Record<string, { label: string; art: strin
 };
 export const DECOS: Record<string, { label: string; art: string[] }> = { ...OFFICIAL_DECOS };
 // The diary book, the trophy, the cosy room and the garden live in ./scene.ts.
-export { BOOK_ART, TROPHY_ART, ROOM_W, ROOM_H, SHELF_BOOK, SHELF_TROPHY, ROOM_SPOTS, ROOM_NIGHT_SPOTS, GARDEN_SPOTS, roomSvg, outdoorSvg, sceneVersion, type Phase } from './scene.ts';
+export { BOOK_ART, TROPHY_ART, ROOM_W, ROOM_H, SHELF_BOOK, SHELF_TROPHY, ROOM_SPOTS, ROOM_NIGHT_SPOTS, GARDEN_SPOTS, EDEN_SPOTS, EDEN_HORIZON, roomSvg, outdoorSvg, edenSvg, sceneVersion, type Phase } from './scene.ts';

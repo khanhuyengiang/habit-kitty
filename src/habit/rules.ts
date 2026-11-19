@@ -8,6 +8,10 @@ export const CONFIG = {
   sitterPenaltyPerDay: 5,
   sitterMaxDays: 7,
   sitterCooldownDays: 30,    // 1 sitter trip per cat per rolling 30 days
+  ascendWindowDays: 90,      // the rolling window the feed rate is measured over (and the least a kitty must have been cared for)
+  ascendRate: 0.95,          // feed rate that earns the right to ascend
+  ascendKeepRate: 0.9,       // the right is lost when the rate falls below this
+  ascendMilestoneDays: [90, 180, 270, 360],   // a pop-up offers ascension at these ages, while the right is held
   maxCats: 9,                // active cats, unless the player opts into unlimited
   taskMaxXp: 15,             // one-off tasks: reward and daily payout cap
   habitMaxXp: 10,            // repeating habits: reward and daily payout cap
@@ -25,7 +29,7 @@ export const CONFIG = {
 // ===================== Types =====================
 export type CatMode = 'classic' | 'lighthearted';
 export type CatStatus =
-  | 'alive' | 'sitter' | 'dead' | 'ranAway' | 'leftForever' | 'gone' | 'shelter';
+  | 'alive' | 'sitter' | 'dead' | 'ranAway' | 'leftForever' | 'gone' | 'shelter' | 'ascended';
 
 import type { CatLook } from '../shared/pixelcat.ts';
 export type { CatLook, CatPattern, CatTrait } from '../shared/pixelcat.ts';
@@ -52,6 +56,9 @@ export interface Cat {
   gender?: CatGender;              // older saves derive it from the id (see genderOf)
   habitDays?: number[];            // days it was done as a mindful habit, before it became a cat
   habitXp?: number;                // what that habit paid a day (see replay); older saves count CONFIG.xpPerFeeding
+  ascendReady?: boolean;           // earned the right to ascend (95% over 90 days); lost again below 90%
+  ascendOffered?: number;          // the latest milestone (in days of care) the pop-up has been shown for
+  ascendedDay?: number;            // the day the kitty became an archangel; offerings after it pay no affection
 }
 
 // Days start..end-1 were spent with the sitter; end is the day the cat came home
@@ -104,7 +111,7 @@ export type Reason =
   | 'no_such_cat' | 'no_such_task' | 'invalid_input'
   | 'cat_not_active' | 'with_sitter' | 'already_with_sitter' | 'not_with_sitter'
   | 'already_fed_today' | 'sitter_cooldown'
-  | 'future_day' | 'before_adoption' | 'low_affection_cat_limit' | 'task_on_cooldown' | 'cat_limit' | 'task_already_done' | 'not_daily_habit';
+  | 'future_day' | 'before_adoption' | 'not_ready_to_ascend' | 'low_affection_cat_limit' | 'task_on_cooldown' | 'cat_limit' | 'task_already_done' | 'not_daily_habit';
 
 // On failure the (settled) state is still returned: always persist result.state.
 export type ActionResult =
@@ -166,6 +173,37 @@ export function levelProgress(xp: number) {
   };
 }
 
+// ===================== Ascension =====================
+// A kitty whose habit has become part of life can ascend to an archangel: it keeps roaming Eden and can still be given
+// offerings, which show on the heatmap but no longer pay affection.
+
+// The first day a kitty was cared for (its habit history counts).
+export const careStart = (c: Cat) => Math.min(c.adoptedDay, c.habitDays?.[0] ?? Infinity, c.fedDays[0] ?? Infinity);
+
+// Share of the last 90 completed days the kitty was fed, not counting days with the sitter. null until it has been cared
+// for the whole window.
+export function feedRate(c: Cat, today: number): number | null {
+  const from = today - CONFIG.ascendWindowDays;
+  if (careStart(c) > from) return null;
+  const fed = new Set([...c.fedDays, ...(c.habitDays ?? [])]);
+  const away = (d: number) => c.sitterTrips.some((t) => d >= t.start && d < (t.end ?? today));
+  let due = 0, got = 0;
+  for (let d = from; d < today; d++) {
+    if (away(d)) continue;
+    due++;
+    if (fed.has(d)) got++;
+  }
+  return due === 0 ? null : got / due;
+}
+
+// The milestone (days of care) the pop-up is due for, or null: the kitty holds the right and has not been offered it yet.
+export function ascendMilestone(c: Cat, today: number): number | null {
+  if (c.status !== 'alive' || !c.ascendReady) return null;
+  const age = today - careStart(c);
+  const reached = CONFIG.ascendMilestoneDays.filter((m) => m <= age).pop();
+  return reached !== undefined && reached > (c.ascendOffered ?? 0) ? reached : null;
+}
+
 // ===================== Settling (applying elapsed days) =====================
 type Settled = { cat: Cat; xpDelta: number; events: GameEvent[] };
 
@@ -202,6 +240,11 @@ function settleAlive(cat: Cat, today: number): Settled {
     }
   }
   c.settledDay = today;
+  if (c.status === 'alive') {
+    const rate = feedRate(c, today);
+    if (rate !== null && rate >= CONFIG.ascendRate) c.ascendReady = true;
+    else if (c.ascendReady && (rate === null || rate < CONFIG.ascendKeepRate)) c.ascendReady = false;
+  }
   return { cat: c, xpDelta, events };
 }
 
@@ -308,6 +351,10 @@ export function feedCat(state: AppState, catId: string, now: Date): ActionResult
     return done(back, [...events, { type: 'returned', catId }]);
   }
   if (cat.status === 'sitter') return fail(s, events, 'with_sitter');
+  if (cat.status === 'ascended') {   // an offering: it shows on the heatmap, nothing more
+    if (cat.lastFedDay === today) return fail(s, events, 'already_fed_today');
+    return done(mapCat(s, catId, (c) => ({ ...c, lastFedDay: today, totalFeedings: c.totalFeedings + 1, fedDays: [...c.fedDays, today] })), events);
+  }
   if (cat.status !== 'alive') return fail(s, events, 'cat_not_active');
   if (cat.lastFedDay === today) return fail(s, events, 'already_fed_today');
 
@@ -316,6 +363,20 @@ export function feedCat(state: AppState, catId: string, now: Date): ActionResult
     fedDays: [...c.fedDays, today],
   }));
   return done(next, events);
+}
+
+// Let a kitty that holds the right ascend to an archangel. Final: it never needs feeding again.
+export function ascendCat(state: AppState, catId: string, now: Date): ActionResult {
+  const { s, events, today } = begin(state, now);
+  const cat = s.cats.find((c) => c.id === catId);
+  if (!cat) return fail(s, events, 'no_such_cat');
+  if (cat.status !== 'alive' || !cat.ascendReady) return fail(s, events, 'not_ready_to_ascend');
+  return done(mapCat(s, catId, (c) => ({ ...c, status: 'ascended', ascendedDay: today, missed: 0, settledDay: today })), events);
+}
+
+// The pop-up was shown (and answered "not yet"): do not show it again until the next milestone.
+export function markAscendOffered(state: AppState, catId: string, milestone: number): AppState {
+  return mapCat(state, catId, (c) => ({ ...c, ascendOffered: Math.max(c.ascendOffered ?? 0, milestone) }));
 }
 
 // Give a cat back to the shelter: no penalties, but it's gone for good.
@@ -590,7 +651,7 @@ export function replay(state: AppState, now: Date): AppState {
     for (const orig of state.cats) {
       let c = orig.adoptedDay === d
         ? { ...orig, status: 'alive' as CatStatus, lastFedDay: null, missed: 0, sitterStartDay: null, lastSitterStartDay: null,
-            endedDay: null, totalFeedings: 0, runAwayCount: 0 }
+            endedDay: null, totalFeedings: 0, runAwayCount: 0, ascendReady: false }
         : live.get(orig.id);
       if (!c) continue;
       const home = orig.sitterTrips.some((t) => t.end === d && t.end - t.start < CONFIG.sitterMaxDays);
@@ -598,7 +659,10 @@ export function replay(state: AppState, now: Date): AppState {
       if (fed.get(orig.id)?.has(d) && (c.status === 'alive' || c.status === 'ranAway') && c.lastFedDay !== d) {
         xp += CONFIG.xpPerFeeding;
         c = { ...c, status: 'alive', missed: 0, lastFedDay: d, endedDay: null, totalFeedings: c.totalFeedings + 1 };
+      } else if (fed.get(orig.id)?.has(d) && c.status === 'ascended' && c.lastFedDay !== d) {
+        c = { ...c, lastFedDay: d, totalFeedings: c.totalFeedings + 1 };   // an offering pays nothing
       }
+      if (orig.ascendedDay === d && c.status === 'alive') c = { ...c, status: 'ascended', ascendedDay: d, missed: 0 };
       const trip = orig.sitterTrips.find((t) => t.start === d);
       if (trip && c.status === 'alive') {   // a trip that ends the day it starts never leaves the kitty with the sitter
         c = trip.end === d ? { ...c, lastSitterStartDay: d } : { ...c, status: 'sitter', sitterStartDay: d, lastSitterStartDay: d };

@@ -2,7 +2,7 @@ import { afterEach, describe, it, expect } from 'vitest';
 import {
   newState, adoptCat, feedCat, startSitter, resumeCat, settleAll,
   addMindfulTask, setHabitSchedule, doMindfulTask, removeMindfulTask, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, STRAY_NAMES, dayIndex, setDayStart, levelFor, levelProgress,
-  graveyard, runaways, hunger, setTaskDay, setCatDay, replay, rewind, genderOf, type ActionResult, type AppState, type CatMode,
+  graveyard, runaways, hunger, ascendCat, ascendMilestone, feedRate, markAscendOffered, setTaskDay, setCatDay, replay, rewind, genderOf, type ActionResult, type AppState, type CatMode,
 } from './rules.ts';
 
 // day n at a given hour (all test dates are local time)
@@ -595,5 +595,96 @@ describe('gender', () => {
     expect(genderOf({ id: 'old-cat' })).toBe(genderOf({ id: 'old-cat' }));
     const kinds = new Set(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((id) => genderOf({ id })));
     expect(kinds.size).toBe(2);
+  });
+});
+
+describe('ascension', () => {
+  const day = (n: number) => dayIndex(at(n));
+  // feed every day from day 0 to `last`, skipping the listed days
+  const feedTo = (last: number, skip: number[] = []) => {
+    let s = setup();
+    for (let d = 0; d <= last; d++) if (!skip.includes(d)) s = ok(feedCat(s, 'c1', at(d)));
+    return settleAll(s, at(last + 1)).state;
+  };
+
+  it('has no feed rate until it has been cared for the whole 90 days', () => {
+    expect(feedRate(feedTo(60).cats[0], day(61))).toBeNull();
+    expect(feedRate(feedTo(95).cats[0], day(96))).toBe(1);
+  });
+
+  it('earns the right at 95% and a pop-up at the first milestone', () => {
+    const s = feedTo(95, [10, 40, 70]);   // 87 of 90
+    expect(s.cats[0].ascendReady).toBe(true);
+    expect(ascendMilestone(s.cats[0], day(96))).toBe(90);
+    const seen = markAscendOffered(s, 'c1', 90);
+    expect(ascendMilestone(seen.cats[0], day(96))).toBeNull();
+    expect(ascendMilestone(seen.cats[0], day(181))).toBe(180);
+  });
+
+  it('does not earn the right below 95%', () => {
+    expect(feedTo(95, [10, 20, 40, 50, 70, 80]).cats[0].ascendReady).toBeFalsy();   // 84 of 90
+  });
+
+  it('keeps the right between 90% and 95%, loses it below 90%', () => {
+    let s = feedTo(95);
+    expect(s.cats[0].ascendReady).toBe(true);
+    // two misses at a time keep the cat alive; 10 misses of the last 90 days is below 90%
+    for (const d of [96, 97, 99, 100, 102, 103, 105, 106]) s = ok(feedCat(s, 'c1', at(d - 0)));
+    s = settleAll(s, at(107)).state;
+    expect(s.cats[0].status).toBe('alive');
+    expect(s.cats[0].ascendReady).toBe(true);   // ~88 of 90 fed still above 90%
+    let t = feedTo(95);
+    for (let d = 96; d <= 120; d++) if (d % 2 !== 0) t = ok(feedCat(t, 'c1', at(d)));
+    t = settleAll(t, at(121)).state;
+    expect(t.cats[0].status).toBe('alive');
+    expect(t.cats[0].ascendReady).toBe(false);
+  });
+
+  it('excuses days with the pet sitter', () => {
+    let s = setup();
+    for (let d = 0; d <= 95; d++) {
+      if (d === 30) s = ok(startSitter(s, 'c1', at(d)));
+      if (d === 36) s = ok(resumeCat(s, 'c1', at(d)));
+      if (d < 30 || d >= 36) s = ok(feedCat(s, 'c1', at(d)));
+    }
+    s = settleAll(s, at(96)).state;
+    expect(feedRate(s.cats[0], day(96))).toBe(1);
+  });
+
+  it('ascends only with the right, then needs no feeding and offerings pay nothing', () => {
+    expect(ascendCat(setup(), 'c1', at(1)).ok).toBe(false);
+    let s = ok(ascendCat(feedTo(95), 'c1', at(96)));
+    expect(s.cats[0]).toMatchObject({ status: 'ascended', ascendedDay: day(96) });
+    const xp = s.xp;
+    s = settleAll(s, at(200)).state;
+    expect(s.cats[0].status).toBe('ascended');
+    expect(s.xp).toBe(xp);
+    s = ok(feedCat(s, 'c1', at(200)));
+    expect(s.xp).toBe(xp);
+    expect(s.cats[0].fedDays).toContain(day(200));
+    expect(feedCat(s, 'c1', at(200)).ok).toBe(false);
+  });
+
+  it('survives a replay', () => {
+    let s = ok(ascendCat(feedTo(95), 'c1', at(96)));
+    s = ok(feedCat(s, 'c1', at(100)));
+    const xp = s.xp;
+    const r = replay(s, at(100));
+    expect(r.cats[0].status).toBe('ascended');
+    expect(r.xp).toBe(xp);
+  });
+});
+
+describe('ascended heatmap', () => {
+  it('keeps the whole history and shows later meals as offerings', async () => {
+    const { monthGrid } = await import('./calendar.ts');
+    const d = (n: number) => dayIndex(at(n));
+    const cat = { fedDays: [d(0), d(1), d(5), d(6)], adoptedDay: d(0), sitterTrips: [], endedDay: null, ascendedDay: d(4) };
+    const date = new Date(Date.UTC(2026, 0, 5));
+    const g = monthGrid(cat, date.getUTCFullYear(), date.getUTCMonth(), d(8));
+    const kind = (n: number) => g.days.find((x) => x.day === d(n))?.kind;
+    expect([kind(0), kind(1), kind(2)]).toEqual(['fed', 'fed', 'missed']);   // life before ascending is kept
+    expect([kind(5), kind(6), kind(7)]).toEqual(['offering', 'offering', 'none']);   // an archangel has no missed days
+    expect(g.count.offering).toBe(2);
   });
 });

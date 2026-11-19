@@ -1,7 +1,7 @@
 // Phone playtest build of Habit Kitty. Bundled into one HTML page by `npm run build:web`.
 import {
   CONFIG, newState, adoptCat, feedCat, startSitter, resumeCat, settleAll, addMindfulTask,
-  doMindfulTask, setTaskDay, setCatDay, replay, rewind, genderOf, daysUntilReady, removeMindfulTask, setHabitSchedule, returnToShelter, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, idHash, dayIndex, dayStartHour, setDayStart, nextReset, levelProgress, hunger, sitterCooldownLeft,
+  doMindfulTask, setTaskDay, setCatDay, replay, rewind, genderOf, daysUntilReady, removeMindfulTask, setHabitSchedule, returnToShelter, ascendCat, ascendMilestone, feedRate, markAscendOffered, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, idHash, dayIndex, dayStartHour, setDayStart, nextReset, levelProgress, hunger, sitterCooldownLeft,
   type ActionResult, type AppState, type Cat, type CatMode, type CatGender, type CatLook, type CatTrait, type GameEvent, type MindfulTask, type Reason, type TaskKind,
 } from './rules.ts';
 import { BACKUP_EXT, BACKUP_PREFIX, backupNow, backupStatus, chooseFolder, folderBackups, markDirty, nativeBackups, onBackupStatus, readFolderBackup, refreshFolder, registerBackupSource, saveBackupToDevice, saveToDevice, shareBackup as shareBackupFile, shareFile, stopBackups } from '../shared/backupfolder.ts';
@@ -20,7 +20,7 @@ import { connectDropbox, disconnectDropbox, isLocalCopy, onSyncStatus, returnAdd
 import type { Part } from '../sync/merge.ts';
 import type { Mood } from '../diary/model.ts';
 import { CONFETTI_COLORS, TRAITS, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
-import { GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, petHeartSvg, iconSvg, markSvg, outdoorSvg, roomSvg, sceneVersion } from '../shared/art.ts';
+import { GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, petHeartSvg, iconSvg, markSvg, outdoorSvg, edenSvg, EDEN_SPOTS, roomSvg, sceneVersion } from '../shared/art.ts';
 import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, trophyIcon, type AppName } from '../shared/apps.ts';
 import { mountDiarySettings } from '../diary/settings.ts';
 import { collectBooks, collectNotes, initNotes, restoreBooks, restoreNotes } from '../notes/data.ts';
@@ -165,6 +165,7 @@ function reasonText(r: Reason, cat?: Cat): string {
     case 'before_adoption': return `${n} wasn't with you yet that day.`;
     case 'task_on_cooldown': return 'You did this one recently. It comes back after its repeat time.';
     case 'task_already_done': return 'This treat is already done. Press and hold it to delete it.';
+    case 'not_ready_to_ascend': return `${n} hasn't earned ascension yet: it takes a 95% feed rate over ${CONFIG.ascendWindowDays} days.`;
     case 'not_daily_habit': return 'Only daily habits can become a kitty.';
     case 'cat_limit': return `You can keep ${CONFIG.maxCats} kitties. Turn on Unlimited kitties in Settings if you really want more.`;
     case 'cat_not_active': return `${n} isn't here anymore.`;
@@ -219,6 +220,24 @@ function moveClock(offsetHours: number): boolean {
   return back;
 }
 
+// Ascension: a kitty that holds the right (95% fed over 90 days) is offered it at 3, 6, 9 and 12 months of care. "Not yet"
+// waits for the next milestone; the option stays in the kitty's menu while the right is held (it is lost below 90%).
+const ascendPanel = (c: Cat) => `<div class="panel"><div class="avatar">${spriteOf({ ...c, status: 'ascended' }, 'happy', false)}</div>
+  <h3>${esc(c.name)} is ready to ascend</h3>
+  <p>${esc(c.habit)} has become part of your life: ${esc(c.name)} was fed ${Math.round(100 * (feedRate(c, today()) ?? 1))}% of the last ${CONFIG.ascendWindowDays} days. ${esc(c.name)} can become an archangel and live in Eden, looked after by a billionaire angel.</p>
+  <p class="muted">They get wings and no longer need feeding. You can still give offerings and the heatmap keeps them, but they stop counting towards affection. This can't be undone.</p>
+  <div class="btns"><button class="btn" data-action="ascend-later" data-id="${c.id}">Not yet</button>
+  <button class="btn primary" data-action="ascend-yes" data-id="${c.id}">Ascend</button></div></div>`;
+function checkAscension() {
+  if (!$('modal').hidden) return;   // a dialog is open: ask on the next check
+  const t = today();
+  const c = save.state.cats.find((k) => ascendMilestone(k, t) !== null);
+  if (!c) return;
+  save.state = markAscendOffered(save.state, c.id, ascendMilestone(c, t) as number);
+  persist();
+  openModal(ascendPanel(c));
+}
+
 // Amnesia: the first time the app is open on a new day, ask about kitties that went unfed yesterday, in case a
 // meal wasn't logged. Saying yes marks it like time travel does, so a kitty lost to that missed meal comes back.
 function checkAmnesia() {
@@ -239,6 +258,7 @@ function checkAmnesia() {
 
 // ===================== Pixel cats =====================
 const sprite = faceSvg;
+const spriteOf = (c: Cat, face: Face, faded: boolean) => faceSvg(face, lookOf(c), faded, c.status === 'ascended');
 const lookFor = lookOf;
 const hash = idHash;
 
@@ -326,6 +346,8 @@ function catStatus(c: Cat, t: number): { face: Face; faded: boolean; chip: DayKi
       return { face: 'sleepy', faded: false, chip: 'sitter', label: `With the sitter · day ${Math.min(day, 7)} of 7`,
         note: day >= 7 ? `Last day: bring ${c.name} home today or they stay with the sitter.` : undefined };
     }
+    case 'ascended': return { face: 'happy', faded: false, chip: 'offering', label: c.lastFedDay === t ? 'Offering given today' : 'Archangel · living in Eden',
+      note: c.lastFedDay === t ? undefined : `${c.name} no longer needs feeding. An offering is optional and pays no affection.` };
     case 'ranAway': return { face: 'open', faded: true, chip: 'none', label: 'Ran away',
       note: `Do your habit to bring ${c.name} back. This only works once.` };
     case 'dead': return { face: 'dead', faded: false, chip: 'none', label: `Died ${c.endedDay ? fmtDay(c.endedDay) : ''}` };
@@ -366,8 +388,9 @@ function renderMonth(c: Subject, t: number, habit?: MindfulTask): string {
     ? `Fed <b class="num">${g.count.fed}/${g.tracked}</b> days (${pct}%)` +
       (g.count.sitter ? ` · ${plural(g.count.sitter, 'day')} with the sitter` : '') +
       (g.count.habit ? ` · ${g.count.habit} done as a habit` : '') +
+      (g.count.offering ? ` · ${plural(g.count.offering, 'offering')}` : '') +
       (back === 0 && (c as Partial<Cat>).status === 'alive' ? ` · streak <b class="num">${streak(c as Cat, t)}</b>` : '')
-    : g.count.sitter ? 'With the sitter all month' : g.count.habit ? `Done <b class="num">${g.count.habit}</b> days as a habit` : 'Nothing tracked this month';
+    : g.count.offering ? `${plural(g.count.offering, 'offering')} this month` : g.count.sitter ? 'With the sitter all month' : g.count.habit ? `Done <b class="num">${g.count.habit}</b> days as a habit` : 'Nothing tracked this month';
   const firstMonth = dateOf(firstDay(c));
   const atStart = shown.getUTCFullYear() * 12 + shown.getUTCMonth() <= firstMonth.getUTCFullYear() * 12 + firstMonth.getUTCMonth();
   return `<div class="month">
@@ -379,7 +402,8 @@ function renderMonth(c: Subject, t: number, habit?: MindfulTask): string {
 
 const isActive = (c: Cat) => ['alive', 'sitter', 'ranAway'].includes(c.status);
 const HEAT_HIDDEN = ['dead', 'ranAway', 'shelter'];   // cats that are gone drop off the heatmap
-const heatCats = () => sortedCats().filter((c) => !HEAT_HIDDEN.includes(c.status));
+const heatCats = () => sortedCats().filter((c) => !HEAT_HIDDEN.includes(c.status) && c.status !== 'ascended');   // an ascended kitty's heatmap lives under Eden
+const heatEden = () => save.state.cats.filter((c) => c.status === 'ascended');
 const sortedCats = () => [...save.state.cats].sort((a, b) => Number(!isActive(a)) - Number(!isActive(b)));
 
 function renderWeek(c: Subject | Cat, t: number): string {
@@ -389,9 +413,9 @@ function renderWeek(c: Subject | Cat, t: number): string {
 }
 
 // ---- Today tab: Home / Sitter / Memories ----
-type TodayView = 'home' | 'sitter' | 'memories';
+type TodayView = 'home' | 'sitter' | 'memories' | 'eden';
 let todayView: TodayView = 'home';
-const viewOf = (c: Cat): TodayView => (c.status === 'alive' ? 'home' : c.status === 'sitter' ? 'sitter' : 'memories');
+const viewOf = (c: Cat): TodayView => (c.status === 'alive' ? 'home' : c.status === 'sitter' ? 'sitter' : c.status === 'ascended' ? 'eden' : 'memories');
 
 // Condensed all-time heatmap, GitHub style: one column per week, a block per month with its own label.
 function renderLife(c: Cat, t: number): string {
@@ -424,22 +448,25 @@ function renderLife(c: Cat, t: number): string {
 // The face with its feed button, and the name, habit, state and health beside it (Today cards and the long-press menu).
 function catHead(c: Cat, t: number, holdable: boolean): string {
   const s = catStatus(c, t);
-  const ended = !isActive(c);
+  const ended = !isActive(c) && c.status !== 'ascended';
   let button = '';
   if (c.status === 'alive') {
     const fed = c.lastFedDay === t;
     button = `<button class="btn primary sq" data-action="feed" data-id="${c.id}" ${fed ? 'disabled' : ''} aria-label="${fed ? `${esc(c.name)} is fed today` : `Feed ${esc(c.name)}`}">${fed ? `<b>${iconSvg('check')}</b>` : foodIcon(foodFor(c, t))}</button>`;
   } else if (c.status === 'sitter') {
     button = `<button class="btn primary sq" data-action="resume" data-id="${c.id}" aria-label="Bring ${esc(c.name)} home"><b>${iconSvg('home')}</b></button>`;
+  } else if (c.status === 'ascended') {
+    const given = c.lastFedDay === t;
+    button = `<button class="btn primary sq" data-action="feed" data-id="${c.id}" ${given ? 'disabled' : ''} aria-label="${given ? `${esc(c.name)} has today's offering` : `Give ${esc(c.name)} an offering`}">${given ? `<b>${iconSvg('check')}</b>` : foodIcon(foodFor(c, t))}</button>`;
   } else if (c.status === 'ranAway') {
     button = `<button class="btn primary sq" data-action="feed" data-id="${c.id}" aria-label="Call ${esc(c.name)} back">${foodIcon(foodFor(c, t))}</button>`;
   }
   const left = c.status === 'alive' ? 3 - c.missed : 0;
   const hp = `<div class="hp${left === 1 ? ' low' : ''}" role="img" aria-label="health ${left} of 3">${[0, 1, 2].map((i) => `<i class="${i < left ? 'on' : ''}"></i>`).join('')}</div>`;
-  return `<div class="cat-head"${holdable ? ` data-hold="cat" data-id="${c.id}"` : ''}><div class="cat-side">${sprite(s.face, lookFor(c), s.faded)}${button}</div>
+  return `<div class="cat-head"${holdable ? ` data-hold="cat" data-id="${c.id}"` : ''}><div class="cat-side">${spriteOf(c, s.face, s.faded)}${button}</div>
     <div><p class="cat-name">${esc(c.name)}<span class="mode">${c.mode === 'classic' ? 'classic' : 'light-hearted'} · ${genderOf(c)} · ${lookFor(c).trait}</span></p>
       <p class="cat-habit">${esc(c.habit)}</p>
-      <span class="chip ${s.chip}">${s.label}</span>${ended ? '' : hp}</div>
+      <span class="chip ${s.chip}">${s.label}</span>${ended || c.status === 'ascended' ? '' : hp}</div>
 </div>`;
 }
 
@@ -458,13 +485,13 @@ function renderCats() {
   const cats = all.filter((c) => viewOf(c) === todayView);
   if (todayView === 'memories') cats.sort((a, b) => Number(b.status === 'ranAway') - Number(a.status === 'ranAway') || (b.endedDay ?? 0) - (a.endedDay ?? 0));
   if (!cats.length) {
-    const msg = { home: 'Nobody is home right now.', sitter: 'No cats with the pet sitter.', memories: 'No cats have left yet.' }[todayView];
+    const msg = { home: 'Nobody is home right now.', sitter: 'No cats with the pet sitter.', memories: 'No cats have left yet.', eden: 'No kitty has ascended yet.' }[todayView];
     $('cats').innerHTML = `<p class="muted hint-c">${msg}</p>`;
     return;
   }
   $('cats').innerHTML = cats.map((c) => {
     const s = catStatus(c, t);
-    const ended = !isActive(c);
+    const ended = !isActive(c) && c.status !== 'ascended';
     return `<article class="cat${ended ? ' ended' : ''}">
       ${catHead(c, t, c.status === 'ranAway' || !ended)}
       ${s.note ? `<p class="note">${esc(s.note)}</p>` : ''}
@@ -498,8 +525,8 @@ function renderCombined(subjects: Subject[], key: string, title: string, keyHtml
   </div></article>`;
 }
 
-const combinedCats = (cats: Cat[], t: number) => renderCombined(cats, 'all', 'All cats',
-  cats.map((c, i) => `<span><b class="num">${i + 1}</b>${miniSvg(catStatus(c, t).face, lookFor(c), !isActive(c) && c.status !== 'dead')}${esc(c.name)}</span>`).join(''),
+const combinedCats = (cats: Cat[], t: number, key = 'all', title = 'All cats') => renderCombined(cats, key, title,
+  cats.map((c, i) => `<span><b class="num">${i + 1}</b>${miniSvg(catStatus(c, t).face, lookFor(c), !isActive(c) && c.status !== 'dead' && c.status !== 'ascended')}${esc(c.name)}</span>`).join(''),
   'Each day is split into one slice per cat, in the order shown above.');
 
 const combinedHabits = (habits: MindfulTask[]) => renderCombined(habits.map(habitSubject), 'all-habits', 'All stray kitties',
@@ -508,12 +535,19 @@ const combinedHabits = (habits: MindfulTask[]) => renderCombined(habits.map(habi
 
 const HEAT_LEGEND = `<div class="legend"><span><i class="fed"></i>fed</span><span><i class="habit"></i>done as a habit</span>
   <span><i class="missed"></i>missed</span><span><i class="today"></i>today (outlined)</span><span><i class="sitter"></i>with sitter</span><span><i></i>not tracked</span></div>`;
+const EDEN_LEGEND = HEAT_LEGEND.replace('</div>', '<span><i class="offering"></i>offering</span></div>');
 
 function renderHeat() {
   if (heatMode === 'strays') {
     const habits = save.state.tasks.filter((k) => k.kind === 'habit');
     $('heat').innerHTML = (habits.length ? combinedHabits(habits) : '<p class="muted">No stray kitties yet.</p>') + HEAT_LEGEND +
       '<p class="muted hint-c">Press and hold a stray kitty to see just its heatmap.</p>';
+    return;
+  }
+  if (heatMode === 'eden') {
+    const cats = heatEden();
+    $('heat').innerHTML = (cats.length ? combinedCats(cats, today(), 'eden', 'Eden') : '<p class="muted">No kitty has ascended yet. Their heatmaps, from the day they were adopted, move to Eden when they ascend.</p>') + EDEN_LEGEND +
+      '<p class="muted hint-c">Press and hold an archangel to see just its heatmap.</p>';
     return;
   }
   const cats = heatCats();
@@ -553,13 +587,15 @@ const props = () => prop('book', "Kitty diary: everyone's day", SHELF_BOOK) + pr
 const homeCats = () => sortedCats().filter((c) => c.status === 'alive').slice(0, SPOTS.length);
 
 // The room tab has two rooms: the cozy room (kitties) and the outdoors (strays, who only turn up now and then).
-type RoomView = 'indoor' | 'outdoor';
+type RoomView = 'indoor' | 'outdoor' | 'eden';
 let roomView: RoomView = 'indoor';
 
 function renderRoom() {
   $('room').hidden = roomView !== 'indoor';
   $('outdoor').hidden = roomView !== 'outdoor';
-  if (roomView === 'outdoor') renderOutdoor(); else renderIndoor();
+  $('eden').hidden = roomView !== 'eden';
+  $('room-rename').hidden = roomView === 'eden';   // Eden keeps its name
+  if (roomView === 'outdoor') renderOutdoor(); else if (roomView === 'eden') renderEden(); else renderIndoor();
 }
 
 function renderIndoor() {
@@ -591,6 +627,12 @@ function renderIndoor() {
 // The note under the room shows the time, so it is redrawn every few seconds, not only when the room itself changes.
 function renderRoomNote() {
   const clock = now().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
+  if (roomView === 'eden') {
+    const n = ascendedCats().length;
+    $('room-note').textContent = !n ? 'Eden is locked. A kitty that keeps a habit for months can ascend and live here.'
+      : `It's ${clock}. ${plural(n, 'archangel')} roam${n === 1 ? 's' : ''} Eden. You can give them an offering under Kitty → Eden.`;
+    return;
+  }
   if (roomView === 'outdoor') {
     const n = visibleStrays().length, all = save.state.tasks.filter((k) => k.kind === 'habit').length;
     $('room-note').textContent = !all ? 'No strays live here yet. Add a stray kitty, or release a kitty to the stray colony.'
@@ -640,6 +682,25 @@ function renderOutdoor() {
     const look = strayLook(k);
     return `<div class="pet${asleep ? ' napping' : ''}" data-id="${k.id}" data-fx="${pos[0]}" data-fy="${pos[1]}" data-nap="${asleep ? 1 : ''}" data-hold="stray" style="${petStyle(pos, asleep)}">${asleep ? napSvg(look) : bodySvg(faceOf(k), look, hash(k.id))}${asleep ? '<b class="zz">z z</b>' : ''}<em>${esc(shortName(strayName(k)))}</em></div>`;
   }).join('')}</div>`;
+}
+
+// ---- Eden: the archangels. Always in the Room tab; a lock hangs over it until a kitty has ascended. ----
+const ascendedCats = () => save.state.cats.filter((c) => c.status === 'ascended').slice(0, EDEN_SPOTS.length);
+const PADLOCK = ['...oooo...', '..o....o..', '..o....o..', '..o....o..', 'oooooooooo', 'oyyyyyyyyo', 'oyyyooyyyo', 'oyyyooyyyo', 'oyyyyyyyyo', 'oooooooooo'];
+let edenSig = '';
+function renderEden() {
+  const t = today();
+  const phase = skyPhase();
+  const cats = ascendedCats();
+  const lookKey = (c: Cat) => Object.values(lookFor(c)).join('');
+  const sig = phase + sceneVersion() + '|' + cats.map((c) => `${c.id}:${lookKey(c)}:${c.name}:${c.lastFedDay === t}`).join('|');
+  renderRoomNote();
+  if (sig === edenSig) return;
+  edenSig = sig;
+  $('eden').innerHTML = `<div class="room eden ${phase}">${edenSvg(phase)}${cats.map((c, i) => {
+    const pos = EDEN_SPOTS[i] as [number, number];
+    return `<div class="pet" data-id="${c.id}" data-fx="${pos[0]}" data-fy="${pos[1]}" data-hold="cat" style="${petStyle(pos)}">${bodySvg('happy', lookFor(c), hash(c.id), true)}<em>${esc(c.name)}</em></div>`;
+  }).join('')}${cats.length ? '' : `<div class="eden-lock">${artSvg(PADLOCK, '')}<b>Eden is locked</b><span>Ascend a kitty to open it</span></div>`}</div>`;
 }
 
 setInterval(() => { if (tab === 'room') { renderRoom(); renderRoomNote(); } }, 5000);
@@ -809,7 +870,7 @@ initSound({ save: () => save, persist, toast, roomAwake: () => tab === 'room' &&
 
 // Double-tap an awake cat to make a heart float up from it.
 let lastTap = { id: '', at: 0 };
-for (const roomEl of [$('room'), $('outdoor')]) roomEl.addEventListener('click', (ev) => {
+for (const roomEl of [$('room'), $('outdoor'), $('eden')]) roomEl.addEventListener('click', (ev) => {
   const pet = (ev.target as HTMLElement).closest<HTMLElement>('.pet');
   if (!pet || asleepNow()) return;
   if (pet.dataset.nap === '1') { napUntil.delete(pet.dataset.id ?? ''); setNap(pet, false); return; }   // a tap wakes a napping cat
@@ -1268,19 +1329,19 @@ let settingsFrom: AppName = 'habit';   // the screen whose gear opened Settings
 //   Heatmap: Kitty / Stray
 // Each place is one of the screens below (today: the cat cards, mindful: strays and treats, room: indoors and outdoors, heat).
 type Bottom = 'room' | 'kitty' | 'heat';
-type Main = 'kitty' | 'stray' | 'treats' | 'sitter' | 'memory';
+type Main = 'kitty' | 'stray' | 'treats' | 'sitter' | 'memory' | 'eden';
 type Sub = 'list' | 'room' | 'heat';   // openNav's second argument: which tab (list = the Kitty tab)
 let bottom: Bottom = 'kitty';
 let navMain: Main = 'kitty';                      // the Kitty tab's section
 let roomSide: RoomView = 'indoor';                // the Room tab's side
-let heatMode: 'cats' | 'strays' = 'cats';         // the Heatmap tab's side
+let heatMode: 'cats' | 'strays' | 'eden' = 'cats';         // the Heatmap tab's side
 const catsIn = (v: TodayView) => save.state.cats.filter((c) => viewOf(c) === v).length;
-const sectionOk = (m: Main) => (m === 'sitter' ? catsIn('sitter') > 0 : m === 'memory' ? catsIn('memories') > 0 : true);
+const sectionOk = (m: Main) => (m === 'sitter' ? catsIn('sitter') > 0 : m === 'memory' ? catsIn('memories') > 0 : m === 'eden' ? catsIn('eden') > 0 : true);
 
 // Points the screens' own switches (which cats, which list, which room) at the tab.
 function syncViews() {
   if (!sectionOk(navMain)) navMain = 'kitty';
-  todayView = navMain === 'sitter' ? 'sitter' : navMain === 'memory' ? 'memories' : 'home';
+  todayView = navMain === 'sitter' ? 'sitter' : navMain === 'memory' ? 'memories' : navMain === 'eden' ? 'eden' : 'home';
   mindfulView = navMain === 'treats' ? 'task' : 'habit';
   roomView = roomSide;
 }
@@ -1288,8 +1349,8 @@ const screenOf = (): string =>
   bottom === 'room' ? 'room' : bottom === 'heat' ? 'heat' : navMain === 'stray' || navMain === 'treats' ? 'mindful' : 'today';
 // Opens a place: a section of the Kitty tab ('list'), or the Room or Heatmap tab on the kitty's or the stray's side.
 function openNav(main: Main, sub: Sub = 'list') {
-  if (sub === 'room') { bottom = 'room'; roomSide = main === 'stray' ? 'outdoor' : 'indoor'; }
-  else if (sub === 'heat') { bottom = 'heat'; heatMode = main === 'stray' ? 'strays' : 'cats'; }
+  if (sub === 'room') { bottom = 'room'; roomSide = main === 'stray' ? 'outdoor' : main === 'eden' ? 'eden' : 'indoor'; }
+  else if (sub === 'heat') { bottom = 'heat'; heatMode = main === 'stray' ? 'strays' : main === 'eden' ? 'eden' : 'cats'; }
   else { bottom = 'kitty'; navMain = main; }
   syncViews();
   showTab(screenOf());
@@ -1303,11 +1364,12 @@ function openBottom(b: Bottom) {
 function navHtml(): string {
   syncViews();   // a section whose kitties are gone falls back to Kitty
   let items: [string, string, boolean, number | null][];
-  if (bottom === 'room') items = [['indoor', indoorName(), roomSide === 'indoor', null], ['outdoor', outdoorName(), roomSide === 'outdoor', null]];
-  else if (bottom === 'heat') items = [['cats', 'Kitty', heatMode === 'cats', null], ['strays', 'Stray', heatMode === 'strays', null]];
+  if (bottom === 'room') items = [['indoor', indoorName(), roomSide === 'indoor', null], ['outdoor', outdoorName(), roomSide === 'outdoor', null], ['eden', 'Eden', roomSide === 'eden', null]];
+  else if (bottom === 'heat') items = [['cats', 'Kitty', heatMode === 'cats', null], ['strays', 'Stray', heatMode === 'strays', null], ['eden', 'Eden', heatMode === 'eden', null]];
   else {
     items = [['kitty', 'Kitty', navMain === 'kitty', null], ['stray', 'Stray', navMain === 'stray', null], ['treats', 'Treats', navMain === 'treats', null]];
     if (catsIn('sitter')) items.push(['sitter', 'Pet sitter', navMain === 'sitter', catsIn('sitter')]);
+    if (catsIn('eden')) items.push(['eden', 'Eden', navMain === 'eden', catsIn('eden')]);
     if (catsIn('memories')) items.push(['memory', 'Memory', navMain === 'memory', catsIn('memories')]);
   }
   const action = bottom === 'room' ? 'nav-room' : bottom === 'heat' ? 'nav-heat' : 'nav-main';
@@ -1606,7 +1668,7 @@ onShown('habit', 'click', (ev) => {
     case 'feed':
       act((s, at) => feedCat(s, id, at), () => {
         const fed = save.state.cats.find((c) => c.id === id) as Cat;
-        return cat?.status === 'ranAway' ? `${fed.name} came back! Welcome home.` : fedMessage(fed, foodName(foodFor(fed, today())), streak(fed, today()));
+        return cat?.status === 'ascended' ? `${fed.name} accepted your offering. Eden is lovely today.` : cat?.status === 'ranAway' ? `${fed.name} came back! Welcome home.` : fedMessage(fed, foodName(foodFor(fed, today())), streak(fed, today()));
       }, cat);
       if (menuCat === id) openCatMenu(id);   // keep the open menu in step (fed, or called back)
       break;
@@ -1642,8 +1704,8 @@ onShown('habit', 'click', (ev) => {
     }
     case 'nav-bottom': openBottom(btn.dataset.bottom as Bottom); break;
     case 'nav-main': openNav(btn.dataset.v as Main); break;
-    case 'nav-room': openNav(btn.dataset.v === 'outdoor' ? 'stray' : 'kitty', 'room'); break;
-    case 'nav-heat': openNav(btn.dataset.v === 'strays' ? 'stray' : 'kitty', 'heat'); break;
+    case 'nav-room': openNav(btn.dataset.v === 'outdoor' ? 'stray' : btn.dataset.v === 'eden' ? 'eden' : 'kitty', 'room'); break;
+    case 'nav-heat': openNav(btn.dataset.v === 'strays' ? 'stray' : btn.dataset.v === 'eden' ? 'eden' : 'kitty', 'heat'); break;
     case 'settings-open': settingsFrom = 'habit'; showTab('settings'); break;
     case 'settings-back':
       if (settingsFrom === 'habit') showTab(tabBeforeSettings);
@@ -1679,6 +1741,20 @@ onShown('habit', 'click', (ev) => {
         <div class="btns"><button class="btn" data-action="modal-close">Keep ${esc(cat.name)}</button>
         <button class="btn primary" data-action="release-yes" data-id="${id}">Release</button></div></div>`);
       break;
+    case 'ascend-ask': {
+      if (!cat) break;
+      const m = ascendMilestone(cat, today());
+      if (m !== null) save.state = markAscendOffered(save.state, id, m);   // asked by hand: no pop-up for this milestone
+      openModal(ascendPanel(cat));
+      break;
+    }
+    case 'ascend-later': closeModal(); persist(); break;
+    case 'ascend-yes': {
+      const name = cat?.name ?? 'Your kitty';
+      closeModal();
+      act((s, at) => ascendCat(s, id, at), `${name} ascended! They have wings now and live in Eden. Offerings are optional from here on.`, cat);
+      break;
+    }
     case 'release-yes': {
       const name = cat?.name ?? 'Your cat';
       closeModal();
@@ -2127,6 +2203,7 @@ let menuTab: MenuTab = 'heat';
 const MENU_TABS: Record<MenuTab, string> = { heat: 'Heatmap', diary: 'Diary', options: 'Options' };   // a stray has the same without the Diary
 
 function catDiaryHtml(cat: Cat): string {
+  if (cat.status === 'ascended') return `<p class="muted">${esc(cat.name)} is an archangel now, roaming Eden.</p>`;
   if (cat.status !== 'alive') return `<p class="muted">${esc(cat.name)} isn't home, so there is nothing to write about.</p>`;
   const clockNow = now().getHours() * 60 + now().getMinutes();
   const lines = catDiary(cat, save.state.cats, today()).filter((l) => l.minute <= clockNow);
@@ -2144,15 +2221,16 @@ function openCatMenu(id: string, tab?: MenuTab) {
   const sitterBtn = cat.status === 'alive'
     ? `<button class="btn" data-action="sitter-ask" data-id="${id}">Pet sitter</button>`
     : away ? `<button class="btn" data-action="resume" data-id="${id}">Bring ${esc(cat.name)} home</button>` : '';
+  const ascendBtn = cat.status === 'alive' && cat.ascendReady ? `<button class="btn primary" data-action="ascend-ask" data-id="${id}">Ascend ${esc(cat.name)} to archangel</button>` : '';
   const pane = menuTab === 'heat'
-    ? (cat.status === 'ranAway' ? `<p class="muted">${esc(cat.name)} ran away.</p>` : renderMonth(cat, today()) + HEAT_LEGEND)
+    ? (cat.status === 'ranAway' ? `<p class="muted">${esc(cat.name)} ran away.</p>` : renderMonth(cat, today()) + (cat.status === 'ascended' ? EDEN_LEGEND : HEAT_LEGEND))
     : menuTab === 'diary' ? catDiaryHtml(cat)
-    : `<div class="stack">${sitterBtn}
+    : `<div class="stack">${ascendBtn}${sitterBtn}
       ${save.allowRename ? `<button class="btn" data-action="rename-cat" data-id="${id}">Rename ${esc(cat.name)}</button>` : ''}
       <button class="btn" data-action="rename-habit" data-id="${id}">Rename habit</button>
       ${save.timeTravel ? `<button class="btn" data-action="travel" data-id="${id}">Time travel</button>` : ''}
       ${cat.status === 'alive' ? `<button class="btn" data-action="release-ask" data-id="${id}">Release to the stray colony</button>` : ''}
-      <button class="btn" data-action="shelter-ask" data-id="${id}">Return to the shelter</button></div>`;
+      ${cat.status === 'ascended' ? '' : `<button class="btn" data-action="shelter-ask" data-id="${id}">Return to the shelter</button>`}</div>`;
   openModal(`<div class="panel">${closeX('modal-close')}
     ${catHead(cat, today(), false)}
     <div class="seg" role="tablist">${(Object.keys(MENU_TABS) as MenuTab[]).map((v) =>
@@ -2240,7 +2318,7 @@ onShown('habit', 'contextmenu', (ev) => {
 });
 
 // Re-settle when the page comes back and at each 2am rollover.
-function tick() { settle(); renderAll(); queueReminderSync(); checkAmnesia(); checkAccomplishments(); }
+function tick() { settle(); renderAll(); queueReminderSync(); checkAmnesia(); checkAscension(); checkAccomplishments(); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
 // Back from Kitty Achievement: the theme may have changed there, and the clock moved on.
 onAppShown('habit', () => {
@@ -2269,5 +2347,6 @@ openWidgetTab();
 scheduleRollover();
 showWhatsNew();
 checkAmnesia();
+checkAscension();
 connectAccount();
 queueReminderSync();

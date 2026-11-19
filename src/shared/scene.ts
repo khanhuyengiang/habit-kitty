@@ -774,3 +774,64 @@ export function outdoorSvg(phase: Phase, cls = 'bg'): string {
   if (mine) return svg(customLayer(mine) + WASH[phase], cls);
   return svg(gardenSky(phase) + gardenBase() + WASH[phase] + gardenGlow(phase), cls);
 }
+
+// ---------- Eden ----------
+// Where the ascended kitties live: a sky of big clouds above water that mirrors it, two pillars of light on the horizon.
+// Drawn per time of day (no wash): a blue day, a pink-and-peach dusk and a starry night. 240 x 320, like the other scenes.
+export const EDEN_HORIZON = 170;
+export const EDEN_SPOTS: readonly Spot[] = [[18, 224], [104, 212], [184, 226], [60, 256], [142, 262], [208, 282], [14, 298], [100, 302]];
+
+interface EdenLook { sky: string[]; lit: string; mid: string; shade: string; glow: string; water: string }
+const EDEN: Record<Phase, EdenLook> = {
+  day: { sky: [P.blue300, P.blue100, P.blue50], lit: P.white, mid: P.blue50, shade: P.blue100, glow: '', water: P.white },
+  dusk: { sky: [P.blue300, P.lavender200, P.pink100, P.peach], lit: P.butter50, mid: P.pink50, shade: P.pink200, glow: P.butter200, water: P.pink50 },
+  night: { sky: [P.night900, P.night800, P.plum800, P.dusk700], lit: P.lavender300, mid: P.lavender400, shade: P.dusk700, glow: '', water: P.lavender200 },
+};
+
+// One cumulus: a flat shaded base with round lit puffs piled on it. `k` scales it.
+function edenCloud(cx: number, cy: number, k: number, e: EdenLook): string {
+  const puffs: [number, number, number, number][] = [[-34, 4, 14, 9], [-14, 2, 18, 12], [10, 3, 20, 13], [32, 5, 15, 9], [-18, -8, 14, 12], [2, -14, 17, 15], [22, -8, 13, 11], [-4, -23, 11, 11]];
+  let s = '';
+  for (const [dx, dy, rx, ry] of puffs) s += blob(cx + dx * k + k, cy + dy * k + 3 * k, rx * k, ry * k, e.shade);   // the shaded underside
+  for (const [dx, dy, rx, ry] of puffs) s += blob(cx + dx * k, cy + dy * k, rx * k, ry * k, e.mid);
+  for (const [dx, dy, rx, ry] of puffs.slice(4)) s += blob(cx + dx * k - 2 * k, cy + dy * k - 2 * k, rx * k * 0.75, ry * k * 0.7, e.lit);
+  for (const [dx, dy, rx, ry] of puffs.slice(0, 4)) s += blob(cx + dx * k - k, cy + dy * k - k, rx * k * 0.7, ry * k * 0.55, e.lit);
+  return s;
+}
+
+function edenSky(phase: Phase): string {
+  const e = EDEN[phase];
+  const bh = Math.ceil(EDEN_HORIZON / e.sky.length);
+  let s = '';
+  e.sky.forEach((c, i) => { s += R(0, i * bh, ROOM_W, Math.min(bh, EDEN_HORIZON - i * bh), c); });
+  for (let i = 1; i < e.sky.length; i++) for (let x = i % 2; x < ROOM_W - 1; x += 2) s += R(x, i * bh - 1, 1, 1, e.sky[i]) + R(x + 1, i * bh, 1, 1, e.sky[i - 1]);
+  if (e.glow) s += blob(120, 118, 70, 30, P.pink100) + blob(120, 118, 46, 20, e.glow) + blob(120, 118, 24, 10, P.butter50);
+  if (phase === 'night') s += stars(0, 0, ROOM_W, 130, 34, 21);
+  // two pillars of light stand on the horizon, with the clouds piled around them
+  for (const x of [92, 146]) s += R(x, 56, 5, EDEN_HORIZON - 56, e.lit) + R(x + 4, 56, 1, EDEN_HORIZON - 56, e.shade) + R(x, 56, 5, 1, e.mid);
+  s += edenCloud(40, 44, 0.7, e) + edenCloud(205, 150, 0.5, e) + edenCloud(22, 152, 0.5, e) + edenCloud(58, 112, 1.2, e)
+    + edenCloud(182, 78, 1.5, e) + edenCloud(120, 158, 0.9, e);
+  // sparkles drifting between the pillars
+  for (let i = 0; i < 14; i++) {
+    const x = 100 + Math.floor(rnd(i, 5) * 40), y = 60 + Math.floor(rnd(5, i) * 100);
+    s += i % 4 === 0 ? R(x - 1, y, 3, 1, P.white) + R(x, y - 1, 1, 3, P.white) : R(x, y, 1, 1, P.white);
+  }
+  return s;
+}
+
+export function edenSvg(phase: Phase, cls = 'bg'): string {
+  const e = EDEN[phase];
+  const sky = edenSky(phase);
+  const h = EDEN_HORIZON;
+  // the water: the sky upside down, softened, with ripples
+  let water = `<g transform="translate(0 ${2 * h}) scale(1 -1)">${sky}</g><rect x="0" y="${h}" width="${ROOM_W}" height="${ROOM_H - h}" fill="${e.water}" opacity=".28"/>`;
+  for (let y = h + 3; y < ROOM_H; y += 3) {
+    const k = (y - h) / (ROOM_H - h);
+    for (let i = 0; i < 3 + Math.round(k * 4); i++) {
+      const w = Math.round(6 + rnd(i, y, 2) * 16 + k * 22), x = Math.floor(rnd(y, i, 3) * (ROOM_W - w));
+      water += `<rect x="${x}" y="${y}" width="${w}" height="1" fill="${P.white}" opacity="${(0.35 + 0.3 * rnd(i, y, 4)).toFixed(2)}"/>`;
+    }
+  }
+  const shore = R(0, h, ROOM_W, 1, P.white);
+  return svg(sky + water + shore, cls);
+}

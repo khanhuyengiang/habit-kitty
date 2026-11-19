@@ -56,3 +56,11 @@ describe('napping cat', () => {
     expect(NAP_H).toBe(NAP.length);
   });
 });
+
+describe('Eden', () => {
+  it('is drawn for every time of day, with spots for the archangels on the water', async () => {
+    const { edenSvg, EDEN_SPOTS, EDEN_HORIZON } = await import('./art.ts');
+    for (const phase of ['day', 'dusk', 'night'] as const) expect(edenSvg(phase)).toMatch(/^<svg class="bg" viewBox="0 0 240 320"/);
+    for (const [x, y] of EDEN_SPOTS) { expect(y).toBeGreaterThan(EDEN_HORIZON); expect(x + BODY_W).toBeLessThanOrEqual(ROOM_W + 2); expect(y).toBeLessThanOrEqual(ROOM_H); }
+  });
+});

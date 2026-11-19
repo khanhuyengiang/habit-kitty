@@ -2,6 +2,12 @@
 
 Newest first. The app bundles this file: it shows the latest entry once after an update, and the whole list under Settings → Change log.
 
+## 0.6.3 - 2026-11-19 · Eden
+
+### New
+- **Kitty Gallery: zoom.** Every drawing board (stickers, kitties, icons, weather, decorations and scenes) now has the **1× 2× 4× 8×** zoom bar, not only scenes. Zoomed in, the board scrolls inside its box, and the **Move around** tool drags it. Pencil, Fill, Select and the rest work as usual at any zoom.
+- **Archangel kitties.** A habit that has become part of your life no longer needs a kitty to feed. A kitty fed on 95% of the last 90 days earns the right to **ascend**, and a pop-up offers it at 3, 6, 9 and 12 months of care (**Not yet** waits for the next one). The option stays in the kitty's **Options** while the right is held, and is lost if the 90-day rate falls below 90%. Days with the pet sitter don't count against it. An ascended kitty gets wings and a halo and lives in **Eden** (a new section of the Kitty tab). You can still give it an offering each day, which shows on the heatmap but pays no affection. Ascending frees a kitty slot. **Eden** is also a third room in the Room tab, next to the cosy room and the garden: a sky of big clouds over mirror-still water, with a day, dusk and night look. The archangels roam it, and a lock hangs over Eden until the first kitty ascends. On the Heatmap tab, archangels have their own **Eden** side: an ascended kitty's heatmap moves there with its whole history (the days before it ascended too), and offerings show in yellow.
+
 ## 0.6.2 - 2026-11-19
 
 ### New

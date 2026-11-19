@@ -41,6 +41,15 @@ describe('pixel cats', () => {
   });
 });
 
+describe('archangel', () => {
+  it('draws wings and a halo around the same face', () => {
+    const plain = faceSvg('happy', look), angel = faceSvg('happy', look, false, true);
+    expect(angel).toContain('angel');
+    expect(angel).toContain('#ffd36e');   // the halo
+    expect(angel.length).toBeGreaterThan(plain.length);
+  });
+});
+
 describe('notification icons', () => {
   it('names a resource per base fur and face, falling back for unusual furs', () => {
     expect(notifyIconName({ fur: FURS[3], pattern: 'plain' }, 'sad')).toBe('notif_3_sad');

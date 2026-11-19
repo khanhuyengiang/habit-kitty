@@ -18,7 +18,7 @@ import { goTo } from '../shared/apps.ts';
 import { plural } from '../shared/html.ts';
 import { COLOR, faceSvg, tint, winBar } from './window.ts';
 import { allBooks, allNotes, deleteBook, deleteNote, moveBook, noteOf, notesInitialised, notesReady, onNotes, saveBook, saveNote, takeAsked } from './data.ts';
-import { MAX_BOOK_NAME, MAX_NOTES, MAX_TEXT, NOTE_COLORS, NOTE_FACES, bookName, cardLines, composeNote, continueList, isDateText, parseNote, renderMarkdown, sameBook, searchNotes, titleFromText, toggleTask, type Cover, type Note, type NoteColor, type NoteDoodle, type NoteFace } from './model.ts';
+import { MAX_BOOK_NAME, MAX_NOTES, MAX_TEXT, NOTE_COLORS, NOTE_FACES, bookName, cardLines, composeNote, continueList, isDateText, parseNote, renderMarkdown, sameBook, searchNotes, titleFromText, indentLines, toggleLineKind, toggleTask, toggleWrap, type Cover, type Note, type NoteColor, type NoteDoodle, type NoteFace } from './model.ts';
 import { MAX_BOOKS, bookOf, defaultBook, looseNotes, notesIn, type Notebook } from './books.ts';
 
 const toast = (text: string) => showToast($('notes-toast'), text);
@@ -93,7 +93,7 @@ const TICKED = ['ooooooo', 'o.....o', 'o....oo', 'oo..o.o', 'o.oo..o', 'o.....o'
 const boxHtml = (done: boolean) => `<span class="ntask${done ? ' on' : ''}" aria-hidden="true">${monoSvg(done ? TICKED : BOX)}</span>`;
 function cardWords(body: string, cover: boolean): string {
   const lines = cardLines(body, cover ? 120 : 280).slice(0, cover ? 1 : undefined);
-  return lines.map((l) => `${l.task === undefined ? '' : boxHtml(l.task)}${esc(l.text)}`).join('\n');
+  return lines.map((l) => `${l.task === undefined ? '' : boxHtml(l.task)}${l.bullet ? `${esc(l.bullet)} ` : ''}${l.head ? `<strong>${esc(l.text)}</strong>` : esc(l.text)}`).join('\n');
 }
 
 function cardHtml(name: string, text: string, mtime: number | null, o: { preview?: boolean } = {}): string {
@@ -134,8 +134,8 @@ function renderList() {
   $('notes-body').innerHTML = `${head}<div class="nbar"><label class="field"><input id="notes-search" type="search" placeholder="${open ? `Search ${esc(open.name)}` : 'Search notes'}" autocomplete="off" aria-label="Search notes" value="${esc(query)}"></label>
       <button class="btn primary" type="button" data-action="note-new" ${all.length >= MAX_NOTES ? 'disabled' : ''}>+ New</button></div>
     <div class="tools"><div class="toolbar">${filterButton(filterOpen, changed, 'notes-filter')}<span class="grow"></span>
-      ${open ? '' : `${books.length > 1 ? '<button class="btn small" type="button" data-action="book-arrange">Arrange</button>' : ''}
-      <button class="btn small" type="button" data-action="book-new" ${books.length >= MAX_BOOKS ? 'disabled' : ''}>+ Notebook</button>`}</div>${panel}</div>
+      ${open ? '' : `${books.length > 1 ? '<button class="btn" type="button" data-action="book-arrange">Arrange</button>' : ''}
+      <button class="btn" type="button" data-action="book-new" ${books.length >= MAX_BOOKS ? 'disabled' : ''}>+ Notebook</button>`}</div>${panel}</div>
     <div id="notes-list">${listHtml()}</div>`;
 }
 const grid = (cards: string) => `<div class="ngrid">${cards}</div>`;
@@ -226,6 +226,18 @@ function renderRead() {
 }
 
 // ---- editing ----
+const FORMATS: [string, string, string][] = [['bold', 'Bold', '<b>B</b>'], ['italic', 'Italic', '<i>I</i>'], ['strike', 'Strikethrough', '<s>S</s>'],
+  ['bullet', 'List', '• List'], ['number', 'Numbered list', '1. List'], ['task', 'Checklist', '☐ Checklist'], ['h1', 'Heading 1', 'H1'], ['h2', 'Heading 2', 'H2'], ['in', 'Indent', '→'], ['out', 'Outdent', '←']];
+const WRAP: Record<string, string> = { bold: '**', italic: '*', strike: '~~' };
+function applyFormat(kind: string) {
+  const t = document.getElementById('note-text') as HTMLTextAreaElement | null;
+  if (!t || !cur) return;
+  const a = t.selectionStart, b = t.selectionEnd;
+  const r = WRAP[kind] ? toggleWrap(t.value, a, b, WRAP[kind]) : kind === 'in' || kind === 'out' ? indentLines(t.value, a, b, kind) : toggleLineKind(t.value, a, b, kind as 'bullet' | 'number' | 'task' | 'h1' | 'h2');
+  if (r.text.length > MAX_TEXT) return;
+  t.value = r.text; t.focus(); t.setSelectionRange(r.from, r.to);
+  cur.body = r.text; edited();
+}
 const KINDS: [CoverKind, string][] = [['none', 'Text only'], ['icon', 'Icon'], ['image', 'Picture']];
 function renderEditor() {
   if (!cur) return;
@@ -251,7 +263,9 @@ function renderEditor() {
       <div class="ndoodles">${NOTE_FACES.map((k) =>
         `<label title="${FACE_LABEL[k]}"><input type="radio" name="note-face" value="${k}" ${cur!.face === k ? 'checked' : ''} aria-label="${FACE_LABEL[k]}"><span>${faceSvg(k)}</span></label>`).join('')}</div></fieldset>
     <fieldset class="field"><legend>Picture at the bottom</legend><div id="note-doodle">${doodleFieldHtml()}</div></fieldset>
-    <label class="field">Note <textarea id="note-text" class="ntext" maxlength="${MAX_TEXT}" placeholder="Write in Markdown: # heading, **bold**, - list, - [ ] task" spellcheck="true">${esc(cur.body)}</textarea></label>`;
+    <label class="field">Note <textarea id="note-text" class="ntext" maxlength="${MAX_TEXT}" placeholder="Write in Markdown: # heading, **bold**, - list, - [ ] task" spellcheck="true">${esc(cur.body)}</textarea></label>
+    <div class="nfmt" role="toolbar" aria-label="Format the note">${FORMATS.map(([k, label, art]) =>
+      `<button class="btn small" type="button" data-action="note-fmt" data-fmt="${k}" title="${label}" aria-label="${label}">${art}</button>`).join('')}</div>`;
   if (cur.name === null && isEmpty(cur)) $('note-text').focus();
 }
 // What the date box shows when no date was set: the day the note was last changed (today, for a new one).
@@ -349,6 +363,7 @@ onShown('notes', 'click', async (ev) => {
   const btn = (ev.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!btn || (btn as HTMLButtonElement).disabled) return;
   switch (btn.dataset.action) {
+    case 'note-fmt': applyFormat(btn.dataset.fmt ?? ''); break;
     case 'note-new': cur = openNote(null, true); if (book) cur.book = book; renderEditor(); break;
     case 'notes-filter': filterOpen = !filterOpen; renderList(); if (filterOpen) document.getElementById('v-show')?.focus(); break;
     case 'notes-filter-reset': show = 'all'; book = null; group = 'covers'; setLocal(GROUP_KEY, null); renderList(); break;
@@ -430,6 +445,8 @@ onShown('notes', 'input', (ev) => {
   if (t.id === 'note-title') { cur.title = t.value; edited(); }
   else if (t.id === 'note-text') { cur.body = t.value; edited(); }
 });
+// the format buttons must not take the focus (and the selection) from the text box
+onShown('notes', 'mousedown', (ev) => { if ((ev.target as HTMLElement).closest('.nfmt')) ev.preventDefault(); });
 // Enter in a list carries the list on; Enter on an empty item ends it.
 onShown('notes', 'keydown', (ev) => {
   const t = ev.target as HTMLTextAreaElement;

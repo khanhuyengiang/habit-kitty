@@ -252,22 +252,78 @@ function build(face: Face, look: CatLook, sitting: boolean): { grid: Grid; coat:
 
 const draw = cellRects;
 
-// The round face on its own (cards, moods, thought bubbles, previews).
-export function faceSvg(face: Face, look: CatLook, faded = false): string {
+// An archangel's wings and halo, drawn around the round face (palette colours only). The left wing is mirrored.
+//   o outline  W feather  l shade
+const WING_HALF = [
+  '...oo',
+  '..oWo',
+  '.oWWo',
+  'oWWlo',
+  'oWllo',
+  '.olWo',
+  '..ooo',
+];
+const WING_W = WING_HALF[0].length, WING_Y = 4, HALO_H = 3;
+const HALO = ['.xxxxx.', 'x.....x', '.xxxxx.'];
+
+function angelSvg(face: Face, look: CatLook, faded: boolean): string {
+  const { grid, coat } = build(face, look, false);
+  const w = FACE_W + 2 * WING_W, c = Math.floor(w / 2);
+  const pal = colors(look, coat, false);
+  const feather: Record<string, string> = { o: OUTLINE, W: WHITE, l: '#e6dafc' };
+  const wing = (mirrorIt: boolean) => WING_HALF.map((row, y) => [...row].map((ch, x) => {
+    const col = feather[ch];
+    return col ? rect(mirrorIt ? w - 1 - x : x, y + WING_Y + HALO_H, col) : '';
+  }).join('')).join('');
+  const halo = HALO.map((row, y) => [...row].map((ch, x) => (ch === 'x' ? rect(c - 3 + x, y, '#ffd36e') : '')).join('')).join('');
+  const body = grid.map((row, y) => [...row].map((ch, x) => {
+    const px = x - FACE_X;
+    return px >= 0 && px < FACE_W && pal[ch] ? rect(px + WING_W, y + HALO_H, pal[ch]) : '';
+  }).join('')).join('');
+  return `<svg class="sprite angel${faded ? ' faded' : ''}" style="--w:${w}" viewBox="0 0 ${w} ${grid.length + HALO_H}" aria-hidden="true" shape-rendering="crispEdges">${wing(false)}${wing(true)}${body}${halo}</svg>`;
+}
+
+// The sitting archangel's wings (behind the body, overlapping it) and halo (over the ears): left halves, wings mirrored.
+const BODY_WING = [
+  '.........oo.',
+  '.......ooWWo',
+  '......oWWWWW',
+  '....ooWWWWlW',
+  '...oWWWWWlWW',
+  '..oWWWWWlWWW',
+  '..oWWWWlWWWW',
+  '...oWWWlWWWW',
+  '....oWWlWWWW',
+  '.....oollWWW',
+  '......ooollW',
+  '........ooo.',
+];
+const BODY_WING_X = -6, BODY_WING_Y = 12;
+function bodyWings(): string {
+  const feather: Record<string, string> = { o: OUTLINE, W: WHITE, l: '#e6dafc' };
+  const mid = WIDTH - 1;
+  return BODY_WING.map((row, y) => [...row].map((ch, x) => (feather[ch]
+    ? rect(BODY_WING_X + x, BODY_WING_Y + y, feather[ch]) + rect(mid - (BODY_WING_X + x), BODY_WING_Y + y, feather[ch]) : '')).join('')).join('');
+}
+const bodyHalo = () => HALO.map((row, y) => [...row].map((ch, x) => (ch === 'x' ? rect(Math.floor(WIDTH / 2) - 3 + x, y - 4, '#ffd36e') : '')).join('')).join('');
+
+// The round face on its own (cards, moods, thought bubbles, previews). An archangel also has wings and a halo.
+export function faceSvg(face: Face, look: CatLook, faded = false, angel = false): string {
+  if (angel) return angelSvg(face, look, faded);
   const { grid, coat } = build(face, look, false);
   return `<svg class="sprite${faded ? ' faded' : ''}" style="--w:${FACE_W}" viewBox="${FACE_X} 0 ${FACE_W} ${grid.length}" aria-hidden="true" shape-rendering="crispEdges">${draw(grid, colors(look, coat, face === 'dead'))}</svg>`;
 }
 
 // The sitting cat for the room. Blinks and swishes its tail (CSS animations, see page.html).
-export function bodySvg(face: Face, look: CatLook, seed = 0): string {
+export function bodySvg(face: Face, look: CatLook, seed = 0, angel = false): string {
   const { grid, coat, blink } = build(face, look, true);
   const pal = colors(look, coat, face === 'dead');
   const tail = (rows: string[]) => rows.flatMap((row, y) => [...row].map((ch, x) =>
     (pal[ch] ? rect(x, y, pal[ch === 'f' && coat.tail ? coat.tail : ch]) : ''))).join('');
   const blinkG = blink.length ? `<g class="blink">${blink.map(([x, y]) => rect(x, y, pal.f)).join('')}</g>` : '';
   const delay = `${-((seed % 40) / 10).toFixed(1)}s`;
-  return `<svg class="sprite body" style="--d:${delay};--w:${BODY_W}" viewBox="0 0 ${BODY_W} ${grid.length}" aria-hidden="true" shape-rendering="crispEdges">` +
-    `<g class="tail a">${tail(TAIL_A)}</g><g class="tail b">${tail(TAIL_B)}</g>${draw(grid, pal)}${blinkG}</svg>`;
+  return `<svg class="sprite body${angel ? ' angel' : ''}" style="--d:${delay};--w:${BODY_W}" viewBox="0 0 ${BODY_W} ${grid.length}" aria-hidden="true" shape-rendering="crispEdges">` +
+    `${angel ? bodyWings() : ''}<g class="tail a">${tail(TAIL_A)}</g><g class="tail b">${tail(TAIL_B)}</g>${draw(grid, pal)}${blinkG}${angel ? bodyHalo() : ''}</svg>`;
 }
 
 // ---- the curled-up napping cat (any size): head tucked on its paws, tail wrapped round the front ----

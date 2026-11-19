@@ -3,17 +3,18 @@ import type { Cat } from './rules.ts';
 
 import { dateOf, dayOf } from '../shared/dates.ts';
 
-export type DayKind = 'fed' | 'missed' | 'today' | 'sitter' | 'habit' | 'none';
+export type DayKind = 'fed' | 'missed' | 'today' | 'sitter' | 'habit' | 'offering' | 'none';
 
 // Anything with a feeding history: a cat, or a mindful habit dressed up as one (noMiss: skipped days aren't failures).
-export type Trackable = Pick<Cat, 'fedDays' | 'adoptedDay' | 'sitterTrips' | 'endedDay'> & { habitDays?: number[]; noMiss?: boolean };
+export type Trackable = Pick<Cat, 'fedDays' | 'adoptedDay' | 'sitterTrips' | 'endedDay'> & { habitDays?: number[]; noMiss?: boolean; ascendedDay?: number };
 
 function kindOf(cat: Trackable, day: number, today: number, fed: Set<number>, habit: Set<number>): DayKind {
-  if (fed.has(day)) return 'fed';
+  if (fed.has(day)) return cat.ascendedDay !== undefined && day > cat.ascendedDay ? 'offering' : 'fed';   // an archangel's meals are offerings
   if (habit.has(day)) return 'habit';   // done before it was a cat (or while it is just a habit)
   if (day < cat.adoptedDay || day > today) return 'none';
   if (cat.sitterTrips.some((t) => day >= t.start && day < (t.end ?? Infinity))) return 'sitter';
   if (cat.endedDay !== null && day >= cat.endedDay) return 'none';
+  if (cat.ascendedDay !== undefined && day >= cat.ascendedDay) return 'none';   // an archangel has no missed days
   if (day === today) return 'today';
   return cat.noMiss ? 'none' : 'missed';
 }
@@ -31,7 +32,7 @@ export function monthGrid(cat: Trackable, year: number, month: number, today: nu
   const habit = new Set(cat.habitDays ?? []);
   const first = dayOf(year, month, 1);
   const last = dayOf(year, month + 1, 0);
-  const count: Record<DayKind, number> = { fed: 0, missed: 0, today: 0, sitter: 0, habit: 0, none: 0 };
+  const count: Record<DayKind, number> = { fed: 0, missed: 0, today: 0, sitter: 0, habit: 0, offering: 0, none: 0 };
   const days = [];
   for (let d = first; d <= last; d++) {
     const kind = kindOf(cat, d, today, fed, habit);

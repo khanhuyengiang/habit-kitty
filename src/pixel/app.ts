@@ -27,10 +27,10 @@ import { BOOK_ART, TROPHY_ART, ROOM_H, ROOM_W, type Spot } from '../shared/scene
 import { PAL, artSvg } from '../shared/pixelart.ts';
 import { FURS, bodySvg } from '../shared/pixelcat.ts';
 import {
-  BASE_ROWS, INK_ROWS, MORE_INKS, byHue,
+  BASE_ROWS, INK_ROWS, ALL_INKS, byHue,
   CATEGORIES, DEFAULT_GROUP, byName, LETTERS, LIMITS, USER_GROUP, blankGrid, categoryOf, cleanGroup, cleanName, dropCount, dropFloat, dropIcon, dropIcons,
   exportName, exportText, flipGrid, floodFill, groupsOf, iconsOf, liveIcons, canDeleteOfficial, deleteOfficial, restoreIcon, importClashes, importIcons, inRect, nameTaken, type PixelIcon, isBlank, letterName, liftArea, linePoints,
-  moveIcons, newId, officialOf, putIcon, readExport, rectOf, renameGroup, setFood, shiftGrid, sizeOf, toArt, toGrid, type CategoryId, type Grid,
+  moveIcons, newId, officialOf, putIcon, readExport, rectOf, renameGroup, setFood, shiftGrid, sizeOf, FREE_MAX, freeSize, resizeGrid, toArt, toGrid, type CategoryId, type Grid,
   type Rect, type Shown, CAT_SIZE, isFixed, MAX_SPOTS, SCENE_INKS, clampProp, clampSpot, sceneColors, type Props,
 } from './model.ts';
 
@@ -40,8 +40,8 @@ type Tab = 'icons' | 'draw' | 'colours';
 const TABS: [Tab, string][] = [['icons', 'Icons'], ['draw', 'Draw'], ['colours', 'Colours']];
 type Tool = 'pencil' | 'erase' | 'fill' | 'pick' | 'select' | 'pan';
 const TOOLS: [Tool, string][] = [['pencil', 'Pencil'], ['erase', 'Eraser'], ['fill', 'Fill'], ['pick', 'Pick'], ['select', 'Select']];
-// A scene is too big to see whole when zoomed in, so it has a tool to move around it too.
-const SCENE_TOOLS: [Tool, string][] = [...TOOLS, ['pan', 'Move around']];
+// Every board can be zoomed in (a scene is too big to see whole anyway), so every board has a tool to move around it too.
+const ALL_TOOLS: [Tool, string][] = [...TOOLS, ['pan', 'Move around']];
 const ZOOMS = [1, 2, 4, 8];
 // The drawing tools' icons: smooth line drawings (not pixel art, so they don't look like part of the picture), in the text colour.
 const TOOL_ICONS: Record<Tool | 'mirror', string> = {
@@ -117,7 +117,7 @@ function moveSel(x: number, y: number) {
 function pictureSvg(c: CategoryId, art: string[], big = false): string {
   if (c === 'scene') return `<img class="pix-scene${big ? ' big' : ''}" src="${scenePng(art, sceneColors()) ?? ''}" alt="">`;
   if (c === 'sticker') return stickerArtSvg(art, 1, 'x2');   // a card zooms it to twice its size
-  if (c === 'friend' || c === 'deco' || c === 'weather') return fineSvg(art, big ? 'x4' : 'x2');
+  if (c === 'friend' || c === 'deco' || c === 'weather' || c === 'kitty') return fineSvg(art, big ? 'x4' : 'x2');
   return monoSvg(art, big ? 'x4' : 'x2');
 }
 // The colour a letter is painted on the board (the base colours and the dark line follow the text colour, as outside a card).
@@ -145,12 +145,12 @@ function inksHtml(c: CategoryId): string {
 const RECENT_KEY = 'hk-pixel-recent', RECENT_MAX = 9;
 function recentInks(): string[] {
   const v = readJson(RECENT_KEY);
-  return Array.isArray(v) ? v.filter((ch): ch is string => typeof ch === 'string' && ch.length === 1 && MORE_INKS.includes(ch)).slice(0, RECENT_MAX) : [];
+  return Array.isArray(v) ? v.filter((ch): ch is string => typeof ch === 'string' && ch.length === 1 && ALL_INKS.includes(ch)).slice(0, RECENT_MAX) : [];
 }
 // Draws with a colour from now on (one from "Choose a colour" goes to the top of Previously used).
 function useInk(ch: string) {
   ink = ch;
-  if (ch.length !== 1 || !MORE_INKS.includes(ch)) return;
+  if (ch.length !== 1 || !ALL_INKS.includes(ch)) return;
   writeJson(RECENT_KEY, [ch, ...recentInks().filter((r) => r !== ch)].slice(0, RECENT_MAX));   // not kept: fine
 }
 function openInks() {
@@ -158,7 +158,7 @@ function openInks() {
   const c = draft.cat, recent = recentInks();
   const grid = (label: string, chs: string[]) => `<h4 class="pix-ihead">${label}</h4>
     <div class="pix-igrid" role="radiogroup" aria-label="${label}">${chs.map((ch) => inkButton(c, ch, 'pix-ink-pick')).join('')}</div>`;
-  openLayer(`<h3>Choose a colour</h3>${recent.length ? grid('Previously used', recent) : ''}${grid('All colours', byHue([...MORE_INKS]))}`, 'Choose a colour');
+  openLayer(`<h3>Choose a colour</h3>${recent.length ? grid('Previously used', recent) : ''}${grid('All colours', byHue([...ALL_INKS]))}`, 'Choose a colour');
 }
 
 // ---------- header ----------
@@ -170,8 +170,13 @@ function renderTop() {
 
 function render() {
   if (!pixelReady()) { $('pixel-body').innerHTML = '<div class="panel"><p class="muted">Loading…</p></div>'; return; }
+  // Every redraw (choosing a tool or a colour, Undo...) makes a new board box; keep a zoomed-in board where it was scrolled to.
+  const old = tab === 'draw' ? document.getElementById('pix-board-wrap') : null;
+  const at = old && zoom > 1 ? { left: old.scrollLeft, top: old.scrollTop } : null;
   $('pixel-body').innerHTML = tab === 'icons' ? iconsHtml() : tab === 'draw' ? drawHtml() : coloursHtml();
   if (tab === 'draw') renderBoard();
+  const wrap = at && document.getElementById('pix-board-wrap');
+  if (wrap && at) { wrap.scrollLeft = at.left; wrap.scrollTop = at.top; }
 }
 
 const catSeg = () => `<div class="seg pix-cats" role="tablist" aria-label="Category">${CATEGORIES.map((c) =>
@@ -204,7 +209,8 @@ function iconsHtml(): string {
   const groups = groupsOf(list);
   return `${catSeg()}
     <div class="panel pix-intro">
-      <p class="muted">${c.id === 'weather' ? 'Weather pictures' : `${esc(c.label)}s`} are ${c.w} × ${c.h} pixels. ${esc(c.where)}.${c.id === 'button' ? ' They take the text colour.' : c.base ? ` The <b>base colour</b> takes the colour of ${esc(c.base)}.` : ''}</p>
+      <p class="muted">${c.free ? `Kitties can be any size up to ${FREE_MAX} × ${FREE_MAX} pixels: a new one starts at ${c.w} × ${c.h}, and the board can be resized while you draw.`
+        : `${c.id === 'weather' ? 'Weather pictures' : `${esc(c.label)}s`} are ${c.w} × ${c.h} pixels.`} ${esc(c.where)}.${c.id === 'button' ? ' They take the text colour.' : c.base ? ` The <b>base colour</b> takes the colour of ${esc(c.base)}.` : ''}</p>
       ${c.id === 'scene' ? `<p class="muted">Draw on them, or turn a photo into one, and choose where the kitties can sit.</p>`
         : isFixed(c.id) ? ''
         : `<div class="btns flow"><button class="btn primary" type="button" data-action="pix-new">${iconSvg('pencil')} New ${esc(c.label.toLowerCase())}</button>
@@ -309,7 +315,7 @@ async function movePicked() {
 // =================== Draw ===================
 function startDraft(c: CategoryId, id: string | null, asCopy = false) {
   const shown = id ? iconsOf(pixelData(), c).find((i) => i.id === id) : undefined;
-  const [w, h] = sizeOf(c, shown && !asCopy ? shown.id : null);
+  const [w, h] = (categoryOf(c).free && shown && freeSize(shown.art)) || sizeOf(c, shown && !asCopy ? shown.id : null);
   const grid = shown ? toGrid(shown.art.map((r) => r.padEnd(w, '.').slice(0, w))) : blankGrid(w, h);
   while (grid.length < h) grid.push(Array<string>(w).fill('.'));
   draft = { cat: c, id: shown ? shown.id : null, name: shown?.name ?? '', group: shown?.group ?? USER_GROUP, grid: grid.slice(0, h), saved: '' };
@@ -339,16 +345,22 @@ function drawHtml(): string {
   const group = cleanGroup(d.group, '');
   const scene = d.cat === 'scene', spots = scene && sceneMode === 'spots';
   return `<div class="panel pix-draw">
-    <div class="pix-dhead"><h3>${esc(title)}</h3><span class="muted num">${w} × ${h} · ${esc(c.label)}</span></div>
+    <div class="pix-dhead"><h3>${esc(title)}</h3><span class="muted num" id="pix-size">${w} × ${h} · ${esc(c.label)}</span></div>
+    ${c.free ? `<form class="pix-resize" id="pix-resize-form" novalidate>
+      <label class="field">Width <input id="pix-w" type="number" inputmode="numeric" min="1" max="${FREE_MAX}" value="${w}"></label>
+      <span aria-hidden="true">×</span>
+      <label class="field">Height <input id="pix-h" type="number" inputmode="numeric" min="1" max="${FREE_MAX}" value="${h}"></label>
+      <button class="btn small" type="submit">Resize</button>
+      <span class="muted">Keeps the top-left corner; use the arrows below to move the drawing.</span></form>` : ''}
     ${scene ? `<div class="seg pix-modes" role="tablist" aria-label="Board">${([['draw', 'Draw'], ['spots', 'Kitty spots']] as const).map(([m, label]) =>
       `<button type="button" role="tab" data-action="pix-scene-mode" data-mode="${m}" aria-selected="${m === sceneMode}">${label}</button>`).join('')}</div>` : ''}
     <div class="pix-tools" ${spots ? 'hidden' : ''}>
-      <div class="seg" role="toolbar" aria-label="Tool">${(scene ? SCENE_TOOLS : TOOLS).map(([t, label]) => `<button type="button" data-action="pix-tool" data-tool="${t}" aria-pressed="${t === tool}" aria-label="${label}" title="${label}">${toolIcon(t)}</button>`).join('')}</div>
+      <div class="seg" role="toolbar" aria-label="Tool">${ALL_TOOLS.map(([t, label]) => `<button type="button" data-action="pix-tool" data-tool="${t}" aria-pressed="${t === tool}" aria-label="${label}" title="${label}">${toolIcon(t)}</button>`).join('')}</div>
       <div class="seg" role="toolbar" aria-label="Board"><button type="button" data-action="pix-mirror" aria-pressed="${mirror}" aria-label="Mirror" title="Mirror: draw on both halves">${toolIcon('mirror')}</button></div>
     </div>
-    ${scene ? `<div class="seg pix-zooms" role="radiogroup" aria-label="Zoom">${ZOOMS.map((z) =>
-      `<button type="button" role="radio" data-action="pix-zoom" data-zoom="${z}" aria-checked="${z === zoom}">${z}×</button>`).join('')}</div>` : ''}
-    <div class="pix-board-wrap${scene ? ' scene' : ''}" id="pix-board-wrap" style="${baseStyle(d.cat)}${scene ? `; --zoom: ${zoom}` : ''}"><div class="pix-board${scene ? ' scene' : ''}${spots ? ' spots' : ''}" id="pix-board" data-tool="${tool}" style="--bw-cells: ${w}; --bh-cells: ${h}" role="img" aria-label="Drawing board, ${w} by ${h} pixels"></div></div>
+    <div class="seg pix-zooms" role="radiogroup" aria-label="Zoom">${ZOOMS.map((z) =>
+      `<button type="button" role="radio" data-action="pix-zoom" data-zoom="${z}" aria-checked="${z === zoom}">${z}×</button>`).join('')}</div>
+    <div class="pix-board-wrap${scene ? ' scene' : ''}${zoom > 1 ? ' zoomed' : ''}" id="pix-board-wrap" style="${baseStyle(d.cat)}; --zoom: ${zoom}"><div class="pix-board${scene ? ' scene' : ''}${spots ? ' spots' : ''}" id="pix-board" data-tool="${tool}" style="--bw-cells: ${w}; --bh-cells: ${h}" role="img" aria-label="Drawing board, ${w} by ${h} pixels"></div></div>
     <div class="pix-selbar" id="pix-selbar" aria-live="polite"></div>
     ${scene && !spots ? `<div class="btns flow pix-photo"><button class="btn small" type="button" data-action="pix-photo">Use a photo…</button>
       <span class="muted">It is turned into pixel art in the app's colours, to touch up.</span><input type="file" id="pix-photo" accept="image/*" hidden></div>` : ''}
@@ -387,6 +399,12 @@ function renderBoard() {
   const b = document.getElementById('pix-board');
   if (!b || !draft) return;
   const d = draft, g = shownGrid(), w = g[0].length, h = g.length;
+  b.style.setProperty('--bw-cells', String(w));
+  b.style.setProperty('--bh-cells', String(h));
+  b.setAttribute('aria-label', `Drawing board, ${w} by ${h} pixels`);
+  const size = document.getElementById('pix-size');
+  if (size) size.textContent = `${w} × ${h} · ${categoryOf(d.cat).label}`;
+  for (const [id, v] of [['pix-w', w], ['pix-h', h]] as const) { const f = document.getElementById(id) as HTMLInputElement | null; if (f && document.activeElement !== f) f.value = String(v); }
   b.innerHTML = (d.cat === 'scene' ? `<canvas width="${w}" height="${h}"></canvas><div class="pix-marks" id="pix-marks"></div>`
     : g.map((row, y) => row.map((ch, x) => `<i data-x="${x}" data-y="${y}" style="background: ${cellColor(d.cat, ch)}"></i>`).join('')).join(''))
     + (sel ? `<b class="pix-sel${float ? ' lifted' : ''}" style="left: ${(sel.x / w) * 100}%; top: ${(sel.y / h) * 100}%; width: ${(sel.w / w) * 100}%; height: ${(sel.h / h) * 100}%"></b>` : '');
@@ -510,7 +528,7 @@ function renderPreview() {
   const small = c === 'sticker' ? stickerArtSvg(art, 1) : fineSvg(art);
   const row = `<div class="pix-prow" style="${baseStyle(c)}"><span class="pix-pbig">${big}<span>${c === 'sticker' ? 'On a card (zoomed in)' : 'Zoomed in'}</span></span>
       <span class="pix-psmall">${small}<span>Real size</span></span></div>`;
-  if (c === 'deco') { el.innerHTML = row; return; }   // no base colour, and each is drawn in its own place
+  if (c === 'deco' || c === 'kitty') { el.innerHTML = row; return; }   // no base colour, and each is drawn in its own place
   if (c === 'weather') {   // no base colour; on a diary page it is a choice with its name under it
     el.innerHTML = `${row}<p class="muted">On a diary page:</p><div class="moods"><button type="button" aria-pressed="true" tabindex="-1" aria-hidden="true" style="pointer-events: none">${fineSvg(art, 'weather')}<span>${esc(draft.name || 'Untitled')}</span></button></div>`;
     return;
@@ -607,7 +625,7 @@ onShown('pixel', 'pointerdown', (ev) => {
   const board = (ev.target as Element).closest?.('#pix-board');
   if (!board || !draft || ev.button > 0 && ev.button !== 2) return;
   if (isScene() && sceneMode === 'spots') { spotDown(ev, board as HTMLElement); return; }
-  if (isScene() && tool === 'pan') {
+  if (tool === 'pan') {
     const wrap = document.getElementById('pix-board-wrap');
     if (!wrap) return;
     ev.preventDefault();
@@ -699,7 +717,7 @@ async function save(asNew: boolean) {
     // a copy is a new icon: it goes in "user" rather than "default", and has a new icon's size
     if (group === DEFAULT_GROUP) group = USER_GROUP;
     const [w, h] = sizeOf(d.cat, null);
-    if (d.grid[0].length !== w || d.grid.length !== h) { toast(`A new ${categoryOf(d.cat).label.toLowerCase()} is ${w} × ${h}, so this one can't be copied. Start a new one instead.`); return; }
+    if (!categoryOf(d.cat).free && (d.grid[0].length !== w || d.grid.length !== h)) { toast(`A new ${categoryOf(d.cat).label.toLowerCase()} is ${w} × ${h}, so this one can't be copied. Start a new one instead.`); return; }
   }
   const other = nameTaken(pixelData(), d.cat, name, asNew ? null : d.id);
   if (other) {
@@ -714,6 +732,17 @@ async function save(asNew: boolean) {
   d.id = id; d.name = name; d.group = group; d.saved = artKey(d);
   toast(asNew ? `Saved as ${name}.` : `Saved ${name}.`);
   render();
+}
+
+// ---- the board's size (a free-size category, such as a kitty) ----
+function resize() {
+  if (!draft || !categoryOf(draft.cat).free) return;
+  const read = (id: string) => Math.round(Number((document.getElementById(id) as HTMLInputElement | null)?.value));
+  const w = read('pix-w'), h = read('pix-h');
+  if (!(w >= 1 && h >= 1 && w <= FREE_MAX && h <= FREE_MAX)) { toast(`Width and height are 1 to ${FREE_MAX} pixels.`); return; }
+  if (w === draft.grid[0].length && h === draft.grid.length) return;
+  settle(); sel = null;
+  edit((g) => resizeGrid(g, w, h));
 }
 
 // ---- a photo as a scene ----
@@ -976,6 +1005,7 @@ async function remove() {
 onShown('pixel', 'submit', async (ev) => {
   const f = ev.target as HTMLFormElement;
   if (f.id === 'pix-form') { ev.preventDefault(); save(false); }
+  if (f.id === 'pix-resize-form') { ev.preventDefault(); resize(); }
   if (f.id === 'pix-group-form') {
     ev.preventDefault();
     const from = f.dataset.group!, to = (document.getElementById('pix-group-new') as HTMLInputElement).value;

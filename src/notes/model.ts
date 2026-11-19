@@ -145,15 +145,17 @@ export function excerpt(text: string, max = 90): string {
 export const plainText = (text: string, max = 280): string => cardLines(text, max).map((l) => l.text).join('\n');
 
 // The same, line by line, with a task line's tick: true (done) or false (to do); none on any other line.
-export function cardLines(text: string, max = 280): { text: string; task?: boolean }[] {
-  const out: { text: string; task?: boolean }[] = [];
+// A heading line says head: true; a bullet or numbered line says its mark in bullet ("•", or "1."); a task line has its box instead.
+export function cardLines(text: string, max = 280): { text: string; task?: boolean; head?: boolean; bullet?: string }[] {
+  const out: { text: string; task?: boolean; head?: boolean; bullet?: string }[] = [];
   let left = max;
   for (const raw of text.split('\n')) {
     const t = cleanLine(raw);
     if (!t) continue;
     if (left <= 0) { const last = out[out.length - 1]; if (last && !last.text.endsWith('…')) last.text = `${last.text.trimEnd()}…`; break; }
     const box = TASK.exec(raw);
-    out.push({ text: cut(t, left), ...(box && { task: box[2] !== ' ' }) });
+    const mark = box ? null : /^\s*(?:([-*+])|(\d+[.)]))\s+/.exec(raw);
+    out.push({ text: cut(t, left), ...(box && { task: box[2] !== ' ' }), ...(/^\s*#{1,6}\s+/.test(raw) && { head: true }), ...(mark && { bullet: mark[1] ? '•' : mark[2] }) });
     left -= t.length + 1;
   }
   return out;
@@ -202,19 +204,41 @@ export function renderMarkdown(md: string, o: { tasks?: boolean } = {}): string 
     }
     const list = /^\s*([-*+]|\d+[.)])\s+/.exec(line);
     if (list) {
+      // A list is its lines, one level deep: a line indented under another is inside that item (a bullet list in a numbered
+      // one, say), and the numbers of the outer list carry on past it. Deeper indents count as that one level.
       const ordered = /\d/.test(list[1]);
-      const items: string[] = [];
+      type Item = { ordered: boolean; text: string; line: number; kids: Item[] };
+      const tops: Item[] = [];
       for (; i < lines.length; i++) {
-        const m = /^\s*([-*+]|\d+[.)])\s+(.*)$/.exec(lines[i]);
-        if (!m || /\d/.test(m[1]) !== ordered) break;
-        const task = /^\[([ xX])\]\s+(.*)$/.exec(m[2]);
-        items.push(task
-          ? (o.tasks
-            ? `<li class="task${task[1] === ' ' ? '' : ' done'}"><label><input type="checkbox" data-line="${i}" ${task[1] === ' ' ? '' : 'checked'}> <span>${inline(task[2])}</span></label></li>`
-            : `<li class="task${task[1] === ' ' ? '' : ' done'}"><input type="checkbox" disabled ${task[1] === ' ' ? '' : 'checked'}> ${inline(task[2])}</li>`)
-          : `<li>${inline(m[2])}</li>`);
+        const m = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/.exec(lines[i]);
+        if (!m) break;
+        const item: Item = { ordered: /\d/.test(m[2]), text: m[3], line: i, kids: [] };
+        if (m[1] && tops.length) tops[tops.length - 1].kids.push(item);
+        else if (item.ordered !== ordered) break;
+        else tops.push(item);
       }
-      out.push(`<${ordered ? 'ol' : 'ul'}>${items.join('')}</${ordered ? 'ol' : 'ul'}>`);
+      const itemHtml = (it: Item): string => {
+        const task = /^\[([ xX])\]\s+(.*)$/.exec(it.text);
+        const kids = listHtml(it.kids);
+        if (!task) return `<li>${inline(it.text)}${kids}</li>`;
+        const done = task[1] === ' ' ? '' : ' done', box = task[1] === ' ' ? '' : 'checked';
+        return o.tasks
+          ? `<li class="task${done}"><label><input type="checkbox" data-line="${it.line}" ${box}> <span>${inline(task[2])}</span></label>${kids}</li>`
+          : `<li class="task${done}"><input type="checkbox" disabled ${box}> ${inline(task[2])}${kids}</li>`;
+      };
+      // consecutive items of one kind make one <ul> or <ol>
+      function listHtml(items: Item[]): string {
+        let html = '';
+        for (let k = 0; k < items.length;) {
+          let e = k;
+          while (e < items.length && items[e].ordered === items[k].ordered) e++;
+          const tag = items[k].ordered ? 'ol' : 'ul';
+          html += `<${tag}>${items.slice(k, e).map(itemHtml).join('')}</${tag}>`;
+          k = e;
+        }
+        return html;
+      }
+      out.push(listHtml(tops));
       continue;
     }
     const p: string[] = [];
@@ -231,8 +255,81 @@ export function continueList(text: string, caret: number): { text: string; caret
   const line = text.slice(start, caret);
   const m = /^(\s*)(?:([-*+])(?: \[[ xX]\])?|(\d+)([.)]))\s/.exec(line);
   if (!m) return null;
-  if (!line.slice(m[0].length).trim()) return { text: text.slice(0, start) + text.slice(caret), caret: start };
+  if (!line.slice(m[0].length).trim()) {
+    if (m[1]) { const out = text.slice(0, start) + line.slice(m[1].length) + text.slice(caret); return { text: out, caret: caret - m[1].length }; }
+    return { text: text.slice(0, start) + text.slice(caret), caret: start };
+  }
   const marker = m[3] ? `${Number(m[3]) + 1}${m[4]} ` : `${m[2]} ${/\[[ xX]\]/.test(m[0]) ? '[ ] ' : ''}`;
   const add = `\n${m[1]}${marker}`;
   return { text: text.slice(0, caret) + add + text.slice(caret), caret: caret + add.length };
+}
+
+// ---- the editing buttons under the text box ----
+export type LineKind = 'bullet' | 'number' | 'task' | 'h1' | 'h2';
+const LINE_MARK: Record<LineKind, string> = { bullet: '- ', number: '1. ', task: '- [ ] ', h1: '# ', h2: '## ' };
+const LINE_ANY = /^(\s*)(?:#{1,6}\s+|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)?/;
+const kindOf = (line: string): LineKind | null => {
+  if (/^\s*#\s/.test(line)) return 'h1';
+  if (/^\s*##\s/.test(line)) return 'h2';
+  if (/^\s*[-*+]\s+\[[ xX]\]\s/.test(line)) return 'task';
+  if (/^\s*[-*+]\s/.test(line)) return 'bullet';
+  if (/^\s*\d+[.)]\s/.test(line)) return 'number';
+  return null;
+};
+
+// Makes the lines the selection touches a bullet, task, H1 or H2 line; on lines that already are that kind, back to a plain paragraph.
+// Any other mark on a line (another kind, a numbered list) is replaced. Returns the new text and selection.
+export function toggleLineKind(text: string, from: number, to: number, kind: LineKind): { text: string; from: number; to: number } {
+  const start = text.lastIndexOf('\n', from - 1) + 1;
+  let end = text.indexOf('\n', Math.max(to, from));
+  if (end < 0) end = text.length;
+  if (to > from && to > start && text[to - 1] === '\n') end = to - 1;   // a selection that ends at a line's start leaves that line alone
+  const lines = text.slice(start, end).split('\n');
+  const first = lines.find((l) => l.trim()) ?? lines[0];
+  const plain = kindOf(first) === kind;
+  // numbers: carry on from the line above if that is a numbered item at the same indent, else start at 1
+  const above = text.slice(0, Math.max(0, start - 1)).split('\n').pop() ?? '';
+  const prev = start > 0 ? /^(\s*)(\d+)[.)]\s/.exec(above) : null;
+  let n = prev && prev[1].length === (LINE_ANY.exec(first)![1].length) ? Number(prev[2]) + 1 : 1;
+  const out = lines.map((l) => {
+    if (lines.length > 1 && !l.trim()) return l;
+    const m = LINE_ANY.exec(l)!;
+    return plain ? m[1] + l.slice(m[0].length) : m[1] + (kind === 'number' ? `${n++}. ` : LINE_MARK[kind]) + l.slice(m[0].length);
+  });
+  const block = out.join('\n');
+  const delta = block.length - (end - start);
+  const firstDelta = out[0].length - lines[0].length;
+  return { text: text.slice(0, start) + block + text.slice(end), from: Math.max(start, from + firstDelta), to: Math.max(start, to + delta) };
+}
+
+// Wraps the selection in a mark (** for bold, * for italic, ~~ for strikethrough); if it already has it, takes it off.
+// With nothing selected the pair goes in and the caret between. Returns the new text and selection.
+export function toggleWrap(text: string, from: number, to: number, mark: string): { text: string; from: number; to: number } {
+  const n = mark.length, sel = text.slice(from, to);
+  const solo = (i: number) => mark !== '*' || text[i] !== '*';   // a lone * is italic; the ** of a bold is not
+  if (sel.length > 2 * n && sel.startsWith(mark) && sel.endsWith(mark) && solo(n + from) && solo(to - n - 1))
+    return { text: text.slice(0, from) + sel.slice(n, -n) + text.slice(to), from, to: to - 2 * n };
+  if (text.slice(from - n, from) === mark && text.slice(to, to + n) === mark && solo(from - n - 1) && solo(to + n))
+    return { text: text.slice(0, from - n) + sel + text.slice(to + n), from: from - n, to: to - n };
+  return { text: text.slice(0, from) + mark + sel + mark + text.slice(to), from: from + n, to: to + n };
+}
+
+// Indent (one level, three spaces: it nests under a "1. " item too) or take back out the list lines the selection touches.
+// Other lines are left alone, and a line that is indented already goes no deeper.
+export const INDENT = '   ';
+export function indentLines(text: string, from: number, to: number, dir: 'in' | 'out'): { text: string; from: number; to: number } {
+  const start = text.lastIndexOf('\n', from - 1) + 1;
+  let end = text.indexOf('\n', Math.max(to, from));
+  if (end < 0) end = text.length;
+  if (to > from && to > start && text[to - 1] === '\n') end = to - 1;
+  let first = 0;
+  const lines = text.slice(start, end).split('\n').map((l, k) => {
+    let r = l;
+    if (dir === 'in') { if (/^[-*+\d]/.test(l) && kindOf(l)) r = INDENT + l; }
+    else r = l.replace(/^(?: {1,4}|\t)(?=\S)/, '');
+    if (k === 0) first = r.length - l.length;
+    return r;
+  });
+  const block = lines.join('\n');
+  return { text: text.slice(0, start) + block + text.slice(end), from: Math.max(start, from + first), to: Math.max(start, to + block.length - (end - start)) };
 }
