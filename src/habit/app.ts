@@ -66,7 +66,13 @@ interface Save {
 }
 
 const KEY = 'habit-kitty-save-v1';
-const fresh = (): Save => ({ v: 1, state: newState(), offsetHours: 0, log: [], savedAt: 0, accomplished: {}, seenVersion: VERSION });
+// A new game, with the options a new player starts with (the rest are off; see the settings file in src/settings-file.ts).
+// Sound is always on for a new player (never muted), whatever the settings file says.
+// Only a new save gets these: moving an existing player's day start would move their history to other days.
+const fresh = (): Save => ({
+  v: 1, state: newState(), offsetHours: 0, log: [], savedAt: 0, accomplished: {}, seenVersion: VERSION,
+  timeTravel: true, amnesia: true, dayStart: 6, outdoorName: 'Cherry Garden', sound: { bgm: 15, meow: 100, purr: 100 },
+});
 
 function readLocal() { return readJson<Save>(KEY); }
 

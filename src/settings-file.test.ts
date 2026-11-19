@@ -66,7 +66,7 @@ describe("Kitty Mart's settings", () => {
     cats: [...emptyData().cats, { id: 'pets', name: 'Pets', icon: 'cat', color: 'pink', subs: [] }],
     lists: [{ id: 'a', name: 'Aldi', items: [{ id: '1', name: 'Kibble', qty: '', unit: '', cat: 'pets', done: false }, { id: '2', name: 'Milk', qty: '', unit: '', cat: 'dairy', done: false }] },
       { id: 'b', name: 'Corner shop', items: [], order: ['drinks'] }],
-    pantry: [{ id: 'p', name: 'Rice', cat: 'pantry', sub: '' }],
+    pantry: [{ id: 'p', name: 'Basmati', cat: 'pantry', sub: '' }],
   });
 
   it('takes the categories, options and aisle order, not the items', () => {
@@ -74,7 +74,7 @@ describe("Kitty Mart's settings", () => {
     d.lists[0].order = ['pets', 'dairy'];
     const s = martSettingsOf(d);
     expect(s.orders).toEqual({ aldi: ['pets', 'dairy'], 'corner shop': ['drinks'] });
-    expect(JSON.stringify(s)).not.toMatch(/Kibble|Milk|Rice/);
+    expect(JSON.stringify(s)).not.toMatch(/Kibble|Milk|Basmati/);
   });
 
   it("puts them on someone else's data, keeping their lists", () => {
@@ -87,7 +87,7 @@ describe("Kitty Mart's settings", () => {
     expect(next.lists[0].items.map((i) => [i.name, i.cat])).toEqual([['Kibble', 'other'], ['Milk', 'dairy']]);   // Pets is not in the settings
     expect(next.lists[0].order).toEqual(['dairy', 'produce']);
     expect(next.lists[1].order).toEqual(['drinks']);   // no order for it in the settings: kept
-    expect(next.pantry.map((p) => p.name)).toEqual(['Rice']);
+    expect(next.pantry.map((p) => p.name)).toEqual(['Basmati']);
     expect(theirs.cats.some((c) => c.id === 'pets')).toBe(true);   // the data it was given is left alone
   });
 });

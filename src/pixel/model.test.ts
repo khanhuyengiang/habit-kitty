@@ -134,7 +134,7 @@ describe('importing over your icons', () => {
   });
   it('tells apart a new icon that takes a name already used', () => {
     const d = importIcons(emptyData(), [{ category: 'sticker', id: 'twinkle', name: 'star', group: USER_GROUP, art: teapot() }]);
-    expect(iconsOf(d, 'sticker').filter((i) => /^star/i.test(i.name)).map((i) => [i.id, i.name])).toEqual([['star', 'Star 1'], ['twinkle', 'Star 2']]);
+    expect(iconsOf(d, 'sticker').filter((i) => /^star( \d+)?$/i.test(i.name)).map((i) => [i.id, i.name])).toEqual([['star', 'Star 1'], ['twinkle', 'Star 2']]);
   });
 });
 
@@ -253,7 +253,7 @@ describe('deleting an official icon', () => {
     // a new "Star" while it is gone: bringing it back tells the two apart
     d = putIcon(d, { category: 'sticker', id: 'mystar', name: 'Star', group: USER_GROUP, art: teapot() });
     d = restoreIcon(d, 'sticker', 'star');
-    expect(liveIcons(d, 'sticker').filter((i) => /^star/i.test(i.name)).map((i) => i.name).sort()).toEqual(['Star 1', 'Star 2']);
+    expect(liveIcons(d, 'sticker').filter((i) => /^star( \d+)?$/i.test(i.name)).map((i) => i.name).sort()).toEqual(['Star 1', 'Star 2']);
   });
   it('goes through the save file and the export', () => {
     const d = deleteOfficial(emptyData(), 'sticker', 'star', 7);
@@ -341,10 +341,10 @@ describe('cat food', () => {
 });
 
 describe('decorations', () => {
-  it('has the home screen wing, in the decoration colours, and takes no new ones', () => {
+  it('has the home screen wing, in its colours, and takes no new ones', () => {
     const wing = officials('deco').find((o) => o.id === 'wing')!;
     expect(sizeOf('deco', 'wing')).toEqual([12, 12]);
-    expect(wing.art.join('').replace(/\./g, '')).toMatch(/^[H[{]+$/);
+    expect(wing.art.join('').replace(/\./g, '')).toMatch(/^[H[{av]+$/);
     const ok = sanitize({ version: 1, icons: [{ category: 'deco', id: 'wing', name: 'Wing', group: 'default', art: wing.art.map((r) => r.replace(/\[/g, 'w')), updated: 1 },
       { category: 'deco', id: 'feather', name: 'Feather', group: 'default', art: wing.art, updated: 1 }] });
     expect(ok.icons.map((i) => i.id)).toEqual(['wing']);

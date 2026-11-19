@@ -6,14 +6,15 @@ import { esc } from './html.ts';
 import { getLocal, setLocal } from './local.ts';
 import { paintBackdrop } from './backdrop.ts';
 
-// ---- the look: light or dark (follows the device until one is chosen), and the fancy background. Kept on this device. ----
-// Chosen in Settings → Look (src/habit/look.ts); read here first, so the first paint is already right.
-// The fancy background is on until it is turned off (stored as '0').
+// ---- the look: light, dark or following the device (the default), and the fancy background. Kept on
+// this device. Chosen in Settings → Look (src/habit/look.ts); read here first, so the first paint is already right.
+// Only a choice other than the default is stored; the fancy background is on until it is turned off (stored as '0').
 const THEME_KEY = 'hk-theme', FANCY_KEY = 'hk-fancy';
 export type ThemeMode = 'device' | 'light' | 'dark';
+const DEFAULT_THEME: ThemeMode = 'device';   // always: follow the device until someone picks light or dark
 const stored = getLocal, store = setLocal;   // storage blocked: the defaults, and not remembered
 {
-  const t = stored(THEME_KEY);
+  const t = stored(THEME_KEY) ?? DEFAULT_THEME;
   if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
   if (stored(FANCY_KEY) !== '0') document.documentElement.dataset.fancy = '';
 }
@@ -28,7 +29,7 @@ export const isDark = () => document.documentElement.dataset.theme
 export const themeMode = (): ThemeMode => (document.documentElement.dataset.theme as ThemeMode | undefined) ?? 'device';
 export function setThemeMode(m: ThemeMode) {
   if (m === 'device') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = m;
-  store(THEME_KEY, m === 'device' ? null : m);
+  store(THEME_KEY, m === DEFAULT_THEME ? null : m);
   paintBackdrop();
 }
 export const fancyOn = () => 'fancy' in document.documentElement.dataset;
