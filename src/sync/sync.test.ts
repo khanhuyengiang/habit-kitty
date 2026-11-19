@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@capacitor/filesystem', async () => (await import('../test/fsmock.ts')).fsModule);
-vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => false }, registerPlugin: () => ({}) }));
+vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => false }, CapacitorHttp: {}, registerPlugin: () => ({}) }));
 vi.mock('@capacitor/app', () => ({ App: { addListener: () => {}, getLaunchUrl: async () => undefined } }));
 vi.mock('@capacitor/share', () => ({ Share: {} }));
 

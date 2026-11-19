@@ -111,7 +111,17 @@ async function finishSignIn(q: URLSearchParams) {
     store({ name });
     emit({ error: '' });
     requestSync();
-  } catch { emit({ error: "Couldn't connect to Dropbox. Try again." }); }
+  } catch (e) { emit({ error: `Couldn't connect to Dropbox (${reason(e)}). Try again.` }); }
+}
+
+// What went wrong, in a few words, so a failed sign-in can be told apart (and reported).
+function reason(e: unknown): string {
+  if (e instanceof DropboxError) {
+    try { const j = JSON.parse(e.body); return [j.error, j.error_description].filter(Boolean).join(': ').slice(0, 160) || `error ${e.status}`; }
+    catch { return `error ${e.status}`; }
+  }
+  if (e instanceof TypeError) return `no connection: ${e.message}`.slice(0, 160);
+  return String((e as Error)?.message ?? e).slice(0, 160);
 }
 
 export async function disconnectDropbox() {

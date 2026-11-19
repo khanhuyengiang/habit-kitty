@@ -1,5 +1,11 @@
 // Talking to Dropbox: signing in (OAuth with PKCE, so no server and no secret) and one file in the app's own folder
-// (Dropbox → Apps → <the app's name>; the app sees nothing else). Plain fetch, the same in the browser and on the phone.
+// (Dropbox → Apps → <the app's name>; the app sees nothing else).
+//
+// Requests go out with fetch in the browser. In the phone app they go through Android itself (CapacitorHttp): the app's
+// web view refuses them ("no connection"). Android hands bytes over as base64, both ways, so the backup file arrives
+// and leaves intact.
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { fromBase64, toBase64 } from '../shared/files.ts';
 
 export const APP_KEY = 'ww16ej2zaqp4mbu';
 const AUTHORIZE = 'https://www.dropbox.com/oauth2/authorize';
@@ -8,6 +14,44 @@ const RPC = 'https://api.dropboxapi.com/2/';
 const CONTENT = 'https://content.dropboxapi.com/2/';
 
 export interface Tokens { access: string; expires: number; refresh: string }
+
+// ---- one request, either way ----
+type Body = { form: Record<string, string> } | { json: unknown } | { bytes: Uint8Array };
+interface Req { url: string; headers?: Record<string, string>; body?: Body; binary?: boolean }   // binary: the answer is a file
+interface Res { status: number; ok: boolean; header(name: string): string | null; text: string; bytes: Uint8Array }
+
+async function viaFetch(r: Req): Promise<Res> {
+  const b = r.body;
+  const res = await fetch(r.url, {
+    method: 'POST',
+    headers: {
+      ...r.headers,
+      ...(b && 'json' in b ? { 'Content-Type': 'application/json' } : {}),
+      ...(b && 'bytes' in b ? { 'Content-Type': 'application/octet-stream' } : {}),
+    },
+    ...(b ? { body: 'form' in b ? new URLSearchParams(b.form) : 'json' in b ? JSON.stringify(b.json) : b.bytes as BodyInit } : {}),
+  });
+  const bytes = r.binary && res.ok ? new Uint8Array(await res.arrayBuffer()) : new Uint8Array();
+  const text = r.binary && res.ok ? '' : await res.text();
+  return { status: res.status, ok: res.ok, header: (n) => res.headers.get(n), text, bytes };
+}
+
+async function viaAndroid(r: Req): Promise<Res> {
+  const b = r.body;
+  const headers: Record<string, string> = { ...r.headers };
+  let data: unknown, dataType: string | undefined;
+  if (b && 'form' in b) { headers['Content-Type'] = 'application/x-www-form-urlencoded'; data = new URLSearchParams(b.form).toString(); }
+  else if (b && 'json' in b) { headers['Content-Type'] = 'application/json'; data = b.json === null ? 'null' : b.json; }
+  else if (b && 'bytes' in b) { headers['Content-Type'] = 'application/octet-stream'; data = toBase64(b.bytes); dataType = 'file'; }
+  const res = await CapacitorHttp.request({ url: r.url, method: 'POST', headers, data, ...(dataType ? { dataType: dataType as 'file' } : {}), responseType: r.binary ? 'arraybuffer' : 'text' });
+  const ok = res.status >= 200 && res.status < 300;
+  const lower = Object.fromEntries(Object.entries(res.headers ?? {}).map(([k, v]) => [k.toLowerCase(), String(v)]));
+  const text = r.binary && ok ? '' : typeof res.data === 'string' ? res.data : JSON.stringify(res.data ?? null);
+  const bytes = r.binary && ok && typeof res.data === 'string' ? fromBase64(res.data.replace(/\s+/g, '')) : new Uint8Array();
+  return { status: res.status, ok, header: (n) => lower[n.toLowerCase()] ?? null, text, bytes };
+}
+
+const send = (r: Req) => (Capacitor.isNativePlatform() ? viaAndroid(r) : viaFetch(r));
 
 // ---- signing in ----
 const b64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -23,9 +67,9 @@ export async function authorizeUrl(o: { redirect: string; state: string; verifie
 }
 
 async function token(params: Record<string, string>): Promise<{ access_token: string; expires_in: number; refresh_token?: string }> {
-  const r = await fetch(TOKEN, { method: 'POST', body: new URLSearchParams({ client_id: APP_KEY, ...params }) });
-  if (!r.ok) throw new DropboxError(r.status, await r.text());
-  return r.json();
+  const r = await send({ url: TOKEN, body: { form: { client_id: APP_KEY, ...params } } });
+  if (!r.ok) throw new DropboxError(r.status, r.text);
+  return JSON.parse(r.text);
 }
 export async function exchangeCode(o: { code: string; verifier: string; redirect: string }): Promise<Tokens> {
   const t = await token({ grant_type: 'authorization_code', code: o.code, code_verifier: o.verifier, redirect_uri: o.redirect });
@@ -38,7 +82,7 @@ async function refreshed(t: Tokens): Promise<Tokens> {
 }
 // Forget the sign-in on Dropbox's side too (best effort).
 export async function revoke(t: Tokens) {
-  try { await fetch(`${RPC}auth/token/revoke`, { method: 'POST', headers: { Authorization: `Bearer ${t.access}` } }); } catch { /* offline: it lapses anyway */ }
+  try { await send({ url: `${RPC}auth/token/revoke`, headers: { Authorization: `Bearer ${t.access}` } }); } catch { /* offline: it lapses anyway */ }
 }
 
 // ---- calls ----
@@ -53,21 +97,18 @@ export class DropboxError extends Error {
 // A signed-in session. `save` is told whenever the access token is renewed, so the caller can keep it.
 export function session(tokens: Tokens, save: (t: Tokens) => void) {
   let t = tokens;
-  async function send(make: (access: string) => Promise<Response>): Promise<Response> {
+  async function call(make: (access: string) => Req): Promise<Res> {
     if (Date.now() > t.expires - 60_000) { t = await refreshed(t); save(t); }
-    let r = await make(t.access);
-    if (r.status === 401) { t = await refreshed(t); save(t); r = await make(t.access); }
-    if (!r.ok) throw new DropboxError(r.status, await r.text());
+    let r = await send(make(t.access));
+    if (r.status === 401) { t = await refreshed(t); save(t); r = await send(make(t.access)); }
+    if (!r.ok) throw new DropboxError(r.status, r.text);
     return r;
   }
+  const auth = (a: string) => ({ Authorization: `Bearer ${a}` });
   const rpc = async <T>(path: string, arg: unknown): Promise<T> =>
-    (await send((a) => fetch(RPC + path, { method: 'POST', headers: { Authorization: `Bearer ${a}`, 'Content-Type': 'application/json' }, body: JSON.stringify(arg) }))).json();
-  const content = (path: string, arg: unknown, body?: Uint8Array) =>
-    send((a) => fetch(CONTENT + path, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${a}`, 'Dropbox-API-Arg': JSON.stringify(arg), ...(body ? { 'Content-Type': 'application/octet-stream' } : {}) },
-      ...(body ? { body: body as BodyInit } : {}),
-    }));
+    JSON.parse((await call((a) => ({ url: RPC + path, headers: auth(a), body: { json: arg } }))).text);
+  const content = (path: string, arg: unknown, o: { bytes?: Uint8Array; binary?: boolean } = {}) =>
+    call((a) => ({ url: CONTENT + path, headers: { ...auth(a), 'Dropbox-API-Arg': JSON.stringify(arg) }, ...(o.bytes ? { body: { bytes: o.bytes } } : {}), binary: o.binary }));
 
   return {
     async accountName(): Promise<string> {
@@ -81,18 +122,17 @@ export function session(tokens: Tokens, save: (t: Tokens) => void) {
     },
     async download(path: string): Promise<{ bytes: Uint8Array; rev: string } | null> {
       try {
-        const r = await content('files/download', { path });
-        const bytes = new Uint8Array(await r.arrayBuffer());
+        const r = await content('files/download', { path }, { binary: true });
         let rev = '';
-        try { rev = JSON.parse(r.headers.get('Dropbox-API-Result') ?? '{}').rev ?? ''; } catch { /* asked for below */ }
-        return { bytes, rev: rev || (await this.rev(path)) || '' };
+        try { rev = JSON.parse(r.header('Dropbox-API-Result') ?? '{}').rev ?? ''; } catch { /* asked for below */ }
+        return { bytes: r.bytes, rev: rev || (await this.rev(path)) || '' };
       } catch (e) { if (e instanceof DropboxError && e.notFound) return null; throw e; }
     },
     // Writes the file only if it is still at `rev` (null: only if there is none yet); throws a conflict otherwise.
     async upload(path: string, bytes: Uint8Array, rev: string | null): Promise<string> {
       const mode = rev ? { '.tag': 'update', update: rev } : { '.tag': 'add' };
-      const r = await content('files/upload', { path, mode, autorename: false, mute: true }, bytes);
-      return (await r.json()).rev;
+      const r = await content('files/upload', { path, mode, autorename: false, mute: true }, { bytes });
+      return JSON.parse(r.text).rev;
     },
   };
 }
