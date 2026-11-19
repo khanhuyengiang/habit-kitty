@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Habit Kitty</string>
-    <string name="title_activity_main">Habit Kitty</string>
+    <string name="app_name">Itty Bitty Kitty</string>
+    <string name="title_activity_main">Itty Bitty Kitty</string>
     <string name="package_name">local.habitkitty.app</string>
     <string name="custom_url_scheme">local.habitkitty.app</string>
     <string name="widget_description">Your cozy room</string>
-    <string name="widget_empty">Open Habit Kitty once to fill the room.</string>
+    <string name="widget_empty">Open Itty Bitty Kitty once to fill the room.</string>
 </resources>

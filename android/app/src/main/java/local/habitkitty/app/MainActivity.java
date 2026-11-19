@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(RoomWidgetPlugin.class);
+        registerPlugin(BackupFolderPlugin.class);
         super.onCreate(savedInstanceState);
         remember(getIntent());
     }

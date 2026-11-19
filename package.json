@@ -2,11 +2,10 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "play": "node src/play.ts",
+    "play": "node src/habit/play.ts",
     "build:web": "node web/build.js",
     "app:sync": "node web/build.js && cap sync android",
-    "app:apk": "npm run app:sync && cd android && JAVA_HOME=${JAVA_HOME:-$HOME/android-studio-rabbit1-linux/android-studio/jbr} ./gradlew clean assembleDebug && cp app/build/outputs/apk/debug/app-debug.apk ../dist/HabitKitty.apk",
-    "preview": "node web/preview.js",
+    "app:apk": "npm run app:sync && cd android && JAVA_HOME=${JAVA_HOME:-$HOME/android-studio-rabbit1-linux/android-studio/jbr} ./gradlew clean assembleDebug && cp app/build/outputs/apk/debug/app-debug.apk ../dist/IttyBittyKitty.apk",
     "editor": "node web/editor.js",
     "icons": "node scripts/notify-icons.ts"
   },
@@ -18,11 +17,13 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.3",
     "@capacitor/filesystem": "^8.1.4",
     "@capacitor/local-notifications": "^8.3.1",
     "@capacitor/share": "^8.0.3",
-    "fflate": "^0.8.3"
+    "fflate": "^0.8.3",
+    "html-to-image": "^1.11.11"
   },
-  "version": "0.4.1"
+  "version": "0.6.0"
 }

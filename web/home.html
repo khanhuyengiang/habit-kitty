@@ -1,0 +1,59 @@
+<style>
+/* The home page. It is drawn with the shared sheet and Habit Kitty's (web/page.html); these are only its own parts. */
+/* the player card (Player Stat dialog) */
+.player { display: grid; gap: var(--s4); }
+.player-head { display: grid; grid-template-columns: auto 1fr auto; gap: var(--s4); align-items: center; }
+.p-info { display: grid; gap: var(--s1); min-width: 0; }
+.p-name { font: 700 24px/1.1 var(--font); overflow-wrap: anywhere; }
+.p-info .muted { font-size: 18px; }
+.pstats { display: grid; gap: var(--s4); }
+.title-line { color: var(--accent-text); font-weight: 700; font-size: 18px; }
+
+/* The menu, after inspo/menu.jpg: short, long keys in a column, each with a dark two-pixel outline, a lit top edge and a shaded
+   bottom band. The colours fade from lavender (the first key) to periwinkle; the in-between keys mix their neighbours. The key of the app opened last is the chosen one: a
+   white outline that glows and a wing on each side. A white cat always sleeps on Habit Kitty's key.
+   Each name is written like its app's title bar: the word in the title colour, "Kitty" in pink. */
+.home-menu { --m1: #e6dafc; --m2: #d9ccf7; --m3: color-mix(in srgb, #d9ccf7, #bdb0e6); --m4: #bdb0e6; --m5: color-mix(in srgb, #bdb0e6 70%, #9a8cc8); --menu-dk: #6b4f9e;
+  --wing: calc(12 * 2 * var(--px)); --wing-gap: calc(2 * var(--px));
+  /* every key is as wide as the longest name, and the keys plus both wings always fit the screen */
+  display: grid; gap: var(--s4); justify-items: stretch; width: max-content; margin-inline: auto;
+  max-width: calc(100% - 2 * (var(--wing) + var(--wing-gap))); }
+/* The page fills the screen and the keys sit in its middle, however many there are: the title bar is in the top row and the
+   version in the bottom one, both as tall as each other, so neither pushes the keys off centre. The version sits just under the
+   last key. The cat sleeping on the first key lies in the top row, above the key.
+   In the Android app the page starts below the status bar (web/build.js pads :root by the safe-area inset), so the page is
+   that much shorter than the screen; otherwise it would scroll by the status bar's height and the keys would be off centre. */
+.wrap.home { overflow-x: clip; min-height: calc(100vh - env(safe-area-inset-top, 0px)); min-height: calc(100dvh - env(safe-area-inset-top, 0px)); grid-template-rows: 1fr auto 1fr; padding-bottom: var(--s6); padding-top: var(--s6); }
+.wrap.home > .top { align-self: start; }
+.wrap.home > .home-foot { align-self: start; margin: 0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .home-menu { --m1: #6b4f9e; --m2: #4a4084; --m3: color-mix(in srgb, #4a4084, #4a3a78); --m4: #4a3a78; --m5: color-mix(in srgb, #4a3a78 60%, #3d2c63); --menu-dk: #231d44; } }
+:root[data-theme="dark"] .home-menu { --m1: #6b4f9e; --m2: #4a4084; --m3: color-mix(in srgb, #4a4084, #4a3a78); --m4: #4a3a78; --m5: color-mix(in srgb, #4a3a78 60%, #3d2c63); --menu-dk: #231d44; }
+.home-menu .menu-btn { padding: var(--s2) var(--s5) calc(var(--s2) + 3 * var(--px)); font-size: 20px; letter-spacing: .06em; white-space: nowrap; min-width: 0;
+  background: var(--mb); border-color: var(--menu-dk); text-shadow: var(--px) var(--px) 0 var(--hilite);
+  box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 color-mix(in srgb, var(--mb) 70%, var(--menu-dk)); }
+.home-menu .menu-btn .kitty { color: var(--accent-text); }
+@media (hover: hover) { .home-menu .menu-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--mb) 80%, #fff); } }
+.perch { position: relative; }
+.perch .glow { display: block; filter: drop-shadow(0 0 calc(3 * var(--px)) rgba(255, 255, 255, .9)); }
+/* the chosen key keeps the same dark two-pixel outline as the others, with its white line just inside it */
+.perch .menu-btn { width: 100%;
+  box-shadow: inset 0 0 0 var(--bw) #fff, inset 0 calc(-3 * var(--px) - var(--bw)) 0 color-mix(in srgb, var(--mb) 70%, var(--menu-dk)); }
+.seat { position: relative; display: grid; }
+.seat .sitter { position: absolute; right: calc(5 * var(--u)); bottom: calc(100% - var(--px)); pointer-events: none; }
+.perch .wing { position: absolute; top: 50%; transform: translateY(-62%); pointer-events: none; }
+.perch .wing .pxs { width: calc(var(--w) * 2 * var(--px)); height: calc(var(--h) * 2 * var(--px)); }
+.perch .wing.l { right: calc(100% + var(--wing-gap)); }
+.perch .wing.r { left: calc(100% + var(--wing-gap)); transform: translateY(-62%) scaleX(-1); }
+.home-foot { text-align: center; font-size: 16px; }
+.pform { display: grid; gap: var(--s4); }
+</style>
+<div data-app-root="home" hidden>
+  <div class="wrap home">
+    <header class="top" id="home-top"></header>
+    <nav class="home-menu" id="home-menu" aria-label="Menu"></nav>
+    <p class="home-foot muted" id="home-foot"></p>
+  </div>
+</div>
+<!-- The player card opens from every screen (the person in each title bar), so it is outside the home page. -->
+<div id="home-modal" hidden></div>
+<div class="toast" id="home-toast" role="status" hidden></div>

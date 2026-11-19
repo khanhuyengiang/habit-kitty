@@ -1,0 +1,280 @@
+<!-- Kitty Achievement's part of the page: web/build.js puts it into page.html, after Habit Kitty's. -->
+<style data-app="achievement" media="not all">
+/* Kitty Achievement's own parts. The tokens, title bar, buttons, tabs, windows, fields and dialogs are in the shared
+   sheet in web/page.html, so it looks like every other screen; layout counts in --u, pictures in --px. */
+[data-app-root="achievement"] { image-rendering: pixelated; }
+.wrap { max-width: calc(250 * var(--u)); }
+#page { display: grid; gap: var(--s6); align-content: start; min-width: 0; }   /* the page's own blocks: one even rhythm between them */
+#status:empty { display: none; }
+.saving { font-size: 16px; color: var(--muted); }
+
+.icon-pick label > span, .swatch, .tag { border: var(--bw) solid var(--edge); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); }
+
+.btns { flex-wrap: wrap; }
+.btns.end { justify-content: flex-end; }
+.btns .grow { flex: 1 1 auto; }
+label.btn { cursor: pointer; }
+
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); flex-wrap: wrap; margin-bottom: calc(-1 * var(--s3)); }   /* a heading sits closer to what it names than the blocks do to each other */
+.save-filter { display: grid; gap: var(--s2); }
+.check { align-items: center; font-size: 18px; font-weight: 600; }
+
+/* quest sections */
+.quests { display: grid; gap: var(--s5); grid-template-columns: repeat(auto-fill, minmax(calc(78 * var(--u)), 1fr)); align-items: start; }
+.panel.quest { cursor: pointer; }
+.quest-title { background: none; border: 0; padding: 0; text-align: left; font: 700 24px/1.1 var(--font); color: var(--ink); overflow-wrap: anywhere; }
+.quest-title:hover { color: var(--accent-text); }
+.quest-info { display: grid; gap: var(--s2); }
+.quest-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s4); }
+.quest-head .quest-title { flex: 1; }
+.quick-add { flex: none; }
+.toggle { flex: none; width: calc(10 * var(--u)); height: calc(10 * var(--u)); display: grid; place-items: center; padding: 0; background: transparent; border: 0; color: var(--muted); }
+.toggle[aria-expanded="true"] .pxs { transform: rotate(180deg); }
+.sub { font-size: 18px; color: var(--muted); }
+.section-head .sub { font-size: 16px; }
+.btn.new-quest { width: 100%; }
+
+/* main page: one small block per achievement, the icon in its side quest's colour */
+.sides { display: grid; gap: var(--s4); }
+.side-box { display: grid; gap: var(--s3); padding: var(--s4); border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); background: var(--surface2); }
+.side-box h4 { margin: 0; font: 700 20px/1.1 var(--font); display: flex; align-items: center; gap: var(--s3); }
+.side-box h4 .n { margin-left: auto; font-size: 16px; font-weight: 400; color: var(--muted); }
+.blocks { display: flex; flex-wrap: wrap; gap: var(--s3); }
+.block { width: calc(12 * var(--u)); height: calc(12 * var(--u)); display: grid; place-items: center; padding: 0; background: var(--surface); border: var(--bw) solid var(--c); color: var(--c); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); }
+.block:hover { background: var(--accent-soft); }
+.block.planned { border-style: dashed; border-color: var(--line); color: var(--muted); opacity: .8; }
+.block.planned .pxs { filter: grayscale(1); }
+.blk-goal { position: absolute; left: var(--bw); bottom: var(--bw); height: var(--bw); width: calc((100% - 2 * var(--bw)) * var(--p)); background: var(--c); }
+.block.add { border-color: var(--line); color: var(--muted); background: transparent; border-style: dashed; }
+.block.add:hover { color: var(--accent-text); border-color: var(--accent-edge); }
+
+/* empty states */
+.empty { text-align: center; justify-items: center; padding: var(--s8) var(--s6); gap: var(--s4); }
+.empty p { color: var(--muted); max-width: 40ch; }
+
+/* quest page */
+.qbar { display: flex; justify-content: space-between; align-items: center; gap: var(--s4); }
+.qhead { display: grid; gap: var(--s3); }
+.qhead h2.big { font: 700 40px/1 var(--font); letter-spacing: .01em; text-transform: none; color: var(--ink); text-shadow: var(--px) var(--px) 0 var(--line); overflow-wrap: anywhere; }
+.qhead p { color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.menu { position: relative; }
+.menu summary { list-style: none; cursor: pointer; }
+.menu summary::-webkit-details-marker { display: none; }
+.menu-list { position: absolute; right: 0; top: calc(100% + var(--s1)); z-index: 5; min-width: calc(48 * var(--u)); display: grid; gap: var(--s2); padding: var(--s3); background: var(--surface); border: var(--bw) solid var(--edge); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); }
+.menu-list .btn, .menu-sheet .btn { justify-content: flex-start; }
+.menu-sheet { display: grid; gap: var(--s3); }
+.side-sec h3 .pxs { color: var(--c); }
+.tag { display: inline-block; padding: var(--s1) var(--s3); font-size: 14px; line-height: 1.3; border-color: var(--line); background: var(--surface2); color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.tag-sugs { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s2); }
+.tag-sug { padding: var(--s1) var(--s3); font-size: 16px; background: var(--surface2); color: var(--muted); border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); }
+.tag-sug:hover { color: var(--accent-text); border-color: var(--accent-edge); }
+dd.tags { display: flex; flex-wrap: wrap; gap: var(--s2); }
+dd.tags .tag { text-transform: none; letter-spacing: 0; font-size: 16px; }
+
+/* ---------- achievement cards ---------- */
+/* A trading card drawn as a little pixel camera: a screwed frame, a top bar (icon and name), a graph-paper screen
+   (date, picture, a few words) and a footer (place). Its pixel is --cu, about one --px, set from the screen width by the
+   app (see fitCards). Every colour comes from the side-quest colour (--sq), so all the cards of a side quest
+   match and recolouring repaints them; the rarity (--rar) only colours the stars and the glow. */
+/* The card is 108 of its own pixels wide, and its height leaves room for a 4:3 photo (the screen is 82 wide, so 61.5 tall) under a two-line note.
+   Its text is sized in the same pixels, so that stays true at every size. A short note gives the photo more room. */
+/* Every card is the same size wherever it is: the collection, the detail view and the form preview. */
+:root { --cu: var(--px); --card-w: calc(108 * var(--cu)); --cu-mini: var(--cu); }   /* --cu-mini: the collection's card pixel, which the big card's pictures keep */
+.card .pxs.fine { width: calc(var(--w) * var(--cu)); height: calc(var(--h) * var(--cu)); }
+.cards { display: grid; gap: var(--s5) var(--cgap, var(--s5)); grid-template-columns: repeat(var(--cols, auto-fill), var(--card-w)); justify-content: center; }
+.card { --cp: calc(2 * var(--cu)); --pad: calc(9 * var(--cu)); --sq: var(--sqc); --sq-ink: var(--sqi, #fff);
+  --dk: color-mix(in srgb, var(--sq) 30%, #231d44); --sql: color-mix(in srgb, var(--sq) 40%, #fff); --sqd: color-mix(in srgb, var(--sq) 70%, var(--dk));
+  --frame: color-mix(in srgb, var(--sq) 55%, var(--surface)); --hi: color-mix(in srgb, var(--sq) 22%, var(--surface)); --inner: var(--hi); --scr: var(--hi);
+  --dith: color-mix(in srgb, var(--dk) 28%, transparent);
+  --panel: color-mix(in srgb, var(--sq) 9%, var(--surface)); --gl: color-mix(in srgb, var(--sq) 16%, var(--surface));
+  --txt: color-mix(in srgb, var(--sq) 50%, var(--ink));
+  /* the frame and its three boxes: one-pixel outlines with one pixel cut from every corner */
+  --fnotch: polygon(0 var(--cu), var(--cu) var(--cu), var(--cu) 0, calc(100% - var(--cu)) 0, calc(100% - var(--cu)) var(--cu), 100% var(--cu),
+    100% calc(100% - var(--cu)), calc(100% - var(--cu)) calc(100% - var(--cu)), calc(100% - var(--cu)) 100%, var(--cu) 100%, var(--cu) calc(100% - var(--cu)), 0 calc(100% - var(--cu)));
+  position: relative; display: block; flex: none; width: calc(108 * var(--cu)); height: calc(182.5 * var(--cu)); padding: var(--pad); border: 0; text-align: left; background: none;
+  color: var(--txt); cursor: pointer; }
+/* the boxes' corner pixels, so their two-pixel outlines stay two pixels round the corners (see page.html) */
+.icon-pick label > span, .swatch, .tag, .side-box, .block, .tag-sug, .chip, .icon-fold > summary, .gallery button, .manage li { position: relative; }
+.icon-pick label > span::after, .swatch::after, .tag::after, .side-box::after, .block::after, .menu-list::after, .tag-sug::after, .chip::after, .photo::after, .icon-fold > summary::after, .gallery button::after, .manage li::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; border: var(--bw) solid; border-color: inherit;
+  -webkit-mask-box-image: var(--patch-box); }
+/* the frame is its own layer: the glow (a drop-shadow on the card) follows the frame's notched outline, which a clip-path on the card itself would cut off */
+.card::before { content: ""; position: absolute; inset: 0; background: var(--frame); box-shadow: inset 0 0 0 var(--cu) var(--dk), inset 0 0 0 calc(2 * var(--cu)) var(--inner); clip-path: var(--fnotch); }
+.card > span { display: block; }
+.card .crn { position: absolute; }
+.card .crn.tl { top: 0; left: 0; } .card .crn.tr { top: 0; right: 0; } .card .crn.bl { bottom: 0; left: 0; } .card .crn.br { bottom: 0; right: 0; }
+/* the main quest's name, faint on the frame along both long edges (between the corner screws) */
+.card .rim { position: absolute !important; top: calc(24 * var(--cu)); bottom: calc(24 * var(--cu)); width: calc(var(--pad) - 2 * var(--cu)); display: block !important;
+  writing-mode: vertical-rl; text-align: center; font: 700 max(12px, calc(8.5 * var(--cu)))/calc(var(--pad) - 2 * var(--cu)) var(--font); letter-spacing: .14em; text-indent: .14em; text-transform: uppercase; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; color: var(--dk); opacity: .42; pointer-events: none; }
+.card .stars { position: absolute !important; top: calc(2 * var(--cu)); left: 0; right: 0; height: calc(7 * var(--cu)); display: flex !important; justify-content: center; align-items: center; gap: calc(2 * var(--cu)); pointer-events: none; }
+.card .rim.l { left: calc(2.15 * var(--cu)); transform: rotate(180deg); } .card .rim.r { right: calc(2 * var(--cu)); }
+.card-in { display: grid !important; grid-template-rows: auto minmax(0, 1fr) auto; gap: calc(2 * var(--cu)); height: 100%; position: relative; }
+.card-head, .card-screen, .card-foot { border: var(--cu) solid var(--dk); clip-path: var(--fnotch); min-width: 0; }
+.card:hover { transform: translateY(calc(-1 * var(--cp))); }
+.card:focus-visible { outline-offset: calc(-1 * var(--cp)); }
+.card.static { cursor: default; }
+.card.static:hover { transform: none; }
+.card-head { height: calc(33 * var(--cu)); overflow: hidden; display: flex !important; align-items: center; gap: calc(3 * var(--cu)); padding: calc(2 * var(--cu)) calc(3 * var(--cu));
+  background: var(--panel); box-shadow: inset 0 calc(-1 * var(--cu)) 0 var(--gl); min-height: calc(11 * var(--cp)); }
+.card-title { flex: 1; font: 700 calc(6.3 * var(--cp))/1.05 var(--font); color: var(--txt); overflow: hidden; display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.card-screen { position: relative; overflow: hidden; display: grid !important; grid-template-rows: auto minmax(calc(36 * var(--cu)), 1fr) auto; padding: calc(2 * var(--cu)) calc(3 * var(--cu)) calc(3 * var(--cu));
+  background:
+    linear-gradient(var(--gl) var(--cu), transparent 0) calc(-1 * var(--cu)) calc(-1 * var(--cu)) / calc(8 * var(--cu)) calc(8 * var(--cu)),
+    linear-gradient(90deg, var(--gl) var(--cu), transparent 0) calc(-1 * var(--cu)) calc(-1 * var(--cu)) / calc(8 * var(--cu)) calc(8 * var(--cu)),
+    var(--panel); }
+.card-row { display: flex !important; align-items: center; gap: calc(2 * var(--cu)); min-width: 0; }
+/* a counted achievement: a pixel bar in the side quest's colour and the count, left of the date */
+.card-goal { flex: 1; min-width: 0; display: flex !important; align-items: center; gap: calc(2 * var(--cu)); }
+.goal-bar { flex: 1; min-width: calc(10 * var(--cu)); height: calc(5 * var(--cu)); display: block !important; border: var(--cu) solid var(--dk); background: var(--panel); clip-path: var(--fnotch); }
+.goal-bar > i { display: block; height: 100%; background: var(--sq); }
+.goal-n { font-size: max(12px, calc(4.7 * var(--cp))); line-height: 1; color: var(--txt); white-space: nowrap; }
+.card:not(.big) .card-goal ~ .card-count { display: none !important; }   /* a small card has no room for both: the count wins, the date is on its page */
+.card.big .goal-n { font-size: 18px; }
+.card.big .goal-bar { height: calc(7 * var(--cu)); }
+.card-count { margin-left: auto; white-space: nowrap; justify-self: end; font-size: max(12px, calc(4.7 * var(--cp))); line-height: 1; letter-spacing: .04em; color: var(--txt); opacity: .85; min-height: 1em; }
+.card-art { position: relative; display: grid !important; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; overflow: hidden; min-height: 0; }
+.card-art > .pxs { grid-area: 1 / 1; }
+.card-deco { position: absolute !important; left: 0; bottom: 0; display: flex !important; gap: var(--cu); align-items: end; }
+.card-art .burst { max-width: none; }
+/* the photo is framed on all four sides, with its corner pixels cut like the other boxes; its icons sit one pixel inside the frame */
+.card-art img { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box; object-fit: cover; border: var(--cu) solid var(--dk); clip-path: var(--fnotch); }
+.card-art.has-photo .card-deco { left: calc(2 * var(--cu)); bottom: calc(2 * var(--cu)); }
+.card-desc { color: var(--txt); text-align: center; font-size: max(12px, calc(5.3 * var(--cp))); line-height: 1.1; overflow: hidden; display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.card-foot { height: calc(26 * var(--cu)); display: flex !important; align-items: center; gap: calc(3 * var(--cu)); padding: calc(2 * var(--cu)) calc(3 * var(--cu)); background: var(--panel); box-shadow: inset 0 var(--cu) 0 var(--gl); }
+.card-foot > span:first-child { white-space: nowrap; }
+.card-place { flex: 1; min-width: 0; font-size: max(12px, calc(4.7 * var(--cp))); line-height: 1.1; letter-spacing: .05em; text-transform: uppercase; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lockmark { position: absolute !important; right: var(--cp); bottom: var(--cp); width: calc(9 * var(--cp)); height: calc(9 * var(--cp)); display: grid !important; place-items: center; background: var(--surface); color: var(--muted); border: var(--cp) solid var(--line); }
+.lockmark .pxs { width: calc(7 * var(--cp)); }
+
+/* Rarity: the stars are in --rar (set on the card: grey, green, blue, purple, yellow). Everything above common also glows in that colour,
+   the same size for all of them: a bit of strong colour next to the card, fading out. Common has no glow. */
+.card.rar-uncommon, .card.rar-rare, .card.rar-mythical, .card.rar-legendary {
+  filter: drop-shadow(0 0 calc(2 * var(--cu)) color-mix(in srgb, var(--rar) 90%, transparent)) drop-shadow(0 0 calc(4 * var(--cu)) color-mix(in srgb, var(--rar) 45%, transparent)); }
+
+/* planned: greyed out, a slot waiting to be filled */
+.card.planned { --frame: var(--line); --sq: color-mix(in srgb, var(--sqc) 28%, #b4b0c2); --sq-ink: #231d44; }
+.card.planned .card-in { filter: saturate(.15); opacity: .8; }
+.card.planned .card-art img { opacity: .55; filter: grayscale(1) contrast(.9) brightness(1.08); }
+.card.planned .card-title { font-weight: 400; }
+
+/* the moment a planned card is unlocked: colour floods back in, in a few steps */
+@media (prefers-reduced-motion: no-preference) {
+  .card.unlock .card-in { animation: unlock .7s steps(7) 1; }
+  @keyframes unlock { from { filter: saturate(.15); opacity: .8; } to { filter: saturate(1); opacity: 1; } }
+}
+
+/* forms */
+.panel form { display: grid; gap: var(--s5); }
+.field textarea { resize: vertical; min-height: calc(20 * var(--u)); }
+.field select:disabled, .field input:disabled { opacity: .6; }
+.field [aria-invalid="true"] { --bc: var(--bad); }
+.hint { font-size: 16px; font-weight: 400; color: var(--muted); }
+.panel .sub { margin: var(--s2) 0 0; font: 700 18px/1 var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.hint:empty, .err:empty { display: none; }
+.err { color: var(--bad); font-size: 18px; font-weight: 600; }
+@media (max-width: 420px) { .row { grid-template-columns: 1fr; } }
+details.panel .manage { margin-top: var(--s4); }
+.chips .rar-dot { width: var(--s3); height: var(--s3); background: var(--r); }
+.chip { display: inline-flex; align-items: center; gap: var(--s2); padding: var(--s2) var(--s3); background: var(--surface); border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); font-size: 18px; font-weight: 600; }
+.icon-pick label, .swatches label { position: relative; display: inline-flex; cursor: pointer; }
+.icon-pick input, .swatches input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.icon-pick input:focus-visible + span, .swatches input:focus-visible + span { outline: var(--bw) solid var(--accent-text); outline-offset: calc(-2 * var(--bw)); }
+.icon-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(14 * var(--u)), 1fr)); gap: var(--s3); }
+.icon-pick label > span { width: 100%; height: calc(14 * var(--u)); display: grid; place-items: center; border-color: var(--line); background: var(--surface2); color: var(--edge); }
+.icon-pick label:hover > span { border-color: var(--edge); }
+.icon-pick input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); }
+.swatches { display: flex; flex-wrap: wrap; gap: var(--s3); align-items: center; }
+.swatch { display: block; width: calc(9 * var(--u)); height: calc(9 * var(--u)); background: var(--c); border-color: var(--line); }
+.swatches input:checked + .swatch { border-color: var(--ink); box-shadow: inset 0 0 0 var(--px) var(--surface); }
+.swatches input[type="color"] { position: static; opacity: 1; width: calc(11 * var(--u)); height: calc(9 * var(--u)); padding: 0; border: var(--bw) solid var(--edge); background: none; }
+.photo-list { display: flex; flex-wrap: wrap; gap: var(--s3); }
+.photo { position: relative; width: calc(22 * var(--u)); height: calc(22 * var(--u)); border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); overflow: hidden; }
+.photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo button { position: absolute; top: 0; right: 0; width: calc(8 * var(--u)); height: calc(8 * var(--u)); padding: 0; display: grid; place-items: center; background: var(--surface); border: 0; border-left: var(--bw) solid var(--line); border-bottom: var(--bw) solid var(--line); }
+.file { display: inline-flex; }
+.preview-wrap { display: grid; justify-items: center; background: var(--surface2); padding: var(--s3); border: var(--px) dashed var(--line); }
+.preview-wrap .card { --cu: var(--cu-prev, 1px); }   /* the preview is the card at two thirds of its size, so it fits above the options */
+
+/* dialogs */
+.scrim .panel.wide { width: min(calc(190 * var(--u)), 100%); }
+/* the form for an achievement: the card stays at the top and only the options scroll, with the buttons pinned below */
+.scrim .panel.form-panel { padding: 0; overflow: hidden; display: flex; flex-direction: column; max-height: calc(100vh - 2 * var(--s4)); max-height: calc(100dvh - 2 * var(--s4)); }
+.form-panel > form.stable { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; gap: 0; }
+.form-top { flex: none; display: grid; gap: var(--s4); padding: var(--s5) var(--s5) var(--s4); border-bottom: var(--px) solid var(--line); }
+.form-top h3 { padding-right: calc(12 * var(--u)); }
+.form-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; gap: var(--s5); align-content: start; padding: var(--s5); }
+.form-actions { flex: none; padding: var(--s4) var(--s5); border-top: var(--px) solid var(--line); }
+/* the icon list: the chosen icon is the button that opens it */
+.icon-fold > summary { list-style: none; display: flex; align-items: center; gap: var(--s4); padding: var(--s3) var(--s4); cursor: pointer; border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); background: var(--surface2); color: var(--edge); font-weight: 700; font-size: 18px; }
+.icon-fold > summary::-webkit-details-marker { display: none; }
+.icon-fold > summary:hover { border-color: var(--edge); }
+.fold-name { flex: 1; color: var(--ink); }
+.fold-chev { color: var(--muted); }
+.icon-fold[open] .fold-chev .pxs { transform: rotate(180deg); }
+.icon-fold > .icon-pick { margin-top: var(--s4); }
+/* an achievement on its own page: the buttons, the card drawn big with all of its words, its photos and the facts */
+.ctools { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
+.ctools .grow { flex: 1; }
+.goal-panel { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); flex-wrap: wrap; width: 100%; max-width: calc(216 * var(--px)); justify-self: center; }
+.goal-big { margin: 0; font-size: 28px; display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.facts { display: grid; gap: var(--s4); width: 100%; max-width: calc(216 * var(--px)); justify-self: center; }   /* as wide as the big card */
+.facts dl { display: grid; grid-template-columns: auto 1fr; gap: var(--s2) var(--s5); margin: 0; font-size: 18px; }
+.facts dt { color: var(--muted); } .facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+#page > .gallery { justify-content: center; }
+/* The big card: the card's frame drawn at the pixel of inspo/achivement_card.jpg (as wide as 108 of them, as the card always is)
+   and as tall as its words, so nothing is cut short. Its frame and its three boxes have the inspo's border (see "The big windows' borders"
+   in page.html): one-pixel outlines with stepped corners, the frame lit along the top and left, each box with a soft line inside
+   all round (stepping in at its corners) and a shadow just outside along the top and left; its screws and checkers are the inspo's
+   too (cornerSvg). The words and pictures keep their usual sizes. */
+.card.big { --cu: calc(2 * var(--px)); --rp: var(--cu); --pad: calc(8 * var(--cu));   /* a narrower frame: the screws sit in the boxes' corners */
+  --rose: color-mix(in oklch, var(--sq) 40%, var(--dk));
+  width: 100%; max-width: calc(108 * var(--cu)); height: auto; min-height: calc(160 * var(--cu)); justify-self: center; display: flex; flex-direction: column; }
+@supports (color: oklch(from red l c h)) { .card.big { --rose: oklch(from var(--sq) calc(l * .58) calc(c * .8) h); } }   /* the side quest's own hue, deeper */
+.card.big::before { --o: var(--dk); --hl: var(--hi); --sh: color-mix(in srgb, var(--frame) 80%, var(--dk)); --fill: var(--frame); box-shadow: none; }
+.card.big .card-in { flex: 1; height: auto; grid-template-rows: auto 1fr auto; gap: calc(3 * var(--cu));
+  filter: drop-shadow(calc(-1 * var(--cu)) calc(-1 * var(--cu)) 0 color-mix(in srgb, var(--frame) 70%, var(--dk))); }
+.card.big.planned .card-in { filter: saturate(.15) drop-shadow(calc(-1 * var(--cu)) calc(-1 * var(--cu)) 0 color-mix(in srgb, var(--frame) 70%, var(--dk))); }
+.card.big :is(.card-head, .card-screen, .card-foot) { --o: var(--rose); --hl: color-mix(in srgb, var(--sq) 30%, var(--surface)); --sh: var(--hl); --hc: var(--hl); --fill: var(--panel);
+  border: 0; box-shadow: none; }
+.card.big .card-head { height: auto; min-height: calc(20 * var(--cu)); padding: calc(3 * var(--cu)) calc(4 * var(--cu)); gap: calc(3 * var(--cu)); }
+.card.big .card-title { font-size: 24px; line-height: 1.05; }   /* as big as a note's title */
+/* the pictures inside (the icons, the burst, the heart and flower) stay the size they are on the card in the collection */
+.card.big .card-in .pxs.fine { width: calc(var(--w) * var(--cu-mini)); height: calc(var(--h) * var(--cu-mini)); }
+/* the card's picture: the icon at its own size, zoomed to twice as big (each of its pixels two card pixels) */
+.card .card-art > .pxs.fine.zoom { width: calc(var(--w) * 2 * var(--cu)); height: calc(var(--h) * 2 * var(--cu)); }
+.card.big .card-in .card-art > .pxs.fine.zoom { width: calc(var(--w) * 2 * var(--cu-mini)); height: calc(var(--h) * 2 * var(--cu-mini)); }
+.card.big .card-title, .card.big .card-desc { display: block !important; -webkit-line-clamp: unset; line-clamp: none; overflow: visible; }
+.card.big .card-screen { --fill:
+    linear-gradient(var(--gl) var(--cu), transparent 0) calc(-1 * var(--cu)) calc(-1 * var(--cu)) / calc(8 * var(--cu)) calc(8 * var(--cu)),
+    linear-gradient(90deg, var(--gl) var(--cu), transparent 0) calc(-1 * var(--cu)) calc(-1 * var(--cu)) / calc(8 * var(--cu)) calc(8 * var(--cu)),
+    var(--panel);
+  grid-template-rows: auto 1fr auto; gap: calc(3 * var(--cu)); padding: calc(3 * var(--cu)) calc(4 * var(--cu)) calc(5 * var(--cu)); }
+.card.big .card-count { font-size: 18px; }
+.card.big .card-art { min-height: calc(62 * var(--cu-mini)); }
+.card.big .card-art.has-photo { aspect-ratio: 4 / 3; }
+.card.big .card-art img { border-color: var(--rose); }
+.card.big .card-desc { font-size: 20px; white-space: pre-wrap; line-height: 1.25; }
+.card.big .card-foot { height: auto; min-height: calc(18 * var(--cu)); padding: calc(3 * var(--cu)) calc(4 * var(--cu)); }
+.card.big .card-place { font-size: 18px; white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+.card.big .rim { font-size: 14px; }
+/* the rarity stars: drawn at the page's pixel, centred in the frame above the title's box (whose shadow starts one pixel above it) */
+.card.big .stars { top: calc(2 * var(--cu)); height: calc(var(--pad) - 3 * var(--cu)); gap: calc(2 * var(--px)); }
+.card.big .stars .pxs.fine { width: calc(var(--w) * var(--px)); height: calc(var(--h) * var(--px)); }
+.gallery { display: flex; gap: var(--s3); flex-wrap: wrap; }
+.gallery button { padding: 0; width: calc(12 * var(--u)); height: calc(12 * var(--u)); border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); background: none; overflow: hidden; }
+.gallery button[aria-current="true"] { border-color: var(--accent-edge); }
+.gallery img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.manage { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s4); }
+.manage li { display: grid; gap: var(--s3); padding: var(--s4); border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); background: var(--surface2); }
+.manage li.arch { opacity: .7; }
+.manage .nm { display: flex; align-items: center; gap: var(--s3); font-weight: 700; overflow-wrap: anywhere; color: var(--ink); }
+.manage .nm .pxs { color: var(--c); }
+.side-ico { display: inline-flex; }
+.loading { display: grid; place-items: center; min-height: 40vh; color: var(--muted); }
+</style>
+<div data-app-root="achievement" hidden>
+<div id="app" class="wrap"><p class="loading">Loading…</p></div>
+<div id="layer-modal"></div>
+<div class="toast" id="ach-toast" role="status" aria-live="polite" hidden></div>
+</div>

@@ -2,6 +2,84 @@
 
 Newest first. The app bundles this file: it shows the latest entry once after an update, and the whole list under Settings → Change log.
 
+## 0.6.0 - 2026-11-16
+
+### New
+- **Kitty Gallery.** A new key on the home page: draw your own pixel art and change the app's own. Stickers, mini stickers (the card friends), button icons, weather, decorations and Habit Kitty's scenes each have their own tab, with the icons in groups (**default** and **user** to start). What you draw is used everywhere in the app straight away. **Colours** lists every colour in the app.
+- **Kitty Gallery: Select.** A tool on the drawing board: drag a box over part of a drawing, then drag it (or use the arrows) to move it over the rest without wiping it. Flip, **Duplicate** or **Delete** just that part; **Select all** moves the whole drawing. One Undo takes back the whole move.
+- **Kitty Gallery: Organise.** Tap icons to pick them (or **Pick all** in a group), then **Move** them to another group, **Delete** them, or make stickers cat food or not, in one go. The group of an icon is a dropdown, with **New group…** to make one.
+- **Kitty Gallery: delete official icons.** An official sticker or weather can be deleted: the app stops showing and using it, and anything that had it shows a heart. Deleted ones wait under **Deleted**, to bring back with your changes. The heart can't be deleted.
+- **Kitty Gallery: cat food.** Tick **Can kitty eat this?** on a sticker and Habit Kitty's feed button can serve it. Every kitty still gets a different food each day.
+- **Kitty Gallery: your own weather.** Draw new weather for Meteorokinesis, and it turns up on every diary page.
+- **Kitty Gallery: scenes.** The cosy room and the garden are redrawn, bigger and more detailed, so the kitties are small in a cosy world. In Kitty Gallery you can draw on them, **Use a photo…** to turn a photo into pixel art in the app's colours, and place the **Kitty spots** where the kitties sit (and, in the room, the diary book and the trophy). The home-screen widget shows the new room.
+- **Kitty Gallery: decorations.** The wings beside the chosen app on the home page can be redrawn.
+- **Kitty Gallery: safe imports.** **Export icons** saves your icons in their own file and **Import icons** reads one back. Before an import replaces icons you've changed or drawn yourself, Kitty Gallery lists them and asks: **Replace** yours, **Keep both** (the file's comes in as a new icon), or **Cancel**. No two icons in a category can share a name. If two ever do, they become "Star 1" and "Star 2".
+- **Kitty Gallery: more colours.** Every note colour (pink, lavender, sky, mint, sun, peach) can be drawn in, lit or shaded, and there is a new lime green and a light and a dark red. The colours are listed three to a row in rainbow order, the base colour on top, and **Choose a colour…** opens every other colour of the app, with the ones you picked before at the top.
+- **Kitty Gallery: tool icons.** Pencil, Eraser, Fill, Pick, Select and Mirror are icons, so the drawing bar fits a phone without scrolling.
+- **Kitty Gallery: Reset to original.** Settings → Kitty Gallery puts every icon back as it comes with the app. **Reset changed icons** keeps the icons you drew yourself; **Reset and delete my own icons** clears those too.
+- **New sticker icons.** A cute dessert group (strawberry cake, macaron, sundae, pancake, flan, chocolates, paw coffee, honey jar, rabbit tanghulu and a drink), plus a rabbit, two chickens and a bee. The other icons are redrawn and sorted into groups.
+- **Counted achievements.** Give an achievement a **Goal (times)**, like 10 marathons or 100 pasta meals. Its page has **−1** and **+1** to count, and the card shows a pixel bar with the count. When a locked card reaches its goal, the app offers to unlock it.
+- **Diary: an icon instead of a photo.** Under **Picture**, choose **Photo** or **Icon**. A page with an icon shows that sticker, and its day turns pink like a written page. Saving with an icon removes the page's photos.
+- **Settings file.** Settings → Backup → **Settings only** saves a small **.kittyset** file with how your app looks and works: the look, Habit Kitty options and sounds, your day and room names, diary options and emotion names, Kitty Mart categories and aisle order, and your Kitty Gallery icons. It holds nothing personal (no kitties, diary, notes, shopping lists or achievements), so you can give it to someone else or a new phone. **Load settings…** asks which parts to take.
+- **Kitty Mart: aisle order per supermarket.** **List… → Category order** puts the categories the way you walk through that shop. Every supermarket has its own; **Use the pantry's order** goes back. The pantry has its own order under **Arrange**.
+- **Fancy background and every Diary option on to start.** New installs start with the fancy background, and a new diary starts with Meteorokinesis, Teleportation, Photographer, Titles and Starry Nights on. Each can be turned off in Settings.
+
+### Changed
+- **The backup holds Kitty Gallery too.** The .kitty file now carries your icons and scenes, and restoring it puts them back. Older backups still load.
+- **Stickers are 18 × 18.** Icons you drew at 16 × 16 keep their look: **Add border to all** in Kitty Gallery gives them their border and edges.
+- **Icon pickers in groups.** The icon lists in notes, Kitty Achievement and Kitty Mart show a heading over each group, so an icon is quicker to find. A card's big picture is the icon itself, zoomed in, rather than a smoothed redraw.
+- **Cancel on the Undo notice** in Kitty Gallery and Kitty Mart puts it away until the next change.
+- **Home and Player stat buttons** use the new button icons.
+
+## 0.5.1 - 2026-11-11
+
+### New
+- **Kitty Mart.** Shopping Lists is here, on the home page, with four tabs: Lists, Recipes, Pantry and Regulars.
+- **Kitty Mart: Lists**: one shopping list per supermarket. Type "2 milk" or "500 g flour" to add something; items are sorted by category, in the order you walk through the shop. Tick what goes in the basket, then **Shopping trip done** clears it (and keeps or deletes what you didn't buy). Each row has a **×** to delete it outright. An item on two lists is flagged. **List… → Share list** sends a list as text, and **Paste a shared list** reads one back.
+- **Kitty Mart: Suggestions** on top of the lists: what you mark as running low, reminders, "always buy" items, and things you buy every so often.
+- **Kitty Mart: Recipes**: save the ingredients, then add only what you don't have and isn't on the list yet, in one tap.
+- **Kitty Mart: Pantry**: what you have at home, as a card per category. Make your own categories and sub-categories, with a picture and a colour. **−** and **+** count things down, **Low?** puts them in the suggestions, and what you used up waits under **Had before** to go back in. Switch to **List** to see everything at home on one page. Untick **Show empty categories** to hide the empty cards. **Fill from shopping trips** puts what you bought in here. Wherever you put an item, Kitty Mart remembers it for that item everywhere.
+- **Kitty Mart: Regulars**: everything you've bought, with favourites, "always buy", "every 2 weeks" and reminders.
+- **Share as a picture.** An open note and an achievement's big card each have a **Share** button that saves the card as an image, to send or keep.
+- **Mute all.** Settings → Sound → **Mute all** turns every sound off at once and keeps your volumes for when you turn it back on.
+- **Change how often a stray comes.** Press and hold a stray kitty → **Change how often**: every day, every few days, or on certain weekdays. Its history stays as it is.
+- **Notes as little windows.** Each note is a window card with its own colour, an icon or picture, a kitty in the title bar, a doodle in the corner and a date. The card's look is stored in the note's `.md` file, so it travels with folder sync and backups.
+- **Diary options** (Settings → Diary): **Teleportation** adds a location to each page, **Photographer** lets a page hold 1, 2 or 4 photos, **Titles** adds a title, and **Starry Nights** lets you star a day (yellow for an exceptionally good one, blue for a bad one), with the starred days listed under Memorable days. A diary page can also link to notes.
+- **Settings → Look.** Light or dark (or follow the device), and a fancy background with sparkles, clouds and hearts.
+
+### Changed
+- **New home menu** with long pixel keys; the app you used last is highlighted.
+- **Kitty Achievement cards** open on their own page, drawn big with every word on them, and the collection fits two cards to a row on most phones. Side quest colours moved to the app's palette.
+- **Trackamaniac is now Meteorokinesis**, and the weather has a windy choice.
+- **Achievement Kitty is now Kitty Achievement** everywhere.
+
+## 0.5.0 - 2026-11-05
+
+### New
+- **Diary has its own screen.** The Diary button on the home page opens it; it is no longer a tab in Habit Kitty, which now has Room, Strays, Today and Heatmap. Your pages, photos, Trackamaniac setting and emotion names carry over by themselves, and the backup holds all of it.
+- **Journal.** The home page's Diary button is now **Journal**, with two tabs at the top: **Diary** and **Notes** (Simple Notes moved in here).
+- **Monthly reflection.** Under the calendar, a note for the month (what went well, what was hard, what to change), with a tally of the moods you picked.
+- **Birthdays.** Add the people whose birthdays you want to remember (the year is optional). A cake marks the day on the calendar and on that day's page, and the next three are listed in the Birthdays section at the bottom.
+- **Simple Notes.** A new screen on the home page: a list of notes with a search box, and an editor that saves as you type, with a Markdown preview. Each note is one `.md` file named after its title, and notes are part of the backup. On Android, **Settings → Notes → Sync with the notes folder** keeps them in step with the **Notes** folder inside your backup folder, so you can open it as a vault in Obsidian. A note changed on both sides keeps both versions; deleting in Obsidian does not delete in the app. Notes can also be exported (.zip) and imported (.md).
+- **A new top bar in Habit Kitty.** **Kitty**, **Stray**, **Treats**, and, only when they apply, **Pet sitter** (a kitty is with the sitter) and **Memory** (a kitty died, ran away or went to the shelter) replace the tab bar at the bottom. Kitty and Stray each have **List**, a room (the **Cosy Room** and the **Garden**) and **Heatmap**; the Heatmap of each shows only its own kitties.
+- **Home page.** The app now opens on a home page with big pixel buttons: Habit Kitty, Diary, Achievements, and Simple Notes and Shopping Lists (coming soon). The trophy and kitty buttons in the two apps are now a **home button** that brings you back here, and Android's back button goes home too.
+- **One player for every app.** Your name, picture, age, gender and player ID are the same everywhere. The **Player Stat** button on the home page opens your player card; tap the pencil there to edit it.
+- **Lv, HP and MP, the same everywhere.** Each screen has one bar on top with the same text: **HP 397** and "97/300 to lvl 3" in Habit Kitty, **MP 34** in the Diary tab, **Lv 4** in Kitty Achievement. The number is always your running total: affection, days written in the diary, and (for Lv) the achievements unlocked. Level comes from achievements, HP from affection, and MP from diary days (10 days to leave level 1, 20 for level 2, 30 for level 3 …).
+
+### Changed
+- **Kitties, strays and treats work the same way.** Their cards have the same layout, and long-pressing any of them opens the same menu (Heatmap, Options). Treats now have a menu too. **Time travel** is one rewind button in the same place on a kitty, a stray and a treat (it used to be on strays and treats only, and in the menu for kitties), and also in each menu.
+- **One Settings screen.** The gear in every screen (home, Habit Kitty, Diary, Kitty Achievement) opens the same Settings, with the shared options (Sound, Your day, Backup, Change log) first and a button for each mini-app below them: Habit Kitty (reminders, game options, how to use), Diary (Trackamaniac, emotion names) and Achievements (load achievements only). The back arrow returns to the screen you came from.
+- **Diary: Birthdays** moved to the bottom of the page and starts closed.
+- **Start over** in Habit Kitty's settings no longer deletes your diary: it only resets the kitties and progress.
+
+## 0.4.2 - 2026-11-05
+
+### New
+- **One backup for both apps.** The .kitty file now also holds Kitty Achievement's quests, achievements and photos. Restoring it brings both back (the app reloads once). Older Habit Kitty files and Kitty Achievement save files still load.
+- **Save to device.** Settings → Backup → **Save to device…** (in both Habit Kitty and Kitty Achievement) opens the phone's own save dialog, so you choose the folder (Downloads, Documents, an SD card…). **Share…** is still there for Drive, Bluetooth and mail.
+- **Auto-backup.** Pick a backup folder once (Settings → Backup → **Choose backup folder**) and one fresh dated file is saved there whenever you leave the app after changing something, plus once when the app opens if the last one is a day old. The newest 7 days are kept. **Back up now** and **Restore from folder…** are next to it.
+- If the folder can't be reached (deleted, or the card is out), the app tells you instead of failing quietly.
+
 ## 0.4.1 - 2026-10-29
 
 ### New
