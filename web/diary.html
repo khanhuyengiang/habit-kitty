@@ -60,6 +60,7 @@
   .diary-body > * { grid-column: 2; }
   .diary-body > .meter { grid-column: 1 / -1; }
   .diary-body > .cat:has(.month) { grid-column: 1; grid-row: 2 / -1; }
+  .diary-body > .cat:has(.month) { width: 100%; max-width: 560px; justify-self: center; }   /* keep the days a sensible size instead of stretching with the column */
 }
 </style>
 <div data-app-root="diary" hidden>
