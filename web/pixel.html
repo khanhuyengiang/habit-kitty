@@ -60,8 +60,13 @@
   touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair;
   background: repeating-conic-gradient(var(--surface) 0 25%, var(--surface2) 0 50%) 0 0 / calc(200% / var(--bw-cells)) calc(200% / var(--bh-cells));
   box-shadow: 0 0 0 var(--bw) var(--edge); }
-.pix-board > i { display: block; box-shadow: inset 0 0 0 .5px var(--grid); }
+.pix-board > i { display: block; box-shadow: inset 0 0 0 .5px var(--grid); position: relative; }
+/* onion skin: the previous frame, behind the cells (they are positioned after it), so only empty cells show it */
+.pix-onion { position: absolute; inset: 0; opacity: .5; pointer-events: none; }
+.pix-onion .pxs { display: block; width: 100%; height: 100%; }
 .pix-board { position: relative; overflow: hidden; }
+/* the point of tracking: a ring on its cell */
+.pix-pin { position: absolute; box-sizing: border-box; border: 2px solid var(--accent-text); border-radius: 50%; box-shadow: 0 0 0 1px var(--surface), inset 0 0 0 1px var(--surface); pointer-events: none; }
 /* the selection: a dashed box (on a light edge, so it shows on any colour); lifted, it is tinted and can be dragged */
 .pix-sel { position: absolute; box-sizing: border-box; border: 2px dashed var(--accent-text); box-shadow: 0 0 0 1px var(--surface), inset 0 0 0 1px var(--surface); cursor: move; }
 .pix-sel.lifted { background: color-mix(in srgb, var(--accent) 16%, transparent); }
@@ -72,6 +77,21 @@
 .pix-board.scene[data-tool="pan"] { cursor: grab; }
 .pix-board.spots { cursor: pointer; }
 .pix-zooms, .pix-modes { margin-block: var(--s2); }
+/* a kitty animation: frames and the sequence are strips of small named pictures */
+.pix-framebar { display: grid; gap: var(--s2); }
+.pix-fstrip { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.pix-fchip { display: grid; justify-items: center; gap: var(--s1); padding: var(--s2); min-width: 64px; max-width: 110px; background: var(--surface); border: var(--px) solid var(--line); color: var(--ink); font: inherit; cursor: pointer; }
+.pix-fchip[aria-pressed="true"] { border-color: var(--accent-text); box-shadow: inset 0 0 0 var(--px) var(--accent-text); background: var(--accent-soft); }
+.pix-fchip span:not(.pix-fth) { font-size: 16px; line-height: 1.1; overflow-wrap: anywhere; text-align: center; }
+.pix-fchip .num { font-size: 14px; color: var(--muted); }
+.pix-fth { display: grid; place-items: center; width: 56px; height: 56px; background: repeating-conic-gradient(var(--surface) 0 25%, var(--surface2) 0 50%) 0 0 / 8px 8px; }
+.pix-fth .pxs { width: 100%; height: 100%; }
+.pix-animview { display: grid; grid-template-columns: auto 1fr; gap: var(--s4); align-items: start; }
+.pix-animbox { display: grid; gap: var(--s2); width: min-content; max-width: 100%; }
+/* the canvas is the board's size (twice its pixels) and never changes: the picture inside it does */
+.pix-anim { width: calc(var(--w) * var(--px) * 2); max-width: 100%; aspect-ratio: var(--w) / var(--h); background: repeating-conic-gradient(var(--surface) 0 25%, var(--surface2) 0 50%) 0 0 / 12px 12px; }
+.pix-anim .pxs { width: 100%; height: 100%; }
+.pix-animcap { margin: 0; width: 0; min-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
 /* the kitty spots: a see-through kitty on each, numbered; the picked one outlined */
 .pix-marks { position: absolute; inset: 0; pointer-events: none; }
 .pix-spot { position: absolute; opacity: .8; }

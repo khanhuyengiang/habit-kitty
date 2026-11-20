@@ -3,7 +3,7 @@ import { PICKER_ICONS, PICKER_ICON_NAMES } from '../shared/sticker-icons.ts';
 import {
   BASE_ROWS, INK_ROWS, MORE_INKS, byHue, categoryOf, paletteLabel,
   CATEGORIES, DEFAULT_GROUP, EXPORT_FORMAT, LETTERS, USER_GROUP, blankGrid, cleanArt, dropIcon, emptyData, exportText, floodFill,
-  byName, canDeleteOfficial, deleteOfficial, liveIcons, restoreIcon, countMine, dropCount, dropFloat, dropIcons, groupsOf, setFood, resetIcons, iconsOf, importClashes, importIcons, nameTaken, uniqueNames, inRect, liftArea, linePoints, moveIcons, rectOf, newId, officials, putIcon, readExport, renameGroup, sanitize, shiftGrid, sizeOf, toArt, toGrid, FREE_MAX, freeSize, resizeGrid, ALL_INKS
+  byName, canDeleteOfficial, deleteOfficial, liveIcons, restoreIcon, countMine, dropCount, dropFloat, dropIcons, groupsOf, setFood, resetIcons, iconsOf, importClashes, importIcons, nameTaken, uniqueNames, inRect, liftArea, linePoints, moveIcons, rectOf, newId, officials, putIcon, readExport, renameGroup, sanitize, shiftGrid, sizeOf, toArt, toGrid, FREE_MAX, freeSize, resizeGrid, ALL_INKS, cleanFrames, cleanSequence, cleanPin, shiftArt, trackShifts, pingPong, playOrder, removeFrame, nextFrameName, newFrameId, MAX_FRAMES, DEFAULT_FPS,
 } from './model.ts';
 import { PALETTE, type PaletteName } from '../shared/palette.ts';
 import { FINE } from '../shared/stickers.ts';
@@ -416,5 +416,114 @@ describe('choosing any colour', () => {
     const hexes = [...ALL_INKS].map((ch) => PALETTE[LETTERS[ch].palette!]);
     expect(new Set(hexes).size).toBe(hexes.length);
     expect(new Set(hexes)).toEqual(new Set(Object.values(PALETTE)));
+  });
+});
+
+describe('kitty animations (frames and a sequence)', () => {
+  const pic = (ch: string) => ['....', `.${ch}${ch}.`, '....'];
+  const frames = () => [{ id: 'f1', name: 'Sit', art: pic('o') }, { id: 'f2', name: 'Stretch', art: pic('w') }, { id: 'f3', name: 'Pounce', art: pic('y') }];
+  const icon = (extra = {}) => ({ category: 'kitty' as const, id: 'loaf', name: 'Loaf', group: 'user', art: pic('o'), frames: frames(), sequence: ['f1', 'f2', 'f3', 'f2', 'f1'], fps: 6, ...extra });
+
+  it('ping-pongs 1 2 3 into 1 2 3 2 1', () => {
+    expect(pingPong(['a', 'b', 'c'])).toEqual(['a', 'b', 'c', 'b', 'a']);
+    expect(pingPong(['a', 'b'])).toEqual(['a', 'b', 'a']);
+    expect(pingPong(['a'])).toEqual(['a']);
+  });
+
+  it('plays one picture per step, so a frame in two steps shows the same picture, and changing it changes both', () => {
+    const f = frames();
+    const play = (fr: typeof f) => playOrder(fr, ['f1', 'f2', 'f3', 'f2', 'f1']);
+    expect(play(f).map((a) => a[1][1])).toEqual(['o', 'w', 'y', 'w', 'o']);
+    const edited = f.map((x) => (x.id === 'f1' ? { ...x, art: pic('R') } : x));
+    expect(play(edited).map((a) => a[1][1])).toEqual(['R', 'w', 'y', 'w', 'R']);
+  });
+
+  it('lines the frames up by their points of tracking', () => {
+    const fr = [
+      { id: 'a', name: 'A', art: ['X..', '...'], pin: [0, 0] as [number, number] },
+      { id: 'b', name: 'B', art: ['...', '.X.'], pin: [1, 1] as [number, number] },
+      { id: 'c', name: 'C', art: ['..X', '...'] },
+    ];
+    expect(trackShifts(fr, ['a', 'b', 'c']).get('b')).toEqual([-1, -1]);
+    expect(trackShifts(fr, ['a', 'b', 'c']).has('c')).toBe(false);
+    expect(playOrder(fr, ['a', 'b', 'c'])).toEqual([['X..', '...'], ['X..', '...'], ['..X', '...']]);
+    expect(trackShifts(fr.map((f) => ({ ...f, pin: undefined })), ['a', 'b']).size).toBe(0);
+  });
+
+  it('shifts art, cuts off what leaves the board, and keeps only pins on the board', () => {
+    expect(shiftArt(['AB.', 'CD.'], 1, 1)).toEqual(['...', '.AB']);
+    expect(shiftArt(['AB.', 'CD.'], -1, 0)).toEqual(['B..', 'D..']);
+    expect(cleanPin([2, 1], [3, 2])).toEqual([2, 1]);
+    expect(cleanPin([3, 1], [3, 2])).toBeNull();
+    expect(cleanPin([1.5, 0], [3, 2])).toBeNull();
+  });
+
+  it('is saved as one icon whose picture is the first frame', () => {
+    const d = putIcon(emptyData(), icon({ art: pic('K') }), 1);
+    expect(d.icons).toHaveLength(1);
+    expect(d.icons[0].art).toEqual(pic('o'));
+    expect(d.icons[0].frames?.map((f) => f.name)).toEqual(['Sit', 'Stretch', 'Pounce']);
+    expect(d.icons[0].sequence).toEqual(['f1', 'f2', 'f3', 'f2', 'f1']);
+    expect(d.icons[0].fps).toBe(6);
+    const shown = iconsOf(d, 'kitty')[0];
+    expect(shown.frames).toHaveLength(3);
+    expect(sanitize(JSON.parse(JSON.stringify(d))).icons[0]).toEqual(d.icons[0]);
+  });
+
+  it('survives moving the kitty to another group', () => {
+    const d = moveIcons(putIcon(emptyData(), icon(), 1), 'kitty', ['loaf'], 'poses');
+    expect(d.icons[0].group).toBe('poses');
+    expect(d.icons[0].frames).toHaveLength(3);
+    expect(d.icons[0].sequence).toHaveLength(5);
+  });
+
+  it('is exported and read back with its frames', () => {
+    const text = exportText(putIcon(emptyData(), icon(), 1), '2026-11-19');
+    const [back] = readExport(text);
+    expect(back.frames?.[1]).toEqual({ id: 'f2', name: 'Stretch', art: pic('w') });
+    expect(back.sequence).toEqual(['f1', 'f2', 'f3', 'f2', 'f1']);
+    expect(back.fps).toBe(6);
+  });
+
+  it('cleans what is broken: odd sizes, repeated ids, repeated names, steps for frames that are gone', () => {
+    const raw = [
+      { id: 'a', name: 'Pose', art: pic('o') }, { id: 'a', name: 'Dup id', art: pic('o') }, { id: 'b', name: 'pose', art: pic('w') },
+      { id: 'c', name: 'Wrong size', art: ['oo'] }, { id: 'bad id!', name: 'x', art: pic('o') },
+    ];
+    const fr = cleanFrames(raw, [4, 3])!;
+    expect(fr.map((f) => f.id)).toEqual(['a', 'b']);
+    expect(fr.map((f) => f.name)).toEqual(['Pose', 'pose 2']);
+    expect(cleanSequence(['a', 'zzz', 'b', 'a'], fr)).toEqual(['a', 'b', 'a']);
+    expect(cleanSequence(['zzz'], fr)).toEqual(['a', 'b']);
+    expect(cleanSequence(undefined, fr)).toEqual(['a', 'b']);
+    expect(cleanFrames([], [4, 3])).toBeNull();
+    expect(cleanFrames(Array.from({ length: MAX_FRAMES + 5 }, (_, i) => ({ id: `x${i}`, name: `N${i}`, art: pic('o') })), [4, 3])).toHaveLength(MAX_FRAMES);
+  });
+
+  it('falls back to every frame in order, at the default speed', () => {
+    const d = putIcon(emptyData(), icon({ sequence: undefined, fps: undefined }), 1);
+    expect(d.icons[0].sequence).toEqual(['f1', 'f2', 'f3']);
+    expect(d.icons[0].fps).toBe(DEFAULT_FPS);
+    expect(sanitize({ version: 1, icons: [{ ...d.icons[0], fps: 99 }] }).icons[0].fps).toBe(DEFAULT_FPS);
+  });
+
+  it('only a kitty has frames', () => {
+    const d = putIcon(emptyData(), { ...icon(), category: 'sticker', art: Array.from({ length: 18 }, () => '.'.repeat(18)) } as never, 1);
+    expect(d.icons[0].frames).toBeUndefined();
+  });
+
+  it('removing a frame takes its steps out too, and keeps something to play', () => {
+    const r = removeFrame(frames(), ['f1', 'f2', 'f3', 'f2', 'f1'], 'f2');
+    expect(r.frames.map((f) => f.id)).toEqual(['f1', 'f3']);
+    expect(r.sequence).toEqual(['f1', 'f3', 'f1']);
+    expect(removeFrame(frames().slice(0, 2), ['f2'], 'f2').sequence).toEqual(['f1']);
+  });
+
+  it('names and numbers new frames', () => {
+    expect(nextFrameName([{ name: 'Frame 1' }, { name: 'sit' }])).toBe('Frame 3');
+    expect(nextFrameName([{ name: 'Frame 2' }])).toBe('Frame 3');
+    expect(nextFrameName([{ name: 'a' }])).toBe('Frame 2');
+    expect(newFrameId([{ id: 'f1' }, { id: 'f2' }])).toBe('f3');
+    expect(newFrameId([{ id: 'f3' }, { id: 'f2' }])).toBe('f4');
   });
 });

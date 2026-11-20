@@ -31,6 +31,7 @@ import {
   CATEGORIES, DEFAULT_GROUP, byName, LETTERS, LIMITS, USER_GROUP, blankGrid, categoryOf, cleanGroup, cleanName, dropCount, dropFloat, dropIcon, dropIcons,
   exportName, exportText, flipGrid, floodFill, groupsOf, iconsOf, liveIcons, canDeleteOfficial, deleteOfficial, restoreIcon, importClashes, importIcons, inRect, nameTaken, type PixelIcon, isBlank, letterName, liftArea, linePoints,
   moveIcons, newId, officialOf, putIcon, readExport, rectOf, renameGroup, setFood, shiftGrid, sizeOf, FREE_MAX, freeSize, resizeGrid, toArt, toGrid, type CategoryId, type Grid,
+  DEFAULT_FPS, FPS_CHOICES, MAX_FRAMES, MAX_STEPS, cleanSequence, playOrder, newFrameId, shiftArt, trackShifts, nextFrameName, pingPong, removeFrame,
   type Rect, type Shown, CAT_SIZE, isFixed, MAX_SPOTS, SCENE_INKS, clampProp, clampSpot, sceneColors, type Props,
 } from './model.ts';
 
@@ -38,13 +39,15 @@ const toast = (text: string) => showToast($('pixel-toast'), text);
 
 type Tab = 'icons' | 'draw' | 'colours';
 const TABS: [Tab, string][] = [['icons', 'Icons'], ['draw', 'Draw'], ['colours', 'Colours']];
-type Tool = 'pencil' | 'erase' | 'fill' | 'pick' | 'select' | 'pan';
+type Tool = 'pencil' | 'erase' | 'fill' | 'pick' | 'select' | 'pan' | 'track';
 const TOOLS: [Tool, string][] = [['pencil', 'Pencil'], ['erase', 'Eraser'], ['fill', 'Fill'], ['pick', 'Pick'], ['select', 'Select']];
 // Every board can be zoomed in (a scene is too big to see whole anyway), so every board has a tool to move around it too.
 const ALL_TOOLS: [Tool, string][] = [...TOOLS, ['pan', 'Move around']];
+const TRACK_TOOL: [Tool, string] = ['track', 'Point of tracking'];
 const ZOOMS = [1, 2, 4, 8];
 // The drawing tools' icons: smooth line drawings (not pixel art, so they don't look like part of the picture), in the text colour.
 const TOOL_ICONS: Record<Tool | 'mirror', string> = {
+  track: '<circle cx="12" cy="12" r="4"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/>',
   pan: '<path d="M12 3v18M3 12h18"/><path d="m9 6 3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/>',
   pencil: '<path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 0 1 3 0l.5.5a2.1 2.1 0 0 1 0 3L8.5 19Z"/><path d="m13.5 7 3.5 3.5"/>',
   erase: '<path d="M3 15.5 13.5 5a2 2 0 0 1 2.8 0l3.7 3.7a2 2 0 0 1 0 2.8L11.5 20h-4Z"/><path d="m8.5 10 5.5 5.5"/><path d="M11.5 20H21"/>',
@@ -67,10 +70,16 @@ const picked = new Set<string>();      // the ids picked, in the shown category
 let moveTo: string = USER_GROUP;       // the group they were last moved to
 
 // The icon on the board. id null: a new one, not saved yet. A scene also has its kitty spots and (the room) its props.
-interface Draft { cat: CategoryId; id: string | null; name: string; group: string; grid: Grid; saved: string; spots?: Spot[]; props?: Props; food?: boolean }
+// A kitty can be an animation: frames (each its own named grid; `grid` below is the one being drawn on, the frame at `cur`)
+// and a sequence of frame ids that plays them (see Frame in ./model.ts).
+interface DraftFrame { id: string; name: string; grid: Grid; pin?: [number, number] }
+interface Draft { cat: CategoryId; id: string | null; name: string; group: string; grid: Grid; saved: string; spots?: Spot[]; props?: Props; food?: boolean;
+  frames?: DraftFrame[]; cur?: number; sequence?: string[]; fps?: number }
 let draft: Draft | null = null;
 let undos: Grid[] = [], redos: Grid[] = [];
-const artKey = (d: Draft) => `${d.name}\n${d.group}\n${toArt(d.grid).join('')}\n${JSON.stringify(d.spots ?? null)}${JSON.stringify(d.props ?? null)}${d.food ? '\nfood' : ''}`;
+const artKey = (d: Draft) => `${d.name}\n${d.group}\n${toArt(d.grid).join('')}\n${JSON.stringify(d.spots ?? null)}${JSON.stringify(d.props ?? null)}${d.food ? '\nfood' : ''}`
+  + (d.frames ? `\n${JSON.stringify(d.frames.map((f, i) => [f.id, f.name, toArt(i === d.cur ? d.grid : f.grid).join(''), f.pin ?? null]))}${JSON.stringify([d.sequence, d.fps])}` : '');
+let stepSel: number | null = null;   // the step picked in the sequence
 // A scene: how far it is zoomed in, and whether the board draws or places the kitty spots (and which one is picked).
 let zoom = 1;
 let sceneMode: 'draw' | 'spots' = 'draw';
@@ -177,6 +186,7 @@ function render() {
   if (tab === 'draw') renderBoard();
   const wrap = at && document.getElementById('pix-board-wrap');
   if (wrap && at) { wrap.scrollLeft = at.left; wrap.scrollTop = at.top; }
+  restartAnim();
 }
 
 const catSeg = () => `<div class="seg pix-cats" role="tablist" aria-label="Category">${CATEGORIES.map((c) =>
@@ -243,6 +253,7 @@ function groupHtml(group: string, list: Shown[]): string {
       ? `data-action="pix-pick" aria-pressed="${picked.has(i.id)}"` : 'data-action="pix-view"'} data-id="${esc(i.id)}" title="${esc(i.name)}">
       <span class="pix-pic">${pictureSvg(cat, i.art)}</span><span class="pix-tname">${esc(i.name)}</span>
       ${i.status === 'official' ? '' : `<span class="badge ${i.status}">${i.status === 'new' ? 'New' : 'Changed'}</span>`}
+      ${i.frames && i.frames.length > 1 ? `<span class="badge">${i.frames.length} frames</span>` : ''}
       ${organise && i.food ? '<span class="badge">Food</span>' : ''}</button>`).join('')}</div></section>`;
 }
 
@@ -320,6 +331,15 @@ function startDraft(c: CategoryId, id: string | null, asCopy = false) {
   while (grid.length < h) grid.push(Array<string>(w).fill('.'));
   draft = { cat: c, id: shown ? shown.id : null, name: shown?.name ?? '', group: shown?.group ?? USER_GROUP, grid: grid.slice(0, h), saved: '' };
   if (c === 'sticker') draft.food = !!shown?.food;
+  stepSel = null;
+  if (c === 'kitty' && shown?.frames) {
+    const gridOf = (art: string[]) => { const g = toGrid(art.map((r) => r.padEnd(w, '.').slice(0, w))); while (g.length < h) g.push(Array<string>(w).fill('.')); return g.slice(0, h); };
+    draft.frames = shown.frames.map((f) => ({ id: f.id, name: f.name, grid: gridOf(f.art), ...(f.pin && { pin: [...f.pin] as [number, number] }) }));
+    draft.cur = 0;
+    draft.grid = draft.frames[0].grid;
+    draft.sequence = cleanSequence(shown.sequence, shown.frames);
+    draft.fps = shown.fps ?? DEFAULT_FPS;
+  }
   if (c === 'scene') {
     draft.spots = (shown?.spots ?? []).map((p) => [...p] as Spot);
     if (shown?.props) draft.props = { book: [...shown.props.book] as Spot, trophy: [...shown.props.trophy] as Spot };
@@ -354,8 +374,9 @@ function drawHtml(): string {
       <span class="muted">Keeps the top-left corner; use the arrows below to move the drawing.</span></form>` : ''}
     ${scene ? `<div class="seg pix-modes" role="tablist" aria-label="Board">${([['draw', 'Draw'], ['spots', 'Kitty spots']] as const).map(([m, label]) =>
       `<button type="button" role="tab" data-action="pix-scene-mode" data-mode="${m}" aria-selected="${m === sceneMode}">${label}</button>`).join('')}</div>` : ''}
+    ${d.cat === 'kitty' ? frameBar(d) : ''}
     <div class="pix-tools" ${spots ? 'hidden' : ''}>
-      <div class="seg" role="toolbar" aria-label="Tool">${ALL_TOOLS.map(([t, label]) => `<button type="button" data-action="pix-tool" data-tool="${t}" aria-pressed="${t === tool}" aria-label="${label}" title="${label}">${toolIcon(t)}</button>`).join('')}</div>
+      <div class="seg" role="toolbar" aria-label="Tool">${(d.frames ? [...ALL_TOOLS, TRACK_TOOL] : ALL_TOOLS).map(([t, label]) => `<button type="button" data-action="pix-tool" data-tool="${t}" aria-pressed="${t === tool}" aria-label="${label}" title="${label}">${toolIcon(t)}</button>`).join('')}</div>
       <div class="seg" role="toolbar" aria-label="Board"><button type="button" data-action="pix-mirror" aria-pressed="${mirror}" aria-label="Mirror" title="Mirror: draw on both halves">${toolIcon('mirror')}</button></div>
     </div>
     <div class="seg pix-zooms" role="radiogroup" aria-label="Zoom">${ZOOMS.map((z) =>
@@ -379,6 +400,7 @@ function drawHtml(): string {
     <div class="seg pix-bases" role="radiogroup" aria-label="Show the base colour in">${NOTE_COLORS.map((n) =>
       `<button type="button" role="radio" data-action="pix-base" data-base="${n}" aria-checked="${n === base}"><i style="background: ${COLOR[n][0]}"></i>${COLOR[n][1]}</button>`).join('')}</div>`}
   </div>
+  ${d.cat === 'kitty' ? animHtml(d) : ''}
   ${scene ? '' : '<div class="panel"><h3>Preview</h3><div id="pix-preview" class="pix-preview"></div></div>'}
   <form class="panel pix-save" id="pix-form" novalidate>
     <label class="field">Name <input id="pix-name" maxlength="${LIMITS.name}" autocomplete="off" value="${esc(d.name)}" placeholder="${esc(off?.name ?? 'Teapot')}"></label>
@@ -405,8 +427,9 @@ function renderBoard() {
   const size = document.getElementById('pix-size');
   if (size) size.textContent = `${w} × ${h} · ${categoryOf(d.cat).label}`;
   for (const [id, v] of [['pix-w', w], ['pix-h', h]] as const) { const f = document.getElementById(id) as HTMLInputElement | null; if (f && document.activeElement !== f) f.value = String(v); }
-  b.innerHTML = (d.cat === 'scene' ? `<canvas width="${w}" height="${h}"></canvas><div class="pix-marks" id="pix-marks"></div>`
+  b.innerHTML = onionHtml(d) + (d.cat === 'scene' ? `<canvas width="${w}" height="${h}"></canvas><div class="pix-marks" id="pix-marks"></div>`
     : g.map((row, y) => row.map((ch, x) => `<i data-x="${x}" data-y="${y}" style="background: ${cellColor(d.cat, ch)}"></i>`).join('')).join(''))
+    + pinHtml(d, w, h)
     + (sel ? `<b class="pix-sel${float ? ' lifted' : ''}" style="left: ${(sel.x / w) * 100}%; top: ${(sel.y / h) * 100}%; width: ${(sel.w / w) * 100}%; height: ${(sel.h / h) * 100}%"></b>` : '');
   b.dataset.tool = tool;
   if (d.cat === 'scene') { paintCanvas(g); renderMarks(); }
@@ -561,6 +584,7 @@ function step(from: Grid[], to: Grid[]) {
   if (!draft || !from.length) { renderBoard(); return; }
   to.push(draft.grid);
   draft.grid = from.pop()!;
+  fitFrames();
   renderBoard();
 }
 
@@ -638,6 +662,7 @@ onShown('pixel', 'pointerdown', (ev) => {
   ev.preventDefault();
   const [x, y] = at;
   const t: Tool = ev.button === 2 ? 'erase' : tool;
+  if (t === 'track') { setPin(x, y); return; }
   if (t === 'select') { selectDown(ev, board as HTMLElement, at); return; }
   if (sel) { settle(); renderBoard(); }
   if (t === 'pick') {
@@ -703,13 +728,20 @@ function readFields() {
   if (g !== null) draft.group = g;
   const f = document.getElementById('pix-food') as HTMLInputElement | null;
   if (f) draft.food = f.checked;
+  const fn = document.getElementById('pix-frame-name') as HTMLInputElement | null;
+  if (fn && draft.frames && draft.cur !== undefined) draft.frames[draft.cur].name = fn.value;
 }
 async function save(asNew: boolean) {
   if (!draft) return;
   readFields();
   settle();
-  const d = draft, art = toArt(d.grid);
-  if (isBlank(art)) { toast('Draw something first.'); return; }
+  const d = draft;
+  syncFrame(); fitFrames();
+  const frames = d.frames?.map((f) => ({ id: f.id, name: cleanName(f.name, 'Frame'), art: toArt(f.grid), ...(f.pin && { pin: f.pin }) }));
+  const art = frames ? frames[0].art : toArt(d.grid);
+  if (frames ? frames.every((f) => isBlank(f.art)) : isBlank(art)) { toast('Draw something first.'); return; }
+  const twin = frames?.find((f, i) => frames.findIndex((o) => o.name.toLowerCase() === f.name.toLowerCase()) !== i);
+  if (twin) { toast(`Two frames are called ${twin.name}. Give each frame its own name.`); return; }
   const off = d.id && !asNew ? officialOf(d.cat, d.id) : undefined;
   const name = cleanName(d.name, off?.name ?? 'Untitled');
   let group = cleanGroup(d.group, off?.group ?? USER_GROUP);
@@ -727,10 +759,206 @@ async function save(asNew: boolean) {
   }
   if (d.cat === 'scene' && !d.spots?.length) { toast('Give the kitties at least one spot.'); return; }
   const id = !asNew && d.id ? d.id : newId(name, d.cat, pixelData());
-  const ok = await setPixelData(putIcon(pixelData(), { category: d.cat, id, name, group, art, ...(d.spots && { spots: d.spots }), ...(d.props && { props: d.props }), ...(d.cat === 'sticker' && { food: !!d.food }) }));
+  const ok = await setPixelData(putIcon(pixelData(), { category: d.cat, id, name, group, art, ...(frames && { frames, sequence: cleanSequence(d.sequence, frames), fps: d.fps ?? DEFAULT_FPS }), ...(d.spots && { spots: d.spots }), ...(d.props && { props: d.props }), ...(d.cat === 'sticker' && { food: !!d.food }) }));
   if (!ok) { toast("Couldn't save. Try again."); return; }
   d.id = id; d.name = name; d.group = group; d.saved = artKey(d);
   toast(asNew ? `Saved as ${name}.` : `Saved ${name}.`);
+  render();
+}
+
+// ---- a kitty animation: frames and a sequence ----
+// The frames are named drawings. The sequence lists them by id, in play order, so a frame can be in it more than once
+// (1 2 3 2 1) and what you draw on a frame shows in every step that plays it.
+const thumb = (grid: Grid) => `<span class="pix-fth">${fineSvg(toArt(grid))}</span>`;
+const liveGrid = (d: Draft, i: number) => (i === d.cur ? d.grid : d.frames![i].grid);
+const fchip = (d: Draft, i: number, action: string, on: boolean, n?: number, ai?: number) =>
+  `<button type="button" class="pix-fchip" data-action="${action}" data-i="${ai ?? i}" aria-pressed="${on}">${n === undefined ? '' : `<b class="num">${n}</b>`}${thumb(liveGrid(d, i))}<span>${esc(d.frames![i].name || 'Frame')}</span></button>`;
+// Onion skin: the frame before the one on the board, faint (50%) behind what you draw, to line the two up. It can be turned off.
+let onion = true;
+function onionHtml(d: Draft): string {
+  const prev = onion && d.frames && d.cur ? d.frames[d.cur - 1] : undefined;
+  return prev ? `<div class="pix-onion" aria-hidden="true">${fineSvg(toArt(prev.grid))}</div>` : '';
+}
+// The point of tracking of the frame on the board: a ring on its cell. Every frame's point lines up with the first one's as it plays.
+function pinHtml(d: Draft, w: number, h: number): string {
+  const pin = d.frames?.[d.cur ?? 0]?.pin;
+  return pin ? `<b class="pix-pin" aria-hidden="true" style="left: ${(pin[0] / w) * 100}%; top: ${(pin[1] / h) * 100}%; width: ${100 / w}%; height: ${100 / h}%"></b>` : '';
+}
+// The frames, just above the board: pick the one to draw on, add, copy or delete one.
+function frameBar(d: Draft): string {
+  if (!d.frames) return '';
+  const frames = d.frames, cur = d.cur ?? 0;
+  return `<div class="pix-framebar"><div class="pix-fstrip" role="group" aria-label="Frames">${frames.map((_, i) => fchip(d, i, 'pix-frame-pick', i === cur)).join('')}</div>
+    <div class="btns flow"><button class="btn small" type="button" data-action="pix-frame-add" ${frames.length >= MAX_FRAMES ? 'disabled' : ''}>New frame</button>
+      <button class="btn small" type="button" data-action="pix-frame-copy" ${frames.length >= MAX_FRAMES ? 'disabled' : ''}>Copy this frame</button>
+      <button class="btn small" type="button" data-action="pix-frame-left" ${cur === 0 ? 'disabled' : ''} aria-label="Move this frame earlier">&larr; Earlier</button>
+      <button class="btn small" type="button" data-action="pix-frame-right" ${cur >= frames.length - 1 ? 'disabled' : ''} aria-label="Move this frame later">Later &rarr;</button>
+      <button class="btn small danger" type="button" data-action="pix-frame-del" ${frames.length < 2 ? 'disabled' : ''}>${iconSvg('x')} Delete frame</button></div>
+    <div class="btns flow"><span class="muted">Point of tracking (optional): ${frames[cur].pin ? `cell ${frames[cur].pin![0] + 1}, ${frames[cur].pin![1] + 1}` : 'not set'}.</span>
+      <button class="btn small" type="button" data-action="pix-tool" data-tool="track">Set point</button>
+      <button class="btn small" type="button" data-action="pix-pin-clear" ${frames[cur].pin ? '' : 'disabled'}>Clear point</button></div>
+    <p class="muted">Mark the same part on each frame, such as the front paw, then the back paw. As the animation plays the points line up, so the kitty moves from one to the next.</p>
+    <label class="check"><input type="checkbox" id="pix-onion" ${onion ? 'checked' : ''}><span><b>Show the previous frame</b><br><span class="muted">Faint (50%) behind your drawing, to line the frames up. ${cur ? `Now showing ${esc(frames[cur - 1].name || 'Frame')}.` : 'The first frame has none before it.'}</span></span></label></div>`;
+}
+function animHtml(d: Draft): string {
+  if (!d.frames) {
+    return `<div class="panel pix-animp"><h3>Animation</h3>
+      <p class="muted">Make this kitty an animation: several named frames, and a sequence that plays them, such as 1 2 3 2 1. Draw a frame once and every step that plays it shows it.</p>
+      <button class="btn" type="button" data-action="pix-anim-start">Make an animation</button></div>`;
+  }
+  const frames = d.frames, cur = d.cur ?? 0, seq = d.sequence ?? [];
+  const here = frames[cur];
+  const uses = seq.filter((id) => id === here.id).length;
+  const idx = new Map(frames.map((f, i) => [f.id, i]));
+  const chip = (i: number, action: string, on: boolean, n?: number, ai?: number) => fchip(d, i, action, on, n, ai);
+  return `<div class="panel pix-animp"><h3>Animation</h3>
+    <label class="field">Frame name <input id="pix-frame-name" maxlength="${LIMITS.name}" autocomplete="off" value="${esc(here.name)}"></label>
+    <p class="muted">You are drawing on <b>${esc(here.name || 'Frame')}</b>, which plays in ${plural(uses, 'step')}: changing it changes every one of them.</p>
+    <h3>Sequence <span class="num muted">${seq.length}</span></h3>
+    <div class="pix-fstrip" role="group" aria-label="Sequence">${seq.map((id, n) => chip(idx.get(id) ?? 0, 'pix-step-pick', n === stepSel, n + 1, n)).join('')}</div>
+    <div class="btns flow"><button class="btn small" type="button" data-action="pix-step-add" ${seq.length >= MAX_STEPS ? 'disabled' : ''}>Add ${esc(here.name || 'Frame')} ${stepSel === null ? 'to the end' : `after step ${stepSel + 1}`}</button>
+      <button class="btn small" type="button" data-action="pix-step-left" aria-label="Move step earlier" ${stepSel === null || stepSel < 1 ? 'disabled' : ''}>${iconSvg('prev')}</button>
+      <button class="btn small" type="button" data-action="pix-step-right" aria-label="Move step later" ${stepSel === null || stepSel >= seq.length - 1 ? 'disabled' : ''}>${iconSvg('next')}</button>
+      <button class="btn small" type="button" data-action="pix-step-del" ${stepSel === null || seq.length < 2 ? 'disabled' : ''}>Remove step</button></div>
+    <div class="btns flow"><button class="btn small" type="button" data-action="pix-pingpong" title="Plays the frames forward, then back: 1 2 3 2 1">Ping-pong ${frames.length > 1 ? frames.map((_, i) => i + 1).join(' ') + ' ' + frames.slice(0, -1).map((_, i) => frames.length - 1 - i).join(' ') : ''}</button>
+      <button class="btn small" type="button" data-action="pix-seq-reset">Frames in order</button></div>
+    <div class="pix-animview"><div class="pix-animbox"><div class="pix-anim" id="pix-anim" style="--w:${d.grid[0].length};--h:${d.grid.length}" aria-hidden="true"></div><p class="muted pix-animcap" id="pix-animcap"></p></div>
+      <div class="stack"><label class="field">Speed <select id="pix-fps">${FPS_CHOICES.map((n) => `<option value="${n}" ${n === (d.fps ?? DEFAULT_FPS) ? 'selected' : ''}>${n} steps a second</option>`).join('')}</select></label>
+        <button class="btn small" type="button" data-action="pix-anim-toggle">${animPlaying ? 'Pause' : 'Play'}</button></div></div></div>`;
+}
+
+// The animation plays on the page while the board is open, at the speed chosen, from what is on the board now.
+let animTimer: ReturnType<typeof setInterval> | undefined;
+let animI = 0;
+let animPlaying = true;
+function drawAnim() {
+  const el = document.getElementById('pix-anim');
+  if (!el || !draft?.frames || !draft.sequence?.length) { stopAnim(); return; }
+  const d = draft, byId = new Map(d.frames!.map((f, i) => [f.id, i]));
+  const ids = d.sequence!.filter((id) => byId.has(id));
+  if (!ids.length) return;
+  animI %= ids.length;
+  const i = byId.get(ids[animI])!;
+  const sh = trackShifts(d.frames!.map((f, k) => ({ id: f.id, name: f.name, art: [], pin: f.pin })), d.sequence).get(d.frames![i].id);
+  const art = toArt(liveGrid(d, i));
+  el.innerHTML = fineSvg(sh && (sh[0] || sh[1]) ? shiftArt(art, sh[0], sh[1]) : art);   // only the picture changes: the canvas keeps its size
+  const cap = document.getElementById('pix-animcap');
+  if (cap) cap.textContent = `Step ${animI + 1} of ${ids.length}: ${d.frames![i].name || 'Frame'}`;
+  animI++;
+}
+function stopAnim() { if (animTimer !== undefined) clearInterval(animTimer); animTimer = undefined; }
+function restartAnim() {
+  stopAnim();
+  if (!draft?.frames || tab !== 'draw') return;
+  drawAnim();
+  if (animPlaying) animTimer = setInterval(drawAnim, 1000 / (draft.fps ?? DEFAULT_FPS));
+}
+// The frame on the board is stored with the others before anything switches, saves or counts them.
+function syncFrame() { if (draft?.frames && draft.cur !== undefined) draft.frames[draft.cur].grid = draft.grid; }
+// Every frame is the board's size (a resize, or an Undo of one, changes the board you are on).
+function fitFrames() {
+  if (!draft?.frames) return;
+  const w = draft.grid[0].length, h = draft.grid.length;
+  draft.frames.forEach((f, i) => {
+    if (i === draft!.cur) f.grid = draft!.grid;
+    else if (f.grid.length !== h || f.grid[0]?.length !== w) f.grid = resizeGrid(f.grid, w, h);
+    if (f.pin && (f.pin[0] >= w || f.pin[1] >= h)) delete f.pin;
+  });
+}
+function setPin(x: number, y: number) {
+  const f = draft?.frames?.[draft.cur ?? 0];
+  if (!f) return;
+  f.pin = f.pin && f.pin[0] === x && f.pin[1] === y ? undefined : [x, y];   // tapping the same cell again takes it off
+  if (!f.pin) delete f.pin;
+  readFields(); render();
+}
+// Moves the frame on the board one place along the strip. The sequence names frames by id, so it plays the same; only the
+// order of the strip (and which frame is the kitty's picture in lists: the first) changes.
+function moveFrame(by: -1 | 1) {
+  const d = draft;
+  if (!d?.frames) return;
+  const at = d.cur ?? 0, to = at + by;
+  if (to < 0 || to >= d.frames.length) return;
+  readFields(); settle(); syncFrame();
+  [d.frames[at], d.frames[to]] = [d.frames[to], d.frames[at]];
+  d.cur = to;
+  render();
+}
+function selectFrame(i: number) {
+  const d = draft;
+  if (!d?.frames?.[i]) return;
+  readFields(); settle(); syncFrame();
+  d.cur = i; d.grid = d.frames[i].grid;
+  undos = []; redos = []; sel = null; float = null;
+  render();
+}
+function startAnimation() {
+  if (!draft || draft.cat !== 'kitty' || draft.frames) return;
+  readFields(); settle();
+  draft.frames = [{ id: 'f1', name: 'Frame 1', grid: draft.grid }];
+  draft.cur = 0; draft.sequence = ['f1']; draft.fps = DEFAULT_FPS;
+  render();
+}
+function addFrame(copy: boolean) {
+  const d = draft;
+  if (!d?.frames || d.frames.length >= MAX_FRAMES) return;
+  readFields(); settle(); syncFrame();
+  const here = d.frames[d.cur ?? 0];
+  const f: DraftFrame = { id: newFrameId(d.frames), name: nextFrameName(d.frames),   // a copy is named like a new frame: the next number
+    grid: copy ? here.grid.map((r) => r.slice()) : blankGrid(here.grid[0].length, here.grid.length),
+    ...(copy && here.pin && { pin: [...here.pin] as [number, number] }) };
+  d.frames.push(f);
+  d.sequence = [...(d.sequence ?? []), f.id].slice(0, MAX_STEPS);
+  selectFrame(d.frames.length - 1);
+}
+function askDeleteFrame() {
+  const d = draft;
+  if (!d?.frames || d.frames.length < 2) return;
+  readFields();
+  const here = d.frames[d.cur ?? 0], uses = (d.sequence ?? []).filter((id) => id === here.id).length;
+  openLayer(`<h3>Delete ${esc(here.name || 'Frame')}?</h3>
+    <p class="muted">The drawing is lost${uses ? `, and ${plural(uses, 'step')} that play${uses === 1 ? 's' : ''} it ${uses === 1 ? 'is' : 'are'} taken out of the sequence` : ''}.</p>
+    <div class="btns"><button class="btn" type="button" data-action="pix-layer-close" data-focus>Cancel</button>
+    <button class="btn danger" type="button" data-action="pix-frame-del-confirm">${iconSvg('x')} Delete</button></div>`, 'Delete frame');
+}
+function deleteFrame() {
+  const d = draft;
+  closeLayer();
+  if (!d?.frames || d.frames.length < 2) return;
+  syncFrame();
+  const at = d.cur ?? 0, r = removeFrame(d.frames, d.sequence ?? [], d.frames[at].id);
+  d.frames = r.frames; d.sequence = r.sequence; stepSel = null;
+  d.cur = Math.min(at, d.frames.length - 1); d.grid = d.frames[d.cur].grid;
+  undos = []; redos = []; sel = null; float = null;
+  render();
+}
+// The sequence's own buttons.
+function stepAction(a: 'pick' | 'add' | 'left' | 'right' | 'del' | 'pingpong' | 'reset', i = 0) {
+  const d = draft;
+  if (!d?.frames) return;
+  readFields();
+  const seq = [...(d.sequence ?? [])];
+  if (a === 'pick') {
+    stepSel = stepSel === i ? null : i;
+    const f = d.frames.findIndex((x) => x.id === seq[i]);
+    if (f >= 0 && f !== d.cur) { selectFrame(f); return; }   // tapping a step opens its frame to draw on
+  } else if (a === 'add') {
+    if (seq.length >= MAX_STEPS) { toast(`A sequence can have ${MAX_STEPS} steps.`); return; }
+    const at = stepSel === null ? seq.length : stepSel + 1;
+    seq.splice(at, 0, d.frames[d.cur ?? 0].id);
+    stepSel = at;
+  } else if (a === 'left' && stepSel !== null && stepSel > 0) {
+    [seq[stepSel - 1], seq[stepSel]] = [seq[stepSel], seq[stepSel - 1]]; stepSel--;
+  } else if (a === 'right' && stepSel !== null && stepSel < seq.length - 1) {
+    [seq[stepSel + 1], seq[stepSel]] = [seq[stepSel], seq[stepSel + 1]]; stepSel++;
+  } else if (a === 'del' && stepSel !== null && seq.length > 1) {
+    seq.splice(stepSel, 1); stepSel = null;
+  } else if (a === 'pingpong') {
+    seq.splice(0, seq.length, ...pingPong(d.frames.map((f) => f.id)).slice(0, MAX_STEPS)); stepSel = null;
+  } else if (a === 'reset') {
+    seq.splice(0, seq.length, ...d.frames.map((f) => f.id)); stepSel = null;
+  }
+  d.sequence = seq;
   render();
 }
 
@@ -743,6 +971,7 @@ function resize() {
   if (w === draft.grid[0].length && h === draft.grid.length) return;
   settle(); sel = null;
   edit((g) => resizeGrid(g, w, h));
+  fitFrames();   // every frame is the board's size
 }
 
 // ---- a photo as a scene ----
@@ -866,11 +1095,25 @@ function openView(id: string) {
   const gone = i.status === 'deleted';
   openLayer(`<h3>${esc(i.name)}</h3>
     <p class="muted">${esc(groupLabel(i.group))}${i.status === 'official' ? '' : ` · <span class="badge ${i.status}">${{ new: 'New', changed: 'Changed', deleted: 'Deleted' }[i.status]}</span>`}</p>
-    <div class="pix-preview pix-view${gone ? ' pix-gone' : ''}" style="${baseStyle(cat)}"><div class="pix-prow"><span class="pix-pbig">${pictureSvg(cat, i.art, true)}</span></div></div>
+    <div class="pix-preview pix-view${gone ? ' pix-gone' : ''}" style="${baseStyle(cat)}"><div class="pix-prow"><span class="pix-pbig" id="pix-view-pic">${pictureSvg(cat, i.art, true)}</span></div></div>
+    ${i.frames ? `<p class="muted">An animation: ${plural(i.frames.length, 'frame')}, ${plural(i.sequence?.length ?? i.frames.length, 'step')}.</p>` : ''}
     ${gone ? '<p class="muted">The app no longer shows or uses it.</p>' : ''}
     <div class="btns flow"><button class="btn" type="button" data-action="pix-layer-close">Close</button>
     ${gone ? `<button class="btn primary" type="button" data-action="pix-restore" data-id="${esc(i.id)}" data-focus>Bring back</button>`
       : `<button class="btn primary" type="button" data-action="pix-open" data-id="${esc(i.id)}" data-focus>${iconSvg('pencil')} Edit</button>`}</div>`, i.name);
+  if (i.frames && i.frames.length > 0) playView(playOrder(i.frames, i.sequence), i.fps ?? DEFAULT_FPS);
+}
+// An animation opened from the list plays, rather than showing its first frame; it stops when the dialog closes.
+let viewTimer: ReturnType<typeof setInterval> | undefined;
+function playView(pics: string[][], fps: number) {
+  if (viewTimer !== undefined) clearInterval(viewTimer);
+  let n = 0;
+  const tick = () => {
+    const el = document.getElementById('pix-view-pic');
+    if (!el) { clearInterval(viewTimer); viewTimer = undefined; return; }
+    el.innerHTML = fineSvg(pics[n++ % pics.length], 'x4');
+  };
+  if (pics.length > 1) viewTimer = setInterval(tick, 1000 / fps);
 }
 async function restore(id: string) {
   closeLayer();
@@ -941,6 +1184,23 @@ onShown('pixel', 'click', (ev) => {
     case 'pix-copy': save(true); break;
     case 'pix-scene-mode': settle(); sceneMode = b.dataset.mode as 'draw' | 'spots'; pickedSpot = null; readFields(); render(); break;
     case 'pix-zoom': setZoom(Number(b.dataset.zoom)); break;
+    case 'pix-anim-start': startAnimation(); break;
+    case 'pix-frame-pick': selectFrame(Number(b.dataset.i)); break;
+    case 'pix-pin-clear': { const f = draft?.frames?.[draft.cur ?? 0]; if (f) { delete f.pin; readFields(); render(); } break; }
+    case 'pix-frame-left': moveFrame(-1); break;
+    case 'pix-frame-right': moveFrame(1); break;
+    case 'pix-frame-add': addFrame(false); break;
+    case 'pix-frame-copy': addFrame(true); break;
+    case 'pix-frame-del': askDeleteFrame(); break;
+    case 'pix-frame-del-confirm': deleteFrame(); break;
+    case 'pix-step-pick': stepAction('pick', Number(b.dataset.i)); break;
+    case 'pix-step-add': stepAction('add'); break;
+    case 'pix-step-left': stepAction('left'); break;
+    case 'pix-step-right': stepAction('right'); break;
+    case 'pix-step-del': stepAction('del'); break;
+    case 'pix-pingpong': stepAction('pingpong'); break;
+    case 'pix-seq-reset': stepAction('reset'); break;
+    case 'pix-anim-toggle': animPlaying = !animPlaying; readFields(); render(); break;
     case 'pix-photo': document.getElementById('pix-photo')?.click(); break;
     case 'pix-spot-del':
       if (draft?.spots && typeof pickedSpot === 'number' && draft.spots.length > 1) { draft.spots.splice(pickedSpot, 1); pickedSpot = null; renderMarks(); renderSelbar(); }
@@ -1020,6 +1280,8 @@ onShown('pixel', 'change', (ev) => {
   if (t.id === 'pix-file') { importFile(t.files?.[0]); t.value = ''; }
   if (t.id === 'pix-photo') { usePhoto(t.files?.[0]); t.value = ''; }
   if (t.id === 'pix-food') { readFields(); renderPreview(); }
+  if (t.id === 'pix-onion') { onion = (t as HTMLInputElement).checked; renderBoard(); }
+  if (t.id === 'pix-fps' && draft) { draft.fps = FPS_CHOICES.includes(Number(t.value)) ? Number(t.value) : DEFAULT_FPS; restartAnim(); }
   if (t.matches('[data-group-select]')) {
     // New group… shows the field for its name
     const name = document.getElementById(`${t.id}-new`) as HTMLInputElement | null, box = name?.closest('label');

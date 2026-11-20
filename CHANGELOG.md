@@ -2,6 +2,15 @@
 
 Newest first. The app bundles this file: it shows the latest entry once after an update, and the whole list under Settings → Change log.
 
+## 0.6.4 - 2026-11-19
+
+### New
+- **Kitty Gallery: animations play when opened.** Tapping an animated kitty in the list now plays it (at its own speed, with its points of tracking) instead of showing the first frame.
+- **Kitty Gallery: reorder frames.** **Earlier** and **Later** move the frame you are on along the strip. The sequence still plays the same frames; only the strip's order changes.
+- **Kitty Gallery: Umber with Taupe.** Wood, Taupe and Umber now share a row in the colour list.
+- **Kitty Gallery: points of tracking.** In an animation, the **Point of tracking** tool (or **Set point**) marks a spot on a frame, such as the front paw. As it plays, every frame with a point is moved so its point lands on the first one, so a point on the front paw, then the back paw, makes the kitty travel while the planted paw stays still. It is optional, per frame, and frames without one are not moved.
+- **Kitty Gallery: kitty animations.** A kitty drawing can be an animation, still just one drawing. **Make an animation** gives it **frames**, each with its own name that you pick, draw on, add, copy or delete. A **sequence** plays them by name, so it can go 1 2 3 2 1 (**Ping-pong** builds that for you), and a frame can be in it as many times as you like. Change frame 1 once and both the first and the last step show it. Tap a step to open its frame. Pick the speed, and watch it play as you draw. **Show the previous frame** puts the frame before the one you are drawing on behind it at 50%, to line the frames up (the checkbox under the frames turns it off). Resizing the board resizes every frame, and exports and backups carry the frames and the sequence.
+
 ## 0.6.3 - 2026-11-19 · Eden
 
 ### New
