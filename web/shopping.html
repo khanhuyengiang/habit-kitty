@@ -123,6 +123,15 @@
 .shop-dialog .btns { flex-wrap: wrap; align-items: center; }
 .shop-dialog .grow { flex: 1; }
 #shop-toast .linkish { color: var(--accent-text); font-weight: 700; margin-left: var(--s2); }
+/* wide screens (see .wrap in page.html): the suggestions beside the list; recipes, the pantry's categories and the regulars
+   tile. The last row takes up whatever the suggestions need beyond the list, so nothing on the left is pulled apart. */
+@media (min-width: 960px) {
+  .shop-body:has(> #shop-sugg) { grid-template-columns: minmax(0, 1fr) minmax(0, calc(120 * var(--u))); grid-template-rows: auto auto auto 1fr; align-items: start; }
+  .shop-body:has(> #shop-sugg) > * { grid-column: 1; }
+  .shop-body > #shop-sugg { grid-column: 2; grid-row: 1 / -1; }
+  .shop-cards { grid-template-columns: repeat(auto-fill, minmax(calc(60 * var(--u)), 1fr)); }
+  #pantry-main:not(:has(.ngrid)), .regs { grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--tile)), 1fr)); align-items: start; }
+}
 </style>
 <div data-app-root="shopping" hidden>
   <div class="wrap shopping">

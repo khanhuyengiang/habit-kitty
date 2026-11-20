@@ -31,7 +31,7 @@ export const OFFICIAL_PICKER_ICONS: Readonly<Record<string, PickerIcon>> = {
     '........o.........', '.......oYo........', '......oyYyo.......', '.......oyo........', '.......oro........', '..ooooooroooooo...',
     '.owwwwwwwwwwwwwo..', '.owwwwwwwwwwwwwwo.', '.owswwwswwwwswwwo.', '.odsrsssssrssssdo.', '.odssssssssssssdo.', '.occcccccccccccco.',
     '.odssssssssssssdo.', '.odssssssssssssdo.', '.odssssssssssssdo.', 'okkkkkkkkkkkkkkkko', '.oooooooooooooooo.', '..................'] },
-  fish: { label: 'Fish', group: 'pet', food: true, art: [
+  fish: { label: 'Fish', group: 'animal', food: true, art: [
     '..................', '..................', '.....ooooo.....oo.', '...oollllloo..ollo', '..ollssssslloolsdo', '.olssssssssslolsdo',
     'olsowssssssssldddo', 'olsoossssssssdooo.', 'olsssssssssssdo...', 'olsssssssssssdooo.', 'olsssssssssssdlllo', '.olsssssssssdolsdo',
     '..oldsssssddoolsdo', '...oolddddoo..oldo', '.....ooooo.....oo.', '..................', '..................', '..................'] },
@@ -99,7 +99,7 @@ export const OFFICIAL_PICKER_ICONS: Readonly<Record<string, PickerIcon>> = {
     '........o.........', '.......oRo........', '......oRRo....o...', '......oRRRo..oRo..', '.....oRRRRo.oRRo..', '....oRRRRRRooRRRo.',
     '...oRRRRYRRRRRRRo.', '..oRRRRYYRRRRRRRo.', '..oRRRYYYYRRRRRRo.', '.oRRRYYyyYYRRRRRo.', '.oRRYYyyyyYYRRRRo.', '.oRRYyyyyyyYRRRRo.',
     '.oRRYyyywyyYRRRo..', '..oRRYyyyyyYRRo...', '...oRRYYYYYRRo....', '....ooRRRRRRo.....', '......oooooo......', '..................'] },
-  paw: { label: 'Paw', group: 'pet', art: [
+  paw: { label: 'Paw', group: 'animal', art: [
     '..................', '.....oo....oo.....', '....ollo..ollo....', '...olssloolsslo...', '...olssdoolssdo...', '..oooldo..oldooo..',
     '.ollooo....ooollo.', 'olsslo.oooo.olsslo', 'olssdoolllloolssdo', '.oldoolsssslooldo.', '..ooolsssssslooo..', '...olsssssssslo...',
     '...olssssssssdo...', '...olsssddsssdo...', '....olddoolddo....', '.....ooo..ooo.....', '..................', '..................'] },
@@ -107,11 +107,11 @@ export const OFFICIAL_PICKER_ICONS: Readonly<Record<string, PickerIcon>> = {
     '..................', '.......oooo.......', '......ollllo......', '.....oloooolo.....', '...oooloooolooo...', '..olllsllllslllo..',
     '..olwwssssssssdo..', '..olwsssssssssdo..', '..olssssssssssdo..', '.olsssswsswsssslo.', '.olssswwwwwwsssdo.', '.olsssswwwwssssdo.',
     '.olssssswwsssssdo.', '.olssssssssssssdo.', '.oldddddddddddddo.', '..oooooooooooooo..', '..................', '..................'] },
-  cat: { label: 'Cat', group: 'pet', art: [
+  cat: { label: 'Cat', group: 'animal', art: [
     '....o........o....', '...olo......olo...', '..olslo....olslo..', '..olssloooolssdo..', '..olsssllllsssdo..', '.olsssssssssssslo.',
     '.olssssssssssssdo.', 'olsswosssssswosslo', 'olssoossssssoossdo', 'olssssssrrssssssdo', 'oooossssoossssoooo', 'olssssoossoossssdo',
     'oooossssssssssoooo', '.oolssssssssssddo.', '...oldssssssddoo..', '....ooldddddoo....', '......oooooo......', '..................'] },
-  dog: { label: 'Dog', group: 'pet', art: [
+  dog: { label: 'Dog', group: 'animal', art: [
     '..................', '...oo........oo...', '..onnoooooooonno..', '.onnnllllllllnnno.', '.onnssssssssssnno.', '.onnssssssssssnno.',
     '.onnsowssssowsnno.', '.onnsoossssoosnno.', '..onssssssssssno..', '...olwwwNNwwwdo...', '....olwwwwwwdo....', '.....olswwsdo.....',
     '......oldddo......', '.......oooo.......', '..................', '..................', '..................', '..................'] },
@@ -172,9 +172,9 @@ export const OFFICIAL_PICKER_ICONS: Readonly<Record<string, PickerIcon>> = {
     '...o.ololdolo.o...', '..olooolsslooolo..', '.olslllswwslllslo.', '.olsdddswwsdddsdo.', '..olooolssdooolo..', '...o.ololdolo.o...',
     '....olooldoolo....', '...olo.oldo.olo...', '....o.olsslo.o....', '.......oldo.......', '........oo........', '..................'] },
   cloud: { label: 'Cloud', group: 'nature n weather', art: [
-    '..................', '..................', '..................', '..........ooo.....', '....oo...ollloo...', '...ollo.olsssllo..',
-    '..olsslolsssssdo..', '.olsssslssssssslo.', 'olsssssssssssssslo', 'olssssssssssssssdo', '.olssssssssssssdo.', '..oldddddddddddo..',
-    '...oooooooooooo...', '..................', '..................', '..................', '..................', '..................'] },
+    '..........ooo.....', '....ooo..owwwo....', '...owwloolwwwwo...', '..owwlswwlswwwo...', '..ollswwwwwssdo...', '..olsswwwwwswwoo..',
+    '.owwwwwwwwwwwwwwo.', 'owwwwwwwwwwwwwwwwo', 'owwwwwwwwwwwwwwwwo', 'owwwwwwwwwwwwwwwwo', 'olwwwwwwwwwwwwwwlo', 'ollwlsslwwlsslwldo',
+    '.oldddddddddddddo.', '..oooooooooooooo..', '..................', '..................', '..................', '..................'] },
   sparkle: { label: 'Sparkle', art: [
     '........oo........', '.......ollo.......', '.......oldo.......', '.......oldo.......', '.......oldo.......', '.......oldo.......',
     '......olsslo......', '.ooooolsssslooooo.', 'olllllsswwsslllllo', 'olddddsswwssdddddo', '.ooooolssssdooooo.', '......olssdo......',
@@ -187,22 +187,14 @@ export const OFFICIAL_PICKER_ICONS: Readonly<Record<string, PickerIcon>> = {
     '........oo........', '.......orro.......', '......olsslo......', '...oo.olssdo.oo...', '..olloolssdoollo..', '..oldoolssdooldo..',
     '..oldoolssdooldo..', '..olsllssssllsdo..', '..oldddssssddddo..', '...oooolssdoooo...', '......olssdo......', '......olssdo......',
     '....ooolssdooo....', '...onnnnnnnnnno...', '....onnnnnnnno....', '....onNNNNNNno....', '.....oooooooo.....', '..................'] },
-  mushroom: { label: 'Mushroom', group: 'food', art: [
-    '......oooooo......', '....oolllllloo....', '...ollssssssllo...', '..olsssssssssslo..', '.olswwsssssswwslo.', 'olsswwsssssswwsslo',
-    'olssssswwwwsssssdo', 'olssssssssssssssdo', '.olssssssssssssdo.', '..oldddddddddddo..', '...oooooooooooo...', '....occcccccco....',
-    '....occcccccco....', '....occcccccco....', '....occcccccco....', '.....occcccco.....', '......oooooo......', '..................'] },
-  butterfly: { label: 'Butterfly', group: 'pet', art: [
+  butterfly: { label: 'Butterfly', group: 'animal', art: [
     '......o....o......', '.....odo..odo.....', '......odoodo......', '..oo..ooddoo..oo..', '.olloollddlloollo.', 'olssllssddssllsslo',
     'olsswlssddsswlssdo', 'olsswwssddsswwssdo', 'olssssssddssssssdo', '.olsssssddsssssdo.', '..olssssddssssdo..', '.olsssddddddssslo.',
     '.olsslssddsslssdo.', '..olsssddddsssdo..', '...olddoddolddo...', '....ooooddoooo....', '........oo........', '..................'] },
-  chick: { label: 'Chick', group: 'pet', art: [
+  chick: { label: 'Chick', group: 'animal', art: [
     '......oooooo......', '.....oyyyyyyo.....', '...ooyyyyyyyyoo...', '..oyyyyyyysysyyo..', '.oyyyyyyyyysyyyyo.', '.oyyyyyyyyyyyyyyo.',
     'oyyyoyyyyyyyyoyyyo', 'oyyyyyyyyyyyyyyyyo', 'oyyyyyyyRRyyyyyyyo', 'oyyyyyyyRRyyyyyyyo', '.oyyyyyyyyyyyyyyo.', '.oyyyyyyyyyyyyyyo.',
     '..oyyyyyyyyyyyyo..', '...oyyyyyyyyyyo...', '...oRooRooRooRo...', '..oRRoRRooRRoRRo..', '...oo.oo..oo.oo...', '..................'] },
-  pizza: { label: 'Pizza', group: 'food', food: true, art: [
-    '.oooooooooooooooo.', 'onnnnnnnnnnnnnnnno', 'onnnnnnnnnnnnnnnno', 'oyyssyyyyyyyyssyyo', '.oysdyyyylyyysdyo.', '.oyyyyssyyyyyyyyo.',
-    '..oyyysdyyssyyyo..', '..oysyyyyysdysyo..', '...oyyyyyyyyyyo...', '...oyyyyysyyyyo...', '....oylyyyysyo....', '....oyyyyyyyyo....',
-    '.....oyyssyyo.....', '.....oyysdyyo.....', '......oyyyyo......', '.......oydo.......', '.......oyyo.......', '........oo........'] },
   burger: { label: 'Burger', group: 'food', food: true, art: [
     '..................', '.....oooooooo.....', '...oonnnnnnnnoo...', '..onnnnnnnnnnnno..', '.onnnwnnnnnnwnnno.', 'onnnnnnnnnnnnnnnno',
     'oggggggggggggggggo', 'olssssssssssssssdo', 'oyyyyyyyyyyyyyyyyo', 'oNNNNNNNNNNNNNNNNo', 'oNNNNNNNNNNNNNNNNo', 'oggggggggggggggggo',
@@ -315,22 +307,142 @@ export const OFFICIAL_PICKER_ICONS: Readonly<Record<string, PickerIcon>> = {
     '.......ooooooo....', '.....oowwwwwwwoo..', '....owwssllwllwwo.', '...owwsllwlwwllwwo', '...oksswlwwllllswo', '.ooKkdswllwwwlsdwo',
     'owwwwkdwwwssssdwwo', 'owoKKwwdddddddwwKo', 'okoKKkwwwwwwwwwkKo', 'okoKKkkkkkkkkkkkKo', 'okoKKkkwwwwwwwwkKo', 'okoKKkkwwwwwwwwkKo',
     'okkKKkkwwwwwwwwkKo', '.okKKkkwwwwwwwwkdo', '..oodkkwwwwwwwwdo.', '....odkwwwwwwwdo..', '.....oddddddddo...', '......oooooooo....'] },
-  rabbit: { label: 'Rabbit', group: 'pet', art: [
+  rabbit: { label: 'Rabbit', group: 'animal', art: [
     '..................', '.....ooooooo..o...', '...oowwwwwwwoowo..', '..owwwwooowwwowwo.', '.owwwwwowwowwwowo.', '.owwwwwocwwowwowo.',
     'owwwwwwoccwowwwwwo', 'owwwwwwwocwwwwwwwo', 'owwwwwwwwwwwwwwwwo', 'owcwwwwwwwwwwwwwwo', '.owcwwwwwwwldwwwwo', '.owccwwwwwwddwwowo',
     'oldwwwwwwccwwwwwdo', 'olsdddwwwwwwwwddlo', 'ollsssddddddddsslo', '.ollllssssssssllo.', '..ooldllllldlloo..', '....oooooooooo....'] },
-  chicken2: { label: 'Chicken', group: 'pet', art: [
+  chicken2: { label: 'Chicken', group: 'animal', art: [
     '.....ooo..........', '....olllo.........', '...olssslo........', '..olsswwwwo.......', '..olwwwwwwwo...oo.', '.olwwwwwwwwo..owco',
     '.owwwowwwwwwoowwco', 'oyyyworrwwwwccwwco', 'oYYYwwrrwwwwwwwwno', 'ocwwwwwwwwwwwwwnco', 'ocwwwwwwwwcwwcnwco', 'ocwwwwwwwwwcwwwnco',
     'ocwwwwwwwwwwccnwno', '.ocwwwwwwwwwwwwco.', '.ocwwwwwwwwwwwwno.', '..occwwwwwwwccno..', '...oocccccccooo...', '.....ooooooo......'] },
-  chicken: { label: 'Chicken (Cream)', group: 'pet', art: [
+  chicken: { label: 'Chicken (Cream)', group: 'animal', art: [
     '.....ooo..........', '....olllo.........', '...olddddo........', '..olddcccco.......', '..odccccccco...oo.', '.odcccccccco..ocyo',
     '.occcoccccccooccyo', 'oyyycorrccccyyccyo', 'oYYYccrrccccccccno', 'oycccccccccccccnyo', 'oyccccccccyccynwyo', 'oycccccccccycccnyo',
     'oyccccccccccyynwno', '.oyccccccccccccyo.', '.oyccccccccccccno.', '..oyycccccccyyno..', '...ooyyyyyyyooo...', '.....ooooooo......'] },
-  bee: { label: 'Bee', group: 'pet', art: [
+  bee: { label: 'Bee', group: 'animal', art: [
     '....ooo...........', '...owwwoo.........', '...owwwwwo........', '...olllwwwo...o...', '.ooooolllwlo.oNo..', 'owwwwloolllNoNo...',
     'ollwwwllolNooNo...', 'ollllwllnYNyyNo...', '.olllllnYyNyyyyo..', 'oyYnYYnyyyyyyyoyo.', 'oynyynnyyyyyyyoyo.', 'oYnyynnyyyyoyyyro.',
     'oYnyynnYyyyoyyyyo.', 'oYnYynnnyyrryyyyo.', '.oonYYnnYYyyyyyo..', '..onnYYnnnYYYYo...', '...ooYYYnnnnoo....', '.....ooooooo......'] },
+  pie: { label: 'Pie', group: 'cute dessert', art: [
+    '........ooo.......', '.......occcoo.....', '.......oYYYccoo...', '......oYYYYYYccoo.', '.....oYddccYYYYcYo', '....occddYYddccYco',
+    '...oYccYYccddccYco', '...oYYYddccYYYYcco', '..oYYccddYYYYccdco', '.oYddccYYYccddddco', 'oYYddYYccdddssddYo', 'occYccdddsddssddYo',
+    'occssdlsddssdYYYo.', 'oddssdssddYYYooo..', 'odddddddYYooo.....', 'olsddddooo........', 'olddooo...........', '.ooo..............'] },
+  densepie: { label: 'Dense Pie', group: 'cute dessert', art: [
+    '........ooo.......', '.......owlloo.....', '......owcwwlloo...', '.....owccwwwslloo.', '....owwwwwwwwssllo', '....owwwwwcwwssslo',
+    '...olcwwwccwcssslo', '...olscwwwwcsslslo', '..olssssssssssldlo', '.olsssssssllddddlo', 'olsssslllddddddddo', 'olsllldddddddddddo',
+    'olldddddddddddddo.', 'oddddddddddddooo..', 'odddddddddooo.....', 'oddddddooo........', 'odddooo...........', '.ooo..............'] },
+  brightmoon: { label: 'Bright Moon', group: 'nature n weather', art: [
+    '......oooo........', '....ooYyyYo...o...', '...oYyyyoo...olo..', '..oYyyyo...oolwlo.', '.oYyyyYo..oloolo..', '.oyyYyo...olo.o...',
+    'oYyyyyo..olwlo....', 'oyyYyyo...olo...o.', 'oyylyyo...olo..oYo', 'oylclyyo...o...oyo', 'oyylyyyYo....ooyyo', 'oYyYyyyyyooooYyyYo',
+    '.oyyyylyyyyyyyyyo.', '.oYyyYcYyyyyyyyYo.', '..oYyylyyYyyyyYo..', '...oYyyyyyyyyYo...', '....ooYyyyyYoo....', '......oooooo......'] },
+  lightmoon: { label: 'Light Moon', group: 'nature n weather', art: [
+    '......oooo........', '....ooyccyo...o...', '...oycccoo...olo..', '..oyccco...oolwlo.', '.oycccyo..oloolo..', '.occyco...olo.o...',
+    'oycccco..olwlo....', 'occycco...olo...o.', 'occlcco...olo..oyo', 'oclwlcco...o...oco', 'occlcccyo....oocco', 'oycycccccooooyccyo',
+    '.occcclccccccccco.', '.oyccywycccccccyo.', '..oycclccyccccyo..', '...oyccccccccyo...', '....ooyccccyoo....', '......oooooo......'] },
+  whiteskate2: { label: 'White skate', group: 'sport', art: [
+    '.....ooo..........', '....owkwo.........', '...owwsdo.........', '..okwskwo.........', '..okwskwlo........', '..okswwswwo.......',
+    '.okkwwwwkwloo.....', '.okkwwwwwswwlo....', '.okkkwwwwwkswwoo..', '..okkkkwwwwkkkwwo.', '.ooooookwwwwwwwko.', 'odddodoowwwwwwkko.',
+    'odsdodo.ookkkkkdo.', 'odddoo...odddoddo.', '.ooo.....odsdooo..', '.........odddo....', '..........ooo.....', '..................'] },
+  whiteskate: { label: 'Coloured skate', group: 'sport', art: [
+    '.....ooo..........', '....oldlo.........', '...olsllo.........', '..odssddo.........', '..odssdslo........', '..odssslslo.......',
+    '.oddssssdsloo.....', '.oddssssslsllo....', '.odddsssssdlsloo..', '..oddddssssdddllo.', '.oooooodsssssssdo.', 'olllolooldssssddo.',
+    'olslolo.oodddddlo.', 'ollloo...olllollo.', '.ooo.....olslooo..', '.........olllo....', '..........ooo.....', '..................'] },
+  carrot: { label: 'Carrot', group: 'food', art: [
+    '..........oo...oo.', '.........oggoooggo', '..........oggGgggo', '..........ogGgggo.', '.......oooGGGggGo.', '......oYccYYGGGGo.',
+    '.....oYYccYY(GGGGo', '....oYYYY(Y((GooGo', '....oYY(YY(((o..o.', '...oYYYY((((Yo....', '..oY(YYYY(((Yo....', '..oY((Y((((Yo.....',
+    '.oYYY((((YYo......', '.oYYY(((Yoo.......', 'oYY(((YYo.........', 'oY((YYoo..........', 'oYYYoo............', '.ooo..............'] },
+  waffle: { label: 'Waffle', group: 'food', art: [
+    '..................', '...oooo....oooo...', '..oYNUYo..oUYNUo..', '.oYYYYYYooYYYYYYo.', 'oYNYNNYNNYNNYNNYNo', 'oNUYNUYNUYNUYNUYNo',
+    'oYYYYYYYYYYYYYYYYo', 'oNNYNNYNNYNNYNNYNo', '.oUYNUYNUYNUYNUYo.', '.oYYYYYYYYYYYYYYo.', '..oYNNYNNYNNYNNo..', '...oNUYNUYNUYNo...',
+    '....oYYYYYYYYo....', '.....oYNNYNNo.....', '......oNUYNo......', '.......oYYo.......', '........oo........', '..................'] },
+  chocolatewaffle: { label: 'Chocolate Waffle', group: 'food', art: [
+    '..................', '...oooo....oooo...', '..o((((o..o(oNUo..', '.o((((((oo((oYYYo.', 'o(((((((((((oNNYNo', 'o(((((((((o(oNUYNo',
+    'oo(((o(((oYoYYYYYo', 'oNo(oNo((oNNYNNYNo', '.oUoNUo(oYNUYNUYo.', '.oYYYYo(oYYYYYYYo.', '..oYNNYoNYNNYNNo..', '...oNUYNUYNUYNo...',
+    '....oYYYYYYYYo....', '.....oYNNYNNo.....', '......oNUYNo......', '.......oYYo.......', '........oo........', '..................'] },
+  flavouredwaffle: { label: 'Flavoured Waffle', group: 'food', art: [
+    '..................', '...oooo....oooo...', '..ollllo..oldNUo..', '.olssssloolsdYYYo.', 'olssssssllssdNNYNo', 'olssssssssdsdNUYNo',
+    'odsssdsssdYdYYYYYo', 'oNdsdNdssdNNYNNYNo', '.oUdNUdsdYNUYNUYo.', '.oYYYYdsdYYYYYYYo.', '..oYNNYdNYNNYNNo..', '...oNUYNUYNUYNo...',
+    '....oYYYYYYYYo....', '.....oYNNYNNo.....', '......oNUYNo......', '.......oYYo.......', '........oo........', '..................'] },
+  banana: { label: 'Banana', group: 'food', art: [
+    '............oo....', '...........oUUoo..', '...........o((UUo.', '...........o((((o.', '..........oxx(((o.', '.......ooo^^xxx(o.',
+    '....oooy^^^Y^^xxo.', '.oooyy^^^YYy^^xyyo', 'oY^^^^^YYyy^^Ycyyo', 'oYY^YYYyyy^^Yccyyo', '.oYYyyyyy^^Yccyyyo', 'oYyyyy^^^^Ycccyyyo',
+    'oYY^^^^^YYcccyyyo.', '.oY^^YYYccccyyyyo.', '..oooYcccccyyyyo..', '....oYYyyyyyyyo...', '.....oYyyyyyoo....', '......oooooo......'] },
+  whiteiceskate: { label: 'White ice skate', group: 'sport', art: [
+    '.....ooo..........', '....owkwo.........', '...owwsdo.........', '..okwskwo.........', '..okwskwlo........', '..okswwswwo.......',
+    '.okkwwwwkwloo.....', '.okkwwwwwswwlo....', '.okkkwwwwwkswwoo..', '.ookkkkwwwwkkkwwo.', 'oKooKookwwwwwwwko.', 'oKKKKooowwwwwwkko.',
+    '.ooKKKKoookkkkko..', '...oooKkkoooKoo...', '......ooKkkoKo....', '........ooKkkko...', '..........oooKko..', '.............oo...'] },
+  blueberry: { label: 'Blueberry', group: 'food', art: [
+    '..................', '..................', '.........o........', '.....oooolooo.....', '...oolllldllloo...', '..olllsddsdllllo..',
+    '.olslddssssddlslo.', '.olsslddsdddllsdo.', 'olsssslldlllsssslo', 'olsllssllsssssssdo', 'olsllsssssssssssdo', 'odssssssssssssssdo',
+    'odsssslsssssssssdo', '.odssssssssssssdo.', '.odddssssssssdddo.', '..oddddddddddddo..', '...ooddddddddoo...', '.....oooooooo.....'] },
+  snowman: { label: 'Snowman', group: 'nature n weather', art: [
+    '.........oooo.....', '......ooollllo....', '.....owwwwssslo...', '....owwwwwwsdo....', '...owwwwwwwwo.....', '...owowwwowwo.....',
+    '..oowowwwowwo.o...', '.onolwwwwwwdoono..', 'onn(ssssssss((nno.', '.o(n(ssssssw(n(o..', '..o(wwwwwsswn(o...', '..owwwllwsswwwo...',
+    '..owwwllwsswwwo...', '..owwwwwwllwwwo...', '...owwsswwwwwo....', '...oiwsswwwwio....', '....ooiwwwioo.....', '......ooooo.......'] },
+  untitled: { label: 'Gingerbread Man', group: 'cute dessert', art: [
+    '...........oooo...', '..........orryyo..', '.....ooo.oyrroyyo.', '....oyyyooyoyyyyyo', '....oyywyoyoyyyoyo', '....oywYyyyyoyyrro',
+    '.....oYyyyyyyoorro', '..oooyyyydsyyyyyo.', '.oywyyyyyddyyyoo..', 'oyyYwyydsyyyyyo...', 'oyywYyyddyyyywYo..', '.oYYwYyyyyyYwYYo..',
+    '..ooooyyyyYoYYYo..', '.....owywYwoooo...', '.....oYwYwo.......', '.....oyYyYo.......', '......oYYo........', '.......oo.........'] },
+  icecreamwaffle: { label: 'Ice cream waffle', group: 'food', art: [
+    '..................', '..................', '..................', '..................', '..................', '..................',
+    '..................', '....o.............', '...oYo............', '...oYfo...........', '..oYffo...........', '..oYcffoo.........',
+    '.oYffcfffo........', '.oYcffcfYYo.......', 'oYffcfYYoo........', 'oYcfYYoo..........', 'oYYYoo............', '.ooo..............'] },
+  chocoicecream: { label: 'Flavoured ice cream', group: 'food', art: [
+    '.........ooooo....', '........odddddo...', '......oodllllldo..', '.....oddlwwwllldo.', '....oddlwwwwlllldo', '...odldlwwlllllsdo',
+    '...odlsdlllllllsdo', '...odlsdslllllssdo', '...oYdlldsssssssdo', '...oYfdssdsssssdo.', '..oYffdsslddssdo..', '..oYcffddlssdddo..',
+    '.oYffcfffdllldo...', '.oYcffcfYYdddo....', 'oYffcfYYooooo.....', 'oYcfYYoo..........', 'oYYYoo............', '.ooo..............'] },
+  flavouredsoftserve: { label: 'Flavoured soft serve', group: 'food', art: [
+    '.............oo...', '............owlo..', '...........oooldo.', '.......oooodddldo.', '.....ooddddwlssdo.', '....oddlwwdllssdo.',
+    '...odwldwwldsssdo.', '...odlldlllsdddo..', '...oYslldlsssdo...', '...oYfsssdsssdo...', '..oYffdsssddsdo...', '..oYcffdssssdo....',
+    '.oYffcfffsssdo....', '.oYcffcfYYddo.....', 'oYffcfYYoooo......', 'oYcfYYoo..........', 'oYYYoo............', '.ooo..............'] },
+  flavouredduosoftserve: { label: 'Flavoured duo soft serve', group: 'food', art: [
+    '.............oo...', '............owlo..', '...........ooolyo.', '.......oooodddcyo.', '.....ooddddwlccyo.', '....oddlwwdlcccyo.',
+    '...odwldwwldcccyo.', '...odlldlllcyyyo..', '...oYslldlcccyo...', '...oYfsssycccyo...', '..oYffdsscyycyo...', '..oYcffyccccyo....',
+    '.oYffcffycccyo....', '.oYcffcfYYyyo.....', 'oYffcfYYoooo......', 'oYcfYYoo..........', 'oYYYoo............', '.ooo..............'] },
+  cheesecrustpizza: { label: 'Cheese crust pizza', group: 'food', art: [
+    '....oooo..........', '..ooffffooooo.....', '.oUUYYYYfffffooo..', '.oUUUUYYYYYYYfffo.', '..oRRRUUUUUUYYYYYo', '.o#R&RRyNNNNUYUcYo',
+    '.oR&&R&ccyyyNUccco', '.oRR&R&cccyyyNYcco', 'oUUR&&_ccccyyyYYco', 'oyyyUU__RR&UUYYoco', 'occyyyURRRR&Yoooco', 'occ_yy#&&&#Yo...o.',
+    'o&R__y#R&YYo......', 'oR&R_URYYoo.......', 'o&&RRUYoo.........', 'oR#RYYo...........', 'oYYYoo............', '.ooo..............'] },
+  meat: { label: 'Meat', group: 'food', food: true, art: [
+    '..................', '..................', '..oo..ooooo.......', '.occooUU(((oo.....', 'occ(((((f(f((o....', 'oc((((((((fc((o...',
+    '.o(((((((((((((o..', '.o(((((((((fff(o..', 'o((((((((fffff(o..', 'oU((((((fffffffo..', 'oU((((((fffUUffo..', '.oU((((fffUccUUo..',
+    '.oU((((fffUccccco.', '..oU(((ffffUcccco.', '...oU(((fffUccoo..', '....ooUU(ffocco...', '......ooooo.oo....', '..................'] },
+  shell: { label: 'Shell', group: 'animal', art: [
+    '................o.', '..............oolo', '.............ollo.', '...........oolllo.', '.........oolwlwo..', '........ollslwwo..',
+    '......oowlllslo...', '....oollslwlsdo...', '...ollssslwwdo....', '..owwwllsslwwo....', '.olsslwlllllwo....', '.olssslwwllswo....',
+    'ollllsslwwllo.....', 'oldddwlslwwwo.....', 'owodddwllwwo......', 'owsooddlooo.......', 'owwdddoo..........', '.ooooo............'] },
+  jellyfish: { label: 'Jellyfish', group: 'animal', art: [
+    '.....ooooo........', '....olllllooo.....', '...ollwwllllloo...', '...olwwwwsswwlloo.', '..ollwwwwsswwllllo', '..olwwwwwsssllwllo',
+    '.ollwwwwsssslllllo', 'ollwwwwssslllllllo', 'ollwwwlllllllwwlwo', 'owllllllwdddddooo.', '.owwwwwddsdsddo...', '..oldddsdddlsllo..',
+    '...oldsddooldlolo.', '..ollsdoloololldo.', '..ololdoololollolo', '..olloolololoololo', '...oloolololoololo', '....o..o.o.o..o.o.'] },
+  starfish: { label: 'Starfish', group: 'animal', art: [
+    '..oo...........oo.', '.olloo.......oollo', '.olslloo...oollslo', '..oldsllooolldsdo.', '...olssslllsssdo..', '....oldsssddssdo..',
+    '....olsddddssdo...', '...olssddddlsdo...', '..olssddddddsslo..', '..oldsssdssssdslo.', '.olsssssdssssssslo', 'olssddsssssddddsdo',
+    'olddoodsdssdoooddo', '.ooo..olssdo...oo.', '......olsdo.......', '......olsdo.......', '......oldo........', '.......oo.........'] },
+  squirrel: { label: 'Squirrel', group: 'animal', art: [
+    '..........ooooo...', '.....o...oYYYYYo..', '....oYo.oYYYYYYYo.', '...ooYYooYYYYYnnYo', '..oYYYYNoYYYYNnnno', '.occYYYNNYYYYNnnno',
+    'oYcnoYYYNNYYYYNnno', 'oYYoocnYYYNnYYYNno', 'oYYYccnYYYYnnYYNo.', 'onYYYoYYYYYnonYo..', '.ooooYYYYYYYnonNo.', '.oNNYYYoooYYnnoNo.',
+    'oNNYYYoYYYYYnnoNo.', 'oNNNNNcYYYYYnnNNo.', '.oNNNccYYYYnnnNNo.', '..ooocccYYnnnNNo..', '....oYYnnnnnoNo...', '.....ooooooooo....'] },
+  flour: { label: 'Flour', group: 'food', art: [
+    '...ooooooooooooo..', '..occccccccccccco.', '..oufuuuuuuuuuufo.', '...offfffffffffo..', '..ouuuuuuuuuuffoo.', '..occcccccccccfoo.',
+    '.occccccccccccfuo.', '.occcccYYYccccfuuo', 'occcccYcyYccccfuuo', 'occccYyyyYccccfuuo', 'oucccYnynYccccfuuo', 'oucccYnnYcccccfuuo',
+    'oucccYYYccccccfuuo', 'ouccccccccccccfufo', 'ouucccccccccccfufo', 'ofuucccccccccffffo', '.ofuuuuuuuuuffffo.', '..oooooooooooooo..'] },
+  milk: { label: 'Milk', group: 'food', art: [
+    '....ooooooooooo...', '...olllllllllllo..', '...oldldlllssllo..', '..owwwwwwwwwwwslo.', '.owwwwwwwwwwwosslo', 'owwwwwwwwwwwoooddo',
+    'olssssssssssoddddo', 'oldddsssssssdddddo', 'olssssssssssdddddo', 'olssswswssssdddddo', 'olsswwwwwsssdddddo', 'olsswswswsssddddlo',
+    'olsswssswsssddlllo', 'olsssssssssslllllo', 'owwwwwwwwwwwlllllo', 'owwwwwwwwwwwllloo.', 'owwwwwwwwwwwloo...', '.oooooooooooo.....'] },
+  chonkbottle: { label: 'Chonk bottle', group: 'food', art: [
+    '.......oooo.......', '......ollllo......', '.....olsssslo.....', '.....olsssslo.....', '....oiilllliio....', '....oiiiiiiiio....',
+    '.....oibiibio.....', '....oibbbbbbio....', '....oibbbbbbio....', '...oibiiiiiibio...', '...oibiiiiiibio...', '..oibllllllllbio..',
+    '..oissllllllssio..', '..oissssssssssio..', '..oissssssssssio..', '...oissssssssio...', '....oiiiiiiiio....', '.....oooooooo.....'] },
+  boba: { label: 'Boba', group: 'food', art: [
+    '........oo.....oo.', '.......owwo...oslo', '.......owwwo.oslso', '......owffwwoslso.', '.....owffcfwwsso..', '....owffcccfwwo...',
+    '...owffcccfffwwo..', '..owffcccfffffwwo.', '.owffyccfffffffwwo', '.owffyyffffffffwwo', 'owffffffffffffwoo.', 'owfffU(ffU(ffwo...',
+    'owU(f((ff((fwo....', 'ow((fffffffwo.....', '.owfffU(ffwo......', '..owff((wwo.......', '...owwwwoo........', '....oooo..........'] },
+  mushroom2: { label: 'Mushroom', group: 'food', art: [
+    '......oooooo......', '....oowllllloo....', '..oolllsswlsllo...', '.owlsssssllsssdo..', 'olsswlssssssswllo.', 'oldddddddddddlllo.',
+    'oldslccNNNNddddllo', '.oolddlccnncclsddo', '...ooolcccndddddo.', '......occnoooooo..', '......occo........', '.....occco........',
+    '.....occco........', '.....occcno.......', '.....oncccno......', '.....oncccno......', '......onnno.......', '.......ooo........'] },
 };
 // Every icon the app knows: the official ones with Kitty Gallery's put over them (src/pixel/live.ts keeps it so).
 export const PICKER_ICONS: Record<string, PickerIcon> = { ...OFFICIAL_PICKER_ICONS };

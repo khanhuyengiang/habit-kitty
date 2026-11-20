@@ -53,6 +53,15 @@
 .dform .row.two { grid-template-columns: 1fr 1fr; }
 .dform .reflect-area { min-height: calc(70 * var(--u)); font: 500 20px/1.4 var(--font) !important; resize: none; }
 .start { justify-self: start; }
+/* wide screens (see .wrap in page.html): the month on the left, its boxes (at a glance, reflection, birthdays, memorable days)
+   down the right. The last row takes up whatever the calendar needs beyond the boxes, so they keep together at the top. */
+@media (min-width: 960px) {
+  .diary-body { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(5, auto) 1fr; align-items: start; }
+  .diary-body > * { grid-column: 2; }
+  .diary-body > .meter { grid-column: 1 / -1; }
+  .diary-body > .cat:has(.month) { grid-column: 1; grid-row: 2 / -1; }
+  .diary-body > .cat:has(.month) { width: 100%; max-width: 560px; justify-self: center; }   /* keep the days a sensible size instead of stretching with the column */
+}
 </style>
 <div data-app-root="diary" hidden>
   <div class="wrap diary">

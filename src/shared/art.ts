@@ -87,22 +87,21 @@ export const markSvg = (name: string) => artSvg(MARKS[name], 'mark');
 // Decorations: the official pictures that are drawn in one place only. DECOS has Kitty Gallery's changes put over them.
 // The wing beside the chosen app on the home screen (after inspo/menu.jpg): the tip up and out, three tiers of feathers
 // whose tips notch the outer edge, and a round joint with a curl at the bottom, next to the key. This is the left one; the
-// right is drawn mirrored. H outline (lavender400), [ white, { feather line (grey400).
+// right is drawn mirrored. H outline (lavender400), [ white, a lavender (lit) and v lavender for the feather lines.
 export const OFFICIAL_DECOS: Readonly<Record<string, { label: string; art: string[] }>> = {
   wing: { label: 'Wing', art: [
-    '.HH.........',
-    'H[[HH.......',
-    'H[[[[HH.....',
-    '.H[[[[[HH...',
-    'H{{{{[[[[H..',
-    'H[[[[[[[[[H.',
-    '.H{{{[[[[[[H',
-    'H[[[[[HHH[[H',
-    'H[[[[H[[[H[H',
-    '.H{{{H[{[H[H',
-    '..H[[H[[[H[H',
-    '...HHHHHHHH.',
-  ] },
+    '.HHHHH......',
+    'Ha[[[[HH....',
+    'Ha[[[[[[H...',
+    'Ha[[[[[[[H..',
+    '.H[[[[[[[[H.',
+    '.Hvva[[[[[H.',
+    'Ha[[[[avv[[H',
+    'Ha[vaav[[v[H',
+    '.Hvaava[[[[H',
+    '..HHHHaa[[aH',
+    '......HaaaH.',
+    '.......HHH..'] },
 };
 export const DECOS: Record<string, { label: string; art: string[] }> = { ...OFFICIAL_DECOS };
 // The diary book, the trophy, the cosy room and the garden live in ./scene.ts.

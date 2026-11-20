@@ -124,6 +124,13 @@
 .pix-colours .muted { font-size: 16px; }
 .pix-colours .badge { justify-self: start; }
 .pix-foot { text-align: center; font-size: 16px; }
+/* wide screens (see .wrap in page.html): the board on the left, its preview and the save form beside it. The last row takes
+   up whatever the board needs beyond them, so they keep together at the top. */
+@media (min-width: 960px) {
+  .pixel-body:has(> .pix-draw) { grid-template-columns: minmax(0, 1fr) minmax(0, calc(120 * var(--u))); grid-template-rows: repeat(4, auto) 1fr; align-items: start; }
+  .pixel-body:has(> .pix-draw) > * { grid-column: 2; }
+  .pixel-body > .pix-draw { grid-column: 1; grid-row: 1 / -1; }
+}
 </style>
 <div data-app-root="pixel" hidden>
   <div class="wrap pixel">

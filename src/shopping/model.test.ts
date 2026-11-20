@@ -46,6 +46,15 @@ describe('names and categories', () => {
     expect(guessCategory('Whole milk')).toBe('dairy');
     expect(guessCategory('Bananas')).toBe('produce');
     expect(guessCategory('Mystery')).toBe('other');
+    // the default categories: the narrow ones are tried first
+    expect(guessCategory('Eggs')).toBe('bakery');
+    expect(guessCategory('Eggplant')).toBe('produce');
+    expect(guessCategory('Peanut butter')).toBe('spreads');
+    expect(guessCategory('Maple syrup')).toBe('spreads');
+    expect(guessCategory('Olive oil')).toBe('oils');
+    expect(guessCategory('Chili sauce')).toBe('oils');
+    expect(guessCategory('Aluminium foil')).toBe('household');
+    expect(guessCategory('Basmati rice')).toBe('pantry');
     const d = setRegular(emptyData(), 'Milk', { cat: 'drinks' });
     expect(guessCategory('milk', d)).toBe('drinks');
   });
@@ -198,27 +207,29 @@ describe('autocomplete and loading', () => {
     expect(d.lists[0].items).toMatchObject([{ name: 'Milk', cat: 'other', done: false }]);
     expect(d.regulars.tea).toMatchObject({ rule: 'none', bought: [1, 3] });
   });
-  it('shows empty pantry categories unless told not to', () => {
-    expect(sanitize({}).opts.showEmpty).toBe(true);
-    expect(sanitize({ opts: { showEmpty: false } }).opts.showEmpty).toBe(false);
+  it('hides empty pantry categories unless told to show them, and moves bought things to the pantry', () => {
+    expect(sanitize({}).opts.showEmpty).toBe(false);
+    expect(sanitize({ opts: { showEmpty: true } }).opts.showEmpty).toBe(true);
+    expect(sanitize({}).opts.toPantry).toBe(true);
+    expect(sanitize({ opts: { toPantry: false } }).opts.toPantry).toBe(false);
   });
 });
 
 describe('categories and where things go', () => {
   it('remembers where you put an item, everywhere and from then on', () => {
     let { d, ids } = withLists('Aldi');
-    d = addItem(d, ids[0], { name: 'Maple syrup' }).data;
-    d = addToPantry(d, { name: 'Maple syrup', qty: '', unit: '' });
+    d = addItem(d, ids[0], { name: 'Kombucha' }).data;
+    d = addToPantry(d, { name: 'Kombucha', qty: '', unit: '' });
     expect(listOf(d, ids[0])!.items[0].cat).toBe('other');
     d = updateHave(d, d.pantry[0].id, { cat: 'pantry' });
     expect(listOf(d, ids[0])!.items[0].cat).toBe('pantry');
-    expect(placeOf(d, 'maple syrup').cat).toBe('pantry');
+    expect(placeOf(d, 'kombucha').cat).toBe('pantry');
     d = useUp(d, d.pantry[0].id, NOW);
-    d = addItem(d, ids[0], { name: 'Maple Syrup' }).data;   // already on it: left alone
-    const items = parseIngredients('maple syrup');
-    expect(guessCategory('maple syrup', d)).toBe('pantry');
+    d = addItem(d, ids[0], { name: 'KOMBUCHA' }).data;   // already on it: left alone
+    const items = parseIngredients('kombucha');
+    expect(guessCategory('kombucha', d)).toBe('pantry');
     expect(items[0].cat).toBe('other');
-    expect(parseIngredients('maple syrup', d)[0].cat).toBe('pantry');
+    expect(parseIngredients('kombucha', d)[0].cat).toBe('pantry');
   });
   it('adds into the category (and sub-category) it was added from', () => {
     let d = emptyData();
@@ -230,7 +241,7 @@ describe('categories and where things go', () => {
     d = addToPantry(d, { name: 'flour', qty: '', unit: '' });   // from the top: where it was before
     expect(d.pantry[0]).toMatchObject({ cat: 'pantry', sub: s.id });
     expect(hadBefore(d)).toEqual([]);
-    expect(shelves(d, 'pantry').map((x) => [x.name, x.items.map((i) => i.name)])).toEqual([['Baking', ['Flour']]]);
+    expect(shelves(d, 'pantry').map((x) => [x.name, x.items.map((i) => i.name)])).toEqual([['Rice', []], ['Flour', []], ['Noodle', []], ['Baking', ['Flour']]]);   // after the shelves a new Kitty Mart has
   });
   it('sorts a list by sub-category inside each category', () => {
     let { d, ids } = withLists('Aldi');
@@ -285,15 +296,15 @@ describe('category order per supermarket', () => {
     const { d, ids: [aldi, lidl] } = withLists('Aldi', 'Lidl');
     const ids = (cats: { id: string }[]) => cats.map((c) => c.id);
     expect(ids(listCats(d, listOf(d, aldi)))).toEqual(ids(d.cats));
-    const x = moveListCat(d, aldi, 'dairy', -1);
-    expect(ids(listCats(x, listOf(x, aldi))).slice(0, 2)).toEqual(['dairy', 'produce']);
+    const x = moveListCat(d, aldi, 'meat', -1);
+    expect(ids(listCats(x, listOf(x, aldi))).slice(0, 2)).toEqual(['meat', 'produce']);
     expect(ids(x.cats)).toEqual(ids(d.cats));
     expect(ids(listCats(x, listOf(x, lidl)))).toEqual(ids(d.cats));
-    expect(moveListCat(x, aldi, 'dairy', -1)).toBe(x);   // already first
+    expect(moveListCat(x, aldi, 'meat', -1)).toBe(x);   // already first
     // a category made later goes after the list's own order; a deleted one drops out
     const y = sanitize(JSON.parse(JSON.stringify(deleteCat(x, 'bakery'))));
     expect(ids(listCats(y, listOf(y, aldi)))).not.toContain('bakery');
-    expect(listOf(y, aldi)!.order?.[0]).toBe('dairy');
+    expect(listOf(y, aldi)!.order?.[0]).toBe('meat');
     expect(listOf(resetListOrder(x, aldi), aldi)!.order).toBeUndefined();
     expect(resetListOrder(d, aldi)).toBe(d);
   });

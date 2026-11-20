@@ -9,7 +9,7 @@
 // Habit Kitty starts this once (initDiary); the Diary screen and the backup read and write through here. Everything is
 // kept in memory too, so screens draw at once.
 import { Encoding, Filesystem } from '@capacitor/filesystem';
-import { ROOT, at, fileBytes, fileNames, removeFile, stagedReplace, toBase64, writeOk } from '../shared/files.ts';
+import { ROOT, at, fileBytes, fileNames, fileText, removeFile, stagedReplace, toBase64, writeOk } from '../shared/files.ts';
 import {
   EXTRAS_FILE, MAX_PHOTOS, dayFromName, diaryPath, entryFromMarkdown, entryToMarkdown, monthFromKey, photoPath, reflectionPath, sanitizeExtras,
   type DiaryEntry, type DiaryExtras, type Reflection,
@@ -33,8 +33,8 @@ async function readEntries(): Promise<Record<number, DiaryEntry>> {
   const photos = new Set(await fileNames('photos'));
   await Promise.all((await fileNames('diary')).map(async (name) => {
     const day = dayFromName(name.replace(/\.md$/, ''));
-    const bytes = day === null ? undefined : await fileBytes(`diary/${name}`);
-    const e = bytes && entryFromMarkdown(new TextDecoder().decode(bytes));
+    const md = day === null ? undefined : await fileText(`diary/${name}`);
+    const e = md !== undefined && entryFromMarkdown(md);
     if (day === null || !e) return;
     const has = (i: number) => photos.has(photoPath(day, i).slice('photos/'.length));
     let n = has(0) ? 1 : 0;
@@ -49,17 +49,17 @@ async function readReflections(): Promise<Record<string, Reflection>> {
   const out: Record<string, Reflection> = {};
   await Promise.all((await fileNames('reflections')).map(async (name) => {
     const key = name.replace(/\.md$/, '');
-    const bytes = monthFromKey(key) ? await fileBytes(`reflections/${name}`) : undefined;
-    const e = bytes && entryFromMarkdown(new TextDecoder().decode(bytes));
+    const md = monthFromKey(key) ? await fileText(`reflections/${name}`) : undefined;
+    const e = md !== undefined && entryFromMarkdown(md);
     if (e && e.text.trim()) out[key] = { text: e.text, updated: e.updated };
   }));
   return out;
 }
 
 async function readExtras(): Promise<DiaryExtras | null> {
-  const bytes = await fileBytes(EXTRAS_FILE);
-  if (!bytes) return null;
-  try { return sanitizeExtras(JSON.parse(new TextDecoder().decode(bytes))); } catch { return {}; }
+  const json = await fileText(EXTRAS_FILE);
+  if (json === undefined) return null;
+  try { return sanitizeExtras(JSON.parse(json)); } catch { return {}; }
 }
 
 // ---- in memory ----

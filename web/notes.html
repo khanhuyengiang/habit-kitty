@@ -132,7 +132,7 @@ button.nbook:focus-visible .nbook-face { box-shadow: inset 0 0 0 var(--bw) var(-
 .nkinds span, :is(.notes, #notes-layer, .diary-pic) .icon-fold > summary, :is(.notes, #notes-layer, .diary-pic) .icon-pick label > span, .nswatches span, .ndoodles span, .md pre { position: relative; }
 .nkinds span::after, :is(.notes, #notes-layer, .diary-pic) .icon-fold > summary::after, :is(.notes, #notes-layer, .diary-pic) .icon-pick label > span::after, .nswatches span::after, .ndoodles span::after, .md pre::after {
   content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; border: var(--bw) solid; border-color: inherit;
-  -webkit-mask-box-image: var(--patch-box); }
+  -webkit-mask-box-image: var(--patch-box); mask: var(--patch-m); }
 /* the colour and doodle choices */
 .nswatches, .ndoodles { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .nswatches label, .ndoodles label { position: relative; display: inline-flex; cursor: pointer; }
@@ -161,6 +161,10 @@ button.nbook:focus-visible .nbook-face { box-shadow: inset 0 0 0 var(--bw) var(-
 .md hr { border: 0; border-top: var(--px) solid var(--line); width: 100%; }
 .md a { color: var(--accent-text); }
 .md .wikilink { color: var(--accent-text); }
+/* wide screens (see .wrap in page.html): as many cards to a row as fit, instead of two */
+@media (min-width: 960px) {
+  .ngrid { grid-template-columns: repeat(auto-fill, minmax(calc(55 * var(--u)), 1fr)); }
+}
 </style>
 <div data-app-root="notes" hidden>
   <div class="wrap notes">

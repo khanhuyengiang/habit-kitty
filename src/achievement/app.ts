@@ -129,10 +129,11 @@ function fitCards() {
   const cs = getComputedStyle(app);
   const room = app.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   const u = 2 * (parseFloat(getComputedStyle(root).getPropertyValue('--px')) || 1.5);   // --u, the layout unit
-  const gapMin = 2 * u, gapMax = 5 * u, max = Math.max(1.3, u * 0.58);
-  const fit = (n: number) => Math.floor(Math.min(max, (room - (n - 1) * gapMin) / n / CARD_PX) * 16) / 16;   // sixteenths of a px: no fractions that blur
+  const sixteenths = (x: number) => Math.floor(x * 16) / 16;   // sixteenths of a px: no fractions that blur
+  const gapMin = 2 * u, gapMax = 5 * u, max = sixteenths(Math.max(1.3, u * 0.58));
+  const fit = (n: number) => sixteenths(Math.min(max, (room - (n - 1) * gapMin) / n / CARD_PX));
   let n = fit(2) >= CARD_MIN ? 2 : 1;
-  while (n < 6 && fit(n + 1) >= max - 0.001) n++;
+  while (n < 12 && fit(n + 1) >= max) n++;   // a wide window (the website on a computer) takes up to twelve
   const cu = Math.max(fit(n), 0.5);
   const gap = n > 1 ? Math.min(gapMax, Math.floor(((room - n * CARD_PX * cu) / (n - 1)) * 100) / 100) : 0;
   root.style.setProperty('--cu', `${cu}px`);

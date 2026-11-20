@@ -13,13 +13,16 @@ export type Category = string;
 export interface Sub { id: string; name: string }
 export interface Cat { id: string; name: string; icon: string; color: CatColor; subs: Sub[] }
 export const OTHER = 'other';
-const DEFAULT_CATS: [string, string, string, CatColor][] = [
-  ['produce', 'Fruit & veg', 'apple', 'mint'], ['dairy', 'Dairy & eggs', 'chick', 'lemon'], ['bakery', 'Bakery', 'food', 'peach'],
-  ['meat', 'Meat & fish', 'fish', 'pink'], ['frozen', 'Frozen', 'snow', 'blue'], ['pantry', 'Cupboard', 'home', 'peach'],
-  ['drinks', 'Drinks', 'coffee', 'blue'], ['snacks', 'Snacks', 'cake', 'pink'], ['household', 'Household', 'bulb', 'lavender'],
-  ['care', 'Personal care', 'sparkle', 'mint'], [OTHER, 'Other', 'bag', 'lavender'],
+// The categories a new Kitty Mart starts with, in this order: id, name, icon, colour and shelves (sub-categories).
+const DEFAULT_CATS: [string, string, string, CatColor, [string, string][]?][] = [
+  ['produce', 'Fruit & veg', 'banana', 'mint'], ['meat', 'Meat & fish', 'meat', 'pink'], ['bakery', 'Bakery & Eggs', 'untitled', 'peach'],
+  ['frozen', 'Frozen', 'snowman', 'blue'], ['dairy', 'Dairy', 'milk', 'blue'], ['snacks', 'Snacks', 'rabbittanghulu', 'pink'],
+  ['spreads', 'Syrups & Spreads', 'honeyjar', 'lemon', [['syrup', 'Syrup'], ['spread', 'Spread']]], ['drinks', 'Drinks', 'pawcoffee', 'peach'],
+  ['pantry', 'Grains & Staples', 'flour', 'peach', [['rice', 'Rice'], ['flour', 'Flour'], ['noodle', 'Noodle']]],
+  ['oils', 'Oils & Condiments', 'chonkbottle', 'lavender', [['oil', 'Oil'], ['condiment', 'Condiment'], ['sauce', 'Sauce']]],
+  ['household', 'Household', 'bulb', 'lavender'], ['care', 'Personal care', 'sparkle', 'mint'], [OTHER, 'Other', 'bag', 'lavender'],
 ];
-export const defaultCats = (): Cat[] => DEFAULT_CATS.map(([id, name, icon, color]) => ({ id, name, icon, color, subs: [] }));
+export const defaultCats = (): Cat[] => DEFAULT_CATS.map(([id, name, icon, color, subs = []]) => ({ id, name, icon, color, subs: subs.map(([sid, n]) => ({ id: sid, name: n })) }));
 
 // from: the recipes that put it on the list (shown next to it, greyed out)
 export interface Item { id: string; name: string; qty: string; unit: string; cat: Category; done: boolean; dupOk?: boolean; from?: string[] }
@@ -46,6 +49,7 @@ export interface Had { name: string; qty: string; unit: string; cat: Category; s
 export interface Place { cat: Category; sub: string }
 // showEmpty: the pantry shows the categories with nothing in them too
 export interface Options { sink: boolean; learn: boolean; toPantry: boolean; showEmpty: boolean }
+const DEFAULT_OPTS: Options = { sink: true, learn: true, toPantry: true, showEmpty: false };
 export interface ShopData {
   v: 2; lists: List[]; regulars: Record<string, Regular>; recipes: Recipe[]; pantry: Have[];
   cats: Cat[];
@@ -60,7 +64,7 @@ const BOUGHT_KEPT = 12;
 const DAY = 86_400_000;
 
 export const emptyData = (): ShopData => ({
-  v: 2, lists: [], regulars: {}, recipes: [], pantry: [], cats: defaultCats(), places: {}, had: {}, dismissed: {}, opts: { sink: true, learn: true, toPantry: false, showEmpty: true },
+  v: 2, lists: [], regulars: {}, recipes: [], pantry: [], cats: defaultCats(), places: {}, had: {}, dismissed: {}, opts: { ...DEFAULT_OPTS },
 });
 export { newId };
 
@@ -90,17 +94,20 @@ export const qtyText = (x: { qty: string; unit: string }) => [x.qty, x.unit].fil
 export const itemText = (x: { name: string; qty: string; unit: string }) => [qtyText(x), x.name].filter(Boolean).join(' ');
 
 // ---- categories: where you put it before, else guessed from the name ----
+// The first that matches wins, so the narrow ones come first ("peanut butter" is a spread, "chili sauce" a sauce).
 const GUESS: [Category, RegExp][] = [
-  ['dairy', /milk|cheese|yog(h)?urt|butter|cream|quark|egg|feta|mozzarella|parmesan|kefir|skyr/],
-  ['produce', /apple|banana|orange|lemon|lime|pear|grape|berr|tomato|potato|onion|garlic|carrot|lettuce|salad|spinach|cucumber|pepper|zucchini|courgette|avocado|mushroom|herb|basil|parsley|ginger|fruit|veg|broccoli|cabbage|leek|celery|kiwi|mango|melon/],
-  ['bakery', /bread|roll|bun|bagel|croissant|toast|baguette|cake|pretzel|wrap|tortilla/],
+  ['spreads', /jam|jelly|honey|syrup|nutella|peanut butter|spread|marmalade|maple/],
+  ['oils', /\boil|vinegar|sauce|ketchup|mustard|mayo|spice|pesto|dressing/],
+  ['dairy', /milk|cheese|yog(h)?urt|butter|cream|quark|feta|mozzarella|parmesan|kefir|skyr/],
+  ['produce', /apple|banana|orange|lemon|lime|pear|grape|berr|tomato|potato|onion|garlic|carrot|lettuce|salad|spinach|cucumber|pepper|zucchini|courgette|avocado|mushroom|herb|basil|parsley|ginger|fruit|veg|broccoli|cabbage|leek|celery|kiwi|mango|melon|eggplant|aubergine/],
+  ['bakery', /bread|roll|bun|bagel|croissant|toast|baguette|cake|pretzel|wrap|tortilla|egg/],
   ['meat', /chicken|beef|pork|mince|ham|bacon|sausage|salami|turkey|fish|salmon|tuna|shrimp|prawn|lamb|steak|tofu/],
   ['frozen', /frozen|ice cream|pizza|fries|peas/],
   ['drinks', /water|juice|coffee|tea|beer|wine|soda|cola|lemonade|drink/],
   ['snacks', /chocolate|chips|crisps|cookie|biscuit|candy|sweets|nuts|popcorn|snack|gum/],
   ['household', /paper|towel|tissue|detergent|soap|dish|sponge|bag|foil|cling|bin|bulb|batter|clean|bleach|softener|napkin/],
   ['care', /shampoo|conditioner|toothpaste|toothbrush|deodorant|razor|lotion|cream|plaster|floss|tampon|pad|vitamin|medicine/],
-  ['pantry', /flour|sugar|salt|rice|pasta|noodle|oil|vinegar|sauce|spice|cereal|oat|bean|lentil|can|jam|honey|stock|broth|yeast|baking|ketchup|mustard|mayo/],
+  ['pantry', /flour|sugar|salt|rice|pasta|noodle|cereal|oat|bean|lentil|can|stock|broth|yeast|baking/],
 ];
 type Known = Partial<Pick<ShopData, 'regulars' | 'places' | 'had' | 'cats'>>;
 export function guessCategory(name: string, d: Known = {}): Category {
@@ -253,7 +260,8 @@ export function sanitize(raw: unknown): ShopData {
   const cat = (v: unknown): Category => (typeof v === 'string' && d.cats.some((c) => c.id === v) ? v : OTHER);
   const sub = (c: Category, v: unknown) => subIn(d, c, str(v, 20));
   const o = obj(r.opts);
-  d.opts = { sink: o.sink !== false, learn: o.learn !== false, toPantry: o.toPantry === true, showEmpty: o.showEmpty !== false };
+  const opt = (k: keyof Options) => (typeof o[k] === 'boolean' ? o[k] as boolean : DEFAULT_OPTS[k]);
+  d.opts = { sink: opt('sink'), learn: opt('learn'), toPantry: opt('toPantry'), showEmpty: opt('showEmpty') };
   d.lists = arr(r.lists).slice(0, LIMITS.lists).map((l) => obj(l)).filter((l) => str(l.name).trim()).map((l) => ({
     id: str(l.id) || newId(), name: cleanName(str(l.name)),
     ...(arr(l.order).length && { order: [...new Set(arr(l.order).map((c) => str(c, 20)).filter((c) => d.cats.some((x) => x.id === c)))] }),

@@ -21,12 +21,13 @@
   /* The corner shapes are 9-slice masks (-webkit-mask-box-image), painted like borders: the browser snaps them to screen pixels
      the same way it snaps the border, so the steps sit exactly on the border's pixels wherever the box lands. Each corner slice is
      whole art pixels (4, or 2 for --notch-s), so its size is whole CSS pixels too. Browsers without it (Firefox, on the website)
-     cut the corners with --notch-m, rectangles in a plain mask, which can be a screen pixel off. */
+     cut the corners with --notch-m (and keep the corner patches with --patch-m), rectangles in a plain mask, which can be a screen
+     pixel off. */
   --notch-box: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 9 9' shape-rendering='crispEdges'%3E%3Cpath d='M3 0h1v1h-1zM4 0h1v1h-1zM5 0h1v1h-1zM1 1h1v1h-1zM2 1h1v1h-1zM3 1h1v1h-1zM4 1h1v1h-1zM5 1h1v1h-1zM6 1h1v1h-1zM7 1h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM7 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM6 3h1v1h-1zM7 3h1v1h-1zM8 3h1v1h-1zM0 4h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM5 4h1v1h-1zM6 4h1v1h-1zM7 4h1v1h-1zM8 4h1v1h-1zM0 5h1v1h-1zM1 5h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1zM4 5h1v1h-1zM5 5h1v1h-1zM6 5h1v1h-1zM7 5h1v1h-1zM8 5h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM7 6h1v1h-1zM1 7h1v1h-1zM2 7h1v1h-1zM3 7h1v1h-1zM4 7h1v1h-1zM5 7h1v1h-1zM6 7h1v1h-1zM7 7h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1z'/%3E%3C/svg%3E") 4 fill / calc(4 * var(--px));
   --notch-s-box: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='5' height='5' viewBox='0 0 5 5' shape-rendering='crispEdges'%3E%3Cpath d='M1 0h1v1h-1zM2 0h1v1h-1zM3 0h1v1h-1zM0 1h1v1h-1zM1 1h1v1h-1zM2 1h1v1h-1zM3 1h1v1h-1zM4 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1z'/%3E%3C/svg%3E") 2 fill / calc(2 * var(--px));   /* one pixel cut, for small boxes */
   --notch-top-box: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 9 9' shape-rendering='crispEdges'%3E%3Cpath d='M3 0h1v1h-1zM4 0h1v1h-1zM5 0h1v1h-1zM1 1h1v1h-1zM2 1h1v1h-1zM3 1h1v1h-1zM4 1h1v1h-1zM5 1h1v1h-1zM6 1h1v1h-1zM7 1h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM7 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM6 3h1v1h-1zM7 3h1v1h-1zM8 3h1v1h-1zM0 4h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM5 4h1v1h-1zM6 4h1v1h-1zM7 4h1v1h-1zM8 4h1v1h-1zM0 5h1v1h-1zM1 5h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1zM4 5h1v1h-1zM5 5h1v1h-1zM6 5h1v1h-1zM7 5h1v1h-1zM8 5h1v1h-1zM0 6h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM7 6h1v1h-1zM8 6h1v1h-1zM0 7h1v1h-1zM1 7h1v1h-1zM2 7h1v1h-1zM3 7h1v1h-1zM4 7h1v1h-1zM5 7h1v1h-1zM6 7h1v1h-1zM7 7h1v1h-1zM8 7h1v1h-1zM0 8h1v1h-1zM1 8h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1zM8 8h1v1h-1z'/%3E%3C/svg%3E") 4 fill / calc(4 * var(--px));   /* the top corners only */
   --patch-box: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='5' height='5' viewBox='0 0 5 5' shape-rendering='crispEdges'%3E%3Cpath d='M0 0h1v1h-1zM4 0h1v1h-1zM0 4h1v1h-1zM4 4h1v1h-1z'/%3E%3C/svg%3E") 2 fill / var(--bw);                  /* the corner pixels inside a two-pixel outline: see the ::after below */
-  --notch-m: none; --notch-s-m: none;
+  --notch-m: none; --notch-s-m: none; --notch-top-m: none; --patch-m: none; --patch-top-m: none;
   --hilite: rgba(255, 255, 255, .7);   /* the light line along the top of a key */
   /* Pastel pink, baby blue and lavender. Lavender draws the lines, pink is the accent, blue and cream fill the cards. */
   --bg: #e0f2fd; --bg2: #f3ecff; --bg3: #ffe3ee; --grid: rgba(143, 120, 208, .22);
@@ -54,7 +55,7 @@
   --habit: #4a9bea; --fed: #5fc7a8; --missed: #f26fa3; --today: #ffd36e; --sitter: #8f78d0; --none: #4a3a78;
   --warn-bg: #4a3a1c; --warn-ink: #f1cfa0; --bad: #ff7d9f; --ok: #5fc7a8; --hilite: rgba(255, 255, 255, .14); color-scheme: dark;
 } }
-@supports not (-webkit-mask-box-image: none) { :root { --notch-m: linear-gradient(#000 0 0) center / calc(100% - 6 * var(--px)) 100% no-repeat, linear-gradient(#000 0 0) center / calc(100% - 2 * var(--px)) calc(100% - 2 * var(--px)) no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - 6 * var(--px)) no-repeat; --notch-s-m: linear-gradient(#000 0 0) center / calc(100% - 2 * var(--px)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - 2 * var(--px)) no-repeat; --notch-box: none; --notch-s-box: none; --notch-top-box: none; --patch-box: none; } }
+@supports not (-webkit-mask-box-image: none) { :root { --notch-m: linear-gradient(#000 0 0) center / calc(100% - 6 * var(--px)) 100% no-repeat, linear-gradient(#000 0 0) center / calc(100% - 2 * var(--px)) calc(100% - 2 * var(--px)) no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - 6 * var(--px)) no-repeat; --notch-s-m: linear-gradient(#000 0 0) center / calc(100% - 2 * var(--px)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - 2 * var(--px)) no-repeat; --notch-top-m: linear-gradient(#000 0 0) center / calc(100% - 6 * var(--px)) 100% no-repeat, linear-gradient(#000 0 0) bottom / calc(100% - 2 * var(--px)) calc(100% - var(--px)) no-repeat, linear-gradient(#000 0 0) bottom / 100% calc(100% - 3 * var(--px)) no-repeat; --patch-m: linear-gradient(#000 0 0) left top / var(--px) var(--px) no-repeat, linear-gradient(#000 0 0) right top / var(--px) var(--px) no-repeat, linear-gradient(#000 0 0) left bottom / var(--px) var(--px) no-repeat, linear-gradient(#000 0 0) right bottom / var(--px) var(--px) no-repeat; --patch-top-m: linear-gradient(#000 0 0) left top / var(--px) var(--px) no-repeat, linear-gradient(#000 0 0) right top / var(--px) var(--px) no-repeat; --notch-box: none; --notch-s-box: none; --notch-top-box: none; --patch-box: none; } }
 /* The big windows' borders (after inspo/): a one-pixel outline whose corners step in three pixels along a 45° diagonal, a light
    line inside it along the top and left and a shade along the bottom and right (both following the diagonal). Drawn in --rp,
    the window's own pixel, in the colours each window sets: --o (outline), --hl (light), --sh (shade), --hc (the inner pixel of
@@ -157,6 +158,13 @@ body {
 :root[data-fancy] body { background: var(--backdrop, linear-gradient(var(--bg) 0 34%, var(--bg2) 34% 67%, var(--bg3) 67%)) 0 0 / var(--backdrop-size, auto) fixed; }
 [data-app-root] { image-rendering: auto; }   /* pixelated is for the backdrop; it is inherited, so each app picks its own */
 .wrap { max-width: 480px; margin: 0 auto; padding: var(--s6) var(--s5) calc(24 * var(--u)); display: grid; gap: var(--s6); align-content: start; }
+/* Wide screens (the website on a computer, a tablet on its side): the page is not a phone-wide column in the middle but
+   fills the window (up to a point), and its cards tile across it. Each app's sheet says how its own lists tile, in a block
+   like this one with the same width; dialogs keep their size. --tile is the narrowest a card gets in a tiled list. */
+:root { --tile: calc(100 * var(--u)); }
+@media (min-width: 960px) {
+  .wrap { max-width: 1800px; padding-inline: var(--s8); }
+}
 h1, h2, h3 { margin: 0; text-wrap: balance; }
 h2 { font: 700 18px/1 var(--font); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 p { margin: 0; }
@@ -184,7 +192,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .panel, .cat, .btn, .gear, .x-close, .toast, .bar, .avatar, .banner, .chips span, .update, .distrust, .travel-note, .reminder-status.bad, .week, .chip, .clock-btn, .modes label, .moods button, .catlog li, .acc li, .dot, .hp, .room, .seg, .month-nav button:not(.month-title), .pick { position: relative; }
 .panel::after, .cat::after, .btn::after, .gear::after, .x-close::after, .toast::after, .bar::after, .avatar::after, .banner::after, .chips span::after, .update::after, .distrust::after, .travel-note::after, .reminder-status.bad::after, .week::after, .chip::after, .clock-btn::after, .modes label::after, .moods button::after, .catlog li::after, .acc li::after, .dot::after, .hp::after, .room::after, .seg::after, .month-nav button:not(.month-title)::after, .pick::after {
   content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; border: var(--bw) solid; border-color: inherit;
-  -webkit-mask-box-image: var(--patch-box); }
+  -webkit-mask-box-image: var(--patch-box); mask: var(--patch-m); }
 
 /* ---------- the title bar: the same on every screen, so its buttons never move ---------- */
 .top { display: grid; gap: var(--s3); }
@@ -547,8 +555,8 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .tabbar button[aria-selected="true"] { color: var(--accent-text); }
 .tabbar button:not([aria-selected="true"]) i { opacity: .6; }
 .tabbar button.mid { position: relative; margin-top: calc(-6 * var(--px)); padding-top: var(--s3); background: var(--accent-soft);
-  border: var(--bw) solid var(--edge); border-bottom: 0; -webkit-mask-box-image: var(--notch-top-box); }
-.tabbar button.mid::after { content: ""; position: absolute; inset: 0 0 calc(-1 * var(--bw)) 0; pointer-events: none; border: var(--bw) solid; border-color: inherit; border-bottom: 0; -webkit-mask-box-image: var(--patch-box); }
+  border: var(--bw) solid var(--edge); border-bottom: 0; -webkit-mask-box-image: var(--notch-top-box); mask: var(--notch-top-m); }
+.tabbar button.mid::after { content: ""; position: absolute; inset: 0 0 calc(-1 * var(--bw)) 0; pointer-events: none; border: var(--bw) solid; border-color: inherit; border-bottom: 0; -webkit-mask-box-image: var(--patch-box); mask: var(--patch-top-m); }
 .tabbar button.mid[aria-selected="true"] { background: var(--accent-pastel); }
 .clock-pop { position: fixed; right: var(--s4); bottom: calc(26 * var(--u) + env(safe-area-inset-bottom, 0px)); z-index: 6; display: grid; justify-items: end; gap: var(--s2); }
 .clock-btn { width: calc(13 * var(--u)); height: calc(13 * var(--u)); display: grid; place-items: center; padding: 0; background: var(--surface); color: var(--ink); box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--bevel); }
@@ -656,6 +664,22 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .pick[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 var(--accent-shade); }
 .pick:active:not(:disabled) { transform: translateY(calc(3 * var(--px))); box-shadow: none; }
 .pick:disabled { background: var(--none); color: var(--muted); border-color: var(--line); box-shadow: none; opacity: .55; cursor: default; }
+
+/* wide screens (see .wrap): the cats and strays tile; the heatmap (one calendar for them all, with its key under it) stays
+   a calendar's size in the middle. On the Stray and Treats tab the add form sits beside the list. Settings' boxes tile too,
+   each heading and the footer on a row of their own. */
+@media (min-width: 960px) {
+  .cats { grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--tile)), 1fr)); align-items: start; }
+  #heat { grid-template-columns: minmax(0, calc(150 * var(--u))); justify-content: center; }
+  #adopt-btn { justify-self: center; width: min(100%, calc(110 * var(--u))); }
+  .room-foot { justify-content: center; }
+  #tab-mindful.on { grid-template-columns: minmax(0, 1fr) minmax(0, calc(110 * var(--u))); grid-template-rows: auto auto 1fr; align-items: start; }
+  #tab-mindful > * { grid-column: 1; }
+  #tab-mindful > #task-form { grid-column: 2; grid-row: 1 / -1; }
+  #tab-settings .set-page { grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--tile)), 1fr)); align-items: start; }
+  #tab-settings .set-page > :not(details) { grid-column: 1 / -1; }
+  .set-apps { grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(70 * var(--u))), 1fr)); }
+}
 </style>
 <div data-app-root="habit">
 
@@ -736,6 +760,8 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
       </div>
       <p class="muted" id="day-span"></p>
     </div></details>
+
+    <details class="panel fold" hidden><summary>Sync</summary><div class="fold-body" id="sync-box"></div></details>
 
     <details class="panel fold"><summary>Backup</summary><div class="fold-body">
       <p class="muted">One <b>.kitty</b> file holds <b>everything</b>: your kitties, every diary page and photo, notes, Kitty Mart, your Kitty Gallery icons, and your Kitty Achievement quests and achievements (photos are scaled down so the file stays small). Save it on this device, or share it to Drive or by mail.</p>

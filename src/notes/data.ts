@@ -5,7 +5,7 @@
 // (Its own folder, so restoring the diary never touches it.) Everything is kept in memory too, so screens draw at once.
 // Habit Kitty starts this (initNotes) because the backup needs it; the Notes screen and the folder sync read and write here.
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
-import { fromBase64, stagedReplace, writeOk } from '../shared/files.ts';
+import { stagedReplace, writeOk } from '../shared/files.ts';
 import { BACKUP_PREFIX, markDirty } from '../shared/backupfolder.ts';
 import { MAX_NOTES, MAX_TEXT, parseNote, safeName, sameBook, sortNotes, uniqueName, withBook, type Note } from './model.ts';
 import { jsonFile } from '../shared/jsonfile.ts';
@@ -16,11 +16,11 @@ const STAGE = 'habit-kitty-notes-restore';   // a restore is written here first,
 const path = (name: string, root = ROOT) => ({ path: `${root}/${name}.md`, directory: Directory.Data });
 const dir = (root = ROOT) => ({ path: root, directory: Directory.Data });
 
-const textOf = (b64: string) => new TextDecoder().decode(fromBase64(b64));
+// Read as UTF-8, as it is written: on the website Capacitor hands back the text as stored, so base64 would only work on the phone.
 const readText = async (name: string): Promise<string | null> => {
   try {
-    const r = await Filesystem.readFile(path(name));
-    return typeof r.data === 'string' ? textOf(r.data) : await r.data.text();
+    const r = await Filesystem.readFile({ ...path(name), encoding: Encoding.UTF8 });
+    return typeof r.data === 'string' ? r.data : await r.data.text();
   } catch { return null; }
 };
 const writeText = (name: string, text: string, root = ROOT) =>

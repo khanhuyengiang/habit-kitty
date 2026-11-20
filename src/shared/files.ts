@@ -1,5 +1,5 @@
 // Small helpers over Capacitor's Filesystem: files in the app's private storage, under one folder per area.
-import { Directory, Filesystem } from '@capacitor/filesystem';
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 
 export const ROOT = 'habit-kitty';
 export const at = (path: string, root = ROOT) => ({ path: `${root}/${path}`, directory: Directory.Data });
@@ -16,6 +16,14 @@ export const dataBytes = async (data: string | Blob) => typeof data === 'string'
 
 export async function fileBytes(path: string, root = ROOT): Promise<Uint8Array | undefined> {
   try { return await dataBytes((await Filesystem.readFile(at(path, root))).data); } catch { return undefined; }
+}
+// A text file (a diary page, a note, diary.json) as text, or undefined. Text is written as UTF-8, so it is read as UTF-8:
+// on the website Capacitor hands back the text just as it was stored, so reading it as bytes (base64) only works on the phone.
+export async function fileText(path: string, root = ROOT): Promise<string | undefined> {
+  try {
+    const { data } = await Filesystem.readFile({ ...at(path, root), encoding: Encoding.UTF8 });
+    return typeof data === 'string' ? data : await data.text();
+  } catch { return undefined; }
 }
 export async function fileNames(dir: string, root = ROOT): Promise<string[]> {
   try { return (await Filesystem.readdir(at(dir, root))).files.map((f) => f.name); } catch { return []; }
