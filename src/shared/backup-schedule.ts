@@ -4,7 +4,7 @@
 //   - a backup is made whenever something changed (a moment after the last change, and when the app is left)
 //   - there is one file per 3-hour slot (00:00, 03:00 ... 21:00), so a slot keeps the last state it saw; a slot nothing
 //     changed in has no file
-//   - today's and yesterday's slots are all kept; of every older day only the day's last backup is kept
+//   - older ones are thinned out: a file a day for the last week, a week for the last month, a month for the last 3 months
 import { localDateKey } from './dates.ts';
 
 export const SLOT_HOURS = 3;
@@ -37,16 +37,28 @@ export function backupLabel(name: string, prefix: string, ext: string): string {
   return !m ? name : m[2] ? `${m[1]} ${m[2].slice(0, 2)}:${m[2].slice(2)}` : m[1];
 }
 
-// The backups to delete: of every day before the last KEEP_FULL_DAYS, all but the day's last one.
+// The backups to delete, so older ones are thinned out the longer ago they are (the last backup of each stretch stays):
+//   today and yesterday     every slot
+//   the last week           one a day
+//   the last month          one a week (calendar weeks, Monday first; a week that crosses a month end keeps one for each month)
+//   the last 3 months       one a month
+//   older                   none
+const dayAt = (d: Date, days: number, months = 0) => localDateKey(new Date(d.getFullYear(), d.getMonth() + months, d.getDate() + days));
+const mondayOf = (day: string) => {
+  const [y, m, d] = day.split('-').map(Number);
+  const t = new Date(y, m - 1, d);
+  return localDateKey(new Date(y, m - 1, d - ((t.getDay() + 6) % 7)));
+};
 export function toPrune(names: string[], prefix: string, ext: string, now = new Date()): string[] {
-  const edge = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (KEEP_FULL_DAYS - 1));
-  const oldest = localDateKey(edge);   // from this day on, every slot stays
+  const full = dayAt(now, -(KEEP_FULL_DAYS - 1)), daily = dayAt(now, -6), weekly = dayAt(now, 0, -1), monthly = dayAt(now, 0, -3);
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const n of backupsOf(names, prefix, ext)) {   // newest first: the first of a day is its last backup
+  for (const n of backupsOf(names, prefix, ext)) {   // newest first: the first of a stretch is its last backup
     const day = parse(n, prefix, ext)![1];
-    if (day >= oldest) continue;
-    if (seen.has(day)) out.push(n); else seen.add(day);
+    if (day >= full) continue;
+    if (day < monthly) { out.push(n); continue; }
+    const stretch = day >= daily ? `d${day}` : day >= weekly ? `w${mondayOf(day)}|${day.slice(0, 7)}` : `m${day.slice(0, 7)}`;
+    if (seen.has(stretch)) out.push(n); else seen.add(stretch);
   }
   return out;
 }

@@ -1,7 +1,7 @@
 // Backups you can find on the phone, for both apps:
 //   saveToDevice()   "save as": the system picker asks where one file goes (on the web it is a normal download)
 //   auto-backup      one folder, picked once; a backup lands there whenever something changed (one file per 3-hour slot;
-//                    older days are thinned to one file a day; rules in ./backup-schedule.ts)
+//                    older ones are thinned out over 3 months; rules in ./backup-schedule.ts)
 // Android only (the BackupFolder plugin). There is one backup file for both apps: Habit Kitty registers it (registerBackupSource)
 // and builds it, with Kitty Achievement's save inside.
 import { Capacitor, registerPlugin } from '@capacitor/core';

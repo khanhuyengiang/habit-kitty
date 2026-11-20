@@ -1100,7 +1100,7 @@ function renderAutoBackup() {
   const f = st.folder;
   const lines = f.chosen
     ? `<p>Folder: <b>${esc(f.name || 'chosen folder')}</b>${f.ok ? '' : ' (not reachable)'}<br>Last backup: ${st.running ? 'saving…' : st.last ? ago(st.last) : 'none yet'}</p>`
-    : '<p class="muted">Off. Pick a folder once (for example Documents, then make a folder called IttyBittyKitty) and a copy is saved there whenever something changes, one for each 3 hours. The copies from today and yesterday are all kept; older days keep only their last copy.</p>';
+    : '<p class="muted">Off. Pick a folder once (for example Documents, then make a folder called IttyBittyKitty) and a copy is saved there whenever something changes, one for each 3 hours. Older copies are thinned out: every copy for 2 days, one a day for a week, one a week for a month, one a month for 3 months.</p>';
   box.innerHTML = `<h4 class="sub">Auto-backup</h4>${lines}${st.error ? `<p class="form-error">${esc(st.error)}</p>` : ''}
     <div class="btns flow">${f.chosen
       ? `<button class="btn" type="button" data-action="backup-now" ${st.running ? 'disabled' : ''}>Back up now</button>
