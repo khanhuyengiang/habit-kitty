@@ -20,6 +20,7 @@ Newest first. The app bundles this file: it shows the latest entry once after an
 ## 0.6.2 - 2026-11-19
 
 ### New
+- **Kitty Gallery: Empty is a colour.** **Empty** sits under the base colours in the colour list. Draw with it to clear cells, or Fill with it to empty a whole area. The Pick tool on an empty cell picks Empty.
 - **Sync with Dropbox.** Settings → **Sync** → **Connect Dropbox** keeps your kitties, diary, notes, Kitty Mart, Kitty Gallery icons and Kitty Achievement the same on your phone, tablet and the website. It goes through your own Dropbox, and Itty Bitty Kitty only sees its own folder there (in **Apps**). It syncs when you open or leave the app, shortly after a change, and with **Sync now**.
 - **Sync merges, it doesn't overwrite.** Changes made on different devices are put together: a kitty fed on your phone and another fed on the website both count, and affection is worked out again from all of it. A diary page written on two devices keeps both texts, and a note changed on two devices keeps a "(conflict)" copy. Sounds and reminders stay as each device has them.
 

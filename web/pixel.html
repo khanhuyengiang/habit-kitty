@@ -121,6 +121,7 @@
 .pix-ink { display: flex; align-items: center; gap: var(--s2); padding: var(--s1) var(--s2); min-width: 0; cursor: pointer; text-align: left;
   background: var(--surface2); border: var(--px) solid var(--line); font: inherit; font-size: 16px; color: var(--ink); }
 .pix-ink i { flex: none; width: calc(8 * var(--u)); height: calc(8 * var(--u)); box-shadow: 0 0 0 var(--px) var(--edge); }
+.pix-ink i.pix-empty { background: repeating-conic-gradient(var(--surface) 0 25%, var(--surface2) 0 50%) 0 0 / 8px 8px; }
 .pix-ink span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pix-ink.base span { color: var(--accent-text); font-weight: 700; }
 .pix-ink[aria-checked="true"] { background: var(--accent); border-color: var(--accent-edge); color: var(--accent-ink); }

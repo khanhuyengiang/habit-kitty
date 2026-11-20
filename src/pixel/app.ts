@@ -144,10 +144,12 @@ const inkButton = (c: CategoryId, ch: string, action = 'pix-ink') => {
 // Only the category's letters (a decoration has no base colour); a row left empty is not shown.
 const inkRows = (c: CategoryId, rows: string[]) => rows.map((r) => [...r].filter((ch) => categoryOf(c).letters.includes(ch)))
   .filter((r) => r.length).map((r) => `<div class="pix-irow">${r.map((ch) => inkButton(c, ch)).join('')}</div>`).join('');
+// Empty is a colour too: drawn or filled with, it clears cells (the Fill tool can empty a whole area).
+const emptyInk = () => `<div class="pix-irow"><button type="button" class="pix-ink" role="radio" data-action="pix-ink" data-ink="." aria-checked="${ink === '.' && tool !== 'erase'}" title="Empty"><i class="pix-empty"></i><span>Empty</span></button></div>`;
 function inksHtml(c: CategoryId): string {
-  if (c === 'button') return `<div class="pix-inks" role="radiogroup" aria-label="Colour">${inkRows(c, ['o'])}</div>`;
+  if (c === 'button') return `<div class="pix-inks" role="radiogroup" aria-label="Colour">${inkRows(c, ['o'])}${emptyInk()}</div>`;
   const last = recentInks()[0];
-  return `<div class="pix-inks" role="radiogroup" aria-label="Colour"><div class="pix-ibase">${inkRows(c, BASE_ROWS)}</div>${inkRows(c, INK_ROWS)}
+  return `<div class="pix-inks" role="radiogroup" aria-label="Colour"><div class="pix-ibase">${inkRows(c, BASE_ROWS)}</div>${emptyInk()}${inkRows(c, INK_ROWS)}
     <div class="pix-irow">${last ? inkButton(c, last) : ''}<button type="button" class="pix-ink pix-choose" data-action="pix-more" aria-haspopup="dialog">${monoSvg(UI_ICONS.plus)}<span>Choose a colour…</span></button></div></div>`;
 }
 // The palette colours picked with "Choose a colour", latest first (kept on this device).
@@ -667,7 +669,7 @@ onShown('pixel', 'pointerdown', (ev) => {
   if (sel) { settle(); renderBoard(); }
   if (t === 'pick') {
     const ch = draft.grid[y][x];
-    if (ch !== '.') { useInk(ch); tool = 'pencil'; render(); }
+    useInk(ch); tool = 'pencil'; render();   // an empty cell picks Empty
     return;
   }
   const ch = t === 'erase' ? '.' : ink;
