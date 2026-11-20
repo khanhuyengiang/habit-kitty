@@ -4,6 +4,7 @@ import {
   doMindfulTask, setTaskDay, setCatDay, replay, rewind, genderOf, daysUntilReady, removeMindfulTask, setHabitSchedule, returnToShelter, ascendCat, ascendMilestone, feedRate, markAscendOffered, habitToCat, releaseToColony, strayVisible, strayWindow, strayNameOf, idHash, dayIndex, dayStartHour, setDayStart, nextReset, levelProgress, hunger, sitterCooldownLeft,
   type ActionResult, type AppState, type Cat, type CatMode, type CatGender, type CatLook, type CatTrait, type GameEvent, type MindfulTask, type Reason, type TaskKind,
 } from './rules.ts';
+import { backupLabel } from '../shared/backup-schedule.ts';
 import { BACKUP_EXT, BACKUP_PREFIX, backupNow, backupStatus, chooseFolder, folderBackups, markDirty, nativeBackups, onBackupStatus, readFolderBackup, refreshFolder, registerBackupSource, saveBackupToDevice, saveToDevice, shareBackup as shareBackupFile, shareFile, stopBackups } from '../shared/backupfolder.ts';
 import { achievementCount, restoreAchievement, snapshotAchievement } from '../achievement/save.ts';
 import { PICKER_ICONS, iconLabel, stickerSvg } from '../shared/stickers.ts';
@@ -1099,7 +1100,7 @@ function renderAutoBackup() {
   const f = st.folder;
   const lines = f.chosen
     ? `<p>Folder: <b>${esc(f.name || 'chosen folder')}</b>${f.ok ? '' : ' (not reachable)'}<br>Last backup: ${st.running ? 'saving…' : st.last ? ago(st.last) : 'none yet'}</p>`
-    : '<p class="muted">Off. Pick a folder once (for example Documents, then make a folder called IttyBittyKitty) and a fresh copy is saved there whenever you leave the app after changing something. The newest 7 days are kept.</p>';
+    : '<p class="muted">Off. Pick a folder once (for example Documents, then make a folder called IttyBittyKitty) and a copy is saved there whenever something changes, one for each 3 hours. The copies from today and yesterday are all kept; older days keep only their last copy.</p>';
   box.innerHTML = `<h4 class="sub">Auto-backup</h4>${lines}${st.error ? `<p class="form-error">${esc(st.error)}</p>` : ''}
     <div class="btns flow">${f.chosen
       ? `<button class="btn" type="button" data-action="backup-now" ${st.running ? 'disabled' : ''}>Back up now</button>
@@ -1161,8 +1162,8 @@ async function openFolderRestore() {
   try {
     const names = await folderBackups(BACKUP_PREFIX, 'kitty');
     if (!names.length) { toast('No Habit Kitty backups in that folder yet.'); return; }
-    openModal(`<div class="panel"><h3>Restore from folder</h3><p class="muted">Pick a backup. The newest is first.</p>
-      <div class="btns col">${names.map((n) => `<button class="btn" type="button" data-action="restore-pick" data-name="${esc(n)}">${esc(n.replace(/^habit-kitty-|\.kitty$/g, ''))}</button>`).join('')}</div>
+    openModal(`<div class="panel"><h3>Restore from folder</h3><p class="muted">Pick a backup (the date and the hour it was made). The newest is first.</p>
+      <div class="btns col">${names.map((n) => `<button class="btn" type="button" data-action="restore-pick" data-name="${esc(n)}">${esc(backupLabel(n, BACKUP_PREFIX, 'kitty'))}</button>`).join('')}</div>
       <div class="btns"><button class="btn" data-action="modal-close">Cancel</button></div></div>`);
   } catch { toast("Couldn't open the backup folder."); refreshFolder(); }
 }

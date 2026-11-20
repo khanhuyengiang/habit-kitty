@@ -24,6 +24,7 @@ import { DEVICE_ONLY } from './merge-game.ts';
 export const SITE = 'https://khanhuyengiang.com/habit-kitty/';   // the website (GitHub Pages, on its own domain)
 const APP_LINK = 'ittybittykitty://dropbox';
 const FILE = '/itty-bitty-kitty.kitty';
+const CONFLICT_DIR = '/conflicts';   // both sides of a conflict are kept here before the merge replaces the file
 const BASE_DIR = 'habit-kitty-sync', BASE_FILE = 'base.kitty';
 const KEY = 'kitty-sync', KEY_PENDING = 'kitty-sync-pending', KEY_DIRTY = 'kitty-sync-dirty';
 const SETTLE_MS = 20_000;      // a change is sent this long after the last one
@@ -205,6 +206,19 @@ function keepDeviceSettings(merged: Backup, local: Backup): Backup {
   return { ...merged, game: g };
 }
 
+// Two devices changed things the other did not have: before the merge replaces the cloud's file, both files as they were
+// (this device's and the cloud's) are uploaded next to it, so nothing is lost if the merge is not what you wanted.
+// Throws when they can't be uploaded: the sync stops, and the merge is not sent.
+const stamp = (d = new Date()) => d.toISOString().replace(/[-:]/g, '').replace(/\..*$/, '').replace('T', '-');
+async function keepBothSides(s: ReturnType<typeof session>, local: Backup, cloudBytes: Uint8Array, cloudRev: string, kept: Set<string>) {
+  if (kept.has(cloudRev)) return;   // this cloud file is already kept (a retry after someone wrote meanwhile)
+  const at = stamp();
+  await s.upload(`${CONFLICT_DIR}/itty-bitty-kitty-${at}-this-device.kitty`, packBackup(local), null);
+  await s.upload(`${CONFLICT_DIR}/itty-bitty-kitty-${at}-cloud.kitty`, cloudBytes, null);
+  kept.add(cloudRev);
+}
+export const conflictDir = CONFLICT_DIR;
+
 async function doSync(): Promise<string> {
   const t = target!;
   const s = session(stored().tokens!, (tokens) => store({ tokens }));
@@ -213,6 +227,7 @@ async function doSync(): Promise<string> {
   lastCheck = Date.now();
   if (rev && rev === stored().rev && !dirty) return 'Up to date';
 
+  const kept = new Set<string>();
   for (let tries = 0; tries < 4; tries++) {
     const local = await t.collect();
     let theirs: { backup: Backup; bytes: Uint8Array } | null = null;
@@ -228,6 +243,7 @@ async function doSync(): Promise<string> {
         ? await mergeBackups(base, local, theirs.backup)
         : keepDeviceSettings(await mergeBackups(null, theirs.backup, local), local);
       const parts = changedParts(local, result);
+      if (parts.size && changedParts(theirs.backup, result).size) await keepBothSides(s, local, theirs.bytes, rev!, kept);   // both sides had news
       got = parts.size;
       if (got) {
         applying = true;

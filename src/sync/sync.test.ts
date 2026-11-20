@@ -21,6 +21,7 @@ type Backup = import('../backup.ts').Backup;
 // ---- the cloud ----
 let cloud: { bytes: Uint8Array; rev: string } | null = null;
 let revs = 0, uploads = 0, sneakIn: (() => void) | null = null;
+let kept: { path: string; bytes: Uint8Array }[] = [];   // files uploaded anywhere but the main one
 const cloudNotes = () => (cloud ? unpackBackup(cloud.bytes).notes : undefined);
 const putCloud = (b: Backup) => { cloud = { bytes: packBackup(b), rev: `r${++revs}` }; };
 const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status });
@@ -32,6 +33,10 @@ globalThis.fetch = (async (url: string, init: RequestInit) => {
   if (url.endsWith('/files/download')) {
     if (!cloud) return notFound();
     return new Response(cloud.bytes as BodyInit, { headers: { 'Dropbox-API-Result': JSON.stringify({ rev: cloud.rev }) } });
+  }
+  if (url.endsWith('/files/upload') && arg.path !== '/itty-bitty-kitty.kitty') {
+    kept.push({ path: arg.path, bytes: new Uint8Array(await new Response(init.body as BodyInit).arrayBuffer()) });
+    return json({ rev: `k${kept.length}` });
   }
   if (url.endsWith('/files/upload')) {
     if (sneakIn) { const f = sneakIn; sneakIn = null; f(); }   // another device writes just before this one
@@ -56,7 +61,7 @@ const edit = (f: (b: Backup) => void) => { f(local); markDirty(BACKUP_PREFIX); }
 beforeEach(() => {
   mem.clear();
   localStorage.setItem('kitty-sync', JSON.stringify({ tokens: { access: 'a', refresh: 'r', expires: Date.now() + 3_600_000 } }));
-  cloud = null; uploads = 0; sneakIn = null;
+  cloud = null; uploads = 0; sneakIn = null; kept = [];
   local = { game: game(), diary: {}, photos: {}, notes: { Mine: 'hello' } };
 });
 
@@ -84,6 +89,26 @@ describe('sync', () => {
     await sync.requestSync();
     expect(local.notes).toEqual({ Mine: 'hello', Phone: 'yo', Theirs: 'hi' });
     expect(cloudNotes()).toEqual(local.notes);
+  });
+
+  it('on a conflict, keeps both files next to the cloud one before the merge replaces it', async () => {
+    await sync.requestSync();
+    putCloud({ ...unpackBackup(cloud!.bytes), notes: { Mine: 'hello', Theirs: 'hi' } });
+    edit((b) => { b.notes = { ...b.notes, Phone: 'yo' }; });
+    await sync.requestSync();
+    expect(kept.map((k) => k.path.replace(/\d{8}-\d{6}/, 'T'))).toEqual(['/conflicts/itty-bitty-kitty-T-this-device.kitty', '/conflicts/itty-bitty-kitty-T-cloud.kitty']);
+    expect(unpackBackup(kept[0].bytes).notes).toEqual({ Mine: 'hello', Phone: 'yo' });
+    expect(unpackBackup(kept[1].bytes).notes).toEqual({ Mine: 'hello', Theirs: 'hi' });
+    expect(cloudNotes()).toEqual({ Mine: 'hello', Phone: 'yo', Theirs: 'hi' });   // and the merge replaced the file
+  });
+
+  it('keeps nothing extra when only one side changed', async () => {
+    await sync.requestSync();
+    edit((b) => { b.notes = { ...b.notes, Phone: 'yo' }; });
+    await sync.requestSync();
+    putCloud({ ...unpackBackup(cloud!.bytes), notes: { Mine: 'hello', Phone: 'yo', Theirs: 'hi' } });
+    await sync.requestSync();
+    expect(kept).toEqual([]);
   });
 
   it('merges again when another device wrote while this one was sending', async () => {

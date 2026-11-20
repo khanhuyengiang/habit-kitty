@@ -1,7 +1,7 @@
 // Backups you can find on the phone, for both apps:
 //   saveToDevice()   "save as": the system picker asks where one file goes (on the web it is a normal download)
-//   auto-backup      one folder, picked once; a fresh dated file per app lands there whenever you leave the app after changes,
-//                    and the newest few are kept (rules in ./backup-schedule.ts)
+//   auto-backup      one folder, picked once; a backup lands there whenever something changed (one file per 3-hour slot;
+//                    older days are thinned to one file a day; rules in ./backup-schedule.ts)
 // Android only (the BackupFolder plugin). There is one backup file for both apps: Habit Kitty registers it (registerBackupSource)
 // and builds it, with Kitty Achievement's save inside.
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -9,7 +9,7 @@ import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { dataBytes, toBase64 } from './files.ts';
 import { readJson, writeJson } from './local.ts';
-import { KEEP_BACKUPS, backupName, backupsOf, isDue, toPrune } from './backup-schedule.ts';
+import { SETTLE_MS, backupName, backupsOf, isDue, slotName, toPrune } from './backup-schedule.ts';
 
 interface FolderState { chosen: boolean; ok: boolean; name?: string }
 interface BackupFolderPlugin {
@@ -81,7 +81,7 @@ export const shareBackup = async () => shareFile(backupName(BACKUP_PREFIX, BACKU
 
 // ---- auto-backup ----
 export interface BackupSource {
-  prefix: string;                      // files are <prefix>-YYYY-MM-DD.<ext>
+  prefix: string;                      // files are <prefix>-YYYY-MM-DD-HH00.<ext>
   ext: string;
   pack(): Promise<Uint8Array>;
 }
@@ -121,6 +121,13 @@ const dirtyListeners = new Set<(prefix: string) => void>();
 export function markDirty(prefix: string) {
   setMap(KEY_DIRTY, prefix, true);
   for (const l of dirtyListeners) l(prefix);
+  if (nativeBackups) scheduleBackup();
+}
+// A change is backed up a moment after the last one (a run of edits is one backup).
+let backupTimer: ReturnType<typeof setTimeout> | undefined;
+function scheduleBackup() {
+  if (backupTimer !== undefined) clearTimeout(backupTimer);
+  backupTimer = setTimeout(() => { backupTimer = undefined; runBackup(); }, SETTLE_MS);
 }
 // Told about every change (cloud sync uses it to know there is something to send).
 export function onDirty(fn: (prefix: string) => void) { dirtyListeners.add(fn); return () => { dirtyListeners.delete(fn); }; }
@@ -150,31 +157,30 @@ export async function stopBackups() {
 
 let chain: Promise<unknown> = Promise.resolve();
 // Backs up every source that is due (all of them with `force`). Runs one at a time; never throws.
-export function runBackup(o: { force?: boolean; launch?: boolean } = {}): Promise<void> {
+export function runBackup(o: { force?: boolean } = {}): Promise<void> {
   const run = chain.then(() => doBackup(o)).catch(() => { /* reported through the status */ });
   chain = run;
   return run;
 }
 
-async function doBackup(o: { force?: boolean; launch?: boolean }) {
+async function doBackup(o: { force?: boolean }) {
   if (!nativeBackups) return;
   await refreshFolder();
   if (!status.folder.chosen) return;
   if (!status.folder.ok) { emit({ error: "Can't reach the backup folder. Choose it again." }); return; }
-  const now = Date.now();
-  const due = sources.filter((s) => o.force || isDue({ dirty: dirtyOf(s.prefix), last: lastOf(s.prefix), now, launch: o.launch }));
+  const due = sources.filter((s) => o.force || isDue({ dirty: dirtyOf(s.prefix) }));
   if (!due.length) return;
   emit({ running: true, error: '' });
   let error = '';
   for (const s of due) {
-    const name = backupName(s.prefix, s.ext);
+    const name = slotName(s.prefix, s.ext);
     try {
       await toCache(name, await s.pack());
       await Plugin.put({ cache: name, name });
       setMap(KEY_LAST, s.prefix, Date.now());
       setMap(KEY_DIRTY, s.prefix, false);
       const names = (await Plugin.list()).files.map((f) => f.name);
-      for (const old of toPrune(names, s.prefix, s.ext, KEEP_BACKUPS)) await Plugin.remove({ name: old }).catch(() => { /* try again next time */ });
+      for (const old of toPrune(names, s.prefix, s.ext)) await Plugin.remove({ name: old }).catch(() => { /* try again next time */ });
     } catch (e) {
       error = String((e as Error)?.message ?? e) === 'no-folder' ? "Can't reach the backup folder. Choose it again." : "Couldn't write the backup. Is there room on the phone?";
     } finally { await dropCache(name); }
@@ -208,7 +214,6 @@ export const readFolderBackup = (name: string) => fetchBytes(name, `restore-${na
 if (nativeBackups) {
   // Leaving the app is the moment to back up: the phone may close it for good right after.
   document.addEventListener('visibilitychange', () => { if (document.hidden) runBackup(); });
-  // Once after start (when both apps had a moment to register), for a backup that went stale.
-  setTimeout(() => runBackup({ launch: true }), 8000);
+  setTimeout(() => runBackup(), 8000);
   refreshFolder();
 }
