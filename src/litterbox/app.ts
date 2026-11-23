@@ -14,17 +14,22 @@ import { makeLayer } from '../shared/layer.ts';
 import { closeX, filterButton, filterSelect, homeButton, playerButton, settingsButton, titleBar } from '../shared/ui.ts';
 import { COLOR, tint } from '../notes/window.ts';
 import { NATIVE } from '../shared/notifications.ts';
-import { alertPermission, askAlertPermission, onAlertInfo } from './notify.ts';
+import { alertInfo, alertPermission, askAlertPermission, onAlertInfo } from './notify.ts';
 import { planAlerts } from './reminders.ts';
+import { STARTERS, addStarters, hasStarter } from './starters.ts';
+import { LIMITS as MART_LIMITS, addItem, listOf as shopList } from '../shopping/model.ts';
+import { change as changeShop, shopData, shopReady } from '../shopping/data.ts';
 import { change, initLitterbox, litterData, litterInitialised, litterReady, onLitter, undo, undoLabel, undoTop } from './data.ts';
 import {
-  CAT_COLORS, LEADS, OTHER, addChore, agoText, arrange, catNameTaken, catOf, choreOf, deleteCat, defaultLead, defaultRepeat, everyText, setAlerts, delay, delayTarget, dueLine, dueOf, dayKey,
+  CAT_COLORS, LEADS, OTHER, addChore, agoText, arrange, catNameTaken, catOf, choreOf, deleteCat, defaultLead, defaultRepeat, everyText, preferText, preferWarning, setAlerts, delay, delayTarget, dueLine, dueOf, dayKey,
   editChore, firstDue, isDay, lastDone, markDone, nextFromLast, noFilter, ordinal, parseDay, removeChore, saveCat, scheduleText, skip, skipTarget, snooze, statusOf,
   summary, todayNum, unsnooze, weekdayName, whenText, type Arrange, type Cat, type CatColor, type ChoreEdit, type Every, type Filter,
   type LitterData, type Prefer, type StatusFilter, type Unit, type View,
 } from './model.ts';
 
 const VIEW_KEY = 'hk-litterbox-view';
+const MART_ITEMS = MART_LIMITS.items;
+const BUY_KEY = 'hk-litterbox-buylist';   // the shopping list a chore's thing to buy went on last
 const HOWS: [Arrange, string][] = [['urgency', 'Urgency'], ['category', 'Category'], ['frequency', 'Frequency']];
 let how: Arrange = (HOWS.find(([h]) => h === getLocal(VIEW_KEY))?.[0]) ?? 'urgency';
 let filter: Filter = { ...noFilter };
@@ -45,7 +50,11 @@ function toast(text: string, canUndo = false) {
   toastTimer = window.setTimeout(() => (el.hidden = true), canUndo ? 6000 : 3200);
 }
 let hiddenUndo: object | null = null;
-const commit = (next: LitterData, label: string, say = label) => { change(next, label); toast(say, true); };
+const commit = (next: LitterData, label: string, say = label) => {
+  if (next === litterData()) { toast('Nothing changed.'); return; }   // an Undo here would put back some other change
+  change(next, label);
+  toast(say, true);
+};
 
 // ---- header ----
 const renderTop = () => { $('lb-top').innerHTML = titleBar('Kitty', 'Litterbox', homeButton() + playerButton() + settingsButton()); };
@@ -70,6 +79,7 @@ function render() {
   if (!litterReady()) { $('lb-body').innerHTML = '<div class="panel"><p class="muted">Loading…</p></div>'; return; }
   const d = litterData(), t = today();
   shownDay = t;
+  if (filter.cat && !d.cats.some((c) => c.id === filter.cat)) filter = { ...filter, cat: '' };   // its category was deleted
   const u = undoLabel(), top = undoTop();
   const undoBar = u && top !== hiddenUndo ? `<div class="lb-undo"><span class="muted">${esc(u)}</span><button class="btn small" type="button" data-action="undo">Undo</button><button class="btn small" type="button" data-action="undo-hide">Cancel</button></div>` : '';
   const panel = filterOpen ? `<div class="panel filter-panel" id="filter-panel"><div class="filter-grid">
@@ -79,14 +89,14 @@ function render() {
   const groups = arrange(d, t, how, filter);
   const list = !d.chores.length
     ? `<div class="panel"><h3>No chores yet</h3><p class="muted">Add what comes back now and then: the bedsheet, the toothbrush, the dishwasher filter. Litterbox says what is due, and when the next one is.</p>
-        <div class="btns"><button class="btn primary" type="button" data-action="chore-new">+ Chore</button></div></div>`
+        <div class="btns"><button class="btn primary" type="button" data-action="chore-new">+ Chore</button><button class="btn" type="button" data-action="ideas-open">Ideas</button></div></div>`
     : groups.length ? groups.map((g) => `<section class="lb-group"><h4>${g.cat ? `<span class="lb-ico" style="${tint(g.cat.color)}">${catIcon(g.cat)}</span>` : ''}${esc(g.title)} <span class="num muted">${g.items.length}</span></h4>
         <ul class="chores">${g.items.map((v) => choreHtml(v, d, t)).join('')}</ul></section>`).join('')
       : '<div class="panel"><p class="muted">Nothing matches that filter.</p></div>';
   $('lb-body').innerHTML = `${undoBar}${d.chores.length ? `<p class="muted lb-sum">${esc(summary(d, t))}</p>` : ''}
     <div class="lb-arrange"><div class="seg" role="group" aria-label="Arrange by">${HOWS.map(([h, label]) => `<button type="button" data-action="lb-arrange" data-how="${h}" aria-pressed="${h === how}">${label}</button>`).join('')}</div></div>
     <div class="tools"><div class="toolbar">${filterButton(filterOpen, changedFilters(), 'lb-filter')}<span class="grow"></span>
-      <button class="btn" type="button" data-action="alerts-open">Reminders</button><button class="btn" type="button" data-action="cats-open">Categories</button><button class="btn primary" type="button" data-action="chore-new" ${d.chores.length ? '' : 'hidden'}>+ Chore</button></div>${panel}</div>
+      <button class="btn" type="button" data-action="ideas-open">Ideas</button><button class="btn" type="button" data-action="alerts-open">Reminders</button><button class="btn" type="button" data-action="cats-open">Categories</button><button class="btn primary" type="button" data-action="chore-new" ${d.chores.length ? '' : 'hidden'}>+ Chore</button></div>${panel}</div>
     ${list}`;
   if (id) document.getElementById(id)?.focus();
 }
@@ -114,12 +124,57 @@ function openChore(id: string) {
       <fieldset class="field"><legend>Snooze until</legend><div class="btns flow">
         ${[['Tomorrow', 1], ['In 3 days', 3], ['Next week', 7]].map(([l, n]) => `<button class="btn small" type="button" data-action="chore-snooze" data-id="${id}" data-days="${n}">${l}</button>`).join('')}
         ${v.snoozed ? `<button class="btn small" type="button" data-action="chore-unsnooze" data-id="${id}">Wake it now</button>` : ''}</div></fieldset>
+      ${buyHtml(c)}
       <button class="btn" type="button" data-action="chore-delay" data-id="${id}">Delay to ${esc(dayText(delayTarget(c, t)))}</button>
       <button class="btn" type="button" data-action="chore-skip" data-id="${id}">Skip this time (next: ${esc(dayText(skipTarget(c, t)))})</button>
     </div>
     ${history ? `<h4 class="sub">History</h4><ul class="lb-hist">${history}</ul>` : ''}
     <div class="btns"><button class="btn danger" type="button" data-action="chore-delete" data-id="${id}">Delete</button><span class="grow"></span>
       <button class="btn" type="button" data-action="chore-howoften" data-id="${id}">Change how often</button><button class="btn" type="button" data-action="chore-edit" data-id="${id}">Edit</button></div>`, c.name);
+}
+
+// To buy: the thing the chore needs, which goes on one of Kitty Mart's shopping lists (shown "for <the chore>" next to it).
+function buyHtml(c: { id: string; name: string; buy: string }): string {
+  if (!c.buy) return '';
+  const lists = shopReady() ? shopData().lists : [];
+  if (!lists.length) return `<p class="muted">To buy: ${esc(c.buy)}. Make a shopping list in Kitty Mart and you can add it from here.</p>`;
+  const last = getLocal(BUY_KEY);
+  return `<div class="lb-on"><label class="field">Add ${esc(c.buy)} to <select id="buy-list">${lists.map((l) => `<option value="${l.id}" ${l.id === last ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}</select></label>
+    <button class="btn" type="button" data-action="chore-buy" data-id="${c.id}">Add</button></div>`;
+}
+function buyNow(id: string) {
+  const c = choreOf(litterData(), id), listId = (document.getElementById('buy-list') as HTMLSelectElement | null)?.value ?? '';
+  if (!c?.buy || !shopReady()) return;
+  const list = shopList(shopData(), listId);
+  if (!list) { toast('Pick a shopping list.'); return; }
+  setLocal(BUY_KEY, list.id);
+  const r = addItem(shopData(), list.id, { name: c.buy, from: [c.name] });
+  if (!r.added) { toast(list.items.length >= MART_ITEMS ? `The ${list.name} list is full.` : `${c.buy} is already on ${list.name}.`); return; }
+  changeShop(r.data, `Added ${c.buy}`);
+  toast(`Added ${c.buy} to ${list.name}.`);
+}
+
+// ---- ideas: chores to pick from ----
+function openIdeas() {
+  const d = litterData();
+  const home = (s: { cat: string }) => (d.cats.some((c) => c.id === s.cat) ? s.cat : OTHER);   // an idea for a category that was deleted goes into Other
+  const cats = d.cats.filter((c) => STARTERS.some((s) => home(s) === c.id));
+  openLayer(`${closeX()}<h3>Ideas</h3>
+    <p class="muted">Tick what you want. Each one comes up a little way ahead, and you can change how often and when afterwards.</p>
+    <form class="stack" id="ideas-form">${cats.map((c) => `<fieldset class="field lb-ideas"><legend>${esc(c.name)}</legend>
+      ${STARTERS.filter((s) => home(s) === c.id).map((s) => {
+        const i = STARTERS.indexOf(s), have = hasStarter(d, s);
+        return `<label class="check"><input type="checkbox" name="idea" value="${i}" ${have ? 'checked disabled' : ''}><span><b>${esc(s.name)}</b><br><span class="muted">${esc([everyText(s.every), preferText(s.prefer ?? null)].filter(Boolean).join(' '))}${have ? ' · already there' : ''}</span></span></label>`;
+      }).join('')}</fieldset>`).join('')}
+      <div class="btns"><button class="btn" type="button" data-action="layer-close">Cancel</button><span class="grow"></span><button class="btn primary" type="submit">Add the ticked ones</button></div></form>`, 'Ideas');
+}
+function saveIdeas(f: HTMLFormElement) {
+  const picks = [...f.querySelectorAll<HTMLInputElement>('input[name="idea"]:checked:not(:disabled)')].map((i) => STARTERS[Number(i.value)]);
+  if (!picks.length) { toast('Tick at least one.'); return; }
+  const r = addStarters(litterData(), picks, today());
+  if (!r.added) { toast('You can have up to 500 chores.'); return; }
+  closeLayer();
+  commit(r.data, `Added ${plural(r.added, 'chore')}`);
 }
 
 // ---- adding and changing a chore ----
@@ -136,7 +191,7 @@ function openChoreForm(id: string | null, repeatFirst = false) {
   if (id && !c) return;
   const every: Every = c?.every ?? { n: 1, unit: 'week' }, prefer: Prefer = c?.prefer ?? null;
   const preset = PRESETS.some(([v]) => v === presetOf(every)) ? presetOf(every) : 'custom';
-  const kind = !prefer ? '' : 'weekday' in prefer ? 'weekday' : 'dom';
+  const kind = !prefer ? '' : 'nth' in prefer ? 'nth' : 'weekday' in prefer ? 'weekday' : 'dom';
   const lead = c?.lead ?? defaultLead(every);
   const leads = [...new Set<number>([...LEADS, lead])].sort((a, b) => a - b);
   const next = c ? dueOf(c) : firstDue(t, null);
@@ -150,15 +205,18 @@ function openChoreForm(id: string | null, repeatFirst = false) {
       <div class="row" id="lb-custom" ${preset === 'custom' ? '' : 'hidden'}><label class="field">Every <input name="n" type="number" inputmode="numeric" min="1" max="999" value="${every.n}"></label>
         <label class="field">Unit <select name="unit">${UNITS.map(([u, l]) => `<option value="${u}" ${u === every.unit ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
       <fieldset class="field"><legend>Preferred day</legend><div class="stack">
-        <select name="pref" id="lb-pref" aria-label="Preferred day"><option value="">No preference</option><option value="weekday" ${kind === 'weekday' ? 'selected' : ''}>A weekday</option><option value="dom" ${kind === 'dom' ? 'selected' : ''}>A day of the month</option></select>
-        <select name="weekday" id="lb-weekday" aria-label="Weekday" ${kind === 'weekday' ? '' : 'hidden'}>${[0, 1, 2, 3, 4, 5, 6].map((i) => `<option value="${i}" ${prefer && 'weekday' in prefer && prefer.weekday === i ? 'selected' : ''}>${weekdayName(i)}</option>`).join('')}</select>
+        <select name="pref" id="lb-pref" aria-label="Preferred day"><option value="">No preference</option><option value="weekday" ${kind === 'weekday' ? 'selected' : ''}>A weekday</option><option value="dom" ${kind === 'dom' ? 'selected' : ''}>A day of the month</option><option value="nth" ${kind === 'nth' ? 'selected' : ''}>A weekday of the month</option></select>
+        <select name="nth" id="lb-nth" aria-label="Which one" ${kind === 'nth' ? '' : 'hidden'}>${[[1, 'The first'], [2, 'The second'], [3, 'The third'], [4, 'The fourth'], [-1, 'The last']].map(([n, l]) => `<option value="${n}" ${prefer && 'nth' in prefer && prefer.nth === n ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <select name="weekday" id="lb-weekday" aria-label="Weekday" ${kind === 'weekday' || kind === 'nth' ? '' : 'hidden'}>${[0, 1, 2, 3, 4, 5, 6].map((i) => `<option value="${i}" ${prefer && 'weekday' in prefer && prefer.weekday === i ? 'selected' : ''}>${weekdayName(i)}</option>`).join('')}</select>
         <select name="dom" id="lb-dom" aria-label="Day of the month" ${kind === 'dom' ? '' : 'hidden'}>${[...Array(31).keys()].map((i) => i + 1).concat(0).map((i) => `<option value="${i}" ${prefer && 'dom' in prefer && prefer.dom === i ? 'selected' : ''}>${i === 0 ? 'The last day' : `The ${ordinal(i)}`}</option>`).join('')}</select></div></fieldset>
+      <p class="lb-warn" id="lb-pref-warn" role="status" ${preferWarning(every, prefer) ? '' : 'hidden'}>${esc(preferWarning(every, prefer))}</p>
       <label class="check" id="lb-early" ${kind ? '' : 'hidden'}><input type="checkbox" name="early" ${c?.early ?? true ? 'checked' : ''}><span><b>Remind me early</b><br><span class="muted">When the due date is not on that day, take the one before it. Off: the one after.</span></span></label>
       <label class="field">Schedule <select name="mode"><option value="fixed" ${c?.rolling ? '' : 'selected'}>Fixed: keeps its dates, even when I am late</option><option value="rolling" ${c?.rolling ? 'selected' : ''}>Rolling: counted from when I do it</option></select></label>
       <label class="check" id="lb-pile" ${c?.rolling ? 'hidden' : ''}><input type="checkbox" name="pile" ${c?.pile ? 'checked' : ''}><span><b>Missed dates pile up</b><br><span class="muted">When I am several dates behind, each one stays owed and Done clears one at a time (laundry). Off: one Done catches up on all of them.</span></span></label>
       <label class="field">${c ? 'Next due' : 'First due'} <input type="date" name="next" value="${dayKey(next)}"></label>
       <p class="muted" id="lb-next-hint" hidden></p>
       <label class="field">Heads-up <select name="lead" id="lb-lead">${leads.map((n) => `<option value="${n}" ${n === lead ? 'selected' : ''}>${LEAD_TEXT(n)}</option>`).join('')}</select></label>
+      <label class="field">Something to buy for it <input name="buy" maxlength="60" value="${esc(c?.buy ?? '')}" placeholder="Toothbrush, filter…" autocomplete="off"><span class="muted">Optional. You can add it to a Kitty Mart shopping list from the chore.</span></label>
       <label class="check"><input type="checkbox" name="remind" ${c?.remind ?? true ? 'checked' : ''}><span><b>Remind me</b><br><span class="muted">With a notification (switch them on under Reminders).</span></span></label>
       <label class="field" id="lb-repeat-wrap" ${c?.remind ?? true ? '' : 'hidden'}>Then remind me again <select name="repeat" id="lb-repeat">${repeats.map(([v, l]) => `<option value="${v}" ${v === repeatKey(repeat) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="field">Note <textarea name="note" rows="2" maxlength="1000" placeholder="Which brand, where it is kept…">${esc(c?.note ?? '')}</textarea></label>
@@ -171,7 +229,7 @@ function formSchedule(f: HTMLFormElement): { every: Every; prefer: Prefer; early
   const preset = v('preset');
   const every: Every = preset === 'custom' ? { n: Number(v('n')), unit: v('unit') as Unit } : { n: Number(preset.slice(0, -1)), unit: UNITS.find(([u]) => u[0] === preset.slice(-1))![0] };
   const pref = v('pref');
-  const prefer: Prefer = pref === 'weekday' ? { weekday: Number(v('weekday')) } : pref === 'dom' ? { dom: Number(v('dom')) } : null;
+  const prefer: Prefer = pref === 'nth' ? { nth: Number(v('nth')), weekday: Number(v('weekday')) } : pref === 'weekday' ? { weekday: Number(v('weekday')) } : pref === 'dom' ? { dom: Number(v('dom')) } : null;
   return { every, prefer, early: (f.elements.namedItem('early') as HTMLInputElement).checked };
 }
 function readChoreForm(f: HTMLFormElement): ChoreEdit | string {
@@ -181,10 +239,17 @@ function readChoreForm(f: HTMLFormElement): ChoreEdit | string {
   if (!(s.every.n >= 1)) return 'Pick how often.';
   const next = v('next');
   if (!isDay(next)) return 'Pick the day it is next due.';
-  return { name: v('name'), cat: v('cat'), note: v('note'), ...s, remind: (f.elements.namedItem('remind') as HTMLInputElement).checked, repeat: v('repeat') ? { n: Number(v('repeat').slice(0, -1)), unit: UNITS.find(([u]) => u[0] === v('repeat').slice(-1))![0] } : null, rolling: v('mode') === 'rolling', pile: (f.elements.namedItem('pile') as HTMLInputElement).checked, lead: Number(v('lead')), next: parseDay(next) };
+  return { name: v('name'), cat: v('cat'), note: v('note'), ...s, buy: v('buy'), remind: (f.elements.namedItem('remind') as HTMLInputElement).checked, repeat: v('repeat') ? { n: Number(v('repeat').slice(0, -1)), unit: UNITS.find(([u]) => u[0] === v('repeat').slice(-1))![0] } : null, rolling: v('mode') === 'rolling', pile: (f.elements.namedItem('pile') as HTMLInputElement).checked, lead: Number(v('lead')), next: parseDay(next) };
 }
 // Changing how often (or the preferred day) of a chore that was done before: the next due day is suggested from the last time
 // it was done, so a chore moved from every 6 months to every 3 is due 3 months after it was done. The date can still be changed by hand.
+// Says so when the preferred day comes round less often than the chore does.
+function showPrefWarning(f: HTMLFormElement) {
+  const s = formSchedule(f), el = f.querySelector<HTMLElement>('#lb-pref-warn')!;
+  const text = s.every.n >= 1 ? preferWarning(s.every, s.prefer) : '';
+  el.textContent = text;
+  el.hidden = !text;
+}
 function suggestNext(f: HTMLFormElement) {
   const last = Number(f.dataset.last);
   if (!f.dataset.id || !last || f.dataset.next === 'set') return;
@@ -231,7 +296,7 @@ async function fillAlertStatus() {
   const el = document.getElementById('alerts-status');
   if (!el) return;
   const perm = await alertPermission(), d = litterData(), next = planAlerts(d, new Date())[0];
-  el.textContent = perm === 'unsupported' ? "Notifications aren't available here."
+  el.textContent = alertInfo().error && d.alerts.on ? "Couldn't schedule reminders. Try again in a moment." : perm === 'unsupported' ? "Notifications aren't available here."
     : d.alerts.on && perm !== 'granted' ? "Reminders are on, but notifications are blocked. Allow them for Itty Bitty Kitty in your phone's settings, then reopen the app."
     : d.alerts.on ? (next ? `On. Next reminder: ${next.at.toLocaleString('en', { weekday: 'short', hour: '2-digit', minute: '2-digit' })} (your local time).` : 'On. Nothing is due in the next two weeks.') + (NATIVE ? '' : ' In a browser it only works while this page is open.')
     : 'Off.';
@@ -311,6 +376,8 @@ onShown('litterbox', 'click', (ev) => {
     }
     case 'chore-skip': finish(id, skip(d, id, t), 'Skipped'); break;
     case 'chore-edit': openChoreForm(id); break;
+    case 'chore-buy': buyNow(id); break;
+    case 'ideas-open': openIdeas(); break;
     case 'chore-howoften': openChoreForm(id, true); break;
     case 'chore-delete': { const n = nameOf(id); closeLayer(); commit(removeChore(d, id), `Deleted ${n}`); break; }
     case 'cats-open': openCats(); break;
@@ -333,6 +400,7 @@ onShown('litterbox', 'submit', (ev) => {
   ev.preventDefault();
   if (f.id === 'chore-form') saveChoreForm(f);
   else if (f.id === 'cat-form') saveCatForm(f);
+  else if (f.id === 'ideas-form') saveIdeas(f);
   else if (f.id === 'chore-done-on') {
     const on = (f.elements.namedItem('on') as HTMLInputElement).value;
     if (!isDay(on)) { toast('Pick the day you did it.'); return; }
@@ -380,15 +448,22 @@ onShown('litterbox', 'change', (ev) => {
   }
   if (t.id === 'lb-lead') f.dataset.lead = 'set';
   if (t.id === 'lb-pref') {
-    q('#lb-weekday').hidden = t.value !== 'weekday';
+    q('#lb-weekday').hidden = t.value !== 'weekday' && t.value !== 'nth';
+    q('#lb-nth').hidden = t.value !== 'nth';
     q('#lb-dom').hidden = t.value !== 'dom';
     q('#lb-early').hidden = !t.value;
   }
   if (t.name === 'mode') q('#lb-pile').hidden = t.value === 'rolling';
   if (t.name === 'remind') q('#lb-repeat-wrap').hidden = !t.checked;
   if (t.id === 'lb-repeat') f.dataset.rep = 'set';
+  if (['pref', 'weekday', 'nth', 'dom'].includes(t.name) && !f.dataset.id && f.dataset.next !== 'set') {
+    // a new chore's first due day is the first preferred day from today, until the date is picked by hand
+    const s = formSchedule(f);
+    (f.elements.namedItem('next') as HTMLInputElement).value = dayKey(firstDue(today(), s.prefer));
+  }
   if (t.name === 'next') { f.dataset.next = 'set'; q('#lb-next-hint').hidden = true; return; }
-  if (['preset', 'n', 'unit', 'pref', 'weekday', 'dom', 'early'].includes(t.name)) suggestNext(f);
+  if (['preset', 'n', 'unit', 'pref', 'weekday', 'nth', 'dom'].includes(t.name)) showPrefWarning(f);
+  if (['preset', 'n', 'unit', 'pref', 'weekday', 'nth', 'dom', 'early'].includes(t.name)) suggestNext(f);
 });
 
 // ---- start ----

@@ -29,7 +29,7 @@ import { mountNotesSettings } from '../notes/settings.ts';
 import { mountPixelSettings } from '../pixel/settings.ts';
 import { change as changeShop, collectShopping, initShopping, restoreShopping, shopData, shopInitialised } from '../shopping/data.ts';
 import { applyMartSettings, martSettingsOf } from '../shopping/model.ts';
-import { collectLitterbox, initLitterbox, restoreLitterbox } from '../litterbox/data.ts';
+import { collectLitterbox, initLitterbox, litterInitialised, restoreLitterbox } from '../litterbox/data.ts';
 import { startAlerts } from '../litterbox/notify.ts';
 import { collectPixel, initPixel, restorePixel, setPixelData } from '../pixel/data.ts';
 import { PARTS, SETTINGS_EXT, SETTINGS_PREFIX, cleanDiary, isSettingsText, readSettings, settingsText, type HabitSettings, type Part, type SettingsFile } from '../settings-file.ts';
@@ -1066,6 +1066,7 @@ async function loadDiary() {
 // ---- Backup: one .kitty file (a zip) holding the game, every diary page and every photo ----
 async function collectBackup(): Promise<Backup> {
   await initPixel();
+  await Promise.all([shopInitialised, litterInitialised]);   // a part that has not loaded yet would read as emptied, and a sync would delete it elsewhere
   return { game: save, ...await collectDiary(), notes: collectNotes(), notebooks: collectBooks(), shopping: collectShopping(), litterbox: collectLitterbox(), gallery: collectPixel(), achievement: await snapshotAchievement() };
 }
 
@@ -1156,7 +1157,7 @@ function renderSync() {
   const st = syncStatus();
   (box.closest('details') as HTMLElement).hidden = !st.available;
   if (!st.available) return;
-  const what = '<p class="muted">Keep your kitties, diary, notes, Kitty Mart, Kitty Gallery icons and Kitty Achievement the same on your phone, tablet and the website, through your own Dropbox. Itty Bitty Kitty only sees its own folder there (in <b>Apps</b>). Sounds and reminders stay as each device has them.</p>';
+  const what = '<p class="muted">Keep your kitties, diary, notes, Kitty Mart, Kitty Litterbox, Kitty Gallery icons and Kitty Achievement the same on your phone, tablet and the website, through your own Dropbox. Itty Bitty Kitty only sees its own folder there (in <b>Apps</b>). Sounds and reminders stay as each device has them.</p>';
   box.innerHTML = st.connected
     ? `${what}<p>Dropbox${st.name ? `: <b>${esc(st.name)}</b>` : ''}<br>Last sync: ${st.running ? 'syncing…' : st.last ? ago(st.last) : 'not yet'}${!st.running && st.summary && !st.error ? ` · ${esc(st.summary)}` : ''}</p>
        ${st.error ? `<p class="form-error">${esc(st.error)}</p>` : ''}

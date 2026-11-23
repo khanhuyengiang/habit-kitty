@@ -1,6 +1,6 @@
 # Itty Bitty Kitty
 
-A cozy pixel-cat app with a few mini-apps: Habit Kitty, Kitty Journal, Kitty Achievement, Kitty Mart and Kitty Gallery.
+A cozy pixel-cat app with a few mini-apps: Habit Kitty, Kitty Journal, Kitty Achievement, Kitty Mart, Kitty Gallery and Kitty Litterbox.
 
 **Habit Kitty** is a habit tracker where every habit is a pixel cat. Do the habit, feed the cat. Skip it and the cat goes hungry.
 It lives in a cozy pastel pixel world (pink, baby blue and lavender, with a pixel grid behind everything) and runs as a
@@ -98,10 +98,26 @@ New icons and changes are used everywhere in the app straight away, and official
 A sticker can be marked as cat food. A scene can be drawn on, made from a photo (**Use a photo…**), and given its **Kitty spots**.
 **Export icons** writes your icons to a file, which can be merged into the code to make them official; **Import icons** reads one back.
 
+### Kitty Litterbox
+
+Chores that come back now and then: the bedsheet every 2 weeks, the toothbrush every 6 months, the dishwasher filter every month.
+Each chore has how often it comes (days, weeks, months or years), an optional **preferred day** (a weekday, a day of the month, or the first,
+second... or last weekday of the month) and a **Remind me early** switch: with it, a due date that is not on that day moves to the one before it, without it to the one after.
+
+- **Fixed or rolling.** A fixed chore keeps its dates ("every other Thursday"), even when you are late; a rolling one counts from when you did it.
+  When a fixed chore is several dates behind, one **Done** catches up on all of them, or, with **Missed dates pile up** (laundry), each date stays owed and Done clears one.
+- **The list** groups what is due now, coming up, snoozed and resting (done, grayed out until its turn), or groups by category or by how often, with a Filter. The **home page** key shows how many are due.
+- **A chore's actions.** **Done** (today or an earlier day), **Snooze** (quiet until a day), **Delay** (to the next preferred day) and **Skip this time** (to the next date). Everything has Undo.
+  **Change how often** works at any time: the next due day is suggested from when it was last done.
+- **Reminders.** Switch them on under **Reminders** (the time of day is one setting). Each chore says whether to remind and how often to remind again after its due day, until it is done.
+  On the phone they are notifications; in a browser only while the page is open.
+- **Ideas** are chores to pick from (bedding, kitchen, health, car...). A chore can name **something to buy**, which goes on a Kitty Mart shopping list with one tap.
+- Chores live in the backup and in Dropbox sync like everything else.
+
 ### Backup and settings
 
 Everything is stored on the device. **Settings → Backup** saves one **.kitty** file with everything: kitties, diary pages and photos,
-notes, Kitty Mart, Kitty Gallery icons and Kitty Achievement. Save it on the device, share it (Android), or pick a backup folder for daily auto-backups.
+notes, Kitty Mart, Kitty Litterbox, Kitty Gallery icons and Kitty Achievement. Save it on the device, share it (Android), or pick a backup folder for daily auto-backups.
 **Settings only** saves a small **.kittyset** file with just the look and options (and Kitty Gallery icons), with nothing personal in it,
 to give someone else the same setup. Loading one asks which parts to take.
 
@@ -141,6 +157,7 @@ You can also open the `android/` folder in Android Studio and press Run after `n
 | `src/notes/` | The Notes screen (`app.ts`), its data (`data.ts`: one `.md` file per note), the folder sync (`folder.ts`, with the pure planning in `sync.ts`), the Markdown renderer and search (`model.ts`, pure and tested) and its options (`settings.ts`). `web/notes.html` has its markup and styles. |
 | `src/achievement/` | Kitty Achievement: the screen (`app.ts`), its data model, rules (`ops.ts`), storage (`storage.ts` in the browser, `filerepo.ts` on the phone), its save read and written while the app is closed (`save.ts`), and backup. |
 | `src/shopping/` | Kitty Mart: the screen (`app.ts`), its lists, pantry, recipes and aisle orders (`model.ts`, pure and tested) and storage (`data.ts`). `web/shopping.html` has its markup and styles. |
+| `src/litterbox/` | Kitty Litterbox: the screen (`app.ts`), the chores and every rule about due dates (`model.ts`, pure and tested), the notification plan (`reminders.ts`, pure and tested) and its scheduling (`notify.ts`), the ideas (`starters.ts`) and storage (`data.ts`). `web/litterbox.html` has its markup and styles. |
 | `src/pixel/` | Kitty Gallery: the screen (`app.ts`), its icon model, import and export (`model.ts`, pure and tested), storage (`data.ts`), and `live.ts`, which puts your icons over the official ones app-wide. `web/pixel.html` has its markup and styles. |
 | `src/backup.ts` | The `.kitty` backup: packing every app's data into one file and reading it back. |
 | `src/settings-file.ts` | The `.kittyset` settings file: what goes in it, and cleaning one that is read back. |

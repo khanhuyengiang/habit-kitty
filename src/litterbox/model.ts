@@ -19,14 +19,16 @@ export { CAT_COLORS, type CatColor, newId };
 
 export type Unit = 'day' | 'week' | 'month' | 'year';
 export interface Every { n: number; unit: Unit }
-// A weekday (0 = Monday ... 6 = Sunday) or a day of the month (1..31, 0 = the last day, which a short month clamps to).
-export type Prefer = { weekday: number } | { dom: number } | null;
+// A weekday (0 = Monday ... 6 = Sunday), a day of the month (1..31, 0 = the last day, which a short month clamps to), or
+// the first, second, third, fourth (1..4) or last (-1) weekday of the month ("the first Saturday").
+export type Prefer = { weekday: number } | { dom: number } | { nth: number; weekday: number } | null;
 export interface Entry { day: string; kind: 'done' | 'skip' }
 export interface Chore {
   id: string; name: string; cat: string; note: string;
   every: Every; prefer: Prefer; early: boolean; rolling: boolean;
   pile: boolean;                 // fixed schedule only: every missed date stays owed (laundry) instead of one Done clearing them all
   lead: number;                  // the heads-up: it is shown as coming up this many days before it is due
+  buy: string;                   // something to buy for it ("Toothbrush"): can go on a Kitty Mart shopping list; '' none
   remind: boolean;               // notifications for this chore (when they are on at all, see LitterData.alerts)
   repeat: Every | null;          // after the due day, remind again this often until it is done (null: once)
   anchor: string; cycle: number; shift: string;   // see the top; shift is '' unless it was delayed
@@ -50,6 +52,8 @@ export const defaultAlerts = (): Alerts => ({ on: false, hour: 9, minute: 0 });
 export const emptyData = (): LitterData => ({ v: 1, chores: [], cats: defaultCats(), alerts: defaultAlerts() });
 export const clone = (d: LitterData): LitterData => structuredClone(d);
 export const cleanName = (s: string) => s.replace(/\s+/g, ' ').trim().slice(0, LIMITS.name);
+// A name as a chore is compared by (case and spacing do not matter).
+export const keyOfName = (s: string) => cleanName(s).toLowerCase();
 
 // =================== days ===================
 export const todayNum = (now: number | Date = Date.now()): number => { const d = new Date(now); return dayOf(d.getFullYear(), d.getMonth(), d.getDate()); };
@@ -69,13 +73,19 @@ const mondayOf = (n: number) => n - weekdayOf(n);
 export const gridDay = (anchor: number, e: Every, k: number): number =>
   e.unit === 'day' ? anchor + e.n * k : e.unit === 'week' ? anchor + 7 * e.n * k : addMonths(anchor, (e.unit === 'year' ? 12 : 1) * e.n * k);
 
+// The first (1) ... fourth (4) or last (-1) `weekday` of a month.
+const nthWeekdayIn = (nth: number, weekday: number, y: number, m: number) => {
+  if (nth < 0) { const last = dayOf(y, m, daysIn(y, m)); return last - ((weekdayOf(last) - weekday + 7) % 7); }
+  const first = dayOf(y, m, 1);
+  return first + ((weekday - weekdayOf(first) + 7) % 7) + 7 * (nth - 1);
+};
 const domIn = (dom: number, y: number, m: number) => (dom === 0 ? daysIn(y, m) : Math.min(dom, daysIn(y, m)));
 // The preferred day on or before `n` (before = true) or on or after it.
 export function snap(n: number, p: Prefer, before: boolean): number {
   if (!p) return n;
-  if ('weekday' in p) return before ? n - ((weekdayOf(n) - p.weekday + 7) % 7) : n + ((p.weekday - weekdayOf(n) + 7) % 7);
+  if ('weekday' in p && !('nth' in p)) return before ? n - ((weekdayOf(n) - p.weekday + 7) % 7) : n + ((p.weekday - weekdayOf(n) + 7) % 7);
   const d = dateOf(n), t = d.getUTCFullYear() * 12 + d.getUTCMonth();
-  const hits = [-1, 0, 1].map((o) => { const y = Math.floor((t + o) / 12), m = (((t + o) % 12) + 12) % 12; return dayOf(y, m, domIn(p.dom, y, m)); });
+  const hits = [-1, 0, 1].map((o) => { const y = Math.floor((t + o) / 12), m = (((t + o) % 12) + 12) % 12; return 'nth' in p ? nthWeekdayIn(p.nth, p.weekday, y, m) : dayOf(y, m, domIn((p as { dom: number }).dom, y, m)); });
   return before ? Math.max(...hits.filter((h) => h <= n)) : Math.min(...hits.filter((h) => h >= n));
 }
 // The first preferred day strictly after `n` (a delayed chore comes back on the next one), or the next day with no preference.
@@ -86,7 +96,9 @@ export const nextPreferred = (n: number, p: Prefer) => snap(n + 1, p, false);
 // (a short interval with "early" could otherwise land before the last time you did it); then it goes the other way.
 export function dueOfCycle(c: Chore, k: number): number {
   const a = parseDay(c.anchor), raw = gridDay(a, c.every, k);
-  const s = snap(raw, c.prefer, c.early);
+  // "Remind me early" moves a computed due date back to the day before it; the first due date is one the user picked, so it
+  // only ever moves forward (a new chore is never overdue because of its preferred day).
+  const s = snap(raw, c.prefer, c.early && k > 0);
   return k > 0 && s <= gridDay(a, c.every, k - 1) ? snap(raw, c.prefer, false) : s;
 }
 export const dueOf = (c: Chore): number => (isDay(c.shift) ? parseDay(c.shift) : dueOfCycle(c, c.cycle));
@@ -132,7 +144,8 @@ export function everyText(e: Every): string {
   const u = e.unit;
   return e.n === 1 ? `every ${u}` : `every ${e.n} ${u}s`;
 }
-export const preferText = (p: Prefer): string => !p ? '' : 'weekday' in p ? `on ${WEEKDAYS[p.weekday]}s` : p.dom === 0 ? 'on the last day' : `on the ${ordinal(p.dom)}`;
+const NTH = ['', 'first', 'second', 'third', 'fourth'];
+export const preferText = (p: Prefer): string => !p ? '' : 'nth' in p ? `on the ${p.nth < 0 ? 'last' : NTH[p.nth]} ${WEEKDAYS[p.weekday]}` : 'weekday' in p ? `on ${WEEKDAYS[p.weekday]}s` : p.dom === 0 ? 'on the last day' : `on the ${ordinal(p.dom)}`;
 export const scheduleText = (c: Pick<Chore, 'every' | 'prefer'>) => [everyText(c.every), preferText(c.prefer)].filter(Boolean).join(' ');
 
 // "this weekend", "next Friday", "in 2 months": when a due date is, from today.
@@ -148,7 +161,7 @@ export function whenText(due: number, today: number): string {
   if (wd >= 5 && weeks <= 1) return weeks === 0 ? 'this weekend' : 'next weekend';
   if (weeks === 0) return `on ${WEEKDAYS[wd]}`;
   if (weeks === 1) return `next ${WEEKDAYS[wd]}`;
-  if (away < 60) return `in ${Math.round(away / 7)} weeks`;
+  if (away < 60) return `in ${Math.max(2, Math.round(away / 7))} weeks`;   // never "1 weeks": a week or less away is named by its day
   if (away < 540) { const m = Math.round(away / 30.44); return `in ${m} ${m === 1 ? 'month' : 'months'}`; }
   const y = Math.round(away / 365.25);
   return `in ${y} ${y === 1 ? 'year' : 'years'}`;
@@ -192,11 +205,12 @@ export const removeChore = (d: LitterData, id: string): LitterData => ({ ...d, c
 
 export interface ChoreEdit {
   name: string; cat: string; note: string; every: Every; prefer: Prefer; early: boolean; rolling: boolean; pile: boolean; lead: number;
-  remind: boolean; repeat: Every | null;
+  remind: boolean; repeat: Every | null; buy?: string;
   next: number;                  // the day it is next due (a new chore: the first time)
 }
 const cleanEvery = (e: Every): Every => ({ n: Math.min(LIMITS.every, Math.max(1, Math.round(e.n) || 1)), unit: (['day', 'week', 'month', 'year'] as const).includes(e.unit) ? e.unit : 'week' });
 const cleanPrefer = (p: Prefer): Prefer => {
+  if (p && 'nth' in p) return Number.isInteger(p.nth) && (p.nth === -1 || (p.nth >= 1 && p.nth <= 4)) && Number.isInteger(p.weekday) && p.weekday >= 0 && p.weekday <= 6 ? { nth: p.nth, weekday: p.weekday } : null;
   if (p && 'weekday' in p) return Number.isInteger(p.weekday) && p.weekday >= 0 && p.weekday <= 6 ? { weekday: p.weekday } : null;
   if (p && 'dom' in p) return Number.isInteger(p.dom) && p.dom >= 0 && p.dom <= 31 ? { dom: p.dom } : null;
   return null;
@@ -205,7 +219,7 @@ const catIn = (d: Pick<LitterData, 'cats'>, id: string) => (d.cats.some((c) => c
 const fields = (d: LitterData, e: ChoreEdit) => ({
   name: cleanName(e.name), cat: catIn(d, e.cat), note: e.note.slice(0, LIMITS.note), every: cleanEvery(e.every), prefer: cleanPrefer(e.prefer),
   early: !!e.early, rolling: !!e.rolling, pile: !!e.pile, lead: Math.min(60, Math.max(0, Math.round(e.lead) || 0)),
-  remind: e.remind !== false, repeat: e.repeat ? cleanEvery(e.repeat) : null,
+  remind: e.remind !== false, repeat: e.repeat ? cleanEvery(e.repeat) : null, buy: cleanName(e.buy ?? ''),
 });
 
 export function addChore(d: LitterData, e: ChoreEdit): { data: LitterData; id: string } | null {
@@ -228,6 +242,16 @@ export function editChore(d: LitterData, id: string, e: ChoreEdit, today: number
 export function nextFromLast(e: Pick<ChoreEdit, 'every' | 'prefer' | 'early'>, last: number): number {
   const c = { every: cleanEvery(e.every), prefer: cleanPrefer(e.prefer), early: !!e.early, anchor: dayKey(last) } as Chore;
   return dueOfCycle(c, 1);
+}
+// A preferred day that comes round less often than the chore does ("every 2 weeks on the 15th", "every 3 days on Fridays") cannot
+// be kept to: several dates land on the same day. The words to say so in the form, or '' when it is fine.
+export function preferWarning(e: Every, p: Prefer): string {
+  const clean = cleanPrefer(p);
+  if (!clean) return '';
+  const week = 'weekday' in clean && !('nth' in clean);
+  if (approxDays(cleanEvery(e)) >= (week ? 7 : 28)) return '';
+  const subject = week ? WEEKDAYS[(clean as { weekday: number }).weekday] : `${preferText(clean)[3].toUpperCase()}${preferText(clean).slice(4)}`;   // "Friday", "The 15th"
+  return `${subject} comes round only once a ${week ? 'week' : 'month'}, so a chore that repeats ${everyText(cleanEvery(e))} can't keep to it: several dates would land on the same day. Repeat it every ${week ? 'week' : 'month'} or less often, or pick no preferred day.`;
 }
 // The first day a new chore could be due: the preferred day on or after today.
 export const firstDue = (today: number, p: Prefer) => snap(today, cleanPrefer(p), false);
@@ -285,6 +309,9 @@ export function arrange(d: LitterData, today: number, how: Arrange, f: Filter): 
   return [part('Due now', (v) => !v.snoozed && (v.status === 'overdue' || v.status === 'due')), part('Coming up', (v) => !v.snoozed && v.status === 'soon'),
     part('Snoozed', (v) => v.snoozed), part('Resting', (v) => v.status === 'resting')].filter((g) => g.items.length);
 }
+// How many chores are due now and not snoozed (the number on Kitty Litterbox's key on the home page).
+export const dueCount = (d: Pick<LitterData, 'chores'>, today: number): number =>
+  d.chores.filter((c) => { const v = statusOf(c, today); return !v.snoozed && (v.status === 'overdue' || v.status === 'due'); }).length;
 // "2 due · 3 coming up", for under the title.
 export function summary(d: LitterData, today: number): string {
   const vs = views(d, today);
@@ -295,6 +322,8 @@ export function summary(d: LitterData, today: number): string {
 // =================== loading ===================
 const str = (v: unknown, max = LIMITS.name) => (typeof v === 'string' ? v.slice(0, max) : '');
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+// An id goes into HTML attributes and is compared as text: letters, digits, - and _ only (what newId makes), or it is dropped.
+const safeId = (v: unknown, max: number) => (typeof v === 'string' && v.length <= max && /^[A-Za-z0-9_-]+$/.test(v) ? v : '');
 const isRec = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const int = (v: unknown, max: number, min = 0) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : min);
@@ -304,7 +333,7 @@ export function sanitize(raw: unknown): LitterData {
   const r = obj(raw), out = emptyData();
   const cats: Cat[] = [], ids = new Set<string>();
   for (const c of arr(r.cats).slice(0, LIMITS.cats).map(obj)) {
-    const id = str(c.id, 20), name = cleanName(str(c.name));
+    const id = safeId(c.id, 20), name = cleanName(str(c.name));
     if (!id || !name || ids.has(id)) continue;
     ids.add(id);
     cats.push({ id, name, icon: /^[a-z0-9-]{1,20}$/.test(str(c.icon)) ? str(c.icon) : 'bag', color: (CAT_COLORS as readonly string[]).includes(str(c.color)) ? (str(c.color) as CatColor) : 'lavender' });
@@ -316,7 +345,7 @@ export function sanitize(raw: unknown): LitterData {
   if (!('hour' in al)) out.alerts = { ...out.alerts, hour: defaultAlerts().hour };
   const seen = new Set<string>();
   for (const c of arr(r.chores).slice(0, LIMITS.chores).map(obj)) {
-    const id = str(c.id, 40), name = cleanName(str(c.name));
+    const id = safeId(c.id, 40), name = cleanName(str(c.name));
     if (!id || !name || seen.has(id) || !isDay(c.anchor)) continue;
     seen.add(id);
     const ev = obj(c.every), unit = (['day', 'week', 'month', 'year'] as const).find((u) => u === ev.unit) ?? 'week';
@@ -324,7 +353,7 @@ export function sanitize(raw: unknown): LitterData {
     out.chores.push({
       id, name, cat: catIn(out, str(c.cat, 20)), note: str(c.note, LIMITS.note), every, prefer: cleanPrefer(obj(c.prefer) as Prefer) ?? null,
       early: c.early === true, rolling: c.rolling === true, pile: c.pile === true, lead: int(c.lead, 60),
-      remind: c.remind !== false, repeat: c.repeat === null ? null : isRec(c.repeat) ? cleanEvery({ n: Number(c.repeat.n) || 1, unit: c.repeat.unit as Unit }) : defaultRepeat(every), anchor: c.anchor, cycle: int(c.cycle, 100_000),
+      buy: cleanName(str(c.buy)), remind: c.remind !== false, repeat: c.repeat === null ? null : isRec(c.repeat) ? cleanEvery({ n: Number(c.repeat.n) || 1, unit: c.repeat.unit as Unit }) : defaultRepeat(every), anchor: c.anchor, cycle: int(c.cycle, 100_000),
       shift: isDay(c.shift) ? c.shift : '', snooze: isDay(c.snooze) ? c.snooze : '',
       log: arr(c.log).slice(-LIMITS.log).map(obj).filter((e) => isDay(e.day) && (e.kind === 'done' || e.kind === 'skip')).map((e) => ({ day: e.day as string, kind: e.kind as Entry['kind'] })),
     });

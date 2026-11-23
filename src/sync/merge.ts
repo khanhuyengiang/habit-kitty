@@ -13,7 +13,7 @@ import { uniqueName } from '../notes/model.ts';
 import { sanitizeBooks, type BookData } from '../notes/books.ts';
 import { sanitize as sanitizeShop, type ShopData } from '../shopping/model.ts';
 import { sanitize as sanitizePixel, type PixelData } from '../pixel/model.ts';
-import { LIMITS as LITTER_LIMITS, sanitize as sanitizeLitter, type LitterData } from '../litterbox/model.ts';
+import { LIMITS as LITTER_LIMITS, sanitize as sanitizeLitter, type Chore, type LitterData } from '../litterbox/model.ts';
 import { packBackup as packAchievement, unpackBackup as unpackAchievement } from '../achievement/backup.ts';
 import type { Data as AchievementData } from '../achievement/model.ts';
 import { mergeGame, type GameSave } from './merge-game.ts';
@@ -100,13 +100,23 @@ function mergeShop(base: Base<ShopData>, mine: ShopData, theirs: ShopData): Shop
 }
 
 // ---- Kitty Litterbox: chore by chore; a chore's history keeps what either side wrote down ----
+// How often, the preferred day and where it is now (anchor, cycle, delay, snooze) only make sense together: a chore that was
+// re-anchored on one device and marked done on the other must not get one side's anchor with the other's cycle. They are taken
+// whole from the side that changed them (this device's when both did); everything else merges field by field.
+const LITTER_SCHEDULE = ['every', 'prefer', 'early', 'rolling', 'pile', 'anchor', 'cycle', 'shift', 'snooze'] as const;
+function mergeChore(b: Base<Chore>, m: Chore, t: Chore): Chore {
+  const sched = (c: Chore | undefined) => c === undefined ? undefined : LITTER_SCHEDULE.map((k) => c[k]);
+  const theirsOnly = b !== NONE && equal(sched(m), sched(b)) && !equal(sched(t), sched(b));
+  const own = (k: (typeof LITTER_SCHEDULE)[number]) => () => (theirsOnly ? t[k] : m[k]);
+  const out = mergeFields(b, m, t, 'mine', Object.fromEntries(LITTER_SCHEDULE.map((k) => [k, own(k)])));
+  const seen = new Set<string>();
+  out.log = [...m.log, ...t.log].filter((e) => !seen.has(`${e.day} ${e.kind}`) && seen.add(`${e.day} ${e.kind}`))
+    .sort((x, y) => x.day.localeCompare(y.day)).slice(-LITTER_LIMITS.log);
+  return out;
+}
 function mergeLitter(base: Base<LitterData>, mine: LitterData, theirs: LitterData): LitterData {
-  const out = mergeDeep(base, mine, theirs) as LitterData;
-  const logs = (d: LitterData, id: string) => d.chores.find((c) => c.id === id)?.log ?? [];
-  for (const c of out.chores) {
-    const seen = new Set<string>(), all = [...logs(mine, c.id), ...logs(theirs, c.id)].filter((e) => !seen.has(`${e.day} ${e.kind}`) && seen.add(`${e.day} ${e.kind}`));
-    c.log = all.sort((a, b) => a.day.localeCompare(b.day)).slice(-LITTER_LIMITS.log);
-  }
+  const out = mergeDeep(base, mine, theirs) as LitterData;   // the categories and the reminder settings
+  out.chores = mergeById(field(base, 'chores'), mine.chores, theirs.chores, { item: mergeChore });
   return out;
 }
 

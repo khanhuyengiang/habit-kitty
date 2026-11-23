@@ -4,7 +4,7 @@ import { mergeGame, type GameSave } from './merge-game.ts';
 import { mergeBackups } from './merge.ts';
 import { adoptCat, addMindfulTask, doMindfulTask, feedCat, newState, releaseToColony, removeMindfulTask, returnToShelter, setCatDay, type ActionResult, type AppState } from '../habit/rules.ts';
 import { emptyData as emptyShop, sanitize as sanitizeShop } from '../shopping/model.ts';
-import { addChore, emptyData as emptyLitter, markDone, sanitize as sanitizeLitter, type ChoreEdit, type LitterData } from '../litterbox/model.ts';
+import { addChore, delay, editChore, emptyData as emptyLitter, markDone, sanitize as sanitizeLitter, type ChoreEdit, type LitterData } from '../litterbox/model.ts';
 import { dayOf } from '../shared/dates.ts';
 import { emptyData as emptyAchievements } from '../achievement/ops.ts';
 import { packBackup as packAchievement, unpackBackup as unpackAchievement } from '../achievement/backup.ts';
@@ -253,6 +253,28 @@ describe('the whole save', () => {
     const d = JSON.parse(out.litterbox!) as LitterData;
     expect(d.chores.map((c) => c.name)).toEqual(['Bedsheet', 'Dishwasher']);
     expect(d.chores[0].log.map((e) => e.day)).toEqual(['2026-05-03', '2026-05-04']);
+  });
+
+  it('takes a Kitty Litterbox chore\'s schedule whole from one side', async () => {
+    const edit = (over: Partial<ChoreEdit> = {}): ChoreEdit => ({ name: 'Bedsheet', cat: 'home', note: '', every: { n: 1, unit: 'week' }, prefer: null, early: false, rolling: false, pile: false, lead: 0, remind: true, repeat: null, next: dayOf(2026, 10, 23), ...over });
+    const bed = addChore(emptyLitter(), edit())!;
+    const j = (d: LitterData) => JSON.stringify(sanitizeLitter(d));
+    const dueOf = (out: Backup) => { const c = (JSON.parse(out.litterbox!) as LitterData).chores[0]; return { anchor: c.anchor, cycle: c.cycle, every: c.every }; };
+    // this device marks it done (cycle 1); the other changes it to every 2 weeks from 1 Dec (anchor 1 Dec, cycle 0)
+    const mine = markDone(bed.data, bed.id, dayOf(2026, 10, 23));
+    const theirs = editChore(bed.data, bed.id, edit({ every: { n: 2, unit: 'week' }, next: dayOf(2026, 11, 1) }), dayOf(2026, 10, 23));
+    const out = await mergeBackups(backup({ litterbox: j(bed.data) }), backup({ litterbox: j(mine) }), backup({ litterbox: j(theirs) }));
+    const m = sanitizeLitter(mine).chores[0];
+    expect(dueOf(out)).toEqual({ anchor: m.anchor, cycle: m.cycle, every: { n: 1, unit: 'week' } });   // all of this device's, none of theirs mixed in
+    // only the other side changed it: all of theirs
+    const only = await mergeBackups(backup({ litterbox: j(bed.data) }), backup({ litterbox: j(bed.data) }), backup({ litterbox: j(theirs) }));
+    expect(dueOf(only)).toEqual({ anchor: '2026-12-01', cycle: 0, every: { n: 2, unit: 'week' } });
+    // a Delay here and a Done there: both changed it, so this device's pair of delay and cycle, not a mix
+    const delayed = delay(bed.data, bed.id, dayOf(2026, 10, 23));
+    const both = await mergeBackups(backup({ litterbox: j(bed.data) }), backup({ litterbox: j(delayed) }), backup({ litterbox: j(markDone(bed.data, bed.id, dayOf(2026, 10, 23))) }));
+    const c = (JSON.parse(both.litterbox!) as LitterData).chores[0];
+    const d = sanitizeLitter(delayed).chores[0];
+    expect([c.shift, c.cycle]).toEqual([d.shift, d.cycle]);
   });
 
   it('takes the Kitty Gallery icon changed last', async () => {

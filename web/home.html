@@ -32,6 +32,9 @@
   background: var(--mb); border-color: var(--menu-dk); text-shadow: var(--px) var(--px) 0 var(--hilite);
   box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 color-mix(in srgb, var(--mb) 70%, var(--menu-dk)); }
 .home-menu .menu-btn .kitty { color: var(--accent-text); }
+/* the number of chores due, inside the key (a button's notched edge would cut off anything outside it) */
+.home-menu .menu-btn { position: relative; }
+.menu-badge { position: absolute; right: calc(2 * var(--px)); top: calc(2 * var(--px)); min-width: calc(5 * var(--u)); padding: 0 var(--px); font-size: 12px; font-weight: 700; line-height: 1.3; text-align: center; letter-spacing: 0; text-shadow: none; background: var(--accent); color: var(--accent-ink); border: var(--px) solid var(--menu-dk); }
 @media (hover: hover) { .home-menu .menu-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--mb) 80%, #fff); } }
 .perch { position: relative; }
 .perch .glow { display: block; filter: drop-shadow(0 0 calc(3 * var(--px)) rgba(255, 255, 255, .9)); }

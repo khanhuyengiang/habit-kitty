@@ -2,6 +2,15 @@
 
 Newest first. The app bundles this file: it shows the latest entry once after an update, and the whole list under Settings → Change log.
 
+## 0.6.5 - 2026-11-23
+
+### New
+- **Kitty Litterbox: chores that come back now and then.** A new app on the home page, for the bedsheet every 2 weeks, the toothbrush every 6 months, the dishwasher filter every month. A chore says how often it comes (days, weeks, months or years) and may have a **preferred day**: a weekday, a day of the month, or the first, second, third, fourth or last weekday of the month ("the first Saturday"). **Remind me early** decides which way a due date that is not on that day moves: to the one before it, or (off) to the one after. A chore is **fixed** (it keeps its dates, such as every other Thursday, even when you are late) or **rolling** (counted from when you did it). When a fixed chore is several dates behind, one Done catches up on all of them, or, with **Missed dates pile up** (laundry), each date stays owed and Done clears one. The form warns when the preferred day comes round less often than the chore does ("every 2 weeks on the 15th").
+- **Kitty Litterbox: the list and what you can do.** Chores are grouped as due now, coming up, snoozed and resting (done, grayed out until their turn), or by category or by how often, with a Filter by category and state. Each chore has **Done** (today or an earlier day), **Snooze** (quiet until a day), **Delay** (to the next preferred day), **Skip this time** and **Change how often**, which suggests the next due day from when it was last done. Everything has Undo. Categories are yours to make, with a colour and a Kitty Gallery picture. The home page key shows how many chores are due.
+- **Kitty Litterbox: reminders.** Switch them on under **Reminders** and pick the time of day. Each chore says whether to remind you and how often to remind you again after its due day, until it is done (every day, 2 days, week...). You get a heads-up before it is due, a notification on the day, then the repeats; a snoozed chore stays quiet until its day. On the phone they are notifications; in a browser only while the page is open. Habit Kitty's reminders and these no longer cancel each other.
+- **Kitty Litterbox: ideas and shopping.** **Ideas** has chores to pick from (bedding, kitchen, health, the car, the cat). A chore can name **something to buy**, and one tap adds it to a Kitty Mart shopping list, shown "for" that chore.
+- **Kitty Litterbox in backups and Dropbox sync.** Chores are in the **.kitty** backup and merge chore by chore between devices; a chore's schedule is taken whole from one side, and both devices' history is kept.
+
 ## 0.6.4 - 2026-11-19
 
 ### New

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addChore, arrange, bandOf, choreOf, defaultLead, delay, delayTarget, deleteCat, dueLine, dueOf, editChore, emptyData, firstDue, gridDay, markDone,
-  parseDay, dayKey, sanitize, behindBy, nextFromLast, defaultRepeat, setAlerts, saveCat, skip, skipTarget, snap, snooze, statusOf, summary, weekdayOf, whenText, noFilter,
+  parseDay, dayKey, sanitize, behindBy, nextFromLast, defaultRepeat, setAlerts, preferText, dueCount, preferWarning, saveCat, skip, skipTarget, snap, snooze, statusOf, summary, weekdayOf, whenText, noFilter,
   type ChoreEdit, type Every, type LitterData, type Prefer,
 } from './model.ts';
 import { dayOf } from '../shared/dates.ts';
@@ -285,5 +285,90 @@ describe('reminder settings', () => {
     const { d } = make({ remind: false, repeat: { n: 3, unit: 'day' } });
     expect(sanitize(JSON.parse(JSON.stringify(d))).chores[0]).toMatchObject({ remind: false, repeat: { n: 3, unit: 'day' } });
     expect(sanitize(JSON.parse(JSON.stringify(make({ repeat: null }).d))).chores[0].repeat).toBeNull();
+  });
+});
+
+describe('the first Saturday of the month', () => {
+  const sat1: Prefer = { nth: 1, weekday: 5 };   // 1 May 2026 is a Friday, so the first Saturday is the 2nd
+  it('snaps back or forward to the nth weekday, across months', () => {
+    expect(dayKey(snap(D(2026, 5, 20), sat1, true))).toBe('2026-05-02');
+    expect(dayKey(snap(D(2026, 5, 20), sat1, false))).toBe('2026-06-06');
+    expect(dayKey(snap(D(2026, 5, 2), sat1, true))).toBe('2026-05-02');
+    expect(dayKey(snap(D(2026, 5, 1), sat1, true))).toBe('2026-04-04');
+    expect(dayKey(snap(D(2026, 12, 30), { nth: 1, weekday: 5 }, false))).toBe('2027-01-02');
+  });
+  it('knows the second, fourth and last', () => {
+    expect(dayKey(snap(D(2026, 6, 1), { nth: 2, weekday: 1 }, false))).toBe('2026-06-09');   // second Tuesday
+    expect(dayKey(snap(D(2026, 5, 1), { nth: 4, weekday: 0 }, false))).toBe('2026-05-25');   // fourth Monday
+    expect(dayKey(snap(D(2026, 5, 1), { nth: -1, weekday: FRI }, false))).toBe('2026-05-29');   // last Friday
+    expect(dayKey(snap(D(2026, 2, 1), { nth: -1, weekday: 6 }, false))).toBe('2026-02-22');   // last Sunday of a short month
+  });
+  it('is the rule of a chore: every 2 months, first Saturday, remind early', () => {
+    const { d, id } = make({ every: { n: 2, unit: 'month' }, prefer: sat1, early: true, next: D(2026, 5, 20) });
+    expect(due(d, id)).toBe('2026-06-06');   // the first due date only moves forward, to the first Saturday on or after 20 May
+    expect(due(markDone(d, id, D(2026, 6, 6)), id)).toBe('2026-07-04');   // 20 Jul back to the first Saturday, 4 Jul
+  });
+  it('reads as words and is kept when loaded; a bad one is dropped', () => {
+    expect(preferText(sat1)).toBe('on the first Saturday');
+    expect(preferText({ nth: -1, weekday: 4 })).toBe('on the last Friday');
+    const { d } = make({ prefer: sat1 });
+    expect(sanitize(JSON.parse(JSON.stringify(d))).chores[0].prefer).toEqual(sat1);
+    expect(sanitize({ chores: [{ id: 'a', name: 'x', anchor: '2026-05-01', prefer: { nth: 9, weekday: 2 } }] }).chores[0].prefer).toBeNull();
+  });
+});
+
+describe('what to buy, and the badge', () => {
+  it('keeps a thing to buy with the chore', () => {
+    const { d } = make({ buy: '  Toothbrush ' });
+    expect(d.chores[0].buy).toBe('Toothbrush');
+    expect(sanitize(JSON.parse(JSON.stringify(d))).chores[0].buy).toBe('Toothbrush');
+    expect(sanitize({ chores: [{ id: 'a', name: 'x', anchor: '2026-05-01' }] }).chores[0].buy).toBe('');
+  });
+  it('counts what is due now, not what is snoozed or coming', () => {
+    let { d, id } = make({ name: 'A', next: D(2026, 5, 18) });
+    d = addChore(d, edit({ name: 'B', next: D(2026, 5, 20) }))!.data;
+    d = addChore(d, edit({ name: 'C', next: D(2026, 5, 21) }))!.data;
+    const today = D(2026, 5, 20);
+    expect(dueCount(d, today)).toBe(2);
+    expect(dueCount(snooze(d, id, today + 2), today)).toBe(1);
+    expect(dueCount(emptyData(), today)).toBe(0);
+  });
+});
+
+describe('review fixes', () => {
+  it('a new chore with a preferred day and "remind me early" is not overdue because of it', () => {
+    // Mon 23 Nov 2026, weekly on Saturday, early: first due is Sat 28 Nov, not Sat 21 Nov
+    const today = D(2026, 11, 23);
+    const { d, id } = make({ every: { n: 1, unit: 'week' }, prefer: { weekday: 5 }, early: true, next: today });
+    expect(due(d, id)).toBe('2026-11-28');
+    expect(statusOf(choreOf(d, id)!, today).status).not.toBe('overdue');
+    expect(due(markDone(d, id, D(2026, 11, 28)), id)).toBe('2026-12-05');
+  });
+  it('never says "in 1 weeks"', () => {
+    const sun = D(2026, 11, 29);   // two calendar weeks before Mon 7 Dec
+    expect([whenText(D(2026, 12, 7), sun), whenText(D(2026, 12, 8), sun)]).toEqual(['in 2 weeks', 'in 2 weeks']);
+  });
+  it('drops ids that are not safe to put in HTML', () => {
+    const d = sanitize({ cats: [{ id: 'x"><img src=x>', name: 'Bad' }, { id: 'pets', name: 'Pets' }], chores: [{ id: 'a" onclick="x', name: 'Bad', anchor: '2026-05-01' }, { id: 'ok-1_a', name: 'Fine', anchor: '2026-05-01' }] });
+    expect(d.chores.map((c) => c.id)).toEqual(['ok-1_a']);
+    expect(d.cats.map((c) => c.id)).toContain('pets');
+    expect(d.cats.some((c) => c.name === 'Bad')).toBe(false);
+  });
+});
+
+describe('a preferred day that comes round too seldom', () => {
+  const w = (n: number, unit: Every['unit']) => ({ n, unit });
+  it('warns when the interval is shorter than the day comes round, and says why', () => {
+    expect(preferWarning(w(2, 'week'), { dom: 15 })).toMatch(/^The 15th comes round only once a month, so a chore that repeats every 2 weeks can't keep to it/);
+    expect(preferWarning(w(3, 'day'), { weekday: FRI })).toMatch(/^Friday comes round only once a week.*every 3 days/);
+    expect(preferWarning(w(1, 'week'), { nth: 1, weekday: 5 })).toMatch(/^The first Saturday comes round only once a month/);
+    expect(preferWarning(w(1, 'day'), { dom: 0 })).toMatch(/^The last day comes round/);
+  });
+  it('says nothing when it fits, or there is no preferred day', () => {
+    expect(preferWarning(w(1, 'week'), { weekday: FRI })).toBe('');
+    expect(preferWarning(w(2, 'week'), { weekday: FRI })).toBe('');
+    expect(preferWarning(w(4, 'week'), { dom: 15 })).toBe('');
+    expect(preferWarning(w(1, 'month'), { nth: -1, weekday: 6 })).toBe('');
+    expect(preferWarning(w(3, 'day'), null)).toBe('');
   });
 });
