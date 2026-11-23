@@ -19,6 +19,7 @@ import { getLocal, readJson, setLocal, writeJson } from '../shared/local.ts';
 import { onDirty } from '../shared/backupfolder.ts';
 import { DropboxError, authorizeUrl, exchangeCode, randomString, revoke, session, type Tokens } from './dropbox.ts';
 import { changedParts, mergeBackups, type Part } from './merge.ts';
+export type { Part };
 import { DEVICE_ONLY } from './merge-game.ts';
 
 export const SITE = 'https://khanhuyengiang.com/habit-kitty/';   // the website (GitHub Pages, on its own domain)
@@ -26,6 +27,7 @@ const APP_LINK = 'ittybittykitty://dropbox';
 const FILE = '/itty-bitty-kitty.kitty';
 const CONFLICT_DIR = '/conflicts';   // both sides of a conflict are kept here before the merge replaces the file
 const BASE_DIR = 'habit-kitty-sync', BASE_FILE = 'base.kitty';
+const KEY_ASK = 'kitty-sync-ask';
 const KEY = 'kitty-sync', KEY_PENDING = 'kitty-sync-pending', KEY_DIRTY = 'kitty-sync-dirty';
 const SETTLE_MS = 20_000;      // a change is sent this long after the last one
 const RECHECK_MS = 60_000;     // coming back to the app looks for news at most this often
@@ -66,16 +68,26 @@ onDirty(() => {
 });
 
 // ---- status, for the settings screen ----
-export interface SyncStatus { available: boolean; connected: boolean; name: string; running: boolean; last: number; error: string; summary: string }
+export interface SyncStatus { available: boolean; connected: boolean; name: string; running: boolean; last: number; error: string; summary: string; ask: boolean; conflicts: Part[] }
 const listeners = new Set<() => void>();
-let status: SyncStatus = { available: false, connected: false, name: '', running: false, last: 0, error: '', summary: '' };
+let status: SyncStatus = { available: false, connected: false, name: '', running: false, last: 0, error: '', summary: '', ask: false, conflicts: [] };
 function emit(patch: Partial<SyncStatus> = {}) {
   const s = stored();
-  status = { ...status, ...patch, available: syncAvailable(), connected: !!s.tokens, name: s.name ?? '', last: s.last ?? 0 };
+  status = { ...status, ...patch, available: syncAvailable(), connected: !!s.tokens, name: s.name ?? '', last: s.last ?? 0, ask: getLocal(KEY_ASK) === '1' };
   for (const l of listeners) l();
 }
 export const syncStatus = () => status;
 export function onSyncStatus(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; }
+
+// ---- conflicts: when both sides changed the same part, the user can choose instead of merging ----
+export type Choice = 'merge' | 'mine' | 'cloud';
+let resolution: Partial<Record<Part, Choice>> = {};
+export const setAskOnConflict = (on: boolean) => { setLocal(KEY_ASK, on ? '1' : null); if (!on) resolution = {}; emit(on ? {} : { conflicts: [] }); };
+// The user's answer to a waiting conflict: a choice per part (parts left out are merged).
+export function resolveConflicts(choices: Partial<Record<Part, Choice>>): Promise<void> {
+  resolution = { ...choices };
+  return requestSync();
+}
 
 // Signing in needs a web address Dropbox knows: the website (and a local copy of it), or the phone app through it.
 export function syncAvailable(): boolean {
@@ -130,7 +142,8 @@ export async function disconnectDropbox() {
   setLocal(KEY, null);
   setLocal(KEY_DIRTY, null);
   await dropBase();
-  emit({ error: '', summary: '' });
+  resolution = {};
+  emit({ error: '', summary: '', conflicts: [] });
   if (t) await revoke(t);
 }
 
@@ -219,6 +232,23 @@ async function keepBothSides(s: ReturnType<typeof session>, local: Backup, cloud
 }
 export const conflictDir = CONFLICT_DIR;
 
+// The parts of a save, as the apps restore them: which Backup fields each one holds.
+const PART_FIELDS: Record<Part, (keyof Backup)[]> = {
+  game: ['game'], diary: ['diary', 'photos', 'morePhotos', 'reflections', 'extras'], notes: ['notes'],
+  notebooks: ['notebooks'], shopping: ['shopping'], gallery: ['gallery'], achievement: ['achievement'],
+};
+function takePart(part: Part, from: Backup, into: Backup, local: Backup): Backup {
+  const out: Record<string, unknown> = { ...into };
+  for (const k of PART_FIELDS[part]) { if (from[k] === undefined) delete out[k]; else out[k] = from[k]; }
+  const res = out as unknown as Backup;
+  return part === 'game' ? keepDeviceSettings(res, local) : res;   // device-only settings never come from the cloud
+}
+// The parts both this device and the cloud changed since they last agreed, and that now differ.
+function conflictingParts(base: Backup, local: Backup, cloud: Backup): Part[] {
+  const a = changedParts(base, local), b = changedParts(base, cloud), c = changedParts(local, cloud);
+  return [...a].filter((p) => b.has(p) && c.has(p));
+}
+
 async function doSync(): Promise<string> {
   const t = target!;
   const s = session(stored().tokens!, (tokens) => store({ tokens }));
@@ -242,8 +272,18 @@ async function doSync(): Promise<string> {
       result = base
         ? await mergeBackups(base, local, theirs.backup)
         : keepDeviceSettings(await mergeBackups(null, theirs.backup, local), local);
+      let chose = false;
+      if (base && getLocal(KEY_ASK) === '1') {
+        const clashes = conflictingParts(base, local, theirs.backup);
+        if (clashes.some((p) => !resolution[p])) { emit({ conflicts: clashes }); return 'Waiting for your choice'; }
+        for (const p of clashes) {
+          if (resolution[p] !== 'merge') chose = true;
+          if (resolution[p] === 'mine') result = takePart(p, local, result, local);
+          else if (resolution[p] === 'cloud') result = takePart(p, theirs.backup, result, local);
+        }
+      }
       const parts = changedParts(local, result);
-      if (parts.size && changedParts(theirs.backup, result).size) await keepBothSides(s, local, theirs.bytes, rev!, kept);   // both sides had news
+      if ((parts.size || chose) && changedParts(theirs.backup, result).size) await keepBothSides(s, local, theirs.bytes, rev!, kept);   // both sides had news
       got = parts.size;
       if (got) {
         applying = true;
@@ -266,6 +306,8 @@ async function doSync(): Promise<string> {
     }
     await writeBase(baseBytes);
     store({ rev: newRev, last: Date.now() });
+    resolution = {};
+    emit({ conflicts: [] });
     if (gen === startGen) setLocal(KEY_DIRTY, null);
     return got ? 'Got changes from your other devices' : 'Sent this device\'s changes';
   }

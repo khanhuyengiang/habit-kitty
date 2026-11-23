@@ -138,4 +138,39 @@ describe('sync', () => {
     await sync.requestSync();
     expect(cloudNotes()).toEqual({ Mine: 'hello' });
   });
+
+  describe('asking on a conflict', () => {
+    const clash = async () => {
+      await sync.requestSync();
+      sync.setAskOnConflict(true);
+      putCloud({ ...unpackBackup(cloud!.bytes), notes: { Mine: 'hello', Theirs: 'hi' } });
+      edit((b) => { b.notes = { ...b.notes, Phone: 'yo' }; });
+      await sync.requestSync();
+    };
+    it('waits for a choice and changes nothing meanwhile', async () => {
+      await clash();
+      expect(sync.syncStatus().conflicts).toEqual(['notes']);
+      expect(local.notes).toEqual({ Mine: 'hello', Phone: 'yo' });
+      expect(cloudNotes()).toEqual({ Mine: 'hello', Theirs: 'hi' });
+    });
+    it('keeps this device when chosen, and saves the cloud side', async () => {
+      await clash();
+      await sync.resolveConflicts({ notes: 'mine' });
+      expect(cloudNotes()).toEqual({ Mine: 'hello', Phone: 'yo' });
+      expect(local.notes).toEqual({ Mine: 'hello', Phone: 'yo' });
+      expect(kept.length).toBe(2);
+      expect(sync.syncStatus().conflicts).toEqual([]);
+    });
+    it('keeps the cloud when chosen', async () => {
+      await clash();
+      await sync.resolveConflicts({ notes: 'cloud' });
+      expect(local.notes).toEqual({ Mine: 'hello', Theirs: 'hi' });
+      expect(cloudNotes()).toEqual({ Mine: 'hello', Theirs: 'hi' });
+    });
+    it('merges when chosen', async () => {
+      await clash();
+      await sync.resolveConflicts({ notes: 'merge' });
+      expect(local.notes).toEqual({ Mine: 'hello', Phone: 'yo', Theirs: 'hi' });
+    });
+  });
 });

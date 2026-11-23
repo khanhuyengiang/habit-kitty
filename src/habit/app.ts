@@ -17,7 +17,7 @@ import { VERSION } from '../shared/version.ts';
 import CHANGELOG_MD from '../../CHANGELOG.md';
 import { pickThought, type ThoughtKind } from './thoughts.ts';
 import { isZip, packBackup, unpackBackup, type Backup } from '../backup.ts';
-import { connectDropbox, disconnectDropbox, isLocalCopy, onSyncStatus, returnAddress, registerSyncTarget, requestSync, syncStatus } from '../sync/sync.ts';
+import { connectDropbox, disconnectDropbox, isLocalCopy, onSyncStatus, returnAddress, registerSyncTarget, requestSync, resolveConflicts, setAskOnConflict, syncStatus, type Choice } from '../sync/sync.ts';
 import type { Part } from '../sync/merge.ts';
 import type { Mood } from '../diary/model.ts';
 import { CONFETTI_COLORS, TRAITS, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
@@ -1141,6 +1141,13 @@ async function applySynced(b: Backup, parts: Set<Part>): Promise<boolean> {
 }
 registerSyncTarget({ collect: collectBackup, apply: applySynced });
 
+const SYNC_PART_NAMES: Record<Part, string> = { game: 'Kitties', diary: 'Diary', notes: 'Notes', notebooks: 'Notebooks', shopping: 'Kitty Mart', gallery: 'Kitty Gallery', achievement: 'Kitty Achievement' };
+function syncConflictHtml(parts: Part[]): string {
+  return `<div class="panel"><p><b>Both sides changed these.</b> Choose what to keep. The side you don't pick is saved in the <b>conflicts</b> folder in Dropbox.</p>
+    ${parts.map((p) => `<p><label>${SYNC_PART_NAMES[p]}: <select data-sync-part="${p}"><option value="merge">Merge both</option><option value="mine">Keep this device</option><option value="cloud">Keep Dropbox (other devices)</option></select></label></p>`).join('')}
+    <div class="btns flow"><button class="btn primary" type="button" data-action="sync-resolve">Apply</button></div></div>`;
+}
+
 function renderSync() {
   const box = $('sync-box');
   const st = syncStatus();
@@ -1150,6 +1157,8 @@ function renderSync() {
   box.innerHTML = st.connected
     ? `${what}<p>Dropbox${st.name ? `: <b>${esc(st.name)}</b>` : ''}<br>Last sync: ${st.running ? 'syncing…' : st.last ? ago(st.last) : 'not yet'}${!st.running && st.summary && !st.error ? ` · ${esc(st.summary)}` : ''}</p>
        ${st.error ? `<p class="form-error">${esc(st.error)}</p>` : ''}
+       ${st.conflicts.length ? syncConflictHtml(st.conflicts) : ''}
+       <p><label><input type="checkbox" data-action="sync-ask" ${st.ask ? 'checked' : ''}> When both sides changed the same thing, let me choose</label></p>
        <div class="btns flow"><button class="btn primary" type="button" data-action="sync-now" ${st.running ? 'disabled' : ''}>Sync now</button>
        <button class="btn" type="button" data-action="sync-stop">Disconnect</button></div>`
     : `${what}${st.error ? `<p class="form-error">${esc(st.error)}</p>` : ''}
@@ -1901,6 +1910,13 @@ onShown('habit', 'click', (ev) => {
     case 'backup-folder': chooseFolder(); break;
     case 'sync-connect': connectDropbox().catch(() => toast("Couldn't open Dropbox.")); break;
     case 'sync-now': requestSync().then(() => { const e = syncStatus().error; toast(e || 'Synced.'); }); break;
+    case 'sync-ask': setAskOnConflict((btn as HTMLInputElement).checked); break;
+    case 'sync-resolve': {
+      const choices: Partial<Record<Part, Choice>> = {};
+      document.querySelectorAll<HTMLSelectElement>('#sync-box select[data-sync-part]').forEach((x) => { choices[x.dataset.syncPart as Part] = x.value as Choice; });
+      resolveConflicts(choices).then(() => toast(syncStatus().error || 'Synced.'));
+      break;
+    }
     case 'sync-stop': disconnectDropbox().then(() => toast('Dropbox disconnected. Everything stays on this device.')); break;
     case 'backup-now': backupNow().then(() => { const e = backupStatus().error; toast(e || 'Backed up.'); }); break;
     case 'backup-stop': stopBackups().then(() => toast('Auto-backup is off. Your old backups stay in the folder.')); break;
