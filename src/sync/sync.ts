@@ -235,7 +235,7 @@ export const conflictDir = CONFLICT_DIR;
 // The parts of a save, as the apps restore them: which Backup fields each one holds.
 const PART_FIELDS: Record<Part, (keyof Backup)[]> = {
   game: ['game'], diary: ['diary', 'photos', 'morePhotos', 'reflections', 'extras'], notes: ['notes'],
-  notebooks: ['notebooks'], shopping: ['shopping'], gallery: ['gallery'], achievement: ['achievement'],
+  notebooks: ['notebooks'], shopping: ['shopping'], litterbox: ['litterbox'], gallery: ['gallery'], achievement: ['achievement'],
 };
 function takePart(part: Part, from: Backup, into: Backup, local: Backup): Backup {
   const out: Record<string, unknown> = { ...into };

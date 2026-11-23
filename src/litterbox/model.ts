@@ -27,12 +27,16 @@ export interface Chore {
   every: Every; prefer: Prefer; early: boolean; rolling: boolean;
   pile: boolean;                 // fixed schedule only: every missed date stays owed (laundry) instead of one Done clearing them all
   lead: number;                  // the heads-up: it is shown as coming up this many days before it is due
+  remind: boolean;               // notifications for this chore (when they are on at all, see LitterData.alerts)
+  repeat: Every | null;          // after the due day, remind again this often until it is done (null: once)
   anchor: string; cycle: number; shift: string;   // see the top; shift is '' unless it was delayed
   snooze: string;                // quiet until this day ('' not snoozed)
   log: Entry[];                  // the newest last
 }
 export interface Cat { id: string; name: string; icon: string; color: CatColor }
-export interface LitterData { v: 1; chores: Chore[]; cats: Cat[] }
+// The notifications as a whole: on or off, and the time of day they come at.
+export interface Alerts { on: boolean; hour: number; minute: number }
+export interface LitterData { v: 1; chores: Chore[]; cats: Cat[]; alerts: Alerts }
 
 export const OTHER = 'other';
 export const LIMITS = { chores: 500, cats: 30, name: 60, note: 1000, log: 40, every: 999 };
@@ -42,7 +46,8 @@ const DEFAULT_CATS: [string, string, string, CatColor][] = [
   ['digital', 'Digital', 'laptop', 'lavender'], ['admin', 'Admin', 'book', 'lemon'], [OTHER, 'Other', 'bag', 'lavender'],
 ];
 export const defaultCats = (): Cat[] => DEFAULT_CATS.map(([id, name, icon, color]) => ({ id, name, icon, color }));
-export const emptyData = (): LitterData => ({ v: 1, chores: [], cats: defaultCats() });
+export const defaultAlerts = (): Alerts => ({ on: false, hour: 9, minute: 0 });
+export const emptyData = (): LitterData => ({ v: 1, chores: [], cats: defaultCats(), alerts: defaultAlerts() });
 export const clone = (d: LitterData): LitterData => structuredClone(d);
 export const cleanName = (s: string) => s.replace(/\s+/g, ' ').trim().slice(0, LIMITS.name);
 
@@ -115,6 +120,8 @@ export function defaultLead(e: Every): number {
   const days = approxDays(e);
   return days <= 1 ? 0 : days <= 7 ? 1 : days <= 31 ? 3 : days <= 100 ? 7 : 14;
 }
+// How often a chore nags once it is due, unless it says otherwise: every day for chores that come back within a month, else every week.
+export const defaultRepeat = (e: Every): Every => (approxDays(e) <= 31 ? { n: 1, unit: 'day' } : { n: 1, unit: 'week' });
 export const approxDays = (e: Every) => Math.round(e.n * (e.unit === 'day' ? 1 : e.unit === 'week' ? 7 : e.unit === 'month' ? 30.44 : 365.25));
 
 // =================== words ===================
@@ -185,6 +192,7 @@ export const removeChore = (d: LitterData, id: string): LitterData => ({ ...d, c
 
 export interface ChoreEdit {
   name: string; cat: string; note: string; every: Every; prefer: Prefer; early: boolean; rolling: boolean; pile: boolean; lead: number;
+  remind: boolean; repeat: Every | null;
   next: number;                  // the day it is next due (a new chore: the first time)
 }
 const cleanEvery = (e: Every): Every => ({ n: Math.min(LIMITS.every, Math.max(1, Math.round(e.n) || 1)), unit: (['day', 'week', 'month', 'year'] as const).includes(e.unit) ? e.unit : 'week' });
@@ -197,6 +205,7 @@ const catIn = (d: Pick<LitterData, 'cats'>, id: string) => (d.cats.some((c) => c
 const fields = (d: LitterData, e: ChoreEdit) => ({
   name: cleanName(e.name), cat: catIn(d, e.cat), note: e.note.slice(0, LIMITS.note), every: cleanEvery(e.every), prefer: cleanPrefer(e.prefer),
   early: !!e.early, rolling: !!e.rolling, pile: !!e.pile, lead: Math.min(60, Math.max(0, Math.round(e.lead) || 0)),
+  remind: e.remind !== false, repeat: e.repeat ? cleanEvery(e.repeat) : null,
 });
 
 export function addChore(d: LitterData, e: ChoreEdit): { data: LitterData; id: string } | null {
@@ -222,6 +231,12 @@ export function nextFromLast(e: Pick<ChoreEdit, 'every' | 'prefer' | 'early'>, l
 }
 // The first day a new chore could be due: the preferred day on or after today.
 export const firstDue = (today: number, p: Prefer) => snap(today, cleanPrefer(p), false);
+
+// The notifications: on or off, and the time they come at.
+export const setAlerts = (d: LitterData, a: Partial<Alerts>): LitterData => {
+  const x = { ...d.alerts, ...a };
+  return { ...d, alerts: { on: !!x.on, hour: Math.min(23, Math.max(0, Math.round(x.hour) || 0)), minute: Math.min(59, Math.max(0, Math.round(x.minute) || 0)) } };
+};
 
 // =================== categories ===================
 export const catOf = (d: Pick<LitterData, 'cats'>, id: string) => d.cats.find((c) => c.id === id);
@@ -280,6 +295,7 @@ export function summary(d: LitterData, today: number): string {
 // =================== loading ===================
 const str = (v: unknown, max = LIMITS.name) => (typeof v === 'string' ? v.slice(0, max) : '');
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+const isRec = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const int = (v: unknown, max: number, min = 0) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : min);
 
@@ -295,6 +311,9 @@ export function sanitize(raw: unknown): LitterData {
   }
   if (cats.length) out.cats = cats;
   if (!out.cats.some((c) => c.id === OTHER)) out.cats.push(defaultCats().find((c) => c.id === OTHER)!);
+  const al = obj(r.alerts);
+  out.alerts = { on: al.on === true, hour: int(al.hour, 23), minute: int(al.minute, 59) };
+  if (!('hour' in al)) out.alerts = { ...out.alerts, hour: defaultAlerts().hour };
   const seen = new Set<string>();
   for (const c of arr(r.chores).slice(0, LIMITS.chores).map(obj)) {
     const id = str(c.id, 40), name = cleanName(str(c.name));
@@ -304,7 +323,8 @@ export function sanitize(raw: unknown): LitterData {
     const every = cleanEvery({ n: typeof ev.n === 'number' ? ev.n : 1, unit });
     out.chores.push({
       id, name, cat: catIn(out, str(c.cat, 20)), note: str(c.note, LIMITS.note), every, prefer: cleanPrefer(obj(c.prefer) as Prefer) ?? null,
-      early: c.early === true, rolling: c.rolling === true, pile: c.pile === true, lead: int(c.lead, 60), anchor: c.anchor, cycle: int(c.cycle, 100_000),
+      early: c.early === true, rolling: c.rolling === true, pile: c.pile === true, lead: int(c.lead, 60),
+      remind: c.remind !== false, repeat: c.repeat === null ? null : isRec(c.repeat) ? cleanEvery({ n: Number(c.repeat.n) || 1, unit: c.repeat.unit as Unit }) : defaultRepeat(every), anchor: c.anchor, cycle: int(c.cycle, 100_000),
       shift: isDay(c.shift) ? c.shift : '', snooze: isDay(c.snooze) ? c.snooze : '',
       log: arr(c.log).slice(-LIMITS.log).map(obj).filter((e) => isDay(e.day) && (e.kind === 'done' || e.kind === 'skip')).map((e) => ({ day: e.day as string, kind: e.kind as Entry['kind'] })),
     });

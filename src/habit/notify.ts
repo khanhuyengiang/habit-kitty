@@ -1,8 +1,8 @@
 // Habit Kitty's feeding reminders as notifications: asking for permission, scheduling what ./reminders.ts plans (on the
 // phone as local notifications; in a browser only while the page is open), and the Reminders part of Settings.
-import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { $, esc } from '../shared/html.ts';
+import { LITTERBOX_ID_BASE, NATIVE, notifPermission, type Perm } from '../shared/notifications.ts';
 import { iconSvg } from '../shared/art.ts';
 import { lookOf, notifyIconName, type Face } from '../shared/pixelcat.ts';
 import { anyReminder, catAlarmsOn, defaultReminder, planReminders, type ReminderSettings } from './reminders.ts';
@@ -18,22 +18,8 @@ interface ReminderContext {
 let ctx: ReminderContext;
 export const initReminders = (c: ReminderContext) => { ctx = c; };
 
-const NATIVE = Capacitor.isNativePlatform();
-type Perm = 'granted' | 'denied' | 'prompt' | 'unsupported';
 export const reminderSettings = (): ReminderSettings => ctx.save().reminder ?? defaultReminder();
 let reminderInfo: { perm: Perm; next: Date | null; error?: boolean } = { perm: 'prompt', next: null };
-
-async function notifPermission(ask: boolean): Promise<Perm> {
-  try {
-    if (NATIVE) {
-      const r = await (ask ? LocalNotifications.requestPermissions() : LocalNotifications.checkPermissions());
-      return r.display === 'granted' ? 'granted' : r.display === 'denied' ? 'denied' : 'prompt';
-    }
-    if (typeof Notification === 'undefined') return 'unsupported';
-    const p = ask && Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission;
-    return p === 'granted' ? 'granted' : p === 'denied' ? 'denied' : 'prompt';
-  } catch { return 'unsupported'; }
-}
 
 // The notification shows the kitty it is about, in its own fur and in the mood the reminder describes.
 function notifyLargeIcon(p: { catId?: string; face: Face }): { largeIcon?: string } {
@@ -65,8 +51,9 @@ async function syncReminders() {
     if (sig === planSig) { renderReminder(); return; }
     clearTimeout(webTimer);
     if (NATIVE) {
-      const pending = await LocalNotifications.getPending();
-      if (pending.notifications.length) await LocalNotifications.cancel({ notifications: pending.notifications.map((n) => ({ id: n.id })) });
+      // only this app's own: Kitty Litterbox's notifications (ids from LITTERBOX_ID_BASE) stay
+      const pending = (await LocalNotifications.getPending()).notifications.filter((n) => n.id < LITTERBOX_ID_BASE);
+      if (pending.length) await LocalNotifications.cancel({ notifications: pending.map((n) => ({ id: n.id })) });
     }
     if (on) {
       if (JSON.stringify(picks) !== JSON.stringify(r.picks ?? {})) {

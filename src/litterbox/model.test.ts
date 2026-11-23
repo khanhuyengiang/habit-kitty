@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addChore, arrange, bandOf, choreOf, defaultLead, delay, delayTarget, deleteCat, dueLine, dueOf, editChore, emptyData, firstDue, gridDay, markDone,
-  parseDay, dayKey, sanitize, behindBy, nextFromLast, saveCat, skip, skipTarget, snap, snooze, statusOf, summary, weekdayOf, whenText, noFilter,
+  parseDay, dayKey, sanitize, behindBy, nextFromLast, defaultRepeat, setAlerts, saveCat, skip, skipTarget, snap, snooze, statusOf, summary, weekdayOf, whenText, noFilter,
   type ChoreEdit, type Every, type LitterData, type Prefer,
 } from './model.ts';
 import { dayOf } from '../shared/dates.ts';
@@ -10,7 +10,7 @@ import { dayOf } from '../shared/dates.ts';
 const D = (y: number, m: number, d: number) => dayOf(y, m - 1, d);
 const FRI = 4, THU = 3;
 const edit = (over: Partial<ChoreEdit> = {}): ChoreEdit => ({
-  name: 'Change bedsheet', cat: 'bedroom', note: '', every: { n: 2, unit: 'week' }, prefer: null, early: false, rolling: false, pile: false, lead: 1, next: D(2026, 5, 1), ...over,
+  name: 'Change bedsheet', cat: 'bedroom', note: '', every: { n: 2, unit: 'week' }, prefer: null, early: false, rolling: false, pile: false, remind: true, repeat: null, lead: 1, next: D(2026, 5, 1), ...over,
 });
 const make = (over: Partial<ChoreEdit> = {}): { d: LitterData; id: string } => { const r = addChore(emptyData(), edit(over))!; return { d: r.data, id: r.id }; };
 const due = (d: LitterData, id: string) => dayKey(dueOf(choreOf(d, id)!));
@@ -267,4 +267,23 @@ describe('loading', () => {
     expect(bad.chores[0]).toMatchObject({ every: { n: 1, unit: 'week' }, cat: 'other', cycle: 0, log: [] });
   });
   it('parses days it wrote', () => { expect(dayKey(parseDay('2026-02-28'))).toBe('2026-02-28'); });
+});
+
+describe('reminder settings', () => {
+  it('start off, at 9, and are kept and cleaned', () => {
+    expect(emptyData().alerts).toEqual({ on: false, hour: 9, minute: 0 });
+    expect(sanitize({}).alerts).toEqual({ on: false, hour: 9, minute: 0 });
+    expect(sanitize({ alerts: { on: true, hour: 7, minute: 15 } }).alerts).toEqual({ on: true, hour: 7, minute: 15 });
+    expect(sanitize({ alerts: { on: 'yes', hour: 99, minute: -4 } }).alerts).toEqual({ on: false, hour: 23, minute: 0 });
+    expect(setAlerts(emptyData(), { on: true, hour: 25, minute: 61 }).alerts).toEqual({ on: true, hour: 23, minute: 59 });
+  });
+  it('a chore reminds by default and nags by how often it comes; older chores get that', () => {
+    expect(defaultRepeat({ n: 2, unit: 'week' })).toEqual({ n: 1, unit: 'day' });
+    expect(defaultRepeat({ n: 6, unit: 'month' })).toEqual({ n: 1, unit: 'week' });
+    const old = sanitize({ chores: [{ id: 'a', name: 'Toothbrush', anchor: '2026-05-01', every: { n: 6, unit: 'month' } }] }).chores[0];
+    expect([old.remind, old.repeat]).toEqual([true, { n: 1, unit: 'week' }]);
+    const { d } = make({ remind: false, repeat: { n: 3, unit: 'day' } });
+    expect(sanitize(JSON.parse(JSON.stringify(d))).chores[0]).toMatchObject({ remind: false, repeat: { n: 3, unit: 'day' } });
+    expect(sanitize(JSON.parse(JSON.stringify(make({ repeat: null }).d))).chores[0].repeat).toBeNull();
+  });
 });

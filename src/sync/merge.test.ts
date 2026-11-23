@@ -4,6 +4,8 @@ import { mergeGame, type GameSave } from './merge-game.ts';
 import { mergeBackups } from './merge.ts';
 import { adoptCat, addMindfulTask, doMindfulTask, feedCat, newState, releaseToColony, removeMindfulTask, returnToShelter, setCatDay, type ActionResult, type AppState } from '../habit/rules.ts';
 import { emptyData as emptyShop, sanitize as sanitizeShop } from '../shopping/model.ts';
+import { addChore, emptyData as emptyLitter, markDone, sanitize as sanitizeLitter, type ChoreEdit, type LitterData } from '../litterbox/model.ts';
+import { dayOf } from '../shared/dates.ts';
 import { emptyData as emptyAchievements } from '../achievement/ops.ts';
 import { packBackup as packAchievement, unpackBackup as unpackAchievement } from '../achievement/backup.ts';
 import { defaultBook } from '../notes/books.ts';
@@ -238,6 +240,19 @@ describe('the whole save', () => {
     );
     const items = JSON.parse(out.shopping!).lists[0].items;
     expect(items.map((i: { name: string; done: boolean }) => [i.name, i.done])).toEqual([['Milk', true], ['Bread', false]]);
+  });
+
+  it('merges Kitty Litterbox chore by chore, and keeps the history both sides wrote', async () => {
+    const edit = (name: string): ChoreEdit => ({ name, cat: 'home', note: '', every: { n: 1, unit: 'week' }, prefer: null, early: false, rolling: false, pile: false, lead: 0, remind: true, repeat: null, next: dayOf(2026, 4, 1) });
+    const bed = addChore(emptyLitter(), edit('Bedsheet'))!;
+    const j = (d: LitterData) => JSON.stringify(sanitizeLitter(d));
+    const base = j(bed.data);
+    const mine = j(markDone(bed.data, bed.id, dayOf(2026, 4, 3)));
+    const theirsData = addChore(markDone(bed.data, bed.id, dayOf(2026, 4, 4)), edit('Dishwasher'))!.data;
+    const out = await mergeBackups(backup({ litterbox: base }), backup({ litterbox: mine }), backup({ litterbox: j(theirsData) }));
+    const d = JSON.parse(out.litterbox!) as LitterData;
+    expect(d.chores.map((c) => c.name)).toEqual(['Bedsheet', 'Dishwasher']);
+    expect(d.chores[0].log.map((e) => e.day)).toEqual(['2026-05-03', '2026-05-04']);
   });
 
   it('takes the Kitty Gallery icon changed last', async () => {

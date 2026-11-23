@@ -53,3 +53,16 @@ export function undo(): string | null {
   file.write(data);
   return u.label;
 }
+
+// ---- backup ----
+// Left out only while it is just as a new Kitty Litterbox starts (so restoring an older backup can't wipe it by accident).
+export const collectLitterbox = (): string | undefined => (ready && JSON.stringify(data) !== JSON.stringify(emptyData()) ? JSON.stringify(data) : undefined);
+export async function restoreLitterbox(text: string): Promise<boolean> {
+  const next = file.parse(text);
+  if (!next) return false;
+  data = next;
+  undos.length = 0;
+  ready = true;
+  tell();
+  return file.write(data);
+}

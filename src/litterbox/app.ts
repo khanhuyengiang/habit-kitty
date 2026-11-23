@@ -8,13 +8,17 @@ import { iconSvg } from '../shared/art.ts';
 import { PICKER_ICONS, groupedPicks, pickable, stickerSvg } from '../shared/stickers.ts';
 import { onAppShown, onShown } from '../shared/apps.ts';
 import { $, esc, plural } from '../shared/html.ts';
+import { two } from '../shared/dates.ts';
 import { getLocal, setLocal } from '../shared/local.ts';
 import { makeLayer } from '../shared/layer.ts';
 import { closeX, filterButton, filterSelect, homeButton, playerButton, settingsButton, titleBar } from '../shared/ui.ts';
 import { COLOR, tint } from '../notes/window.ts';
+import { NATIVE } from '../shared/notifications.ts';
+import { alertPermission, askAlertPermission, onAlertInfo } from './notify.ts';
+import { planAlerts } from './reminders.ts';
 import { change, initLitterbox, litterData, litterInitialised, litterReady, onLitter, undo, undoLabel, undoTop } from './data.ts';
 import {
-  CAT_COLORS, LEADS, OTHER, addChore, agoText, arrange, catNameTaken, catOf, choreOf, deleteCat, defaultLead, delay, delayTarget, dueLine, dueOf, dayKey,
+  CAT_COLORS, LEADS, OTHER, addChore, agoText, arrange, catNameTaken, catOf, choreOf, deleteCat, defaultLead, defaultRepeat, everyText, setAlerts, delay, delayTarget, dueLine, dueOf, dayKey,
   editChore, firstDue, isDay, lastDone, markDone, nextFromLast, noFilter, ordinal, parseDay, removeChore, saveCat, scheduleText, skip, skipTarget, snooze, statusOf,
   summary, todayNum, unsnooze, weekdayName, whenText, type Arrange, type Cat, type CatColor, type ChoreEdit, type Every, type Filter,
   type LitterData, type Prefer, type StatusFilter, type Unit, type View,
@@ -82,7 +86,7 @@ function render() {
   $('lb-body').innerHTML = `${undoBar}${d.chores.length ? `<p class="muted lb-sum">${esc(summary(d, t))}</p>` : ''}
     <div class="lb-arrange"><div class="seg" role="group" aria-label="Arrange by">${HOWS.map(([h, label]) => `<button type="button" data-action="lb-arrange" data-how="${h}" aria-pressed="${h === how}">${label}</button>`).join('')}</div></div>
     <div class="tools"><div class="toolbar">${filterButton(filterOpen, changedFilters(), 'lb-filter')}<span class="grow"></span>
-      <button class="btn" type="button" data-action="cats-open">Categories</button><button class="btn primary" type="button" data-action="chore-new" ${d.chores.length ? '' : 'hidden'}>+ Chore</button></div>${panel}</div>
+      <button class="btn" type="button" data-action="alerts-open">Reminders</button><button class="btn" type="button" data-action="cats-open">Categories</button><button class="btn primary" type="button" data-action="chore-new" ${d.chores.length ? '' : 'hidden'}>+ Chore</button></div>${panel}</div>
     ${list}`;
   if (id) document.getElementById(id)?.focus();
 }
@@ -122,6 +126,9 @@ function openChore(id: string) {
 const PRESETS: [string, string][] = [['1d', 'Every day'], ['2d', 'Every 2 days'], ['1w', 'Every week'], ['2w', 'Every 2 weeks'], ['1m', 'Every month'], ['3m', 'Every 3 months'], ['6m', 'Every 6 months'], ['1y', 'Every year']];
 const UNITS: [Unit, string][] = [['day', 'days'], ['week', 'weeks'], ['month', 'months'], ['year', 'years']];
 const LEAD_TEXT = (n: number) => (n === 0 ? 'On the day' : n === 7 ? '1 week before' : n === 14 ? '2 weeks before' : `${plural(n, 'day')} before`);
+// How often a chore reminds you again after its due day, until it is done.
+const REPEATS: [string, string][] = [['', "Don't repeat"], ['1d', 'Every day'], ['2d', 'Every 2 days'], ['3d', 'Every 3 days'], ['1w', 'Every week'], ['2w', 'Every 2 weeks'], ['1m', 'Every month']];
+const repeatKey = (e: Every | null) => (e ? presetOf(e) : '');
 const presetOf = (e: Every) => `${e.n}${e.unit[0]}`;
 
 function openChoreForm(id: string | null, repeatFirst = false) {
@@ -133,9 +140,10 @@ function openChoreForm(id: string | null, repeatFirst = false) {
   const lead = c?.lead ?? defaultLead(every);
   const leads = [...new Set<number>([...LEADS, lead])].sort((a, b) => a - b);
   const next = c ? dueOf(c) : firstDue(t, null);
+  const repeat = c ? c.repeat : defaultRepeat(every), repeats = REPEATS.some(([v]) => v === repeatKey(repeat)) ? REPEATS : [...REPEATS, [repeatKey(repeat), `${everyText(repeat!)[0].toUpperCase()}${everyText(repeat!).slice(1)}`] as [string, string]];
   const last = c ? lastDone(c) : '';
   openLayer(`${closeX()}<h3>${c ? 'Change chore' : 'New chore'}</h3>
-    <form class="stack" id="chore-form" data-id="${c?.id ?? ''}" data-lead="${c ? 'set' : ''}" data-last="${last ? parseDay(last) : ''}" novalidate>
+    <form class="stack" id="chore-form" data-id="${c?.id ?? ''}" data-lead="${c ? 'set' : ''}" data-last="${last ? parseDay(last) : ''}" data-rep="${c ? 'set' : ''}" novalidate>
       <label class="field">Name <input name="name" maxlength="60" value="${esc(c?.name ?? '')}" placeholder="Change bedsheet, new toothbrush…" autocomplete="off" ${repeatFirst ? '' : 'data-focus'}></label>
       <label class="field">Category <select name="cat">${d.cats.map((k) => `<option value="${k.id}" ${k.id === (c?.cat ?? 'other') ? 'selected' : ''}>${esc(k.name)}</option>`).join('')}</select></label>
       <label class="field">Repeat <select name="preset" id="lb-preset" ${repeatFirst ? 'data-focus' : ''}>${PRESETS.map(([v, l]) => `<option value="${v}" ${v === preset ? 'selected' : ''}>${l}</option>`).join('')}<option value="custom" ${preset === 'custom' ? 'selected' : ''}>Every N…</option></select></label>
@@ -151,6 +159,8 @@ function openChoreForm(id: string | null, repeatFirst = false) {
       <label class="field">${c ? 'Next due' : 'First due'} <input type="date" name="next" value="${dayKey(next)}"></label>
       <p class="muted" id="lb-next-hint" hidden></p>
       <label class="field">Heads-up <select name="lead" id="lb-lead">${leads.map((n) => `<option value="${n}" ${n === lead ? 'selected' : ''}>${LEAD_TEXT(n)}</option>`).join('')}</select></label>
+      <label class="check"><input type="checkbox" name="remind" ${c?.remind ?? true ? 'checked' : ''}><span><b>Remind me</b><br><span class="muted">With a notification (switch them on under Reminders).</span></span></label>
+      <label class="field" id="lb-repeat-wrap" ${c?.remind ?? true ? '' : 'hidden'}>Then remind me again <select name="repeat" id="lb-repeat">${repeats.map(([v, l]) => `<option value="${v}" ${v === repeatKey(repeat) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="field">Note <textarea name="note" rows="2" maxlength="1000" placeholder="Which brand, where it is kept…">${esc(c?.note ?? '')}</textarea></label>
       <div class="btns"><button class="btn" type="button" data-action="layer-close">Cancel</button><span class="grow"></span><button class="btn primary" type="submit">Save</button></div></form>`, c ? 'Change chore' : 'New chore');
 }
@@ -171,7 +181,7 @@ function readChoreForm(f: HTMLFormElement): ChoreEdit | string {
   if (!(s.every.n >= 1)) return 'Pick how often.';
   const next = v('next');
   if (!isDay(next)) return 'Pick the day it is next due.';
-  return { name: v('name'), cat: v('cat'), note: v('note'), ...s, rolling: v('mode') === 'rolling', pile: (f.elements.namedItem('pile') as HTMLInputElement).checked, lead: Number(v('lead')), next: parseDay(next) };
+  return { name: v('name'), cat: v('cat'), note: v('note'), ...s, remind: (f.elements.namedItem('remind') as HTMLInputElement).checked, repeat: v('repeat') ? { n: Number(v('repeat').slice(0, -1)), unit: UNITS.find(([u]) => u[0] === v('repeat').slice(-1))![0] } : null, rolling: v('mode') === 'rolling', pile: (f.elements.namedItem('pile') as HTMLInputElement).checked, lead: Number(v('lead')), next: parseDay(next) };
 }
 // Changing how often (or the preferred day) of a chore that was done before: the next due day is suggested from the last time
 // it was done, so a chore moved from every 6 months to every 3 is due 3 months after it was done. The date can still be changed by hand.
@@ -205,6 +215,37 @@ function finish(id: string, next: LitterData, label: string) {
   commit(next, `${label} ${nameOf(id)}`, c ? `${label} ${c.name}. Next: ${whenText(dueOf(c), today())}, ${dayText(dueOf(c))}.` : label);
 }
 const done = (id: string, on?: number) => finish(id, markDone(litterData(), id, today(), on), 'Done:');
+
+// ---- reminders: on or off, and the time of day ----
+const timeText = (a: { hour: number; minute: number }) => `${two(a.hour)}:${two(a.minute)}`;
+function openAlerts() {
+  const a = litterData().alerts;
+  openLayer(`${closeX()}<h3>Reminders</h3>
+    <label class="check"><input type="checkbox" id="alerts-on" ${a.on ? 'checked' : ''}><span><b>Send me notifications</b><br><span class="muted">For the chores that have Remind me on: a heads-up, the day it is due, and again until it is done (each chore says how often).</span></span></label>
+    <label class="field">Time of day <input type="time" id="alerts-time" value="${timeText(a)}" ${a.on ? '' : 'disabled'}></label>
+    <p class="muted" id="alerts-status" aria-live="polite"></p>
+    <div class="btns"><span class="grow"></span><button class="btn primary" type="button" data-action="layer-close">Done</button></div>`, 'Reminders');
+  fillAlertStatus();
+}
+async function fillAlertStatus() {
+  const el = document.getElementById('alerts-status');
+  if (!el) return;
+  const perm = await alertPermission(), d = litterData(), next = planAlerts(d, new Date())[0];
+  el.textContent = perm === 'unsupported' ? "Notifications aren't available here."
+    : d.alerts.on && perm !== 'granted' ? "Reminders are on, but notifications are blocked. Allow them for Itty Bitty Kitty in your phone's settings, then reopen the app."
+    : d.alerts.on ? (next ? `On. Next reminder: ${next.at.toLocaleString('en', { weekday: 'short', hour: '2-digit', minute: '2-digit' })} (your local time).` : 'On. Nothing is due in the next two weeks.') + (NATIVE ? '' : ' In a browser it only works while this page is open.')
+    : 'Off.';
+}
+async function switchAlerts(on: boolean, box: HTMLInputElement) {
+  if (on) {
+    const perm = await askAlertPermission();
+    if (perm !== 'granted') { box.checked = false; toast(perm === 'denied' ? 'Notifications are blocked. Allow them in your phone settings first.' : "Notifications aren't available here."); fillAlertStatus(); return; }
+  }
+  await change(setAlerts(litterData(), { on }));
+  (document.getElementById('alerts-time') as HTMLInputElement | null)?.toggleAttribute('disabled', !on);
+  toast(on ? `Reminders on, at ${timeText(litterData().alerts)}.` : 'Reminders off.');
+  fillAlertStatus();
+}
 
 // ---- categories ----
 function openCats() {
@@ -273,6 +314,7 @@ onShown('litterbox', 'click', (ev) => {
     case 'chore-howoften': openChoreForm(id, true); break;
     case 'chore-delete': { const n = nameOf(id); closeLayer(); commit(removeChore(d, id), `Deleted ${n}`); break; }
     case 'cats-open': openCats(); break;
+    case 'alerts-open': openAlerts(); break;
     case 'cat-new': openCat(null); break;
     case 'cat-edit': openCat(id); break;
     case 'cat-delete': {
@@ -301,6 +343,12 @@ onShown('litterbox', 'submit', (ev) => {
 onShown('litterbox', 'change', (ev) => {
   const t = ev.target as HTMLInputElement;
   const f = t.closest('form');
+  if (t.id === 'alerts-on') { switchAlerts(t.checked, t); return; }
+  if (t.id === 'alerts-time') {
+    const [h, m] = t.value.split(':').map(Number);
+    if (Number.isFinite(h) && Number.isFinite(m)) { change(setAlerts(litterData(), { hour: h, minute: m })); fillAlertStatus(); }
+    return;
+  }
   if (t.dataset.filter) {
     if (t.dataset.filter === 'cat') filter = { ...filter, cat: t.value };
     else filter = { ...filter, status: t.value as StatusFilter };
@@ -322,6 +370,13 @@ onShown('litterbox', 'change', (ev) => {
       const e: Every = p === 'custom' ? { n: Number(q<HTMLInputElement>('[name=n]').value) || 1, unit: q<HTMLSelectElement>('[name=unit]').value as Unit } : { n: Number(p.slice(0, -1)), unit: UNITS.find(([u]) => u[0] === p.slice(-1))![0] };
       q<HTMLSelectElement>('#lb-lead').value = String(defaultLead(e));
     }
+    // and so does how it nags once it is due
+    if (!f.dataset.rep) {
+      const p = q<HTMLSelectElement>('#lb-preset').value;
+      const e: Every = p === 'custom' ? { n: Number(q<HTMLInputElement>('[name=n]').value) || 1, unit: q<HTMLSelectElement>('[name=unit]').value as Unit } : { n: Number(p.slice(0, -1)), unit: UNITS.find(([u]) => u[0] === p.slice(-1))![0] };
+      const r = q<HTMLSelectElement>('#lb-repeat');
+      if ([...r.options].some((o) => o.value === repeatKey(defaultRepeat(e)))) r.value = repeatKey(defaultRepeat(e));
+    }
   }
   if (t.id === 'lb-lead') f.dataset.lead = 'set';
   if (t.id === 'lb-pref') {
@@ -330,6 +385,8 @@ onShown('litterbox', 'change', (ev) => {
     q('#lb-early').hidden = !t.value;
   }
   if (t.name === 'mode') q('#lb-pile').hidden = t.value === 'rolling';
+  if (t.name === 'remind') q('#lb-repeat-wrap').hidden = !t.checked;
+  if (t.id === 'lb-repeat') f.dataset.rep = 'set';
   if (t.name === 'next') { f.dataset.next = 'set'; q('#lb-next-hint').hidden = true; return; }
   if (['preset', 'n', 'unit', 'pref', 'weekday', 'dom', 'early'].includes(t.name)) suggestNext(f);
 });
@@ -338,6 +395,7 @@ onShown('litterbox', 'change', (ev) => {
 // The list says "tomorrow" and "overdue" by the day, so it is drawn again when the day changes while the app stays open.
 setInterval(() => { if (document.documentElement.dataset.app === 'litterbox' && litterReady() && todayNum() !== shownDay && !$('lb-layer-host').firstChild) render(); }, 60_000);
 onLitter(render);
+onAlertInfo(() => void fillAlertStatus());
 onAppShown('litterbox', () => { renderTop(); render(); });
 renderTop();
 render();

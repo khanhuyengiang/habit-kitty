@@ -29,6 +29,8 @@ import { mountNotesSettings } from '../notes/settings.ts';
 import { mountPixelSettings } from '../pixel/settings.ts';
 import { change as changeShop, collectShopping, initShopping, restoreShopping, shopData, shopInitialised } from '../shopping/data.ts';
 import { applyMartSettings, martSettingsOf } from '../shopping/model.ts';
+import { collectLitterbox, initLitterbox, restoreLitterbox } from '../litterbox/data.ts';
+import { startAlerts } from '../litterbox/notify.ts';
 import { collectPixel, initPixel, restorePixel, setPixelData } from '../pixel/data.ts';
 import { PARTS, SETTINGS_EXT, SETTINGS_PREFIX, cleanDiary, isSettingsText, readSettings, settingsText, type HabitSettings, type Part, type SettingsFile } from '../settings-file.ts';
 import { backupName } from '../shared/backup-schedule.ts';
@@ -1064,7 +1066,7 @@ async function loadDiary() {
 // ---- Backup: one .kitty file (a zip) holding the game, every diary page and every photo ----
 async function collectBackup(): Promise<Backup> {
   await initPixel();
-  return { game: save, ...await collectDiary(), notes: collectNotes(), notebooks: collectBooks(), shopping: collectShopping(), gallery: collectPixel(), achievement: await snapshotAchievement() };
+  return { game: save, ...await collectDiary(), notes: collectNotes(), notebooks: collectBooks(), shopping: collectShopping(), litterbox: collectLitterbox(), gallery: collectPixel(), achievement: await snapshotAchievement() };
 }
 
 registerBackupSource({ prefix: BACKUP_PREFIX, ext: BACKUP_EXT, pack: async () => packBackup(await collectBackup()) });
@@ -1123,6 +1125,7 @@ async function applySynced(b: Backup, parts: Set<Part>): Promise<boolean> {
   if (parts.has('notes') && !await restoreNotes(b.notes ?? {})) return false;
   if (parts.has('notebooks') && !await restoreBooks(b.notebooks ?? '{"books":[]}')) return false;
   if (parts.has('shopping') && b.shopping && !await restoreShopping(b.shopping)) return false;
+  if (parts.has('litterbox') && b.litterbox && !await restoreLitterbox(b.litterbox)) return false;
   if (parts.has('gallery') && b.gallery) {
     if (!await restorePixel(b.gallery)) return false;
     redrawPixelSettings();
@@ -1141,7 +1144,7 @@ async function applySynced(b: Backup, parts: Set<Part>): Promise<boolean> {
 }
 registerSyncTarget({ collect: collectBackup, apply: applySynced });
 
-const SYNC_PART_NAMES: Record<Part, string> = { game: 'Kitties', diary: 'Diary', notes: 'Notes', notebooks: 'Notebooks', shopping: 'Kitty Mart', gallery: 'Kitty Gallery', achievement: 'Kitty Achievement' };
+const SYNC_PART_NAMES: Record<Part, string> = { game: 'Kitties', diary: 'Diary', notes: 'Notes', notebooks: 'Notebooks', shopping: 'Kitty Mart', litterbox: 'Kitty Litterbox', gallery: 'Kitty Gallery', achievement: 'Kitty Achievement' };
 function syncConflictHtml(parts: Part[]): string {
   return `<div class="panel"><p><b>Both sides changed these.</b> Choose what to keep. The side you don't pick is saved in the <b>conflicts</b> folder in Dropbox.</p>
     ${parts.map((p) => `<p><label>${SYNC_PART_NAMES[p]}: <select data-sync-part="${p}"><option value="merge">Merge both</option><option value="mine">Keep this device</option><option value="cloud">Keep Dropbox (other devices)</option></select></label></p>`).join('')}
@@ -1190,12 +1193,13 @@ function askRestore(b: Backup) {
     b.game ? `your kitties, ${pages} diary ${pages === 1 ? 'page' : 'pages'} and ${photos} ${photos === 1 ? 'photo' : 'photos'}` : '',
     b.notes && Object.keys(b.notes).length ? `${plural(Object.keys(b.notes).length, 'note')}` : '',
     b.shopping ? 'your shopping lists' : '',
+    b.litterbox ? 'your Kitty Litterbox chores' : '',
     b.gallery ? 'your Kitty Gallery icons' : '',
     b.achievement ? `${ach} ${ach === 1 ? 'achievement' : 'achievements'} (Kitty Achievement)` : '',
   ].filter(Boolean);
   openModal(`<div class="panel"><h3>Restore this backup?</h3>
     <p>It holds ${parts.join(' and ')}.</p>
-    <p class="muted">${b.game && b.achievement ? 'Everything in both apps' : b.game ? 'Everything in Habit Kitty' : 'Everything in Kitty Achievement'} on this device will be replaced.${b.notes && Object.keys(b.notes).length ? ' So will your notes.' : ''}${b.shopping ? ' So will your shopping lists, recipes and pantry.' : ''}${b.gallery ? ' So will your Kitty Gallery icons.' : ''}</p>
+    <p class="muted">${b.game && b.achievement ? 'Everything in both apps' : b.game ? 'Everything in Habit Kitty' : 'Everything in Kitty Achievement'} on this device will be replaced.${b.notes && Object.keys(b.notes).length ? ' So will your notes.' : ''}${b.shopping ? ' So will your shopping lists, recipes and pantry.' : ''}${b.litterbox ? ' So will your Kitty Litterbox chores.' : ''}${b.gallery ? ' So will your Kitty Gallery icons.' : ''}</p>
     <div class="btns"><button class="btn" data-action="modal-close">Cancel</button>
     <button class="btn primary" data-action="restore-yes">Restore</button></div></div>`);
 }
@@ -1214,6 +1218,7 @@ async function restoreBackup() {
     if (!await restoreDiary(b, g)) { closeModal(); toast("Couldn't restore the kitties and diary. Achievements were restored."); return; }
     if (b.notes && Object.keys(b.notes).length && !await restoreNotes(b.notes)) toast("Couldn't restore the notes. Everything else was restored.");   // a backup from before notes leaves yours alone
     if (b.notebooks && !await restoreBooks(b.notebooks)) toast("Couldn't restore the notebooks. Everything else was restored.");
+    if (b.litterbox && !await restoreLitterbox(b.litterbox)) toast("Couldn't restore the Kitty Litterbox chores. Everything else was restored.");
     if (b.shopping && !await restoreShopping(b.shopping)) toast("Couldn't restore the shopping lists. Everything else was restored.");   // likewise for one from before Kitty Mart
     if (b.gallery && !await restorePixel(b.gallery)) toast("Couldn't restore the Kitty Gallery icons. Everything else was restored.");   // and for one from before the icons were in it
     else if (b.gallery) redrawPixelSettings();
@@ -2357,6 +2362,7 @@ function scheduleRollover() {
 loadDiary();
 initNotes();
 initShopping();
+initLitterbox().then(startAlerts);   // its notifications keep coming whichever screen is showing
 settle();
 renderAll();
 openNav('kitty', 'list');
