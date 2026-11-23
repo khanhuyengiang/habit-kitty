@@ -19,7 +19,7 @@ import { MAX_NOTES, MAX_TEXT, safeName } from './notes/model.ts';
 
 // Format 2 can carry Kitty Achievement's whole save as one more entry (achievement.achkitty, itself a zip, see achievement/backup.ts),
 // so one file backs up both apps. Format 1 files (Habit Kitty only) still load. Newer entries (notes, shopping.json,
-// gallery.json) were added without a new format: an older app skips what it does not know.
+// gallery.json, litterbox.json) were added without a new format: an older app skips what it does not know.
 export const BACKUP_FORMAT = 2;
 // Every photo (on the phone and in a backup) is scaled to fit under PHOTO_MAX_BYTES, so a backup stays small.
 export { PHOTO_MAX_BYTES, PHOTO_MAX_SIDE } from './shared/photo.ts';
@@ -36,6 +36,7 @@ export interface Backup {
   shopping?: string;                  // Kitty Mart's data, as JSON (shopping.json in the file)
   gallery?: string;                   // Kitty Gallery's icons, as JSON (gallery.json in the file); none in a backup from before it
   notebooks?: string;                 // the notebooks, as JSON (notebooks.json in the file)
+  litterbox?: string;                 // Kitty Litterbox's chores, as JSON (litterbox.json in the file)
 }
 
 export function packBackup(b: Backup, exportedAt = Date.now()): Uint8Array {
@@ -50,6 +51,7 @@ export function packBackup(b: Backup, exportedAt = Date.now()): Uint8Array {
   if (b.shopping) files['shopping.json'] = strToU8(b.shopping);
   if (b.gallery) files['gallery.json'] = strToU8(b.gallery);
   if (b.notebooks) files['notebooks.json'] = strToU8(b.notebooks);
+  if (b.litterbox) files['litterbox.json'] = strToU8(b.litterbox);
   const extras = sanitizeExtras(b.extras);
   if (Object.keys(extras).length) files[EXTRAS_FILE] = strToU8(JSON.stringify(extras));
   if (b.achievement) files[ACHIEVEMENT_ENTRY] = [b.achievement, { level: 0 }];   // photos inside are JPEGs already
@@ -115,5 +117,5 @@ export function unpackBackup(bytes: Uint8Array): Backup {
   }
   let extras: DiaryExtras = {};
   try { if (files[EXTRAS_FILE]) extras = sanitizeExtras(JSON.parse(strFromU8(files[EXTRAS_FILE]))); } catch { /* ignore a damaged settings file */ }
-  return { game: JSON.parse(strFromU8(files['game.json'])), diary, photos, morePhotos, reflections, extras, notes, ...(files['shopping.json'] && { shopping: strFromU8(files['shopping.json']) }), ...(files['gallery.json'] && { gallery: strFromU8(files['gallery.json']) }), ...(files['notebooks.json'] && { notebooks: strFromU8(files['notebooks.json']) }), ...(files[ACHIEVEMENT_ENTRY] && { achievement: files[ACHIEVEMENT_ENTRY] }) };
+  return { game: JSON.parse(strFromU8(files['game.json'])), diary, photos, morePhotos, reflections, extras, notes, ...(files['shopping.json'] && { shopping: strFromU8(files['shopping.json']) }), ...(files['gallery.json'] && { gallery: strFromU8(files['gallery.json']) }), ...(files['notebooks.json'] && { notebooks: strFromU8(files['notebooks.json']) }), ...(files['litterbox.json'] && { litterbox: strFromU8(files['litterbox.json']) }), ...(files[ACHIEVEMENT_ENTRY] && { achievement: files[ACHIEVEMENT_ENTRY] }) };
 }

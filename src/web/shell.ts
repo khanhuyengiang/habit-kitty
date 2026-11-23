@@ -20,6 +20,7 @@ function start(app: AppName) {
   else if (app === 'notes') import('../notes/app.ts');
   else if (app === 'shopping') import('../shopping/app.ts');
   else if (app === 'pixel') import('../pixel/app.ts');
+  else if (app === 'litterbox') import('../litterbox/app.ts');
   else import('../home/app.ts');
 }
 
@@ -40,7 +41,7 @@ function show(app: AppName, tab?: string) {
   window.scrollTo(0, 0);
 }
 
-const asApp = (s: string | undefined): AppName => (s === 'achievement' || s === 'habit' || s === 'diary' || s === 'notes' || s === 'shopping' || s === 'pixel' ? s : 'home');
+const asApp = (s: string | undefined): AppName => (s === 'achievement' || s === 'habit' || s === 'diary' || s === 'notes' || s === 'shopping' || s === 'pixel' || s === 'litterbox' ? s : 'home');
 
 // Capture, so a "go" is handled here and never reaches the screen that is being hidden.
 document.addEventListener('click', (ev) => {

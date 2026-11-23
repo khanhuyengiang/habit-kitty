@@ -16,6 +16,8 @@ import { $, esc } from '../shared/html.ts';
 import { appName, closeX, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
 import { habitStats, onHabitStats } from '../shared/stats.ts';
 import { VERSION } from '../shared/version.ts';
+import { litterData, litterReady, onLitter } from '../litterbox/data.ts';
+import { dueCount, todayNum } from '../litterbox/model.ts';
 
 
 let data: Data | null = null;     // the saved player and achievements (null until read)
@@ -74,12 +76,16 @@ const MENU: { name: [string, string]; to: string }[] = [
   { name: ['Kitty', 'Achievement'], to: 'achievement' },
   { name: ['Kitty', 'Mart'], to: 'shopping' },
   { name: ['Kitty', 'Gallery'], to: 'pixel' },
+  { name: ['Kitty', 'Litterbox'], to: 'litterbox' },
 ];
 
 function renderMenu() {
   const chosen = lastApp();
   $('home-menu').innerHTML = MENU.map((e, i) => {
-    const btn = `<button class="btn menu-btn" type="button" style="--mb: var(--m${i + 1})" data-action="go" data-to="${e.to}">${appName(...e.name)}</button>`;
+    // Kitty Litterbox's key says how many chores are due now
+    const due = e.to === 'litterbox' && litterReady() ? dueCount(litterData(), todayNum()) : 0;
+    const badge = due ? `<span class="menu-badge" role="img" aria-label="${due} due">${due > 99 ? '99+' : due}</span>` : '';
+    const btn = `<button class="btn menu-btn" type="button" style="--mb: var(--m${i + 1})" data-action="go" data-to="${e.to}">${appName(...e.name)}${badge}</button>`;
     // the key of the app opened last is the chosen one: a white outline that glows and a wing on each side
     const key = e.to === chosen
       ? `<div class="perch"><span class="wing l">${fineSvg(DECOS.wing.art)}</span><span class="glow">${btn}</span><span class="wing r">${fineSvg(DECOS.wing.art)}</span></div>`
@@ -223,6 +229,9 @@ async function load() {
 
 // The two apps change the player's numbers and may have changed the player itself: read everything again whenever home shows.
 onAppShown('home', () => { renderTop(); renderMenu(); load(); });
+onLitter(renderMenu);   // the chores load after the page starts, and change while it is open
+let menuDay = todayNum();
+setInterval(() => { if (todayNum() !== menuDay) { menuDay = todayNum(); renderMenu(); } }, 60_000);   // the number of chores due changes at midnight
 onHabitStats(() => { if (view === 'stat') renderStat(); });
 
 renderTop();

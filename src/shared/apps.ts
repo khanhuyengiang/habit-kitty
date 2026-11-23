@@ -5,13 +5,13 @@ import { monoSvg } from './pixelart.ts';
 import { miniSvg } from './pixelcat.ts';
 import { getLocal, setLocal } from './local.ts';
 
-// The home page, the diary and the notes (the Journal's two tabs), Kitty Mart, Kitty Gallery and the two apps: <html data-app> says which one is showing. (Habit Kitty's styles also serve the home page, the diary and the notes.)
-export type AppName = 'home' | 'habit' | 'diary' | 'notes' | 'achievement' | 'shopping' | 'pixel';
-export const APP_TITLE: Record<AppName, string> = { home: 'Kitty Home', habit: 'Habit Kitty', diary: 'Kitty Journal', notes: 'Kitty Journal', achievement: 'Kitty Achievement', shopping: 'Kitty Mart', pixel: 'Kitty Gallery' };
+// The home page, the diary and the notes (the Journal's two tabs), Kitty Mart, Kitty Gallery, Kitty Litterbox and the two apps: <html data-app> says which one is showing. (Habit Kitty's styles also serve the home page, the diary and the notes.)
+export type AppName = 'home' | 'habit' | 'diary' | 'notes' | 'achievement' | 'shopping' | 'pixel' | 'litterbox';
+export const APP_TITLE: Record<AppName, string> = { home: 'Kitty Home', habit: 'Habit Kitty', diary: 'Kitty Journal', notes: 'Kitty Journal', achievement: 'Kitty Achievement', shopping: 'Kitty Mart', pixel: 'Kitty Gallery', litterbox: 'Kitty Litterbox' };
 
 export const shownApp = (): AppName => {
   const a = document.documentElement.dataset.app;
-  return a === 'achievement' || a === 'home' || a === 'diary' || a === 'notes' || a === 'shopping' || a === 'pixel' ? a : 'habit';
+  return a === 'achievement' || a === 'home' || a === 'diary' || a === 'notes' || a === 'shopping' || a === 'pixel' || a === 'litterbox' ? a : 'habit';
 };
 
 // The app opened last (the Journal's two tabs count as one), kept on this device: the home page marks its key. Habit Kitty
@@ -23,7 +23,7 @@ export const rememberApp = (app: AppName) => {
 };
 export const lastApp = (): AppName => {
   const a = getLocal(LAST_KEY);
-  return a === 'diary' || a === 'achievement' || a === 'shopping' || a === 'pixel' ? a : 'habit';
+  return a === 'diary' || a === 'achievement' || a === 'shopping' || a === 'pixel' || a === 'litterbox' ? a : 'habit';
 };
 
 // document.addEventListener, but only while `app` is showing.

@@ -5,7 +5,7 @@
 //   reflections  likewise, month by month
 //   notes        note by note; one changed on both sides keeps both (the other one as a "(conflict)" copy, as the notes
 //                folder sync does)
-//   the rest     record by record (Kitty Mart, notebooks, Kitty Gallery's icons, Kitty Achievement); when both sides
+//   the rest     record by record (Kitty Mart, Kitty Litterbox, notebooks, Kitty Gallery's icons, Kitty Achievement); when both sides
 //                changed one record, the one changed last wins where it says when it was changed, this device's otherwise
 import type { Backup } from '../backup.ts';
 import { MAX_PHOTOS, type DiaryEntry, type DiaryExtras, type Reflection } from '../diary/model.ts';
@@ -13,6 +13,7 @@ import { uniqueName } from '../notes/model.ts';
 import { sanitizeBooks, type BookData } from '../notes/books.ts';
 import { sanitize as sanitizeShop, type ShopData } from '../shopping/model.ts';
 import { sanitize as sanitizePixel, type PixelData } from '../pixel/model.ts';
+import { LIMITS as LITTER_LIMITS, sanitize as sanitizeLitter, type Chore, type LitterData } from '../litterbox/model.ts';
 import { packBackup as packAchievement, unpackBackup as unpackAchievement } from '../achievement/backup.ts';
 import type { Data as AchievementData } from '../achievement/model.ts';
 import { mergeGame, type GameSave } from './merge-game.ts';
@@ -98,6 +99,27 @@ function mergeShop(base: Base<ShopData>, mine: ShopData, theirs: ShopData): Shop
   return out;
 }
 
+// ---- Kitty Litterbox: chore by chore; a chore's history keeps what either side wrote down ----
+// How often, the preferred day and where it is now (anchor, cycle, delay, snooze) only make sense together: a chore that was
+// re-anchored on one device and marked done on the other must not get one side's anchor with the other's cycle. They are taken
+// whole from the side that changed them (this device's when both did); everything else merges field by field.
+const LITTER_SCHEDULE = ['every', 'prefer', 'early', 'rolling', 'pile', 'anchor', 'cycle', 'shift', 'snooze'] as const;
+function mergeChore(b: Base<Chore>, m: Chore, t: Chore): Chore {
+  const sched = (c: Chore | undefined) => c === undefined ? undefined : LITTER_SCHEDULE.map((k) => c[k]);
+  const theirsOnly = b !== NONE && equal(sched(m), sched(b)) && !equal(sched(t), sched(b));
+  const own = (k: (typeof LITTER_SCHEDULE)[number]) => () => (theirsOnly ? t[k] : m[k]);
+  const out = mergeFields(b, m, t, 'mine', Object.fromEntries(LITTER_SCHEDULE.map((k) => [k, own(k)])));
+  const seen = new Set<string>();
+  out.log = [...m.log, ...t.log].filter((e) => !seen.has(`${e.day} ${e.kind}`) && seen.add(`${e.day} ${e.kind}`))
+    .sort((x, y) => x.day.localeCompare(y.day)).slice(-LITTER_LIMITS.log);
+  return out;
+}
+function mergeLitter(base: Base<LitterData>, mine: LitterData, theirs: LitterData): LitterData {
+  const out = mergeDeep(base, mine, theirs) as LitterData;   // the categories and the reminder settings
+  out.chores = mergeById(field(base, 'chores'), mine.chores, theirs.chores, { item: mergeChore });
+  return out;
+}
+
 // ---- Kitty Gallery: each icon says when it was changed (a deleted one is kept, marked deleted) ----
 const iconKey = (i: { category: string; id: string }) => `${i.category}/${i.id}`;
 const mergePixel = (base: Base<PixelData>, mine: PixelData, theirs: PixelData): PixelData => ({
@@ -159,13 +181,14 @@ export async function mergeBackups(base: Backup | null, mine: Backup, theirs: Ba
     notebooks: mergeJson(base?.notebooks, mine.notebooks, theirs.notebooks, sanitizeBooks, mergeBooks, (d) => !d.books.length),
     shopping: mergeJson(base?.shopping, mine.shopping, theirs.shopping, sanitizeShop, mergeShop),
     gallery: mergeJson(base?.gallery, mine.gallery, theirs.gallery, sanitizePixel, mergePixel),
+    litterbox: mergeJson(base?.litterbox, mine.litterbox, theirs.litterbox, sanitizeLitter, mergeLitter),
     achievement: await mergeAchievement(base?.achievement, mine.achievement, theirs.achievement),
   };
 }
 
 // ---- what a merge changed ----
 // The parts of a save, as the app restores them.
-export type Part = 'game' | 'diary' | 'notes' | 'notebooks' | 'shopping' | 'gallery' | 'achievement';
+export type Part = 'game' | 'diary' | 'notes' | 'notebooks' | 'shopping' | 'litterbox' | 'gallery' | 'achievement';
 
 // A page as it is restored: whether it has photos follows the photos themselves.
 const diaryView = (b: Backup) => ({
@@ -185,7 +208,7 @@ export function changedParts(a: Backup, b: Backup): Set<Part> {
   if (!equal(a.game, b.game)) out.add('game');
   if (!equal(diaryView(a), diaryView(b))) out.add('diary');
   if (!equal(a.notes ?? {}, b.notes ?? {})) out.add('notes');
-  for (const k of ['notebooks', 'shopping', 'gallery'] as const) if (!equal(jsonView(a[k]), jsonView(b[k]))) out.add(k);
+  for (const k of ['notebooks', 'shopping', 'litterbox', 'gallery'] as const) if (!equal(jsonView(a[k]), jsonView(b[k]))) out.add(k);
   if (!equal(achievementView(a.achievement), achievementView(b.achievement))) out.add('achievement');
   return out;
 }

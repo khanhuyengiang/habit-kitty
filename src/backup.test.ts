@@ -165,3 +165,11 @@ describe('notes in a backup', () => {
     expect(bad.notes).toEqual({ ok: 'y' });
   });
 });
+
+describe('Kitty Litterbox in a backup', () => {
+  it('round-trips its chores, and an older backup without them reads fine', () => {
+    const litterbox = JSON.stringify({ v: 1, chores: [], cats: [], alerts: { on: true, hour: 9, minute: 30 } });
+    expect(unpackBackup(packBackup({ game: {}, diary: {}, photos: {}, litterbox })).litterbox).toBe(litterbox);
+    expect(unpackBackup(packBackup({ game: {}, diary: {}, photos: {} })).litterbox).toBeUndefined();
+  });
+});

@@ -1,0 +1,54 @@
+<style>
+/* Kitty Litterbox. Drawn with the shared sheet and Habit Kitty's; these are its own parts. Only the shared colour variables. */
+.lb-body { display: grid; gap: var(--s4); }
+.litterbox .grow, .lb-dialog .grow { flex: 1; }
+.litterbox h4, .lb-dialog h4 { margin: 0; font: 700 20px/1.2 var(--font); }
+.lb-undo { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); font-size: 16px; }
+.lb-undo .muted { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-sum { margin: 0; font-size: 18px; }
+.lb-arrange .seg { width: 100%; }
+.lb-group { display: grid; gap: var(--s2); }
+.lb-group h4 { display: flex; align-items: center; gap: var(--s2); font-size: 16px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.lb-group h4 .lb-ico .nart { width: calc(7 * var(--u)); }
+.chores, .lb-cats, .lb-hist { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.lb-hist { font-size: 18px; }
+/* a chore: its picture in the category's colour, the name, when it is due, how often; Done on the right */
+.chore, .lb-cats li { display: flex; align-items: center; gap: var(--s2); }
+.chore-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s3); text-align: left; padding: var(--s3); background: var(--surface2); border: var(--px) solid var(--line); color: var(--ink); font: inherit; cursor: pointer; }
+.chore-main:hover { border-color: var(--edge); }
+.lb-ico { flex: none; --sq: var(--nc); --dk: color-mix(in srgb, var(--nc) 25%, #231d44); }
+.chore-main .lb-ico .nart, .lb-cats .nart { width: calc(10 * var(--u)); }
+.litterbox .nart .sticker, .lb-dialog .nart .sticker { display: block; }
+.cname { display: grid; gap: var(--px); min-width: 0; font-size: 20px; overflow-wrap: anywhere; }
+.cname .when { font-size: 18px; color: var(--accent-text); }
+.cname .muted { font-size: 16px; }
+.chore.overdue .when { color: var(--bad); font-weight: 700; }
+.chore.due .when { font-weight: 700; }
+/* resting and snoozed chores are grayed out: nothing to do until their turn */
+.chore.resting .chore-main, .chore.snoozed .chore-main { opacity: .6; }
+.chore.resting .when, .chore.snoozed .when { color: var(--muted); }
+.chore .btn { flex: none; }
+/* a preferred day that cannot be kept to, said in the form */
+.lb-warn { margin: 0; font-size: 16px; font-weight: 700; color: var(--bad); }
+.lb-warn[hidden] { display: none; }
+.lb-on { display: flex; gap: var(--s3); align-items: end; }
+.lb-on .field { flex: 1; }
+.lb-on .btn { flex: none; }
+.lb-dialog .stack { display: grid; gap: var(--s3); }
+.lb-dialog .btns { flex-wrap: wrap; align-items: center; }
+.lb-dialog .btns.flow { gap: var(--s2); }
+#lb-toast .linkish { color: var(--accent-text); font-weight: 700; margin-left: var(--s2); }
+/* wide screens (see .wrap in page.html): the groups tile */
+@media (min-width: 960px) {
+  .lb-body { grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--tile)), 1fr)); align-items: start; }
+  .lb-body > :not(.lb-group) { grid-column: 1 / -1; }
+}
+</style>
+<div data-app-root="litterbox" hidden>
+  <div class="wrap litterbox">
+    <header class="top" id="lb-top"></header>
+    <div class="lb-body" id="lb-body"></div>
+  </div>
+  <div id="lb-layer-host"></div>
+  <div class="toast" id="lb-toast" role="status" hidden></div>
+</div>
