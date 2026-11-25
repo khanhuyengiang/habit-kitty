@@ -331,7 +331,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .wrap { padding-bottom: calc(40 * var(--u)); }   /* room for the playtest clock in the corner */
 .sprite.mini { width: calc(var(--w, 13) * var(--px)); }
 .sprite.body { width: calc(var(--w, 28) * var(--px)); }
-.sprite.nap { width: calc(var(--w) * var(--px)); }
+.sprite.nap, .sprite.sheetnap { width: calc(var(--w) * var(--px)); }
 .sprite.faded { opacity: .28; }
 .pixart.dim { opacity: .3; filter: grayscale(1); }
 
@@ -526,7 +526,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
   .sprite.body .tail.b { animation: tail-b 1.6s steps(1) infinite; animation-delay: var(--d); }
   .sprite.body .blink { animation: blink 4.4s steps(1) infinite; animation-delay: var(--d); }
   .room .pet.walking .sprite.body { animation: hop .32s steps(2) infinite; }
-  .room .pet .sprite.nap { animation: breathe 3s steps(2) infinite; }
+  .room .pet .sprite.nap, .room .pet .sprite.sheetnap { animation: breathe 3s steps(2) infinite; }
   .room .pet.zooming .sprite.body { animation: hop .2s steps(2) infinite; }
 }
 @keyframes tail-a { 0%, 49.9% { visibility: visible; } 50%, 100% { visibility: hidden; } }
@@ -805,6 +805,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
         <button class="btn menu-btn" type="button" data-action="settings-app" data-app="notes"><i data-icon="pencil"></i><span>Notes</span></button>
         <button class="btn menu-btn" type="button" data-action="settings-app" data-app="achievement"><i data-icon="trophy"></i><span>Achievements</span></button>
         <button class="btn menu-btn" type="button" data-action="settings-app" data-app="pixel"><i data-icon="pencil"></i><span>Kitty Gallery</span></button>
+        <button class="btn menu-btn" type="button" data-action="settings-app" data-app="wardrobe"><i data-icon="cat"></i><span>Kitty Wardrobe</span></button>
       </div>
       <footer class="foot">
       <span><span id="saved">Saved on this device</span> · <span id="version"></span></span>
@@ -876,6 +877,13 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
         <input type="file" id="ach-file" hidden>
         <p class="form-error" id="ach-error" hidden></p>
       </div></details>
+    </div>
+
+    <div class="set-page" id="set-wardrobe" hidden>
+      <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Kitty Wardrobe</h3></div>
+      <div class="panel">
+        <label class="check"><input type="checkbox" id="wardrobe-on"><span><b>Show Kitty Wardrobe</b><br><span class="muted">Puts Kitty Wardrobe on the home page. It is where the kitty's sprites and animations are drawn and where its skins (pattern and colour) are. It is Kitty Gallery's editor, so what you draw is saved the same way. This is a setting of this device.</span></span></label>
+      </div>
     </div>
 
     <div class="set-page" id="set-pixel" hidden>

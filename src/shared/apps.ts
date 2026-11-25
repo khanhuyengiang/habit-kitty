@@ -6,8 +6,16 @@ import { miniSvg } from './pixelcat.ts';
 import { getLocal, setLocal } from './local.ts';
 
 // The home page, the diary and the notes (the Journal's two tabs), Kitty Mart, Kitty Gallery, Kitty Litterbox and the two apps: <html data-app> says which one is showing. (Habit Kitty's styles also serve the home page, the diary and the notes.)
-export type AppName = 'home' | 'habit' | 'diary' | 'notes' | 'achievement' | 'shopping' | 'pixel' | 'litterbox';
-export const APP_TITLE: Record<AppName, string> = { home: 'Kitty Home', habit: 'Habit Kitty', diary: 'Kitty Journal', notes: 'Kitty Journal', achievement: 'Kitty Achievement', shopping: 'Kitty Mart', pixel: 'Kitty Gallery', litterbox: 'Kitty Litterbox' };
+export type AppName = 'home' | 'habit' | 'diary' | 'notes' | 'achievement' | 'shopping' | 'pixel' | 'litterbox' | 'wardrobe';
+export const APP_TITLE: Record<AppName, string> = { home: 'Kitty Home', habit: 'Habit Kitty', diary: 'Kitty Journal', notes: 'Kitty Journal', achievement: 'Kitty Achievement', shopping: 'Kitty Mart', pixel: 'Kitty Gallery', litterbox: 'Kitty Litterbox', wardrobe: 'Kitty Wardrobe' };
+
+// Kitty Wardrobe is Kitty Gallery's editor opened on the kitty (its sprites, animations and skins): it shares the page and the
+// saved icons, so while it shows <html data-app> is 'pixel' and <html data-mode> is 'wardrobe'. It is hidden from the home page until it is switched on
+// (Settings → Mini-apps → Kitty Wardrobe), on this device.
+export const inWardrobe = () => document.documentElement.dataset.mode === 'wardrobe';
+const WARDROBE_KEY = 'hk-wardrobe';
+export const wardrobeOn = () => getLocal(WARDROBE_KEY) === '1';
+export const setWardrobeOn = (on: boolean) => setLocal(WARDROBE_KEY, on ? '1' : '0');
 
 export const shownApp = (): AppName => {
   const a = document.documentElement.dataset.app;
@@ -23,7 +31,7 @@ export const rememberApp = (app: AppName) => {
 };
 export const lastApp = (): AppName => {
   const a = getLocal(LAST_KEY);
-  return a === 'diary' || a === 'achievement' || a === 'shopping' || a === 'pixel' || a === 'litterbox' ? a : 'habit';
+  return a === 'diary' || a === 'achievement' || a === 'shopping' || a === 'pixel' || a === 'litterbox' || (a === 'wardrobe' && wardrobeOn()) ? a : 'habit';
 };
 
 // document.addEventListener, but only while `app` is showing.

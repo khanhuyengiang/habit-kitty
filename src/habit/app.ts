@@ -20,9 +20,11 @@ import { isZip, packBackup, unpackBackup, type Backup } from '../backup.ts';
 import { connectDropbox, disconnectDropbox, isLocalCopy, onSyncStatus, returnAddress, registerSyncTarget, requestSync, resolveConflicts, setAskOnConflict, syncStatus, type Choice } from '../sync/sync.ts';
 import type { Part } from '../sync/merge.ts';
 import type { Mood } from '../diary/model.ts';
+import { sheetCatSvg, sheetLeap, sheetMs, sheetPlace, sheetRests, sheetSize, sheetTravel, sheetVersion } from '../shared/kittysheet.ts';
+import { ANIM_OF, FACINGS, flipOf, sideFacing, sideOf, turnPath, type Facing } from '../shared/facing.ts';
 import { CONFETTI_COLORS, TRAITS, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
 import { GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, petHeartSvg, iconSvg, markSvg, outdoorSvg, edenSvg, EDEN_SPOTS, roomSvg, sceneVersion } from '../shared/art.ts';
-import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, trophyIcon, type AppName } from '../shared/apps.ts';
+import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, setWardrobeOn, trophyIcon, wardrobeOn, type AppName } from '../shared/apps.ts';
 import { mountDiarySettings } from '../diary/settings.ts';
 import { collectBooks, collectNotes, initNotes, restoreBooks, restoreNotes } from '../notes/data.ts';
 import { mountNotesSettings } from '../notes/settings.ts';
@@ -560,7 +562,33 @@ function renderHeat() {
 
 // ---- cozy room: lives in real time (sky follows the clock, cats wander, sleep at night) ----
 // Positions are [x, feet-y] in room pixels (240 x 320, see scene.ts); a cat is BODY_W pixels wide and BODY_H tall, the same pixels as the room.
+// A kitty in the room is drawn from the sprite sheet from Kitty Gallery where it has an Idle (sitting) or Nap animation, else as the code draws it.
 const PET_W = BODY_W, PET_H = BODY_H;
+// Poses of the sheet and what the room uses them for. A sitting kitty rests in Idle (side on, tail wag), three-quarters, facing you or with
+// its back to you, and any of them turned the other way round (the sprites are drawn facing left, see ../shared/facing.ts). It turns
+// through the poses in between, and is side on before it gets up (sit2stand), walks (walk) and sits down again (standtosit, standtosit2).
+// It sleeps in one of the four nap poses, faces you when it has someone on its mind, winks in three-quarters when you pet it, and runs in
+// the zoomies. A pose the sheet does not have is skipped, and without an Idle or Nap the room draws its own kitty.
+const NAPS = ['nap', 'nap2', 'nap3', 'nap4'];
+const isNap = (anim: string) => anim.startsWith('nap');
+const haveAnim = (anim: string) => sheetSize(anim) !== null;
+const napAnimOf = (id: string) => { const have = NAPS.filter(haveAnim); return have.length ? have[hash(id) % have.length] : 'nap'; };
+const napFlip = (id: string) => ((hash(id) >> 1) & 1) === 1;
+// angel: the pictures the code draws (Eden's archangels, the kitties when the sheet has no Idle or Nap).
+const sizeOf = (anim: string): [number, number] => sheetSize(anim) ?? (isNap(anim) ? [NAP_W, NAP_H] : [PET_W, PET_H]);
+const sitW = () => sizeOf('idle')[0], sitH = () => sizeOf('idle')[1];
+const poseSvg = (anim: string, face: Face, look: CatLook, seed: number, still = false, flip = false, once = false) =>
+  sheetCatSvg(haveAnim(anim) ? anim : isNap(anim) ? 'nap' : 'idle', look, isNap(anim) ? 'nap' : 'sit', seed, still, flip, once) ?? (isNap(anim) ? napSvg(look) : bodySvg(face, look, seed));
+// Which way each kitty faces now (kept, so the room drawn again has them as they were), and which of them have their front and back turned over.
+const facingOf = new Map<string, Facing>();
+const mirrorOf = new Map<string, boolean>();
+const haveFacing = (f: Facing) => (haveAnim('idle') ? f === 'SL' || f === 'SR' || haveAnim(ANIM_OF[f]) : f === 'SL');   // the code's own kitty only faces one way
+const mirrored = (id: string) => mirrorOf.get(id) ?? ((hash(id) >> 3) & 1) === 1;
+const restOf = (id: string): Facing => { const f = facingOf.get(id); if (f && haveFacing(f)) return f; const have = FACINGS.filter(haveFacing); return have[hash(id) % have.length]; };
+const poseOf = (id: string, f: Facing) => ({ anim: ANIM_OF[f], flip: flipOf(f, mirrored(id)) });
+const restAnim = (id: string) => poseOf(id, restOf(id)).anim;
+const sitSvg = (id: string, face: Face, look: CatLook, still = false) => { const { anim, flip } = poseOf(id, restOf(id)); return poseSvg(anim, face, look, hash(id), still, flip); };
+const napSvgOf = (id: string, look: CatLook, still = false) => poseSvg(napAnimOf(id), 'sleepy', look, hash(id), still, napFlip(id));
 const SPOTS = ROOM_SPOTS, NIGHT_SPOTS = ROOM_NIGHT_SPOTS;
 const roomPos = new Map<string, number>(); // cat id -> index into SPOTS
 let roomSig = '';
@@ -570,10 +598,23 @@ const skyPhase = (): 'day' | 'dusk' | 'night' => {
 };
 // Cats go to bed at 10pm and get up at 6am, even though the sky starts to darken at 8pm.
 const asleepNow = () => { const h = now().getHours(); return h >= 22 || h < 6; };
-// A napping cat is wider than a sitting one, so it is centred on its spot and kept inside the room.
-const napLeft = (x: number) => Math.max(0, Math.min(ROOM_W - NAP_W, x + (PET_W - NAP_W) / 2));
-const petStyle = ([x, y]: [number, number], nap = false) =>
-  `left:calc(${nap ? napLeft(x) : x} * var(--px));top:calc(${y - (nap ? NAP_H : PET_H)} * var(--px));z-index:${Math.round(y)}`;
+// A pose that plays one of Idle's drawings (standing up, sitting down) is drawn on Idle's page, so the kitty does not move when it changes to
+// Idle; any other pose that is wider or narrower than the sitting kitty is centred on its spot and kept inside the room.
+// `shifted: false` is for a kitty the room moves by hand (a walk or a jump), whose positions already have the sheet's `before` and `after` in them.
+const fwd = (flip: boolean) => (flip ? 1 : -1);   // forward is left, and right when the kitty is turned the other way
+const petLeft = (x: number, anim = 'idle', flip = false, shifted = true) => {
+  const at = anim === 'angel' ? null : sheetPlace(anim);
+  if (at) return Math.max(0, x + (flip ? at.right : at.left) + (shifted ? fwd(flip) * at.f : 0));
+  return anim === 'idle' || anim === 'angel' ? x : Math.max(0, Math.min(ROOM_W - sizeOf(anim)[0], x + (sitW() - sizeOf(anim)[0]) / 2));
+};
+const petTop = (y: number, anim = 'idle', shifted = true) => {
+  const at = anim === 'angel' ? null : sheetPlace(anim);
+  return at ? y + at.top - (shifted ? at.u : 0) : y - sizeOf(anim)[1];
+};
+const petStyle = ([x, y]: [number, number], anim = 'idle', flip = false, shifted = true) =>
+  `left:calc(${petLeft(x, anim, flip, shifted)} * var(--px));top:calc(${petTop(y, anim, shifted)} * var(--px));z-index:${Math.round(y)}`;
+// A kitty at rest on its spot (its pose, and the way it is turned).
+const restStyle = (id: string, pos: [number, number]) => { const { anim, flip } = poseOf(id, restOf(id)); return petStyle(pos, anim, flip); };
 
 // Naps: at night every kitty sleeps curled up; by day they doze off now and then (a lazy cat far more than a playful one).
 const napUntil = new Map<string, number>();   // cat id -> when a daytime nap ends
@@ -608,7 +649,7 @@ function renderIndoor() {
   const asleep = asleepNow();
   const faceOf = (c: Cat): Face => (asleep ? 'sleepy' : catStatus(c, t).face);
   const lookKey = (c: Cat) => Object.values(lookFor(c)).join('');
-  const sig = phase + (asleep ? 'z' : '') + sceneVersion() + '|' + pets.map((c) => `${c.id}:${faceOf(c)}:${lookKey(c)}:${c.name}`).join('|');
+  const sig = phase + (asleep ? 'z' : '') + sceneVersion() + sheetVersion() + '|' + pets.map((c) => `${c.id}:${faceOf(c)}:${lookKey(c)}:${c.name}`).join('|');
   renderRoomNote();
   if (sig === roomSig) return;
   roomSig = sig;
@@ -623,7 +664,7 @@ function renderIndoor() {
   $('room').innerHTML = `<div class="room ${phase}">${roomBg(phase)}${props()}${pets.map((c, i) => {
     const pos = asleep ? NIGHT_SPOTS[i] : SPOTS[spotIdx(c, i)];
     const nap = isNapping(c.id, phase, asleep);
-    return `<div class="pet${nap ? ' napping' : ''}" data-id="${c.id}" data-fx="${pos[0]}" data-fy="${pos[1]}" data-nap="${nap ? 1 : ''}" data-hold="cat" style="${petStyle(pos, nap)}">${nap ? napSvg(lookFor(c)) : bodySvg(faceOf(c), lookFor(c), hash(c.id))}${nap ? '<b class="zz">z z</b>' : ''}<em>${esc(c.name)}</em></div>`;
+    return `<div class="pet${nap ? ' napping' : ''}" data-id="${c.id}" data-fx="${pos[0]}" data-fy="${pos[1]}" data-nap="${nap ? 1 : ''}" data-hold="cat" style="${nap ? petStyle(pos, napAnimOf(c.id), napFlip(c.id)) : restStyle(c.id, pos)}">${nap ? napSvgOf(c.id, lookFor(c)) : sitSvg(c.id, faceOf(c), lookFor(c))}${nap ? '<b class="zz">z z</b>' : ''}<em>${esc(c.name)}</em></div>`;
   }).join('')}</div>`;
 }
 
@@ -676,14 +717,14 @@ function renderOutdoor() {
   const asleep = asleepNow();
   const strays = visibleStrays();
   const faceOf = (k: MindfulTask): Face => (asleep ? 'sleepy' : strayDoneToday(k, t) ? 'happy' : 'open');
-  const sig = phase + (asleep ? 'z' : '') + sceneVersion() + '|' + strays.map((k) => `${k.id}:${faceOf(k)}:${strayName(k)}`).join('|');
+  const sig = phase + (asleep ? 'z' : '') + sceneVersion() + sheetVersion() + '|' + strays.map((k) => `${k.id}:${faceOf(k)}:${strayName(k)}`).join('|');
   renderRoomNote();
   if (sig === outdoorSig) return;
   outdoorSig = sig;
   $('outdoor').innerHTML = `<div class="room outdoor ${phase}">${outdoorSvg(phase)}${strays.map((k, i) => {
     const pos = OUT_SPOTS[i];
     const look = strayLook(k);
-    return `<div class="pet${asleep ? ' napping' : ''}" data-id="${k.id}" data-fx="${pos[0]}" data-fy="${pos[1]}" data-nap="${asleep ? 1 : ''}" data-hold="stray" style="${petStyle(pos, asleep)}">${asleep ? napSvg(look) : bodySvg(faceOf(k), look, hash(k.id))}${asleep ? '<b class="zz">z z</b>' : ''}<em>${esc(shortName(strayName(k)))}</em></div>`;
+    return `<div class="pet${asleep ? ' napping' : ''}" data-id="${k.id}" data-fx="${pos[0]}" data-fy="${pos[1]}" data-nap="${asleep ? 1 : ''}" data-hold="stray" style="${asleep ? petStyle(pos, napAnimOf(k.id), napFlip(k.id)) : restStyle(k.id, pos)}">${asleep ? napSvgOf(k.id, look) : sitSvg(k.id, faceOf(k), look)}${asleep ? '<b class="zz">z z</b>' : ''}<em>${esc(shortName(strayName(k)))}</em></div>`;
   }).join('')}</div>`;
 }
 
@@ -702,7 +743,7 @@ function renderEden() {
   edenSig = sig;
   $('eden').innerHTML = `<div class="room eden ${phase}">${edenSvg(phase)}${cats.map((c, i) => {
     const pos = EDEN_SPOTS[i] as [number, number];
-    return `<div class="pet" data-id="${c.id}" data-fx="${pos[0]}" data-fy="${pos[1]}" data-hold="cat" style="${petStyle(pos)}">${bodySvg('happy', lookFor(c), hash(c.id), true)}<em>${esc(c.name)}</em></div>`;
+    return `<div class="pet" data-id="${c.id}" data-fx="${pos[0]}" data-fy="${pos[1]}" data-hold="cat" style="${petStyle(pos, 'angel')}">${bodySvg('happy', lookFor(c), hash(c.id), true)}<em>${esc(c.name)}</em></div>`;
   }).join('')}${cats.length ? '' : `<div class="eden-lock">${artSvg(PADLOCK, '')}<b>Eden is locked</b><span>Ascend a kitty to open it</span></div>`}</div>`;
 }
 
@@ -715,23 +756,164 @@ const traitOf = (id: string): CatTrait => {
   return c ? (lookFor(c).trait ?? 'curious') : 'curious';
 };
 
-// Swap a cat in the room between the sitting sprite and the curled-up napping one, keeping its feet where they were.
-function setNap(el: HTMLElement, on: boolean) {
-  const c = save.state.cats.find((k) => k.id === el.dataset.id);
+// Swap a cat in the room to another pose of the sheet, keeping its feet where they are (it does not slide: the move that goes with a
+// walk is made by the caller). `anim` is idle, a nap, or any other pose; one the sheet does not have leaves the cat as it is.
+const catOf = (el: HTMLElement) => save.state.cats.find((k) => k.id === el.dataset.id);
+function setPose(el: HTMLElement, anim: string, seed?: number, flip = false, once = false) {
+  const c = catOf(el);
   const old = el.querySelector('svg.sprite');
-  if (!c || !old) return;
+  if (!c || !old || (anim !== 'idle' && !isNap(anim) && !haveAnim(anim))) return false;
   const tpl = document.createElement('template');
-  tpl.innerHTML = on ? napSvg(lookFor(c)) : bodySvg(catStatus(c, today()).face, lookFor(c), hash(c.id));
+  tpl.innerHTML = poseSvg(anim, catStatus(c, today()).face, lookFor(c), seed ?? hash(c.id), false, flip, once);
   old.replaceWith(tpl.content.firstElementChild as Element);
+  el.dataset.pose = anim;
+  el.style.transition = 'none';   // the new size is set at once, so the kitty does not slide to it
+  el.style.top = `calc(${petTop(Number(el.dataset.fy), anim)} * var(--px))`;
+  el.style.left = `calc(${petLeft(Number(el.dataset.fx), anim, flip)} * var(--px))`;
+  void el.offsetWidth;
+  el.style.transition = '';
+  return true;
+}
+// Face a way: the pose of that facing, remembered for the kitty.
+// `seed`: where in Idle it starts (0: from its first step, so it carries on from the drawing the kitty finished sitting down on).
+function applyFacing(el: HTMLElement, f: Facing, seed?: number) {
+  const id = el.dataset.id ?? '';
+  if (!haveFacing(f)) return;
+  facingOf.set(id, f);
+  const { anim, flip } = poseOf(id, f);
+  el.dataset.stance = 'idle';
+  setPose(el, anim, seed, flip);
+}
+function setNap(el: HTMLElement, on: boolean) {
+  const id = el.dataset.id ?? '';
+  if (!catOf(el)) return;
+  if (on) setPose(el, napAnimOf(id), undefined, napFlip(id)); else applyFacing(el, restOf(id));
   el.dataset.nap = on ? '1' : '';
   el.classList.toggle('napping', on);
   el.querySelector('.zz')?.remove();
   if (on) el.insertAdjacentHTML('afterbegin', '<b class="zz">z z</b>');
-  el.style.top = `calc(${Number(el.dataset.fy) - (on ? NAP_H : PET_H)} * var(--px))`;
-  const fx = Number(el.dataset.fx);
-  el.style.left = `calc(${on ? napLeft(fx) : fx} * var(--px))`;
+}
+const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+// Something a kitty does over a while (turning, walking, ...): the room leaves it alone meanwhile, and does one thing at a time.
+async function busyRun(el: HTMLElement, job: () => Promise<void>) {
+  if (el.dataset.busy) return;
+  el.dataset.busy = '1';
+  try { await job(); } finally { delete el.dataset.busy; }
+}
+const poseMs = (anim: string) => (haveAnim(anim) ? sheetMs(anim) ?? 0 : 0);
+// Turn to face a way, one step at a time (front on to side on goes through three-quarters).
+const TURN_MS = 200;
+async function faceTo(el: HTMLElement, to: Facing) {
+  if (!haveFacing(to)) return;
+  const path = turnPath(restOf(el.dataset.id ?? ''), to, haveFacing);
+  for (let i = 1; i < path.length; i++) {
+    applyFacing(el, path[i]);
+    if (i < path.length - 1) await wait(TURN_MS);
+  }
+}
+// Walk to a spot: turn side on, facing the way it is going (left or right: whichever the spot is, and it keeps its side when the spot is
+// straight up or down), get up, walk there with the walking animation, and sit down again facing the way it went.
+const WALK_MS_PER_PX = 45;
+// The pose a kitty is in between animations: sitting (Idle) or standing (the last step of standing up), which `before` and `after` of each
+// animation name. Changing from one to the other plays standing up or sitting down.
+async function stance(el: HTMLElement, to: 'idle' | 'stand', flip: boolean) {
+  if ((el.dataset.stance === 'stand' ? 'stand' : 'idle') === to) return;
+  if (to === 'stand') {
+    if (haveAnim('sit2stand')) { setPose(el, 'sit2stand', 0, flip, true); await wait(poseMs('sit2stand')); }
+  } else {
+    const sits = ['standtosit', 'standtosit2'].filter(haveAnim);
+    if (sits.length) { const sit = sits[Math.floor(Math.random() * sits.length)]; setPose(el, sit, 0, flip, true); await wait(poseMs(sit)); }
+  }
+  el.dataset.stance = to;
+}
+type Calib = { f: number; u: number };
+// Where a kitty that is moved by hand is drawn: `at` is a place in the room (where the sitting kitty would be), and the sheet's `before` / `after`
+// (forward and up from it) say how far the first and last frames are from the poses they start from and end in.
+const placed = (at: [number, number], by: Calib, flip: boolean): [number, number] => [at[0] + fwd(flip) * by.f, at[1] - by.u];
+// A walk that travels (see sheetTravel in ../shared/kittysheet.ts): the sprites are drawn on the spot and the kitty is moved by hand, so that
+// it is where the sheet says it is for each step. Step j of the walk (counting on through every round) is shown for one step's time, and the
+// kitty is at round * stride + the step's place along the way there; the last step is put exactly on the spot.
+async function travelTo(el: HTMLElement, [x0, y0]: [number, number], [x1, y1]: [number, number], tv: { at: number[]; stride: number; frameMs: number }, flip: boolean) {
+  const len = Math.hypot(x1 - x0, y1 - y0), n = tv.at.length;
+  const along = (j: number) => Math.floor(j / n) * tv.stride + tv.at[j % n];
+  let steps = 1;
+  while (along(steps) < len) steps++;
+  const t0 = performance.now();
+  for (let j = 1; j <= steps; j++) {
+    await wait(Math.max(0, t0 + j * tv.frameMs - performance.now()));
+    const f = Math.min(1, along(j) / len);
+    el.setAttribute('style', petStyle([x0 + (x1 - x0) * f, y0 + (y1 - y0) * f], 'walk', flip, false));
+    el.style.transition = 'none';
+  }
+  await wait(tv.frameMs);   // the last step is shown for its turn before it sits down
+}
+// A jump from one spot to another (see sheetLeap in ../shared/kittysheet.ts): the sprites are drawn on the spot and the kitty is moved by hand.
+// Step k is shown for a step's time, `at[k].dx` of the whole jump along (so that is how far along the way from the first frame to the last it is) and
+// `at[k].dy` up, less the part of the last step's height that the way there already has. The jump is stretched or squeezed to the distance.
+const LEAP_MIN = 24;   // a spot this much higher or lower than the kitty's own is reached by jumping, not by walking through the air
+type Leap = { at: { dx: number; dy: number }[]; frameMs: number; start: Calib; end: Calib };
+async function leapTo(el: HTMLElement, from: [number, number], to: [number, number], flip: boolean, lp: Leap) {
+  const [xs, ys] = placed(from, lp.start, flip), [xe, ye] = placed(to, lp.end, flip), last = lp.at[lp.at.length - 1];
+  const put = (k: number) => {
+    const p = lp.at[k].dx / last.dx, x = xs + (xe - xs) * p, y = ys + (ye - ys) * p - (lp.at[k].dy - last.dy * p);
+    el.setAttribute('style', petStyle([x, y], 'jump@spot', flip, false).replace(/z-index:\d+/, `z-index:${Math.round(Math.max(from[1], to[1]))}`));
+    el.style.transition = 'none';
+  };
+  setPose(el, 'jump@spot', 0, flip, true);
+  put(0);
+  const t0 = performance.now();
+  for (let k = 1; k < lp.at.length; k++) {
+    await wait(Math.max(0, t0 + k * lp.frameMs - performance.now()));
+    put(k);
+  }
+  el.setAttribute('style', petStyle([xe, ye], 'jump@spot', flip, false));
+  el.style.transition = 'none';
+  await wait(lp.frameMs);   // the landing is shown for its turn
+}
+async function walkTo(el: HTMLElement, [x1, y1]: [number, number]) {
+  const id = el.dataset.id ?? '';
+  const x0 = Number(el.dataset.fx), y0 = Number(el.dataset.fy), dx = x1 - x0, dy = y1 - y0;
+  const dir: 'L' | 'R' = Math.abs(dx) >= 3 ? (dx < 0 ? 'L' : 'R') : sideOf(restOf(id)) ?? (mirrored(id) ? 'R' : 'L');
+  await faceTo(el, sideFacing(dir));
+  const flip = dir === 'R', walking = haveAnim('walk');
+  const lp = Math.abs(dy) >= LEAP_MIN && haveAnim('jump@spot') ? sheetLeap('jump') : null;
+  // to jump it walks along the floor to within a jump of the spot (if it is further than that), then jumps
+  const reach = lp ? lp.at[lp.at.length - 1].dx : 0;
+  const far = !!lp && Math.abs(dx) > reach * 1.25;
+  const wx = far ? x1 - Math.sign(dx) * reach : lp ? x0 : x1, wy = lp ? y0 : y1;
+  const stroll = !lp || far;
+  const travels = walking ? sheetTravel('walk') : null, rests = sheetRests('walk');
+  if (stroll) {
+    if (walking) await stance(el, rests.before, flip);
+    if (walking) setPose(el, 'walk', 0, flip);
+    el.dataset.fx = String(wx);
+    el.dataset.fy = String(wy);
+    if (travels) {
+      await travelTo(el, placed([x0, y0], travels.start, flip), placed([wx, wy], travels.end, flip), travels, flip);
+      el.dataset.stance = rests.after;
+    } else {
+      const ms = Math.min(5000, Math.max(1500, Math.hypot(wx - x0, wy - y0) * WALK_MS_PER_PX));
+      el.setAttribute('style', petStyle([wx, wy], walking ? 'walk' : restAnim(id)));
+      el.style.transition = `left ${ms}ms steps(${Math.max(1, Math.round(Math.abs(wx - x0)))}), top ${ms}ms steps(${Math.max(1, Math.round(Math.abs(wy - y0)))})`;   // a pixel a step
+      if (!walking) el.classList.add('walking');   // the code's own kitty has no walking frames: it bounces along
+      await wait(ms);
+      el.classList.remove('walking');
+      if (walking) el.dataset.stance = rests.after;
+    }
+  }
+  if (lp) {
+    const jr = sheetRests('jump');
+    await stance(el, jr.before, flip);
+    await leapTo(el, [wx, wy], [x1, y1], flip, lp);
+    el.dataset.fx = String(x1);
+    el.dataset.fy = String(y1);
+    el.dataset.stance = jr.after;
+  }
+  if (walking || lp) await stance(el, 'idle', flip);
+  applyFacing(el, sideFacing(dir), 0);   // Idle starts on its first step, the drawing the sitting down (or the landing) ended on: no flash
 }
 
+const FIDGET_CHANCE = 0.2;
 const NAP_CHANCE: Record<CatTrait, number> = { lazy: 0.12, grumpy: 0.05, cuddly: 0.05, shy: 0.04, curious: 0.02, playful: 0.012 };
 
 function wander() {
@@ -740,6 +922,7 @@ function wander() {
   const taken = new Set(els.map((el) => roomPos.get(el.dataset.id ?? '')));
   els.forEach((el) => {
     const id = el.dataset.id ?? '';
+    if (el.dataset.busy) return;   // in the middle of a pose (getting up, sitting down)
     if (el.dataset.nap === '1') {   // asleep: wake up when the nap is over
       if ((napUntil.get(id) ?? 0) <= Date.now()) { napUntil.delete(id); setNap(el, false); }
       return;
@@ -750,18 +933,18 @@ function wander() {
       setNap(el, true);
       return;
     }
-    if (Math.random() > MOVE_CHANCE[traitOf(id)]) return;
+    if (Math.random() > MOVE_CHANCE[traitOf(id)]) {   // not going anywhere: now and then it turns to look another way
+      const looks = FACINGS.filter(haveFacing).filter((f) => f !== restOf(id));
+      if (looks.length && Math.random() < FIDGET_CHANCE) void busyRun(el, () => faceTo(el, looks[Math.floor(Math.random() * looks.length)]));
+      return;
+    }
     const from = roomPos.get(id) ?? 0;
     const free = SPOTS.map((_, i) => i).filter((i) => !taken.has(i));
     if (!free.length) return;
     const to = free[Math.floor(Math.random() * free.length)];
     taken.delete(from); taken.add(to);
     roomPos.set(id, to);
-    el.dataset.fx = String(SPOTS[to][0]);
-    el.dataset.fy = String(SPOTS[to][1]);
-    el.setAttribute('style', petStyle(SPOTS[to]));
-    el.classList.add('walking');
-    setTimeout(() => el.classList.remove('walking'), 2600);
+    void busyRun(el, () => walkTo(el, SPOTS[to]));
   });
   queueWidget();
 }
@@ -774,23 +957,32 @@ let zooming = false;
 function zoomies() {
   const phase = skyPhase();
   if (phase === 'day' || tab !== 'room' || roomView !== 'indoor' || document.hidden || zooming || Math.random() > 0.4) return;
-  const els = [...document.querySelectorAll<HTMLElement>('#room .pet')].filter((el) => !el.classList.contains('thinking'));
+  const els = [...document.querySelectorAll<HTMLElement>('#room .pet')].filter((el) => !el.classList.contains('thinking') && !el.dataset.busy);
   const el = els[Math.floor(Math.random() * els.length)];
   if (!el || Math.random() > ZOOM_CHANCE[traitOf(el.dataset.id ?? '')]) return;
   zooming = true;
-  const home = el.getAttribute('style') ?? '', homeFx = el.dataset.fx ?? '0', homeFy = el.dataset.fy ?? '0', wasNap = el.dataset.nap === '1';
-  el.classList.add('zooming', 'walking');
+  const id = el.dataset.id ?? '', homeFx = el.dataset.fx ?? '0', homeFy = el.dataset.fy ?? '0', wasNap = el.dataset.nap === '1';
+  const racing = ['run', 'jump'].find(haveAnim) ?? restAnim(id);   // a run cycle when the sheet has one, else the jump, else the kitty bounces along
+  const running = racing === 'run' || racing === 'jump';
+  el.dataset.busy = '1';
+  el.classList.add('zooming');
+  if (!running) el.classList.add('walking');
   if (wasNap) setNap(el, false);
   const route = [...SPOTS].sort(() => Math.random() - 0.5).slice(0, 5);
-  route.forEach(([x, y], i) => setTimeout(() => { el.dataset.fx = String(x); el.dataset.fy = String(y); el.setAttribute('style', petStyle([x, y])); }, 150 + i * 420));
-  setTimeout(() => { el.dataset.fx = homeFx; el.dataset.fy = homeFy; el.setAttribute('style', home); }, 150 + route.length * 420);
+  route.forEach(([x, y], i) => setTimeout(() => {
+    if (running) setPose(el, racing, undefined, x > Number(el.dataset.fx));   // it runs the way it is going
+    el.dataset.fx = String(x); el.dataset.fy = String(y); el.setAttribute('style', petStyle([x, y], racing));
+  }, 150 + i * 420));
+  setTimeout(() => { if (running) setPose(el, racing, undefined, Number(homeFx) > Number(el.dataset.fx)); el.dataset.fx = homeFx; el.dataset.fy = homeFy; el.setAttribute('style', petStyle([Number(homeFx), Number(homeFy)], racing)); }, 150 + route.length * 420);
   setTimeout(() => {
     el.classList.remove('zooming', 'walking');
-    if (wasNap) setNap(el, true);
+    delete el.dataset.busy;
+    if (wasNap) setNap(el, true); else applyFacing(el, restOf(id));
     zooming = false;
   }, 150 + route.length * 420 + 700);
 }
-setInterval(zoomies, 7000);
+const ZOOMIES_ON = false;   // switched off for now
+if (ZOOMIES_ON) setInterval(zoomies, 7000);
 
 // ---- home-screen widget (Android, see ./widget.ts): the room as three pictures, one per time of day ----
 // Cats sit where they are in the room now.
@@ -810,15 +1002,16 @@ function roomPicture(phase: WidgetPhase): string {
   const cats = homeCats().map((c, i) => {
     const [x, y] = phase === 'night' ? NIGHT_SPOTS[i] : SPOTS[(roomPos.get(c.id) ?? i) % SPOTS.length];
     const nap = isNapping(c.id, phase);
-    const body = (nap ? napSvg(lookFor(c)) : bodySvg(catStatus(c, t).face, lookFor(c), hash(c.id)))
+    const { anim, flip } = nap ? { anim: napAnimOf(c.id), flip: napFlip(c.id) } : poseOf(c.id, restOf(c.id)), [aw, ah] = sizeOf(anim);
+    const body = (nap ? napSvgOf(c.id, lookFor(c), true) : sitSvg(c.id, catStatus(c, t).face, lookFor(c), true))
       .replace('<g class="tail b">', '<g display="none">').replace('<g class="blink">', '<g display="none">')   // no CSS here: show tail frame A only
-      .replace('<svg ', `<svg x="${nap ? napLeft(x) : x}" y="${y - (nap ? NAP_H : PET_H)}" width="${nap ? NAP_W : PET_W}" height="${nap ? NAP_H : PET_H}" `);
-    const name = `<text x="${x + PET_W / 2}" y="${y + 7}" font-size="7" font-family="Jersey 15, monospace" text-anchor="middle" fill="#4a4084">${esc(c.name)}</text>`;
+      .replace('<svg ', `<svg x="${petLeft(x, anim, flip)}" y="${petTop(y, anim)}" width="${aw}" height="${ah}" `);
+    const name = `<text x="${x + sitW() / 2}" y="${y + 7}" font-size="7" font-family="Jersey 15, monospace" text-anchor="middle" fill="#4a4084">${esc(c.name)}</text>`;
     const about = thought?.thinker === c.id ? save.state.cats.find((k) => k.id === thought.subject) : undefined;
     let bubble = '';
     if (about && thought) {
       const v = THOUGHT_FACE[thought.kind];
-      const bw = 26, bh = 14, bx = x + PET_W / 2 - bw / 2, by = y - PET_H - bh - 4;
+      const bw = 26, bh = 14, bx = x + sitW() / 2 - bw / 2, by = y - sitH() - bh - 4;
       const edge = '#4a4084', R = (rx: number, ry: number, w: number, h: number, f: string) => `<rect x="${rx}" y="${ry}" width="${w}" height="${h}" fill="${f}"/>`;
       const mark = markSvg(v.mark).replace('<svg ', `<svg x="${bx + 17}" y="${by + 3}" width="${MARKS[v.mark][0].length}" height="${MARKS[v.mark].length}" `);
       bubble = `<g>${R(bx + 1, by, bw - 2, bh, edge)}${R(bx, by + 1, bw, bh - 2, edge)}${R(bx + 1, by + 1, bw - 2, bh - 2, '#fffafd')}
@@ -852,7 +1045,7 @@ function think() {
   const pick = pickThought(save.state.cats, today(), save.returned ?? {}, (id) => t - (thoughtAt.get(id) ?? 0) > THINK_REST_MS);
   const el = pick && document.querySelector<HTMLElement>(`#room .pet[data-id="${pick.thinker}"]`);
   const about = pick && save.state.cats.find((c) => c.id === pick.subject);
-  if (!pick || !el || !about || el.dataset.nap === '1') return;
+  if (!pick || !el || !about || el.dataset.nap === '1' || el.dataset.busy) return;
   lastThought = t;
   thoughtAt.set(pick.thinker, t);
   const v = THOUGHT_FACE[pick.kind];
@@ -863,7 +1056,14 @@ function think() {
   el.classList.add('thinking');
   el.style.zIndex = '300';
   el.appendChild(bubble);
-  setTimeout(() => { bubble.remove(); el.classList.remove('thinking'); }, THINK_SHOW_MS);
+  const was = restOf(pick.thinker), t0 = Date.now();
+  void busyRun(el, async () => {   // it turns to face you, thinks, and turns back
+    await faceTo(el, 'F');
+    await wait(Math.max(0, THINK_SHOW_MS - (Date.now() - t0)));
+    bubble.remove();
+    el.classList.remove('thinking');
+    await faceTo(el, was);
+  });
 }
 setInterval(think, THINK_EVERY_MS);
 
@@ -894,6 +1094,10 @@ for (const roomEl of [$('room'), $('outdoor'), $('eden')]) roomEl.addEventListen
   heart.innerHTML = HEART;
   pet.appendChild(heart);
   setTimeout(() => heart.remove(), 1300);
+  if (!pet.dataset.busy && !pet.classList.contains('thinking') && pet.dataset.hold === 'cat' && pet.closest('#room') && haveFacing('TL')) {   // petted: it turns three-quarters and winks
+    const was = restOf(id);
+    void busyRun(pet, async () => { await faceTo(pet, (sideOf(was) ?? (mirrored(id) ? 'R' : 'L')) === 'L' ? 'TL' : 'TR'); await wait(1500); await faceTo(pet, was); });
+  }
   const roll = Math.random();
   if (roll < PET_MEOW) playSound('meow');
   else if (roll < PET_MEOW + PET_PURR) playSound('purr');
@@ -1398,9 +1602,10 @@ function renderTabbar() {
 }
 
 // Settings: a main page (everything shared, then a button per mini-app), and one page for each mini-app's own options.
-const SETTINGS_PAGES = ['main', 'habit', 'diary', 'notes', 'achievement', 'pixel'] as const;
+const SETTINGS_PAGES = ['main', 'habit', 'diary', 'notes', 'achievement', 'pixel', 'wardrobe'] as const;
 function showSettingsApp(app: string | null) {
   for (const p of SETTINGS_PAGES) $(`set-${p}`).hidden = p !== (app ?? 'main');
+  if (app === 'wardrobe') ($('wardrobe-on') as HTMLInputElement).checked = wardrobeOn();
   if (app === 'pixel') redrawPixelSettings();   // its counts change in Kitty Gallery
   window.scrollTo(0, 0);
 }
@@ -2030,6 +2235,10 @@ $('unlimited-cats').addEventListener('change', (ev) => {
 });
 
 for (const id of ['day-start', 'day-end']) $(id).addEventListener('change', (ev) => setDayBoundary(Number((ev.target as HTMLSelectElement).value)));
+$('wardrobe-on').addEventListener('change', (ev) => {
+  setWardrobeOn((ev.target as HTMLInputElement).checked);
+  toast((ev.target as HTMLInputElement).checked ? 'Kitty Wardrobe is on the home page now.' : 'Kitty Wardrobe is hidden again.');
+});
 $('reminder-on').addEventListener('change', (ev) => setReminderEnabled((ev.target as HTMLInputElement).checked));
 $('last-call').addEventListener('change', async (ev) => {
   const v = (ev.target as HTMLSelectElement).value as LastCall;

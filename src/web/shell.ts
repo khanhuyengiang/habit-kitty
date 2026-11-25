@@ -3,7 +3,7 @@
 // widget and music run in the background whichever screen is showing; the others start the first time they are shown.
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
-import { APP_TITLE, GO_EVENT, SHOWN_EVENT, TAB_EVENT, rememberApp, shownApp, type AppName } from '../shared/apps.ts';
+import { APP_TITLE, GO_EVENT, SHOWN_EVENT, TAB_EVENT, rememberApp, shownApp, wardrobeOn, type AppName } from '../shared/apps.ts';
 import { paintBackdrop } from '../shared/backdrop.ts';
 import '../shared/ui.ts';   // the saved light/dark choice, before the first paint
 import { initPixel } from '../pixel/data.ts';
@@ -27,13 +27,17 @@ function start(app: AppName) {
 // The shared sheet is always on; Habit Kitty's draws the home page and the Journal too, Kitty Achievement has its own.
 const styleOf = (app: AppName) => (app === 'achievement' ? 'achievement' : 'habit');
 
-function show(app: AppName, tab?: string) {
-  const from = shownApp();
+function show(asked: AppName, tab?: string) {
+  const from: AppName = shownApp() === 'pixel' && document.documentElement.dataset.mode === 'wardrobe' ? 'wardrobe' : shownApp();   // so Settings' Back returns to the Wardrobe, not the Gallery
+  // Kitty Wardrobe is Kitty Gallery's page in another mode (see inWardrobe in shared/apps.ts); switched off, it is not there.
+  const wardrobe = asked === 'wardrobe' && wardrobeOn();
+  const app: AppName = asked === 'wardrobe' ? (wardrobe ? 'pixel' : 'home') : asked;
+  document.documentElement.dataset.mode = wardrobe ? 'wardrobe' : '';
   document.documentElement.dataset.app = app;
   for (const s of document.querySelectorAll<HTMLStyleElement>('style[data-app]')) s.media = s.dataset.app === styleOf(app) ? 'all' : 'not all';
   for (const el of document.querySelectorAll<HTMLElement>('[data-app-root]')) el.hidden = el.dataset.appRoot !== app;
-  document.title = APP_TITLE[app];
-  rememberApp(app);
+  document.title = APP_TITLE[wardrobe ? 'wardrobe' : app];
+  rememberApp(wardrobe ? 'wardrobe' : app);
   paintBackdrop();
   if (started.has(app)) document.dispatchEvent(new CustomEvent(SHOWN_EVENT, { detail: app }));
   else start(app);
@@ -41,7 +45,7 @@ function show(app: AppName, tab?: string) {
   window.scrollTo(0, 0);
 }
 
-const asApp = (s: string | undefined): AppName => (s === 'achievement' || s === 'habit' || s === 'diary' || s === 'notes' || s === 'shopping' || s === 'pixel' || s === 'litterbox' ? s : 'home');
+const asApp = (s: string | undefined): AppName => (s === 'achievement' || s === 'habit' || s === 'diary' || s === 'notes' || s === 'shopping' || s === 'pixel' || s === 'litterbox' || s === 'wardrobe' ? s : 'home');
 
 // Capture, so a "go" is handled here and never reaches the screen that is being hidden.
 document.addEventListener('click', (ev) => {

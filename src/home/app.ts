@@ -8,7 +8,7 @@ import { DECOS, iconSvg } from '../shared/art.ts';
 import { fineSvg } from '../shared/stickers.ts';
 import { hpLine, lvLine, mpLine, shortId } from '../shared/stat-lines.ts';
 import { meterHtml } from '../shared/meter.ts';
-import { lastApp, onAppShown } from '../shared/apps.ts';
+import { lastApp, onAppShown, wardrobeOn } from '../shared/apps.ts';
 import { compressPhoto } from '../shared/photo.ts';
 import { avatarUrlOf, loadPlayerData, savePlayer } from '../shared/player.ts';
 import { napSvg } from '../shared/pixelcat.ts';
@@ -77,11 +77,12 @@ const MENU: { name: [string, string]; to: string }[] = [
   { name: ['Kitty', 'Mart'], to: 'shopping' },
   { name: ['Kitty', 'Gallery'], to: 'pixel' },
   { name: ['Kitty', 'Litterbox'], to: 'litterbox' },
+  { name: ['Kitty', 'Wardrobe'], to: 'wardrobe' },   // only once it is switched on in Settings → Mini-apps
 ];
 
 function renderMenu() {
   const chosen = lastApp();
-  $('home-menu').innerHTML = MENU.map((e, i) => {
+  $('home-menu').innerHTML = MENU.filter((e) => e.to !== 'wardrobe' || wardrobeOn()).map((e, i) => {
     // Kitty Litterbox's key says how many chores are due now
     const due = e.to === 'litterbox' && litterReady() ? dueCount(litterData(), todayNum()) : 0;
     const badge = due ? `<span class="menu-badge" role="img" aria-label="${due} due">${due > 99 ? '99+' : due}</span>` : '';
