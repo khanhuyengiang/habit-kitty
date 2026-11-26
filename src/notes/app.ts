@@ -6,7 +6,7 @@
 import { iconSvg } from '../shared/art.ts';
 import { PICKER_ICONS, groupedPicks, iconLabel, uiIconSvg, pickable, stickerSvg } from '../shared/stickers.ts';
 import { monoSvg } from '../shared/pixelart.ts';
-import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
+import { onAppShown, onShown } from '../shared/apps.ts';
 import { $, esc } from '../shared/html.ts';
 import { localDateKey } from '../shared/dates.ts';
 import { makeLayer } from '../shared/layer.ts';
@@ -25,7 +25,7 @@ const toast = (text: string) => showToast($('notes-toast'), text);
 
 // ---- header ----
 function renderTop() {
-  $('notes-top').innerHTML = titleBar('Kitty', 'Journal', homeButton() + playerButton() + settingsButton()) + journalTabs('notes');
+  $('notes-top').innerHTML = titleBar('Kitty', 'Library', homeButton() + playerButton() + settingsButton());
 }
 
 // ---- state ----

@@ -315,7 +315,10 @@ function celebrate(level: number) {
 }
 
 // What the home page shows for HP (affection); the diary publishes its own days (MP).
-const publishStats = () => publishHabitStats({ xp: save.state.xp, offsetHours: save.offsetHours });
+// habitDue is what needs you now: kitties at home not fed today, and treats not done yet.
+const habitDue = () => save.state.cats.filter((c) => c.status === 'alive' && hunger(c, today()) !== 'fed').length
+  + save.state.tasks.filter((k) => k.kind === 'task' && k.lastDoneDay === null).length;
+const publishStats = () => publishHabitStats({ xp: save.state.xp, offsetHours: save.offsetHours, habitDue: habitDue() });
 
 function renderTop() {
   publishStats();

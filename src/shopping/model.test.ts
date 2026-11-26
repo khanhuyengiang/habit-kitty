@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addItem, addList, listCats, moveListCat, resetListOrder, addRecipe, addSub, addToPantry, alsoIn, deleteCat, findInPantry, hadBefore, learnPlace, moveCat, placeOf, restock, saveCat,
-  shelves, stepHave, updateHave, useUp, complete, dayKey, emptyData, finishTrip, guessCategory, itemText, keyOf, listOf,
+  shelves, stepHave, updateHave, useUp, complete, dayKey, emptyData, listsToShop, finishTrip, guessCategory, itemText, keyOf, listOf,
   listToText, moveItem, parseIngredients, parseQuick, recipeNeeds, sanitize, setRegular, settleSuggestion, shownItems, suggestions,
   takeSuggestion, textToList, updateItem, usualGap, type ShopData,
 } from './model.ts';
@@ -307,5 +307,16 @@ describe('category order per supermarket', () => {
     expect(listOf(y, aldi)!.order?.[0]).toBe('meat');
     expect(listOf(resetListOrder(x, aldi), aldi)!.order).toBeUndefined();
     expect(resetListOrder(d, aldi)).toBe(d);
+  });
+});
+
+describe('listsToShop', () => {
+  it('counts the lists that still have an item not bought', () => {
+    const { d, ids } = withLists('Lidl', 'Aldi', 'Market');
+    expect(listsToShop(d)).toBe(0);
+    const list = (i: number) => d.lists.find((l) => l.id === ids[i])!;
+    list(0).items.push({ id: 'a', name: 'Milk', qty: '', unit: '', cat: 'dairy', done: false });
+    list(1).items.push({ id: 'b', name: 'Rice', qty: '', unit: '', cat: 'pantry', done: true });
+    expect(listsToShop(d)).toBe(1);
   });
 });

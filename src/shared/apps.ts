@@ -5,9 +5,9 @@ import { monoSvg } from './pixelart.ts';
 import { miniSvg } from './pixelcat.ts';
 import { getLocal, setLocal } from './local.ts';
 
-// The home page, the diary and the notes (the Journal's two tabs), Kitty Mart, Kitty Gallery, Kitty Litterbox and the two apps: <html data-app> says which one is showing. (Habit Kitty's styles also serve the home page, the diary and the notes.)
+// The home page, the diary (Kitty Journal), the notes (Kitty Library), Kitty Mart, Kitty Gallery, Kitty Litterbox and the two apps: <html data-app> says which one is showing. (Habit Kitty's styles also serve the home page, the diary and the notes.)
 export type AppName = 'home' | 'habit' | 'diary' | 'notes' | 'achievement' | 'shopping' | 'pixel' | 'litterbox' | 'wardrobe';
-export const APP_TITLE: Record<AppName, string> = { home: 'Kitty Home', habit: 'Habit Kitty', diary: 'Kitty Journal', notes: 'Kitty Journal', achievement: 'Kitty Achievement', shopping: 'Kitty Mart', pixel: 'Kitty Gallery', litterbox: 'Kitty Litterbox', wardrobe: 'Kitty Wardrobe' };
+export const APP_TITLE: Record<AppName, string> = { home: 'Kitty Home', habit: 'Habit Kitty', diary: 'Kitty Journal', notes: 'Kitty Library', achievement: 'Kitty Achievement', shopping: 'Kitty Mart', pixel: 'Kitty Gallery', litterbox: 'Kitty Litterbox', wardrobe: 'Kitty Wardrobe' };
 
 // Kitty Wardrobe is Kitty Gallery's editor opened on the kitty (its sprites, animations and skins): it shares the page and the
 // saved icons, so while it shows <html data-app> is 'pixel' and <html data-mode> is 'wardrobe'. It is hidden from the home page until it is switched on
@@ -22,16 +22,16 @@ export const shownApp = (): AppName => {
   return a === 'achievement' || a === 'home' || a === 'diary' || a === 'notes' || a === 'shopping' || a === 'pixel' || a === 'litterbox' ? a : 'habit';
 };
 
-// The app opened last (the Journal's two tabs count as one), kept on this device: the home page marks its key. Habit Kitty
+// The app opened last, kept on this device: the home page marks its key. Habit Kitty
 // until another app has been opened.
 const LAST_KEY = 'hk-last-app';
 export const rememberApp = (app: AppName) => {
   if (app === 'home') return;
-  setLocal(LAST_KEY, app === 'notes' ? 'diary' : app);   // not remembered: Habit Kitty stays marked
+  setLocal(LAST_KEY, app);   // not remembered: Habit Kitty stays marked
 };
 export const lastApp = (): AppName => {
   const a = getLocal(LAST_KEY);
-  return a === 'diary' || a === 'achievement' || a === 'shopping' || a === 'pixel' || a === 'litterbox' || (a === 'wardrobe' && wardrobeOn()) ? a : 'habit';
+  return a === 'diary' || a === 'notes' || a === 'achievement' || a === 'shopping' || a === 'pixel' || a === 'litterbox' || (a === 'wardrobe' && wardrobeOn()) ? a : 'habit';
 };
 
 // document.addEventListener, but only while `app` is showing.
@@ -52,11 +52,6 @@ export const habitKittySvg = () => miniSvg('happy', { fur: '#ffb3d0', pattern: '
 // The trophy: Kitty Achievement's icon on the home page and in the room.
 const TROPHY = ['ooooooooo', 'o.ooooo.o', 'o.ooooo.o', '.ooooooo.', '..ooooo..', '...ooo...', '....o....', '...ooo...', '.ooooooo.'];
 export const trophyIcon = () => monoSvg(TROPHY);
-
-// The Journal: the diary and the notes are its two tabs. Each is its own screen, so the tabs are buttons that go to the other one.
-export const journalTabs = (on: 'diary' | 'notes') =>
-  `<nav class="nav" aria-label="Journal"><div class="seg" role="tablist">${([['diary', 'Diary'], ['notes', 'Notes']] as const).map(([to, label]) =>
-    `<button type="button" role="tab" ${to === on ? '' : `data-action="go" data-to="${to}" `}aria-selected="${to === on}">${label}</button>`).join('')}</div></nav>`;
 
 // Ask the shell to show a screen (it listens for this and for clicks on [data-action="go"]).
 export const GO_EVENT = 'kitty-go';

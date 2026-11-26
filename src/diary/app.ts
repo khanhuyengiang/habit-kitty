@@ -11,7 +11,7 @@ import { newId } from '../shared/id.ts';
 import { makeLayer } from '../shared/layer.ts';
 import { MONTH_NAMES, pickerHtml } from '../shared/picker.ts';
 import { closeX, homeButton, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
-import { goTo, journalTabs, onAppShown, onShown } from '../shared/apps.ts';
+import { goTo, onAppShown, onShown } from '../shared/apps.ts';
 import { meterHtml } from '../shared/meter.ts';
 import { compressPhoto } from '../shared/photo.ts';
 import { groupedPicks, iconLabel, uiIconSvg, pickable, stickerSvg, PICKER_ICONS } from '../shared/stickers.ts';
@@ -42,7 +42,7 @@ const toast = (text: string) => showToast($('diary-toast'), text);
 
 // ---- header ----
 function renderTop() {
-  $('diary-top').innerHTML = titleBar('Kitty', 'Journal', homeButton() + playerButton() + settingsButton()) + journalTabs('diary');
+  $('diary-top').innerHTML = titleBar('Kitty', 'Journal', homeButton() + playerButton() + settingsButton());
 }
 
 // ---- the page ----
