@@ -20,7 +20,7 @@ import { isZip, packBackup, unpackBackup, type Backup } from '../backup.ts';
 import { connectDropbox, disconnectDropbox, isLocalCopy, onSyncStatus, returnAddress, registerSyncTarget, requestSync, resolveConflicts, setAskOnConflict, syncStatus, type Choice } from '../sync/sync.ts';
 import type { Part } from '../sync/merge.ts';
 import type { Mood } from '../diary/model.ts';
-import { sheetCatSvg, sheetLeap, sheetMs, sheetPlace, sheetRests, sheetSize, sheetTravel, sheetVersion } from '../shared/kittysheet.ts';
+import { sheetCatSvg, sheetFaceSvg, sheetLeap, sheetMs, sheetPlace, sheetRests, sheetSize, sheetTravel, sheetVersion } from '../shared/kittysheet.ts';
 import { ANIM_OF, FACINGS, flipOf, sideFacing, sideOf, turnPath, type Facing } from '../shared/facing.ts';
 import { CONFETTI_COLORS, TRAITS, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
 import { GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, petHeartSvg, iconSvg, markSvg, outdoorSvg, edenSvg, EDEN_SPOTS, roomSvg, sceneVersion } from '../shared/art.ts';
@@ -262,8 +262,14 @@ function checkAmnesia() {
 }
 
 // ===================== Pixel cats =====================
-const sprite = faceSvg;
-const spriteOf = (c: Cat, face: Face, faded: boolean) => faceSvg(face, lookOf(c), faded, c.status === 'ascended');
+// A kitty's picture on cards: its three-quarter view (the sheet's), else the code's own round face. Angels and the dead keep theirs.
+function sprite(face: Face, look: CatLook, faded = false, angel = false): string {
+  const own = angel || face === 'dead' ? null : sheetFaceSvg(look, faded);
+  const w = own ? Number(/--w:(\d+)/.exec(own)?.[1]) : FACE_W;
+  document.documentElement.style.setProperty('--face-w', String(w));   // the cat card's picture column follows the art
+  return own ?? faceSvg(face, look, faded, angel);
+}
+const spriteOf = (c: Cat, face: Face, faded: boolean) => sprite(face, lookOf(c), faded, c.status === 'ascended');
 const lookFor = lookOf;
 const hash = idHash;
 

@@ -70,11 +70,13 @@ describe('the kitty sheet in the game', () => {
     expect(once).not.toContain('indefinite');
   });
 
-  it('starts each kitty part-way through, by its seed', () => {
+  it('puts each kitty out of step with the others, by its seed (seed 0 is exact)', () => {
     useSheet(sheetOf(data()));
-    expect(sheetCatSvg('idle', look, 'sit', 0)).toContain('begin="0s"');
-    expect(sheetCatSvg('idle', look, 'sit', 2)).toContain('begin="-0.5s"');
-    expect(sheetCatSvg('idle', look, 'sit', 6)).toContain('begin="-0.5s"');
+    const at = (seed: number) => /begin="(-?[\d.]+)s"/.exec(sheetCatSvg('idle', look, 'sit', seed)!)![1];
+    expect(at(0)).toBe('0');
+    const starts = new Set([1, 2, 3, 4, 5, 6, 7, 8].map(at));
+    expect(starts.size).toBeGreaterThan(5);
+    expect(at(5)).toBe(at(5));
   });
 });
 
@@ -132,6 +134,15 @@ describe('a walk that goes somewhere', () => {
     sprites: [{ id: 's1', name: 'A', art: art('s') }, { id: 's2', name: 'B', art: art('o') }, { id: 's3', name: 'C', art: art('l') }],
     animations: [{ id: 'walk', name: 'Walk', fps: 6, steps: [{ id: 's1' }, { id: 's2', dx: 5 }, { id: 's3', dx: 10 }, ...(closing ? [{ id: 's1', ...closing }] : [])] }],
   }, 1);
+  it('skips a lead-in before the round (steps before the last step first showed)', () => {
+    applyIcons(putIcon(emptyData(), {
+      category: 'kitty', id: SHEET_ID, name: 'Kitty sprites', group: 'user', art: art('s'),
+      sprites: [{ id: 's1', name: 'A', art: art('s') }, { id: 's2', name: 'B', art: art('o') }, { id: 's3', name: 'C', art: art('l') }, { id: 's4', name: 'D', art: art('u') }],
+      animations: [{ id: 'walk', name: 'Walk', fps: 6, steps: [{ id: 's4' }, { id: 's1', dx: 3 }, { id: 's2', dx: 8 }, { id: 's3', dx: 13 }, { id: 's1', dx: 18 }] }],
+    }, 1));
+    expect(sheetTravel('walk')).toMatchObject({ at: [0, 5, 10], stride: 15 });
+    expect(sheetMs('walk')).toBe(500);
+  });
   it('ends on its first step again, which is where the next round starts, so that step is not played twice', () => {
     applyIcons(loop({ dx: 15 }));
     expect(sheetTravel('walk')).toEqual({ at: [0, 5, 10], stride: 15, frameMs: 1000 / 6, start: { f: 0, u: 0 }, end: { f: 0, u: 0 } });

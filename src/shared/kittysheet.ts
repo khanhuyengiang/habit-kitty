@@ -32,9 +32,13 @@ const stepsOf = (anim: string) => live?.animations.get(baseOf(anim))?.steps.filt
 // step 1 moved on by `stride`, step i of round r is at r * stride + (its move), so a walk of 1 2 3 1 with moves 0 5 10 | 15 puts step 1 of
 // the next round 15 on, step 2 of it at 15 + 5, and the one after the last step of a round is the closing step, 15 on from the first.
 function loopOf(anim: string): { cycle: Required<Step>[]; stride: Required<Step> } | null {
-  const steps = stepsOf(anim), first = steps[0], last = steps[steps.length - 1];
-  if (steps.length < 3 || last.id !== first.id || !(last.dx || last.dy)) return null;
-  return { cycle: steps.slice(0, -1), stride: last };
+  const steps = stepsOf(anim), last = steps[steps.length - 1];
+  // The round starts at the first time the last step's drawing is shown: steps before it are a lead-in (getting going), which the room
+  // has already played (standing up), so they are not part of the loop.
+  const k = steps.findIndex((st) => st.id === last?.id);
+  if (steps.length < 3 || k < 0 || k > steps.length - 3 || !(last.dx - steps[k].dx || last.dy - steps[k].dy)) return null;
+  const from = steps[k], rel = (st: Step): Required<Step> => ({ id: st.id, dx: st.dx - from.dx, dy: st.dy - from.dy });
+  return { cycle: steps.slice(k, -1).map(rel), stride: rel(last) };
 }
 // What the animation draws: a looping walk is its round, in place; any other animation is its steps, each where its move puts it.
 const playOf = (anim: string): Required<Step>[] => {
@@ -198,8 +202,11 @@ export function sheetCatSvg(anim: string, look: CatLook, kind: 'sit' | 'nap', se
   if (!steps.length) return null;
   const ink = inkFor(look.fur, look.pattern), box = boxOf(anim)!;
   const n = steps.length, moves = n > 1 && !still;
-  const first = ((seed % n) + n) % n;   // the step it starts on: drawn before the animation's clock starts, so the first picture is not another step
-  const dur = n / a.fps, begin = `${-(((seed % n) + n) % n) / a.fps}s`;
+  // A kitty with a seed of its own (not 0) is out of step with the others: its round starts part-way through, and runs a little faster or slower.
+  const mixed = (k: number) => (Math.imul((seed ^ (seed >>> 15)) + k * 0x9e3779b9, 2246822519) >>> 0) / 4294967296;
+  const dur = (n / a.fps) * (seed ? 1 + (mixed(1) - 0.5) * 0.3 : 1), shift = seed ? mixed(2) * dur : 0;
+  const first = Math.min(n - 1, Math.floor((shift / dur) * n));   // the step it starts on: drawn before the animation's clock starts, so the first picture is not another step
+  const begin = `${-shift.toFixed(3)}s`;
   const t = (k: number) => String(+(k / n).toFixed(5));
   const groups = (moves ? steps : steps.slice(0, 1)).map((st, k) => {
     const paths = spritePaths(look.pattern ? recoat(st.id, live!.sprites.get(st.id)!, look.pattern, live!.zones.get(st.id)) : live!.sprites.get(st.id)!, ink);
@@ -209,4 +216,19 @@ export function sheetCatSvg(anim: string, look: CatLook, kind: 'sit' | 'nap', se
     return `<g visibility="${k === first ? 'visible' : 'hidden'}">${body}<animate attributeName="visibility" calcMode="discrete" values="${values}" keyTimes="${keyTimes}" dur="${dur}s" begin="${begin}" ${once ? 'repeatCount="1" fill="freeze"' : 'repeatCount="indefinite"'}/></g>`;
   }).join('');
   return `<svg class="sprite ${kind === 'sit' ? 'body' : 'sheetnap'} sheet" style="--w:${box.w}" viewBox="${box.x} ${box.y} ${box.w} ${box.h}" aria-hidden="true" shape-rendering="crispEdges">${flip ? `<g transform="translate(${2 * box.x + box.w} 0) scale(-1 1)">${groups}</g>` : groups}</svg>`;
+}
+
+// A kitty's picture for cards and profiles: its whole three-quarter view (cut to the pixels it draws), or null when the sheet has none.
+export function sheetFaceSvg(look: CatLook, faded = false): string | null {
+  const id = live?.animations.get('threeq')?.steps.find((st) => live!.sprites.has(st.id))?.id, art = id ? live!.sprites.get(id) : undefined;
+  if (!id || !art) return null;
+  const rows = art.map((r, y) => ({ y, r })).filter(({ r }) => /[^.]/.test(r));
+  if (!rows.length) return null;
+  const y0 = rows[0].y, y1 = rows[rows.length - 1].y;
+  let x0 = Infinity, x1 = -Infinity;
+  for (let y = y0; y <= y1; y++) for (let x = 0; x < art[y].length; x++) if (art[y][x] !== '.') { x0 = Math.min(x0, x); x1 = Math.max(x1, x); }
+  if (x1 < x0) return null;
+  const full = look.pattern ? recoat(id, art, look.pattern, live!.zones.get(id)) : art;
+  const paths = spritePaths(full, inkFor(look.fur, look.pattern));
+  return `<svg class="sprite${faded ? ' faded' : ''}" style="--w:${x1 - x0 + 1}" viewBox="${x0} ${y0} ${x1 - x0 + 1} ${y1 - y0 + 1}" aria-hidden="true" shape-rendering="crispEdges">${paths}</svg>`;
 }

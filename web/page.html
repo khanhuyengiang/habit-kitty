@@ -507,6 +507,8 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .room .prop:hover, .room .prop:focus-visible { box-shadow: 0 0 0 var(--px) var(--today); }
 .room .pet { position: absolute; touch-action: manipulation; cursor: pointer; -webkit-tap-highlight-color: transparent; outline: none; transition: left 2.6s steps(13), top 2.6s steps(13); }
 .room.night .pet { transition: none; }
+/* The night wash lives inside the scene picture, so the cats (separate elements on top) are dimmed to match; names and bubbles stay readable. */
+.room.night:not(.eden) .pet > :not(.thought):not(em):not(.zz) { filter: brightness(.58) saturate(.85); }
 .room .pet.zooming, .room.night .pet.zooming { transition: left .4s steps(5), top .4s steps(5); }
 .room .pet.napping { width: auto; }
 .room .pet em { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); font: 700 16px/1 var(--font); white-space: nowrap; color: #4a3a78; font-style: normal;
