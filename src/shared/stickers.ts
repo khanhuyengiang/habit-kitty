@@ -2,7 +2,7 @@ import { faceSvg } from './pixelcat.ts';
 import { monoSvg, runPaths } from './pixelart.ts';
 import { PALETTE, type PaletteName } from './palette.ts';
 
-// The stickers (the icons on achievements, notes, diary pages, Kitty Mart...), the interface icons and Kitty Achievement's card pictures, drawn on the shared grid (./pixelart.ts). Pure functions that return SVG strings.
+// The stickers (the icons on achievements, notes, diary pages, Kitty Mart...), the interface icons and Pawchievement's card pictures, drawn on the shared grid (./pixelart.ts). Pure functions that return SVG strings.
 
 export { OFFICIAL_PICKER_ICONS, PICKER_ICONS, PICKER_ICON_NAMES, PICKER_ICON_GROUPS, refreshPickerOrder } from './sticker-icons.ts';
 import { PICKER_ICONS, PICKER_ICON_GROUPS } from './sticker-icons.ts';

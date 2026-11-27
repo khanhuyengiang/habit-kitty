@@ -1,4 +1,4 @@
-// The page's entry: a small router. The home page, the diary and the two apps (Habit Kitty, Kitty Achievement) are all in one page and
+// The page's entry: a small router. The home page, the diary and the two apps (Habit Kitty, Pawchievement) are all in one page and
 // one shows at a time (see shared/apps.ts). The page opens on the home page. Habit Kitty always starts, since its reminders,
 // widget and music run in the background whichever screen is showing; the others start the first time they are shown.
 import { App } from '@capacitor/app';
@@ -24,7 +24,7 @@ function start(app: AppName) {
   else import('../home/app.ts');
 }
 
-// The shared sheet is always on; Habit Kitty's draws the home page and the Journal too, Kitty Achievement has its own.
+// The shared sheet is always on; Habit Kitty's draws the home page and the Journal too, Pawchievement has its own.
 const styleOf = (app: AppName) => (app === 'achievement' ? 'achievement' : 'habit');
 
 function show(asked: AppName, tab?: string) {
@@ -61,7 +61,7 @@ document.addEventListener(GO_EVENT, (ev) => {
   show(asApp(to), tab);
 });
 
-// Android's back button. Kitty Achievement keeps its pages in the page's history, so there it steps back a page; anywhere
+// Android's back button. Pawchievement keeps its pages in the page's history, so there it steps back a page; anywhere
 // else in an app it goes to the home page; on the home page it leaves the app as Android does by default.
 if (Capacitor.isNativePlatform()) App.addListener('backButton', ({ canGoBack }) => {
   const app = shownApp();

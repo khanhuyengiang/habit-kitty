@@ -12,13 +12,15 @@
 /* The menu is four cards (Agenda pink, Almanac purple, Archive blue, Atelier orange), each holding 2 or 3 keys. The keys keep the look from
    inspo/menu.jpg: a dark two-pixel outline, a lit top edge and a shaded bottom band; within a card their colours fade from light to
    deeper, going down. A key's number (needs you now) sits in its corner and the card's title shows the total. The key of the app
-   opened last is the chosen one: a white outline that glows and a wing on each side. A white cat always sleeps on Habit Kitty's
+   opened last is the chosen one: a white outline that glows and a wing on each side. A white cat always sleeps on the Do card.
    key. Each name is written like its app's title bar: the word in the title colour, "Kitty" in pink. */
 .home-menu { --wing: calc(12 * 2 * var(--px)); --wing-gap: calc(2 * var(--px));
   display: grid; gap: var(--s5); justify-items: stretch; width: max-content; margin-inline: auto; max-width: 100%; }
-/* every card is as wide as the widest key plus room for both wings (the card's edge would cut a wing off outside it) */
-.menu-card { --edge: var(--menu-dk); gap: var(--s3); padding: var(--s4) calc(var(--wing) + var(--wing-gap) + 4 * var(--px)) var(--s5);
-  background-color: color-mix(in srgb, var(--c1) 40%, var(--surface)); }
+/* every card is a big Kitty Library note window (.nwin.nread, in page.html): its title bar, its screen holding the keys. The screen
+   is wide enough for both wings (the window's edge would cut a wing off outside it). */
+.menu-card { --nc: var(--tint); --edge: var(--menu-dk); }
+.home-menu .nread { min-height: 0; }
+.home-menu .nread .nwin-screen { gap: var(--s3); padding-block: calc(8 * var(--rp)); padding-inline: calc(var(--wing) + var(--wing-gap) + 4 * var(--px)); }
 /* A card has one tint; its three key colours are that tint mixed toward white (light theme) or toward the night colour (dark theme),
    lightest key first. --menu-dk is the outline. */
 .menu-card { --mix-to: #fff; --p1: 45%; --p2: 70%; --p3: 100%;
@@ -58,8 +60,9 @@
 /* the chosen key keeps the same dark two-pixel outline as the others, with its white line just inside it */
 .perch .menu-btn { width: 100%;
   box-shadow: inset 0 0 0 var(--bw) #fff, inset 0 calc(-3 * var(--px) - var(--bw)) 0 color-mix(in srgb, var(--mb) 70%, var(--menu-dk)); }
-.seat { position: relative; display: grid; }
-.seat .sitter { position: absolute; right: calc(5 * var(--u)); bottom: calc(100% - var(--px)); pointer-events: none; }
+/* the white cat lies along the Do card's title bar, with a paw hanging 5 pixels over the screen's edge, above Habit Kitty's key */
+.menu-card .nwin-bar { position: relative; }
+.menu-card .sitter { position: absolute; right: calc(31 * var(--px)); bottom: calc(-5 * var(--px)); pointer-events: none; z-index: 1; }
 .perch .wing { position: absolute; top: 50%; transform: translateY(-62%); pointer-events: none; }
 .perch .wing .pxs { width: calc(var(--w) * 2 * var(--px)); height: calc(var(--h) * 2 * var(--px)); }
 .perch .wing.l { right: calc(100% + var(--wing-gap)); }

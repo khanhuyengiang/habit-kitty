@@ -285,7 +285,7 @@ describe('the whole save', () => {
     expect(JSON.parse(out.gallery!).icons[0].name).toBe('Three');
   });
 
-  it('merges Kitty Achievement row by row and brings back a quest something new was added to', async () => {
+  it('merges Pawchievement row by row and brings back a quest something new was added to', async () => {
     const d0 = emptyAchievements(1);
     const quest = { id: 'q1', userId: d0.user.id, title: 'Travel', description: '', coverImageUrl: null, sortOrder: 0, createdAt: 1, updatedAt: 1, archivedAt: null };
     const ach = (id: string, title: string, updatedAt: number) => ({

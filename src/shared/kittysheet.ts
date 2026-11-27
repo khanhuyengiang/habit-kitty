@@ -13,7 +13,9 @@ import { KITTY_ZONES } from './kittyzones-art.ts';
 
 let live: Sheet | null = null;
 let version = 0;
-export function useSheet(sheet: Sheet | null) { live = sheet; version++; }
+const sheetListeners: (() => void)[] = [];
+export const onSheetChange = (fn: () => void) => { sheetListeners.push(fn); };   // the sheet loads after the page starts, and changes when it is edited
+export function useSheet(sheet: Sheet | null) { live = sheet; version++; for (const fn of sheetListeners) fn(); }
 // Changes whenever the sheet does, so a room drawn from it knows to be drawn again.
 export const sheetVersion = () => version;
 // The size of an animation's sprites (all of them are one size), or null when there is no such animation to play.

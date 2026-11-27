@@ -24,10 +24,12 @@ import { sheetCatSvg, sheetFaceSvg, sheetLeap, sheetMs, sheetPlace, sheetRests, 
 import { ANIM_OF, FACINGS, flipOf, sideFacing, sideOf, turnPath, type Facing } from '../shared/facing.ts';
 import { CONFETTI_COLORS, TRAITS, TRAIT_TEXT, BODY_H, BODY_W, FACE_W, NAP_H, NAP_W, bodySvg, faceSvg, miniSvg, napSvg, lookOf, popperSvg, randomLook, type Face } from '../shared/pixelcat.ts';
 import { GARDEN_SPOTS, MARKS, ROOM_H, ROOM_NIGHT_SPOTS, ROOM_SPOTS, ROOM_W, SHELF_BOOK, SHELF_TROPHY, TROPHY_ART, artSvg, petHeartSvg, iconSvg, markSvg, outdoorSvg, edenSvg, EDEN_SPOTS, roomSvg, sceneVersion } from '../shared/art.ts';
-import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, setWardrobeOn, trophyIcon, wardrobeOn, type AppName } from '../shared/apps.ts';
+import { GO_EVENT, TAB_EVENT, habitKittySvg, onAppShown, onShown, setAppShown, appShown, trophyIcon, type AppName } from '../shared/apps.ts';
 import { mountDiarySettings } from '../diary/settings.ts';
 import { collectBooks, collectNotes, initNotes, restoreBooks, restoreNotes } from '../notes/data.ts';
 import { mountNotesSettings } from '../notes/settings.ts';
+import { winBar } from '../notes/window.ts';
+import type { NoteFace } from '../notes/model.ts';
 import { mountPixelSettings } from '../pixel/settings.ts';
 import { change as changeShop, collectShopping, initShopping, restoreShopping, shopData, shopInitialised } from '../shopping/data.ts';
 import { applyMartSettings, martSettingsOf } from '../shopping/model.ts';
@@ -279,6 +281,19 @@ const HEART = petHeartSvg();
 document.documentElement.style.setProperty('--face-w', String(FACE_W));   // the cat card's picture column follows the art
 
 // Static buttons in the page template name their icon with data-icon; draw them on the same pixel grid.
+// Settings → Mini-apps: one Kitty Library window per group of the home menu, with a key for each mini-app that has settings.
+const SET_GROUPS: { title: string; color: string; face: NoteFace; apps: [string, string][] }[] = [
+  { title: 'Do', color: '#ff8fb8', face: 'happy', apps: [['habit', 'Habit Kitty']] },
+  { title: 'Track', color: '#b9a3f0', face: 'happy', apps: [['diary', 'Journal']] },
+  { title: 'Keep', color: '#8fd0fa', face: 'happy', apps: [['notes', 'Library'], ['achievement', 'Pawchievement']] },
+  { title: 'Studio', color: '#ffb98a', face: 'happy', apps: [['pixel', 'Gallery']] },
+];
+$('set-apps').innerHTML = SET_GROUPS.map((g) => `<section class="nwin" style="--nc: ${g.color}" aria-label="${g.title}">${winBar(g.title, g.face)}<div class="nwin-screen">${g.apps.map(([app, name]) =>
+  `<button class="btn menu-btn" type="button" data-action="settings-app" data-app="${app}"><span>${name}</span></button>`).join('')}</div></section>`).join('');
+// Settings → Apps to show: one switch for each app that has a key on the home page, in the home menu's order.
+const SHOWABLE: [string, string][] = [['habit', 'Habit Kitty'], ['litterbox', 'Litterbox'], ['diary', 'Journal'], ['clockwork', 'Clockwork (soon)'], ['bank', 'Bank (soon)'], ['shopping', 'Mart'], ['notes', 'Library'], ['achievement', 'Pawchievement'], ['pixel', 'Gallery'], ['wardrobe', 'Wardrobe']];
+$('set-shown').innerHTML = `<p class="muted">Choose which apps have a key on the home page. This is a setting of this device, and Wardrobe is off until you switch it on.</p>${SHOWABLE.map(([app, name]) =>
+  `<label class="check"><input type="checkbox" data-shown="${app}" ${appShown(app) ? 'checked' : ''}><span><b>${name}</b></span></label>`).join('')}`;
 document.querySelectorAll<HTMLElement>('[data-icon]').forEach((el) => el.insertAdjacentHTML('afterbegin', el.dataset.icon === 'cat' ? habitKittySvg() : el.dataset.icon === 'trophy' ? trophyIcon() : iconSvg(el.dataset.icon ?? 'x')));
 
 // ===================== Food =====================
@@ -1358,7 +1373,7 @@ async function applySynced(b: Backup, parts: Set<Part>): Promise<boolean> {
 }
 registerSyncTarget({ collect: collectBackup, apply: applySynced });
 
-const SYNC_PART_NAMES: Record<Part, string> = { game: 'Kitties', diary: 'Diary', notes: 'Notes', notebooks: 'Notebooks', shopping: 'Kitty Mart', litterbox: 'Kitty Litterbox', gallery: 'Kitty Gallery', achievement: 'Kitty Achievement' };
+const SYNC_PART_NAMES: Record<Part, string> = { game: 'Kitties', diary: 'Diary', notes: 'Notes', notebooks: 'Notebooks', shopping: 'Kitty Mart', litterbox: 'Kitty Litterbox', gallery: 'Kitty Gallery', achievement: 'Pawchievement' };
 function syncConflictHtml(parts: Part[]): string {
   return `<div class="panel"><p><b>Both sides changed these.</b> Choose what to keep. The side you don't pick is saved in the <b>conflicts</b> folder in Dropbox.</p>
     ${parts.map((p) => `<p><label>${SYNC_PART_NAMES[p]}: <select data-sync-part="${p}"><option value="merge">Merge both</option><option value="mine">Keep this device</option><option value="cloud">Keep Dropbox (other devices)</option></select></label></p>`).join('')}
@@ -1370,7 +1385,7 @@ function renderSync() {
   const st = syncStatus();
   (box.closest('details') as HTMLElement).hidden = !st.available;
   if (!st.available) return;
-  const what = '<p class="muted">Keep your kitties, diary, notes, Kitty Mart, Kitty Litterbox, Kitty Gallery icons and Kitty Achievement the same on your phone, tablet and the website, through your own Dropbox. Itty Bitty Kitty only sees its own folder there (in <b>Apps</b>). Sounds and reminders stay as each device has them.</p>';
+  const what = '<p class="muted">Keep your kitties, diary, notes, Kitty Mart, Kitty Litterbox, Kitty Gallery icons and Pawchievement the same on your phone, tablet and the website, through your own Dropbox. Itty Bitty Kitty only sees its own folder there (in <b>Apps</b>). Sounds and reminders stay as each device has them.</p>';
   box.innerHTML = st.connected
     ? `${what}<p>Dropbox${st.name ? `: <b>${esc(st.name)}</b>` : ''}<br>Last sync: ${st.running ? 'syncing…' : st.last ? ago(st.last) : 'not yet'}${!st.running && st.summary && !st.error ? ` · ${esc(st.summary)}` : ''}</p>
        ${st.error ? `<p class="form-error">${esc(st.error)}</p>` : ''}
@@ -1409,11 +1424,11 @@ function askRestore(b: Backup) {
     b.shopping ? 'your shopping lists' : '',
     b.litterbox ? 'your Kitty Litterbox chores' : '',
     b.gallery ? 'your Kitty Gallery icons' : '',
-    b.achievement ? `${ach} ${ach === 1 ? 'achievement' : 'achievements'} (Kitty Achievement)` : '',
+    b.achievement ? `${ach} ${ach === 1 ? 'achievement' : 'achievements'} (Pawchievement)` : '',
   ].filter(Boolean);
   openModal(`<div class="panel"><h3>Restore this backup?</h3>
     <p>It holds ${parts.join(' and ')}.</p>
-    <p class="muted">${b.game && b.achievement ? 'Everything in both apps' : b.game ? 'Everything in Habit Kitty' : 'Everything in Kitty Achievement'} on this device will be replaced.${b.notes && Object.keys(b.notes).length ? ' So will your notes.' : ''}${b.shopping ? ' So will your shopping lists, recipes and pantry.' : ''}${b.litterbox ? ' So will your Kitty Litterbox chores.' : ''}${b.gallery ? ' So will your Kitty Gallery icons.' : ''}</p>
+    <p class="muted">${b.game && b.achievement ? 'Everything in both apps' : b.game ? 'Everything in Habit Kitty' : 'Everything in Pawchievement'} on this device will be replaced.${b.notes && Object.keys(b.notes).length ? ' So will your notes.' : ''}${b.shopping ? ' So will your shopping lists, recipes and pantry.' : ''}${b.litterbox ? ' So will your Kitty Litterbox chores.' : ''}${b.gallery ? ' So will your Kitty Gallery icons.' : ''}</p>
     <div class="btns"><button class="btn" data-action="modal-close">Cancel</button>
     <button class="btn primary" data-action="restore-yes">Restore</button></div></div>`);
 }
@@ -1424,7 +1439,7 @@ async function restoreBackup() {
   if (!b) return;
   const g = b.game === null ? null : validGame(b.game);
   if (b.game !== null && !g) { closeModal(); toast("Couldn't restore that backup."); return; }
-  // Kitty Achievement first: if it fails nothing has been touched yet.
+  // Pawchievement first: if it fails nothing has been touched yet.
   if (b.achievement) {
     try { await restoreAchievement(b.achievement); } catch { closeModal(); toast("Couldn't restore that backup."); return; }
   }
@@ -1492,7 +1507,7 @@ function askSettings(s: SettingsFile) {
     <button class="btn primary" data-action="settings-yes">Load</button></div></div>`);
 }
 
-// Your day moves only when that leaves you in the same day right now (as in Settings → Your day).
+// Your day moves only when that leaves you in the same day right now (as in Settings → Time).
 function applyHabitSettings(h: HabitSettings): string {
   for (const k of ['allowRename', 'showClock', 'timeTravel', 'amnesia', 'unlimited', 'muted', 'roomName', 'outdoorName'] as const) {
     if (h[k] !== undefined) (save as unknown as Record<string, unknown>)[k] = h[k];
@@ -1611,10 +1626,9 @@ function renderTabbar() {
 }
 
 // Settings: a main page (everything shared, then a button per mini-app), and one page for each mini-app's own options.
-const SETTINGS_PAGES = ['main', 'habit', 'diary', 'notes', 'achievement', 'pixel', 'wardrobe'] as const;
+const SETTINGS_PAGES = ['main', 'habit', 'diary', 'notes', 'achievement', 'pixel'] as const;
 function showSettingsApp(app: string | null) {
   for (const p of SETTINGS_PAGES) $(`set-${p}`).hidden = p !== (app ?? 'main');
-  if (app === 'wardrobe') ($('wardrobe-on') as HTMLInputElement).checked = wardrobeOn();
   if (app === 'pixel') redrawPixelSettings();   // its counts change in Kitty Gallery
   window.scrollTo(0, 0);
 }
@@ -1841,7 +1855,7 @@ function openTravel(id: string, back = travelBack) {
     <div class="btns"><button class="btn primary" type="button" data-action="modal-close">Done</button></div></div>`);
 }
 
-// ---- change log: shown once after an update, and always in Settings ----
+// ---- change log: shown once after an update, and from the link beside the version in Settings ----
 const CHANGES: ChangeEntry[] = parseChangelog(CHANGELOG_MD);
 const changeBody = (e: ChangeEntry) => e.sections.map((sec) =>
   `${sec.title ? `<p class="change-title">${esc(sec.title)}</p>` : ''}<ul>${sec.items.map((i) =>
@@ -1850,13 +1864,9 @@ const changeHead = (e: ChangeEntry) => `v${e.version}<span class="muted">${e.dat
 // The pop-up after an update shows entries open; the list in Settings folds each version, with the newest open.
 const changesHtml = (entries: ChangeEntry[]) => entries.map((e) =>
   `<section class="change"><h4>${changeHead(e)}</h4>${changeBody(e)}</section>`).join('');
-const renderChangelog = () => {
-  const el = $('changelog');
-  const open = new Set([...el.querySelectorAll<HTMLDetailsElement>('details[data-v]')].filter((d) => d.open).map((d) => d.dataset.v));
-  const first = !el.children.length;
-  el.innerHTML = CHANGES.map((e, i) =>
-    `<details class="change" data-v="${e.version}" ${(first ? i === 0 : open.has(e.version)) ? 'open' : ''}><summary>${changeHead(e)}</summary>${changeBody(e)}</details>`).join('');
-};
+const openChangelog = () => openModal(`<div class="panel"><h3>Change log</h3>${CHANGES.map((e, i) =>
+  `<details class="change" ${i === 0 ? 'open' : ''}><summary>${changeHead(e)}</summary>${changeBody(e)}</details>`).join('')}
+  <div class="btns"><button class="btn primary" type="button" data-action="modal-close">Close</button></div></div>`);
 
 function showWhatsNew() {
   const seen = save.seenVersion;
@@ -1867,7 +1877,7 @@ function showWhatsNew() {
   persist();
   if (brandNew || !news.length) return;
   openModal(`<div class="panel"><h3>What's new in v${VERSION}</h3>${changesHtml(news)}
-    <p class="muted">You can read this again in Settings → Change log.</p>
+    <p class="muted">You can read this again from the Change log link at the bottom of Settings.</p>
     <div class="btns"><button class="btn primary" type="button" data-action="modal-close">Got it</button></div></div>`);
 }
 
@@ -1878,7 +1888,7 @@ function renderTab(name: string) {
     case 'heat': renderHeat(); break;
     case 'room': renderRoom(); break;
     case 'mindful': renderTasks(); break;
-    case 'settings': renderChangelog(); renderReminder(); break;
+    case 'settings': renderReminder(); break;
   }
 }
 function renderAll() {
@@ -1943,6 +1953,7 @@ onShown('habit', 'click', (ev) => {
       break;
     case 'settings-app': showSettingsApp(btn.dataset.app ?? null); break;
     case 'settings-up': showSettingsApp(null); break;
+    case 'changelog-open': openChangelog(); break;
     case 'ach-load': $('ach-file').click(); break;
     case 'picker-open': openPicker(btn); break;
     case 'picker-years': drawPicker('year'); break;
@@ -2244,9 +2255,9 @@ $('unlimited-cats').addEventListener('change', (ev) => {
 });
 
 for (const id of ['day-start', 'day-end']) $(id).addEventListener('change', (ev) => setDayBoundary(Number((ev.target as HTMLSelectElement).value)));
-$('wardrobe-on').addEventListener('change', (ev) => {
-  setWardrobeOn((ev.target as HTMLInputElement).checked);
-  toast((ev.target as HTMLInputElement).checked ? 'Kitty Wardrobe is on the home page now.' : 'Kitty Wardrobe is hidden again.');
+$('set-shown').addEventListener('change', (ev) => {
+  const box = ev.target as HTMLInputElement;
+  if (box.dataset.shown) setAppShown(box.dataset.shown, box.checked);
 });
 $('reminder-on').addEventListener('change', (ev) => setReminderEnabled((ev.target as HTMLInputElement).checked));
 $('last-call').addEventListener('change', async (ev) => {
@@ -2289,7 +2300,7 @@ onShown('habit', 'change', (ev) => {
   draftLook = { ...draftLook, [key]: sel.value } as CatLook;
   redrawLook();
 });
-// Achievements only: from a backup or an older Kitty Achievement save file.
+// Achievements only: from a backup or an older Pawchievement save file.
 $('ach-file').addEventListener('change', async (ev) => {
   const input = ev.target as HTMLInputElement;
   const f = input.files?.[0];
@@ -2561,7 +2572,7 @@ onShown('habit', 'contextmenu', (ev) => {
 // Re-settle when the page comes back and at each 2am rollover.
 function tick() { settle(); renderAll(); queueReminderSync(); checkAmnesia(); checkAscension(); checkAccomplishments(); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
-// Back from Kitty Achievement: the theme may have changed there, and the clock moved on.
+// Back from Pawchievement: the theme may have changed there, and the clock moved on.
 onAppShown('habit', () => {
   if (tab === 'settings') showTab(tabBeforeSettings);   // coming back to Habit Kitty leaves Settings (unless Settings was asked for, below)
   tick();

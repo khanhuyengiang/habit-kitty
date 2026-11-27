@@ -5,7 +5,7 @@
 //   reflections  likewise, month by month
 //   notes        note by note; one changed on both sides keeps both (the other one as a "(conflict)" copy, as the notes
 //                folder sync does)
-//   the rest     record by record (Kitty Mart, Kitty Litterbox, notebooks, Kitty Gallery's icons, Kitty Achievement); when both sides
+//   the rest     record by record (Kitty Mart, Kitty Litterbox, notebooks, Kitty Gallery's icons, Pawchievement); when both sides
 //                changed one record, the one changed last wins where it says when it was changed, this device's otherwise
 import type { Backup } from '../backup.ts';
 import { MAX_PHOTOS, type DiaryEntry, type DiaryExtras, type Reflection } from '../diary/model.ts';
@@ -127,7 +127,7 @@ const mergePixel = (base: Base<PixelData>, mine: PixelData, theirs: PixelData): 
   icons: mergeList(field(base, 'icons'), mine.icons, theirs.icons, iconKey, { item: (b, m, t) => merge3(b, m, t, newer(m.updated, t.updated)) }),
 });
 
-// ---- Kitty Achievement: rows with ids, most of them saying when they were changed ----
+// ---- Pawchievement: rows with ids, most of them saying when they were changed ----
 function mergeAchievementData(base: Base<AchievementData>, mine: AchievementData, theirs: AchievementData): AchievementData {
   const prefer = (m: { updatedAt?: unknown }, t: { updatedAt?: unknown }): Side | undefined =>   // undefined: what the record around it chose
     typeof m.updatedAt === 'number' && typeof t.updatedAt === 'number' ? newer(m.updatedAt, t.updatedAt) : undefined;

@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jersey+15&display=swap">
 <style>
-/* Shared by every screen: the home page, Habit Kitty, the Journal and Kitty Achievement. Each app's own sheet (style[data-app])
+/* Shared by every screen: the home page, Habit Kitty, the Journal and Pawchievement. Each app's own sheet (style[data-app])
    is on only while that app shows (src/web/shell.ts); everything they have in common is here, so it looks the same everywhere.
 
    ONE pixel grid. --px is one art pixel, the same fine pixel the achievement cards are drawn in. Pictures are columns x --px
@@ -40,7 +40,7 @@
   --warn-bg: #fff3d1; --warn-ink: #7a4d09; --bad: #c23f7c; --ok: #2f9e6e;
   --dot1: #ff8fb8; --dot2: #b9a3f0; --dot3: #8fd0fa;
   --font: "Jersey 15", "Courier New", monospace;
-  /* both titles are one size, small enough for "Kitty Achievement" to stay on one line next to its buttons, so every title bar is the same */
+  /* both titles are one size, small enough for "Pawchievement" to stay on one line next to its buttons, so every title bar is the same */
   --title-size: 36px;
 }
 @media (max-width: 479px) { :root { --title-size: 27px; } }
@@ -201,7 +201,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .brand h1 .kitty { color: var(--accent-text); }
 .brand-r { display: flex; align-items: center; gap: var(--s3); }
 /* a list to put in order (shared/ui.ts orderList): a row per thing, its name and the up and down buttons */
-/* A Filter button and its panel, and the sections a page is grouped into (Kitty Achievement's collection, the notes). */
+/* A Filter button and its panel, and the sections a page is grouped into (Pawchievement's collection, the notes). */
 .btn.on { background: var(--accent-soft); border-color: var(--accent-edge); }
 .tools { display: grid; gap: var(--s4); }
 .toolbar { display: flex; flex-wrap: wrap; gap: var(--s4); align-items: center; justify-content: space-between; }
@@ -295,7 +295,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .chips input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); }
 .chips input:focus-visible + span { outline: var(--bw) solid var(--accent-text); outline-offset: calc(-2 * var(--bw)); }
 .chips input:disabled + span { opacity: .5; }
-/* a volume slider (Habit Kitty's sound settings, Kitty Achievement's music): a pixel track that fills with pink, and a square key for a thumb */
+/* a volume slider (Habit Kitty's sound settings, Pawchievement's music): a pixel track that fills with pink, and a square key for a thumb */
 .vol { display: grid; grid-template-columns: 1fr auto; gap: var(--s1) var(--s3); align-items: center; font-size: 18px; font-weight: 600; }
 .vol span { grid-column: 1 / -1; }
 .vol output { min-width: 4ch; text-align: right; color: var(--muted); }
@@ -318,7 +318,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .m-lv .bar i.on { background: var(--today); }
 .m-mp .bar i.on { background: var(--habit); }
 
-/* ---------- the player's picture (the home page's player card, Kitty Achievement's profile) ---------- */
+/* ---------- the player's picture (the home page's player card, Pawchievement's profile) ---------- */
 .avatar { width: calc(29 * var(--u)); height: calc(29 * var(--u)); display: grid; place-items: center; background: var(--accent-soft); overflow: hidden; }
 .avatar .sprite { margin: auto; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -622,9 +622,35 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
 .set-page { display: grid; gap: var(--s4); }
 .set-title { display: flex; align-items: center; gap: var(--s4); }
 .set-title h3 { font: 700 24px/1.1 var(--font); }
-.set-apps { display: grid; gap: var(--s4); }
-.set-apps .menu-btn { width: 100%; gap: var(--s3); font-size: 24px; padding: var(--s4) var(--s4) calc(var(--s4) + 3 * var(--px)); white-space: nowrap; }
-.set-apps .menu-btn i { display: grid; place-items: center; }
+.set-apps { display: grid; gap: var(--s4); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+/* The Kitty Library note window (.nwin, and .nread for the big one), shared by the Library, the home menu and Settings → Mini-apps. */
+.nwin { --nc: var(--accent); --nw-dk: color-mix(in srgb, var(--nc) 25%, #231d44); --nw-frame: color-mix(in srgb, var(--nc) 62%, var(--surface));
+  --nw-hi: color-mix(in srgb, var(--nc) 25%, #fff); --sq: var(--nc); --dk: var(--nw-dk);   /* --sq and --dk colour Pawchievement's icons */
+  display: flex; flex-direction: column; width: 100%; min-width: 0; margin: 0; padding: calc(4 * var(--px)); border: 0; font: inherit; color: var(--ink);
+  background: var(--nw-frame); -webkit-mask-box-image: var(--notch-s-box); mask: var(--notch-s-m);
+  box-shadow: inset 0 0 0 var(--px) var(--nw-dk), inset 0 0 0 calc(2 * var(--px)) var(--nw-hi); }
+.nwin-bar { display: flex; align-items: center; gap: var(--s1); min-width: 0; flex: none; padding: var(--px) var(--px) calc(3 * var(--px)); color: var(--nw-ink, var(--nw-dk)); }
+.nwin-name { flex: 1; min-width: 0; text-align: left; font: 700 20px/1.05 var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nwin-btns { display: flex; gap: var(--px); flex: none; color: var(--nw-dk); }
+/* the window buttons: three plain squares */
+.nwin-btns > span { display: grid; place-items: center; padding: calc(2 * var(--px)); background: var(--nw-hi); box-shadow: inset 0 0 0 var(--px) var(--nw-dk); }
+.nwin-screen { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s2);
+  padding: var(--s4) var(--s3); -webkit-mask-box-image: var(--notch-s-box); mask: var(--notch-s-m); box-shadow: inset 0 0 0 var(--bw) color-mix(in srgb, var(--nc) 70%, var(--nw-dk)); background: color-mix(in srgb, var(--nc) 14%, var(--surface)); }
+/* Reading a note: the same window, as tall as the note, drawn big with the border of inspo/simple_notes.jpg (see "The big
+   windows' borders" in page.html): a dark outline with stepped corners, lit along the top and left, and a screen outlined in a
+   deep rose of the note's colour, with a soft line inside and a sparkle on each corner. */
+.nread { --rp: calc(2 * var(--px)); --nw-rose: color-mix(in oklch, var(--nc) 55%, var(--nw-dk));
+  --o: var(--nw-dk); --hl: var(--nw-hi); --sh: color-mix(in srgb, var(--nc) 75%, var(--nw-dk)); --fill: var(--nw-frame);
+  min-height: calc(150 * var(--u)); padding: calc(3 * var(--rp)) calc(4 * var(--rp)) calc(5 * var(--rp)); box-shadow: none; -webkit-mask-box-image: none; mask: none; }
+@supports (color: oklch(from red l c h)) { .nread { --nw-rose: oklch(from var(--nc) calc(l * .6) calc(c * .95) h); } }   /* the note's own hue, deeper and stronger */
+.nread .nwin-bar { padding: 0 0 calc(4 * var(--rp)); gap: var(--s2); }   /* room for the screen's corner sparkles */
+.nread .nwin-name { font-size: 24px; }
+.nread .nwin-screen { --o: var(--nw-rose); --hl: color-mix(in srgb, var(--nc) 62%, var(--surface)); --sh: var(--hl); --out: var(--nw-frame);
+  --spk: color-mix(in srgb, var(--nc) 35%, var(--nw-rose)); --spo: color-mix(in srgb, var(--nc) 70%, var(--nw-rose)); --spc: #fffafd;
+  --fill: color-mix(in srgb, var(--nc) 14%, var(--surface));
+  align-items: stretch; justify-content: flex-start; gap: var(--s4); padding: calc(10 * var(--rp)) var(--s5) calc(7 * var(--rp)); box-shadow: none; -webkit-mask-box-image: none; mask: none; }
+.set-apps .menu-btn { width: 100%; font-size: 20px; padding: var(--s3) var(--s3) calc(var(--s3) + 3 * var(--px)); white-space: nowrap; min-width: 0; }
+.set-apps .nwin-screen { align-items: stretch; justify-content: flex-start; gap: var(--s3); padding: var(--s3); }
 .fold { padding: 0; display: block; }
 .fold > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; padding: var(--s5); font: 700 24px/1.1 var(--font); }
 .fold > summary::-webkit-details-marker { display: none; }
@@ -682,7 +708,6 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
   #tab-mindful > #task-form { grid-column: 2; grid-row: 1 / -1; }
   #tab-settings .set-page { grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--tile)), 1fr)); align-items: start; }
   #tab-settings .set-page > :not(details) { grid-column: 1 / -1; }
-  .set-apps { grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(70 * var(--u))), 1fr)); }
 }
 </style>
 <div data-app-root="habit">
@@ -739,7 +764,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
   <main id="tab-settings" class="tab">
     <div class="set-page" id="set-main">
       <h2>Everything</h2>
-    <details class="panel fold"><summary>Look</summary><div class="fold-body" id="set-look"></div></details>
+    <details class="panel fold"><summary>Appearance</summary><div class="fold-body" id="set-look"></div></details>
 
     <details class="panel fold"><summary>Sound</summary><div class="fold-body">
       <div class="btns"><button class="btn" type="button" data-action="mute-all" id="mute-all" aria-pressed="false">Mute all</button></div>
@@ -756,7 +781,7 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
       <p class="muted">Music: Strawberry Walk 【BGM： IchinoseSound】 <a href="https://www.youtube.com/@IchinoseSound" target="_blank" rel="noopener">youtube.com/@IchinoseSound</a></p>
     </div></details>
 
-    <details class="panel fold"><summary>Your day</summary><div class="fold-body">
+    <details class="panel fold"><summary>Time</summary><div class="fold-body">
       <p class="muted">Choose when your day starts and ends. Feeding, stray kitties, treats, streaks and diary pages all count toward the day you are in, so a night owl can let the day run past midnight.</p>
       <div class="row">
         <label class="field">Starts at <select id="day-start"></select></label>
@@ -765,10 +790,12 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
       <p class="muted" id="day-span"></p>
     </div></details>
 
+    <details class="panel fold"><summary>Apps to show</summary><div class="fold-body" id="set-shown"></div></details>
+
     <details class="panel fold" hidden><summary>Sync</summary><div class="fold-body" id="sync-box"></div></details>
 
     <details class="panel fold"><summary>Backup</summary><div class="fold-body">
-      <p class="muted">One <b>.kitty</b> file holds <b>everything</b>: your kitties, every diary page and photo, notes, Kitty Mart, Kitty Litterbox, your Kitty Gallery icons, and your Kitty Achievement quests and achievements (photos are scaled down so the file stays small). Save it on this device, or share it to Drive or by mail.</p>
+      <p class="muted">One <b>.kitty</b> file holds <b>everything</b>: your kitties, every diary page and photo, notes, Kitty Mart, Kitty Litterbox, your Kitty Gallery icons, and your Pawchievement quests and achievements (photos are scaled down so the file stays small). Save it on this device, or share it to Drive or by mail.</p>
       <div class="btns flow">
         <button class="btn primary" type="button" data-action="save-file">Save to device…</button>
         <button class="btn" type="button" data-action="share-file" data-native-only>Share…</button>
@@ -798,19 +825,10 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
       <p class="form-error" id="save-error" hidden></p>
     </div></details>
 
-    <details class="panel fold"><summary>Change log</summary><div class="fold-body" id="changelog"></div></details>
-
       <h2>Mini-apps</h2>
-      <div class="set-apps">
-        <button class="btn menu-btn" type="button" data-action="settings-app" data-app="habit"><i data-icon="cat"></i><span>Habit Kitty</span></button>
-        <button class="btn menu-btn" type="button" data-action="settings-app" data-app="diary"><i data-icon="diary"></i><span>Kitty Journal</span></button>
-        <button class="btn menu-btn" type="button" data-action="settings-app" data-app="notes"><i data-icon="pencil"></i><span>Kitty Library</span></button>
-        <button class="btn menu-btn" type="button" data-action="settings-app" data-app="achievement"><i data-icon="trophy"></i><span>Achievements</span></button>
-        <button class="btn menu-btn" type="button" data-action="settings-app" data-app="pixel"><i data-icon="pencil"></i><span>Kitty Gallery</span></button>
-        <button class="btn menu-btn" type="button" data-action="settings-app" data-app="wardrobe"><i data-icon="cat"></i><span>Kitty Wardrobe</span></button>
-      </div>
+      <div class="set-apps" id="set-apps"></div>
       <footer class="foot">
-      <span><span id="saved">Saved on this device</span> · <span id="version"></span></span>
+      <span><span id="saved">Saved on this device</span> · <span id="version"></span> · <button class="linkish" type="button" data-action="changelog-open">Change log</button></span>
       </footer>
     </div>
 
@@ -862,34 +880,27 @@ details.rules ul, .rules-list { padding-left: var(--s6); margin: var(--s2) 0 0; 
     </div>
 
     <div class="set-page" id="set-diary" hidden>
-      <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Kitty Journal</h3></div>
+      <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Journal</h3></div>
       <div class="set-page" id="set-diary-body"></div>
     </div>
 
     <div class="set-page" id="set-notes" hidden>
-      <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Kitty Library</h3></div>
+      <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Library</h3></div>
       <div class="set-page" id="set-notes-body"></div>
     </div>
 
     <div class="set-page" id="set-achievement" hidden>
-      <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Achievements</h3></div>
+      <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Pawchievement</h3></div>
       <details class="panel fold" open><summary>Load achievements</summary><div class="fold-body">
-        <p class="muted">Replaces only your quests and achievements with those from a backup (.kitty) or an older Kitty Achievement save file (.achkitty). Your kitties and diary stay as they are. To save everything, use Backup.</p>
+        <p class="muted">Replaces only your quests and achievements with those from a backup (.kitty) or an older Pawchievement save file (.achkitty). Your kitties and diary stay as they are. To save everything, use Backup.</p>
         <div class="btns"><button class="btn" type="button" data-action="ach-load">Load achievements…</button></div>
         <input type="file" id="ach-file" hidden>
         <p class="form-error" id="ach-error" hidden></p>
       </div></details>
     </div>
 
-    <div class="set-page" id="set-wardrobe" hidden>
-      <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Kitty Wardrobe</h3></div>
-      <div class="panel">
-        <label class="check"><input type="checkbox" id="wardrobe-on"><span><b>Show Kitty Wardrobe</b><br><span class="muted">Puts Kitty Wardrobe on the home page. It is where the kitty's sprites and animations are drawn and where its skins (pattern and colour) are. It is Kitty Gallery's editor, so what you draw is saved the same way. This is a setting of this device.</span></span></label>
-      </div>
-    </div>
-
     <div class="set-page" id="set-pixel" hidden>
-      <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Kitty Gallery</h3></div>
+      <div class="set-title"><button class="btn small" type="button" data-action="settings-up">&lsaquo; Settings</button><h3>Gallery</h3></div>
       <div class="set-page" id="set-pixel-body"></div>
     </div>
   </main>

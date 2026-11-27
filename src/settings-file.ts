@@ -37,7 +37,7 @@ export interface GallerySettings { icons: PixelIcon[] }
 export interface SettingsFile { look?: LookSettings; habit?: HabitSettings; diary?: DiarySettings; mart?: MartSettings; gallery?: GallerySettings }
 export type Part = keyof SettingsFile;
 export const PARTS: [Part, string][] = [
-  ['look', 'Look (colours, fancy background)'],
+  ['look', 'Appearance (colours, fancy background)'],
   ['habit', 'Habit Kitty options, sounds, your day and room names'],
   ['diary', 'Diary options and emotion names'],
   ['mart', 'Kitty Mart categories (order, icons, colours, shelves), options and aisle order'],

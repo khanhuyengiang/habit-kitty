@@ -4,27 +4,15 @@
 .nbar { display: flex; gap: var(--s3); align-items: stretch; }
 .nbar .field { flex: 1; align-content: stretch; }
 .nbar .btn { flex: none; }
-/* The notes as little program windows (after inspo/simple_notes.jpg), drawn like Kitty Achievement's cards: a frame in the
+/* The notes as little program windows (after inspo/simple_notes.jpg), drawn like Pawchievement's cards: a frame in the
    note's colour (--nc) with a one-pixel dark outline and a lit line inside it, one pixel cut from every corner, a title bar, and an inset dotted screen with the picture and a few words. Two to a row, every
    card the same shape: --note-ratio is width / height. */
 .ngrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s4); }
-.nwin { --nc: var(--accent); --nw-dk: color-mix(in srgb, var(--nc) 25%, #231d44); --nw-frame: color-mix(in srgb, var(--nc) 62%, var(--surface));
-  --nw-hi: color-mix(in srgb, var(--nc) 25%, #fff); --sq: var(--nc); --dk: var(--nw-dk);   /* --sq and --dk colour Kitty Achievement's icons */
-  display: flex; flex-direction: column; width: 100%; min-width: 0; margin: 0; padding: calc(4 * var(--px)); border: 0; font: inherit; color: var(--ink);
-  background: var(--nw-frame); -webkit-mask-box-image: var(--notch-s-box); mask: var(--notch-s-m);
-  box-shadow: inset 0 0 0 var(--px) var(--nw-dk), inset 0 0 0 calc(2 * var(--px)) var(--nw-hi); }
 .ncard { --note-ratio: 3 / 4; aspect-ratio: var(--note-ratio); overflow: hidden; cursor: pointer; text-align: center; }
 button.ncard:hover { --nw-frame: color-mix(in srgb, var(--nc) 75%, var(--surface)); }
 button.ncard:active { transform: translateY(var(--px)); }
 button.ncard:focus-visible { outline: none; }
 button.ncard:focus-visible .nwin-screen { box-shadow: inset 0 0 0 var(--bw) var(--accent-text); }
-.nwin-bar { display: flex; align-items: center; gap: var(--s1); min-width: 0; flex: none; padding: var(--px) var(--px) calc(3 * var(--px)); color: var(--nw-ink, var(--nw-dk)); }
-.nwin-name { flex: 1; min-width: 0; text-align: left; font: 700 20px/1.05 var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nwin-btns { display: flex; gap: var(--px); flex: none; color: var(--nw-dk); }
-/* the window buttons: three plain squares */
-.nwin-btns > span { display: grid; place-items: center; padding: calc(2 * var(--px)); background: var(--nw-hi); box-shadow: inset 0 0 0 var(--px) var(--nw-dk); }
-.nwin-screen { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s2);
-  padding: var(--s4) var(--s3); -webkit-mask-box-image: var(--notch-s-box); mask: var(--notch-s-m); box-shadow: inset 0 0 0 var(--bw) color-mix(in srgb, var(--nc) 70%, var(--nw-dk)); background: color-mix(in srgb, var(--nc) 14%, var(--surface)); }
 /* the sparkles in three corners of the screen, and the picture in the fourth */
 .ndeco { position: absolute; inset: 0; pointer-events: none; color: color-mix(in srgb, var(--nc) 70%, var(--nw-dk)); }
 .ndeco .tw { position: absolute; opacity: .75; }
@@ -44,19 +32,6 @@ button.ncard:focus-visible .nwin-screen { box-shadow: inset 0 0 0 var(--bw) var(
 /* the date over a dotted line, at the bottom of the screen */
 .ncard-foot { flex: none; margin-top: auto; display: grid; justify-items: center; gap: var(--px); font-size: 14px; line-height: 1; color: var(--muted); }
 .ncard-foot::after { content: ""; width: calc(24 * var(--px)); height: var(--px); background: repeating-linear-gradient(90deg, var(--nw-dk) 0 var(--px), transparent 0 calc(2 * var(--px))); opacity: .6; }
-/* Reading a note: the same window, as tall as the note, drawn big with the border of inspo/simple_notes.jpg (see "The big
-   windows' borders" in page.html): a dark outline with stepped corners, lit along the top and left, and a screen outlined in a
-   deep rose of the note's colour, with a soft line inside and a sparkle on each corner. */
-.nread { --rp: calc(2 * var(--px)); --nw-rose: color-mix(in oklch, var(--nc) 55%, var(--nw-dk));
-  --o: var(--nw-dk); --hl: var(--nw-hi); --sh: color-mix(in srgb, var(--nc) 75%, var(--nw-dk)); --fill: var(--nw-frame);
-  min-height: calc(150 * var(--u)); padding: calc(3 * var(--rp)) calc(4 * var(--rp)) calc(5 * var(--rp)); box-shadow: none; -webkit-mask-box-image: none; mask: none; }
-@supports (color: oklch(from red l c h)) { .nread { --nw-rose: oklch(from var(--nc) calc(l * .6) calc(c * .95) h); } }   /* the note's own hue, deeper and stronger */
-.nread .nwin-bar { padding: 0 0 calc(4 * var(--rp)); gap: var(--s2); }   /* room for the screen's corner sparkles */
-.nread .nwin-name { font-size: 24px; }
-.nread .nwin-screen { --o: var(--nw-rose); --hl: color-mix(in srgb, var(--nc) 62%, var(--surface)); --sh: var(--hl); --out: var(--nw-frame);
-  --spk: color-mix(in srgb, var(--nc) 35%, var(--nw-rose)); --spo: color-mix(in srgb, var(--nc) 70%, var(--nw-rose)); --spc: #fffafd;
-  --fill: color-mix(in srgb, var(--nc) 14%, var(--surface));
-  align-items: stretch; justify-content: flex-start; gap: var(--s4); padding: calc(10 * var(--rp)) var(--s5) calc(7 * var(--rp)); box-shadow: none; -webkit-mask-box-image: none; mask: none; }
 .nread .ndeco .tw.tl { top: calc(6 * var(--rp)); left: calc(6 * var(--rp)); } .nread .ndeco .tw.tr { top: calc(6 * var(--rp)); right: calc(6 * var(--rp)); }
 .nread .ndeco .tw.br { bottom: calc(6 * var(--rp)); right: calc(6 * var(--rp)); }
 .nread .ndoodle { left: calc(5 * var(--rp)); bottom: calc(5 * var(--rp)); }
@@ -113,7 +88,7 @@ button.nbook:focus-visible .nbook-face { box-shadow: inset 0 0 0 var(--bw) var(-
 .nkinds label:hover span { border-color: var(--edge); }
 .nkinds input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-edge); }
 .nkinds input:focus-visible + span { outline: var(--bw) solid var(--accent-text); outline-offset: calc(-2 * var(--bw)); }
-/* The icon list (the same as Kitty Achievement's; its sheet is off on this screen). */
+/* The icon list (the same as Pawchievement's; its sheet is off on this screen). */
 .notes .hint { margin: 0; font-size: 16px; font-weight: 400; color: var(--muted); }
 :is(.notes, #notes-layer, .diary-pic) .icon-fold > summary { list-style: none; display: flex; align-items: center; gap: var(--s4); padding: var(--s3) var(--s4); cursor: pointer; border: var(--bw) solid var(--line); -webkit-mask-box-image: var(--notch-box); mask: var(--notch-m); background: var(--surface2); color: var(--edge); font-weight: 700; font-size: 18px; }
 :is(.notes, #notes-layer, .diary-pic) .icon-fold > summary::-webkit-details-marker { display: none; }

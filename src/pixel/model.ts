@@ -35,8 +35,8 @@ export const MORE_INKS = Object.keys(PALETTE_INKS).filter((ch) => !INK_ROWS.join
 const INKS = [...BASE_ROWS, ...INK_ROWS].join('') + MORE_INKS;
 const FULL_INKS = INKS.replace(/[sld]/g, '');   // the same without the base colour
 export const CATEGORIES: Category[] = [
-  { id: 'sticker', label: 'Sticker', where: 'Notes, Kitty Achievement cards and side quests, Kitty Mart categories', w: 18, h: 18, letters: INKS, outline: true, base: 'the card or note it is on' },
-  { id: 'friend', label: 'Mini sticker', where: 'The card friends in the corner of a Kitty Achievement card', w: 9, h: 9, letters: INKS, outline: false, base: 'the card or note it is on' },
+  { id: 'sticker', label: 'Sticker', where: 'Notes, Pawchievement cards and side quests, Kitty Mart categories', w: 18, h: 18, letters: INKS, outline: true, base: 'the card or note it is on' },
+  { id: 'friend', label: 'Mini sticker', where: 'The card friends in the corner of a Pawchievement card', w: 9, h: 9, letters: INKS, outline: false, base: 'the card or note it is on' },
   { id: 'button', label: 'Button', where: 'The small one-colour icons on buttons', w: 7, h: 7, letters: 'o', outline: false, base: '' },
   { id: 'weather', label: 'Weather', where: 'The weather choice on a diary page (with Meteorokinesis on)', w: 13, h: 10, letters: FULL_INKS, outline: false, base: '' },
   { id: 'deco', label: 'Decoration', where: 'Pictures drawn in one place only, such as the wings beside the chosen app on the home screen', w: 12, h: 12, letters: FULL_INKS, outline: false, base: '' },
@@ -137,7 +137,7 @@ export function officials(cat: CategoryId): Official[] {
   if (cat === 'kitty') return [{ id: SHEET_ID, name: SHEET_NAME, group: USER_GROUP, art: OFFICIAL_SHEET.sprites[0].art, sprites: OFFICIAL_SHEET.sprites, animations: OFFICIAL_SHEET.animations, zones: KITTY_ZONES }];   // the one sprite sheet
   if (cat === 'scene') return SCENES.map(([id, name]) => ({ id, name, group: DEFAULT_GROUP, art: sceneArt(id), spots: officialSpots(id),
     ...(id === 'room' && { props: { book: [...OFFICIAL_PROPS.book] as Spot, trophy: [...OFFICIAL_PROPS.trophy] as Spot } }) }));
-  // Habit Kitty's button icons, then Kitty Achievement's that Habit Kitty has not got
+  // Habit Kitty's button icons, then Pawchievement's that Habit Kitty has not got
   const all: Record<string, string[]> = { ...OFFICIAL_ICONS };
   for (const [id, art] of Object.entries(OFFICIAL_UI_ICONS)) all[id] ??= art;
   return Object.entries(all).map(([id, art]) => ({ id, name: titleCase(id), group: DEFAULT_GROUP, art }));
@@ -176,7 +176,7 @@ export function cleanGhost(raw: unknown): Ghost | undefined {
 }
 export const MAX_SHIFT = 96;
 export const SHEET_ID = 'sheet', SHEET_NAME = 'Kitty sprites';
-export const MAX_SPRITES = 48, MAX_STEPS = 96, MAX_ANIMS = 24, DEFAULT_FPS = 4, FPS_CHOICES = [2, 4, 6, 8, 12];
+export const MAX_SPRITES = 48, MAX_STEPS = 96, MAX_ANIMS = 24, DEFAULT_FPS = 4, FPS_CHOICES = [1, 2, 4, 6, 8, 12];
 // The animations the game plays (the others are yours to keep): where Habit Kitty's room shows each one.
 export const GAME_ANIMS: { id: string; name: string; where: string }[] = [
   { id: 'idle', name: 'Idle', where: 'a kitty sitting in the room' },

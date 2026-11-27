@@ -42,7 +42,7 @@ const toast = (text: string) => showToast($('diary-toast'), text);
 
 // ---- header ----
 function renderTop() {
-  $('diary-top').innerHTML = titleBar('Kitty', 'Journal', homeButton() + playerButton() + settingsButton());
+  $('diary-top').innerHTML = titleBar('Journal', '', homeButton() + playerButton() + settingsButton());
 }
 
 // ---- the page ----
@@ -222,7 +222,7 @@ function drawDraftPhoto() {
   const hint = document.getElementById('diary-photo-hint');
   if (hint) hint.textContent = settings().photographer ? `${urls.length} of ${MAX_PHOTOS}. A page has 1, 2 or 4 photos.` : '';
 }
-// The page's icon (instead of photos): Kitty Achievement's icon list, Kitty Gallery's icons too, folded to the chosen one.
+// The page's icon (instead of photos): Pawchievement's icon list, Kitty Gallery's icons too, folded to the chosen one.
 function iconFieldHtml(): string {
   if (!draft) return '';
   const sel = draft.icon;

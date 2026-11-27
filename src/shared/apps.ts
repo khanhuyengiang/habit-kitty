@@ -1,21 +1,27 @@
-// Habit Kitty and Kitty Achievement share one page: both are in it, and the shell (web/shell.ts) shows one at a time.
+// Habit Kitty and Pawchievement share one page: both are in it, and the shell (web/shell.ts) shows one at a time.
 // <html data-app> says which one is showing. Each app's own styles are switched off while it is hidden, and its
 // listeners on the document ignore events while it is hidden, so the two never act on each other's buttons.
 import { monoSvg } from './pixelart.ts';
 import { miniSvg } from './pixelcat.ts';
-import { getLocal, setLocal } from './local.ts';
+import { getLocal, readJson, setLocal, writeJson } from './local.ts';
 
 // The home page, the diary (Kitty Journal), the notes (Kitty Library), Kitty Mart, Kitty Gallery, Kitty Litterbox and the two apps: <html data-app> says which one is showing. (Habit Kitty's styles also serve the home page, the diary and the notes.)
 export type AppName = 'home' | 'habit' | 'diary' | 'notes' | 'achievement' | 'shopping' | 'pixel' | 'litterbox' | 'wardrobe';
-export const APP_TITLE: Record<AppName, string> = { home: 'Kitty Home', habit: 'Habit Kitty', diary: 'Kitty Journal', notes: 'Kitty Library', achievement: 'Kitty Achievement', shopping: 'Kitty Mart', pixel: 'Kitty Gallery', litterbox: 'Kitty Litterbox', wardrobe: 'Kitty Wardrobe' };
+export const APP_TITLE: Record<AppName, string> = { home: 'Itty Bitty Kitty', habit: 'Habit Kitty', diary: 'Journal', notes: 'Library', achievement: 'Pawchievement', shopping: 'Mart', pixel: 'Gallery', litterbox: 'Litterbox', wardrobe: 'Wardrobe' };
 
 // Kitty Wardrobe is Kitty Gallery's editor opened on the kitty (its sprites, animations and skins): it shares the page and the
 // saved icons, so while it shows <html data-app> is 'pixel' and <html data-mode> is 'wardrobe'. It is hidden from the home page until it is switched on
-// (Settings → Mini-apps → Kitty Wardrobe), on this device.
+// (Settings → Apps to show), on this device.
 export const inWardrobe = () => document.documentElement.dataset.mode === 'wardrobe';
-const WARDROBE_KEY = 'hk-wardrobe';
-export const wardrobeOn = () => getLocal(WARDROBE_KEY) === '1';
-export const setWardrobeOn = (on: boolean) => setLocal(WARDROBE_KEY, on ? '1' : '0');
+const WARDROBE_KEY = 'hk-wardrobe';   // before the list below, Wardrobe had its own switch: '1' still counts as on
+// Settings → Apps to show: which apps have a key on the home page, kept on this device. All of them, except Wardrobe, until chosen otherwise.
+const SHOWN_KEY = 'hk-apps-shown';
+export const appShown = (app: string): boolean => {
+  const own = readJson<Record<string, boolean>>(SHOWN_KEY)?.[app];
+  return typeof own === 'boolean' ? own : app === 'wardrobe' ? getLocal(WARDROBE_KEY) === '1' : true;
+};
+export const setAppShown = (app: string, on: boolean) => { writeJson(SHOWN_KEY, { ...readJson<Record<string, boolean>>(SHOWN_KEY), [app]: on }); };
+export const wardrobeOn = () => appShown('wardrobe');
 
 export const shownApp = (): AppName => {
   const a = document.documentElement.dataset.app;
@@ -49,7 +55,7 @@ export const onAppShown = (app: AppName, fn: () => void) =>
 // Habit Kitty's own little cat: the pink face on its Today tab, and on the button that goes back to it.
 export const habitKittySvg = () => miniSvg('happy', { fur: '#ffb3d0', pattern: 'plain' });
 
-// The trophy: Kitty Achievement's icon on the home page and in the room.
+// The trophy: Pawchievement's icon on the home page and in the room.
 const TROPHY = ['ooooooooo', 'o.ooooo.o', 'o.ooooo.o', '.ooooooo.', '..ooooo..', '...ooo...', '....o....', '...ooo...', '.ooooooo.'];
 export const trophyIcon = () => monoSvg(TROPHY);
 

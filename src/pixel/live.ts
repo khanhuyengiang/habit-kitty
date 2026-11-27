@@ -30,8 +30,8 @@ export function applyIcons(data: PixelData) {
   reset(DECOS, OFFICIAL_DECOS);
   for (const i of iconsOf(data, 'deco')) if (i.status !== 'official') DECOS[i.id] = { label: i.name, art: i.art };
 
-  // A button icon can be in Habit Kitty's list, Kitty Achievement's or both: a change goes to each list it is in, a new one
-  // to Habit Kitty's (a new one in Kitty Achievement's would be taken for a sticker of that name).
+  // A button icon can be in Habit Kitty's list, Pawchievement's or both: a change goes to each list it is in, a new one
+  // to Habit Kitty's (a new one in Pawchievement's would be taken for a sticker of that name).
   reset(ICONS, OFFICIAL_ICONS);
   reset(UI_ICONS, OFFICIAL_UI_ICONS);
   for (const i of iconsOf(data, 'button')) {

@@ -195,7 +195,7 @@ function openInks() {
 // ---------- header ----------
 function renderTop() {
   const w = inWardrobe();
-  $('pixel-top').innerHTML = titleBar('Kitty', w ? 'Wardrobe' : 'Gallery', homeButton() + playerButton() + settingsButton())
+  $('pixel-top').innerHTML = titleBar(w ? 'Wardrobe' : 'Gallery', '', homeButton() + playerButton() + settingsButton())
     + `<nav class="nav" aria-label="${w ? 'Kitty Wardrobe' : 'Kitty Gallery'}"><div class="seg" role="tablist">${tabs().map(([t, label]) =>
       `<button type="button" role="tab" data-action="pix-tab" data-tab="${t}" aria-selected="${t === tab}">${label}</button>`).join('')}</div></nav>`;
 }
@@ -1064,7 +1064,7 @@ function animHtml(d: Draft): string {
     <p class="muted">${game ? `The game plays this as ${esc(game.where)}.` : `The game plays ${GAME_ANIMS.map((g) => esc(g.name)).join(' and ')}, and the poses Walk, Jump, Front, Back, Three-quarter, Sit side to stand side and Stand to sit; this one is yours to keep.`}</p>
     <div class="pix-animview"><div class="pix-animbox"><div class="pix-anim" id="pix-anim" style="--w:${d.grid[0].length};--h:${d.grid.length};${baseStyle('kitty')}" aria-hidden="true"></div><p class="muted pix-animcap" id="pix-animcap"></p></div>
       <div class="stack"><label class="field">Animation name <input id="pix-anim-name" maxlength="${LIMITS.name}" autocomplete="off" value="${esc(a.name)}"></label>
-        <label class="field">Speed <select id="pix-fps">${FPS_CHOICES.map((n) => `<option value="${n}" ${n === a.fps ? 'selected' : ''}>${n} steps a second</option>`).join('')}</select></label>
+        <label class="field">Speed <select id="pix-fps">${FPS_CHOICES.map((n) => `<option value="${n}" ${n === a.fps ? 'selected' : ''}>${n} ${n === 1 ? 'step' : 'steps'} a second</option>`).join('')}</select></label>
         <div class="btns flow"><button class="btn small" type="button" data-action="pix-anim-toggle">${animPlaying ? 'Pause' : 'Play'}</button>
           <button class="btn small" type="button" data-action="pix-anim-png" ${seq.length ? '' : 'disabled'} title="Every step side by side in one picture, to check the drawing">Save steps as a picture</button></div></div></div>
     ${st ? `<div class="pix-resize"><label class="field">Forward ${numField('pix-step-dx', st.dx ?? 0)}</label>

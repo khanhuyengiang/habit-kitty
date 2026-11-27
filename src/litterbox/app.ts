@@ -57,7 +57,7 @@ const commit = (next: LitterData, label: string, say = label) => {
 };
 
 // ---- header ----
-const renderTop = () => { $('lb-top').innerHTML = titleBar('Kitty', 'Litterbox', homeButton() + playerButton() + settingsButton()); };
+const renderTop = () => { $('lb-top').innerHTML = titleBar('Litterbox', '', homeButton() + playerButton() + settingsButton()); };
 
 // ---- the list ----
 const catIcon = (c: Cat | undefined) => `<span class="nart">${stickerSvg(c?.icon || 'bag', 1)}</span>`;
