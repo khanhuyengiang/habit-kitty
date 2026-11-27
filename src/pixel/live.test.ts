@@ -81,7 +81,7 @@ describe('applyIcons', () => {
     expect(ICONS.x).toEqual(x);
     expect(UI_ICONS.x).toEqual(x);
     expect(ICONS.wand).toBeTruthy();
-    expect(UI_ICONS.wand).toBeUndefined();   // else Kitty Achievement would draw it for a sticker called "wand"
+    expect(UI_ICONS.wand).toBeUndefined();   // else Pawchievement would draw it for a sticker called "wand"
   });
 
   it('leaves Kitty Gallery listing only the code as official', () => {

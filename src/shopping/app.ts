@@ -60,8 +60,8 @@ const commit = (next: ReturnType<typeof shopData>, label: string, say = label) =
 
 // ---- header ----
 function renderTop() {
-  $('shop-top').innerHTML = titleBar('Kitty', 'Mart', homeButton() + playerButton() + settingsButton())
-    + `<nav class="nav" aria-label="Kitty Mart"><div class="seg" role="tablist">${TABS.map(([t, label]) =>
+  $('shop-top').innerHTML = titleBar('Mart', '', homeButton() + playerButton() + settingsButton())
+    + `<nav class="nav" aria-label="Mart"><div class="seg" role="tablist">${TABS.map(([t, label]) =>
       `<button type="button" role="tab" data-action="shop-tab" data-tab="${t}" aria-selected="${t === tab}">${label}</button>`).join('')}</div></nav>`;
 }
 

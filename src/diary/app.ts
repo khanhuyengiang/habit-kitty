@@ -11,7 +11,7 @@ import { newId } from '../shared/id.ts';
 import { makeLayer } from '../shared/layer.ts';
 import { MONTH_NAMES, pickerHtml } from '../shared/picker.ts';
 import { closeX, homeButton, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
-import { goTo, journalTabs, onAppShown, onShown } from '../shared/apps.ts';
+import { goTo, onAppShown, onShown } from '../shared/apps.ts';
 import { meterHtml } from '../shared/meter.ts';
 import { compressPhoto } from '../shared/photo.ts';
 import { groupedPicks, iconLabel, uiIconSvg, pickable, stickerSvg, PICKER_ICONS } from '../shared/stickers.ts';
@@ -42,7 +42,7 @@ const toast = (text: string) => showToast($('diary-toast'), text);
 
 // ---- header ----
 function renderTop() {
-  $('diary-top').innerHTML = titleBar('Kitty', 'Journal', homeButton() + playerButton() + settingsButton()) + journalTabs('diary');
+  $('diary-top').innerHTML = titleBar('Journal', '', homeButton() + playerButton() + settingsButton());
 }
 
 // ---- the page ----
@@ -222,7 +222,7 @@ function drawDraftPhoto() {
   const hint = document.getElementById('diary-photo-hint');
   if (hint) hint.textContent = settings().photographer ? `${urls.length} of ${MAX_PHOTOS}. A page has 1, 2 or 4 photos.` : '';
 }
-// The page's icon (instead of photos): Kitty Achievement's icon list, Kitty Gallery's icons too, folded to the chosen one.
+// The page's icon (instead of photos): Pawchievement's icon list, Kitty Gallery's icons too, folded to the chosen one.
 function iconFieldHtml(): string {
   if (!draft) return '';
   const sel = draft.icon;

@@ -6,7 +6,8 @@
 import { CARD_FRIENDS, OFFICIAL_CARD_FRIENDS, OFFICIAL_PICKER_ICONS, OFFICIAL_UI_ICONS, PICKER_ICONS, UI_ICONS, refreshPickerOrder } from '../shared/stickers.ts';
 import { DECOS, ICONS, OFFICIAL_DECOS, OFFICIAL_ICONS, OFFICIAL_WEATHER, WEATHER } from '../shared/art.ts';
 import { useScene, type SceneId } from '../shared/scene.ts';
-import { DEFAULT_GROUP, SCENES, iconsOf, sceneColors, type PixelData } from './model.ts';
+import { useSheet } from '../shared/kittysheet.ts';
+import { DEFAULT_GROUP, SCENES, iconsOf, sceneColors, sheetOf, type PixelData } from './model.ts';
 
 const reset = <T>(live: Record<string, T>, official: Readonly<Record<string, T>>) => {
   for (const k of Object.keys(live)) delete live[k];
@@ -29,8 +30,8 @@ export function applyIcons(data: PixelData) {
   reset(DECOS, OFFICIAL_DECOS);
   for (const i of iconsOf(data, 'deco')) if (i.status !== 'official') DECOS[i.id] = { label: i.name, art: i.art };
 
-  // A button icon can be in Habit Kitty's list, Kitty Achievement's or both: a change goes to each list it is in, a new one
-  // to Habit Kitty's (a new one in Kitty Achievement's would be taken for a sticker of that name).
+  // A button icon can be in Habit Kitty's list, Pawchievement's or both: a change goes to each list it is in, a new one
+  // to Habit Kitty's (a new one in Pawchievement's would be taken for a sticker of that name).
   reset(ICONS, OFFICIAL_ICONS);
   reset(UI_ICONS, OFFICIAL_UI_ICONS);
   for (const i of iconsOf(data, 'button')) {
@@ -38,6 +39,9 @@ export function applyIcons(data: PixelData) {
     if (has(OFFICIAL_UI_ICONS, i.id)) UI_ICONS[i.id] = i.art;
     if (has(OFFICIAL_ICONS, i.id) || !has(OFFICIAL_UI_ICONS, i.id)) ICONS[i.id] = i.art;
   }
+
+  // The kitty sprite sheet: the room's kitties are drawn from it where it has an animation for what they do.
+  useSheet(sheetOf(data));
 
   // The cosy room and the garden: a changed one is drawn from your picture, with your kitty spots.
   const scenes = iconsOf(data, 'scene');

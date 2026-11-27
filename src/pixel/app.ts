@@ -10,8 +10,8 @@
 // its own, in web/pixel.html.
 import { FINE, UI_ICONS, fineSvg, stickerArtSvg } from '../shared/stickers.ts';
 import { iconSvg } from '../shared/art.ts';
-import { monoSvg } from '../shared/pixelart.ts';
-import { onAppShown, onShown } from '../shared/apps.ts';
+import { monoSvg, runPaths } from '../shared/pixelart.ts';
+import { inWardrobe, onAppShown, onShown } from '../shared/apps.ts';
 import { $, esc, plural } from '../shared/html.ts';
 import { localDateKey } from '../shared/dates.ts';
 import { makeLayer } from '../shared/layer.ts';
@@ -23,6 +23,7 @@ import { COLOR } from '../notes/window.ts';
 import type { NoteColor } from '../notes/model.ts';
 import { initPixel, pixelData, pixelReady, setPixelData } from './data.ts';
 import { scenePng } from './live.ts';
+import { SKIN_COLOURS, SKIN_PATTERNS, inkFor, sheetCatSvg } from '../shared/kittysheet.ts';
 import { BOOK_ART, TROPHY_ART, ROOM_H, ROOM_W, type Spot } from '../shared/scene.ts';
 import { PAL, artSvg } from '../shared/pixelart.ts';
 import { FURS, bodySvg } from '../shared/pixelcat.ts';
@@ -31,23 +32,24 @@ import {
   CATEGORIES, DEFAULT_GROUP, byName, LETTERS, LIMITS, USER_GROUP, blankGrid, categoryOf, cleanGroup, cleanName, dropCount, dropFloat, dropIcon, dropIcons,
   exportName, exportText, flipGrid, floodFill, groupsOf, iconsOf, liveIcons, canDeleteOfficial, deleteOfficial, restoreIcon, importClashes, importIcons, inRect, nameTaken, type PixelIcon, isBlank, letterName, liftArea, linePoints,
   moveIcons, newId, officialOf, putIcon, readExport, rectOf, renameGroup, setFood, shiftGrid, sizeOf, FREE_MAX, freeSize, resizeGrid, toArt, toGrid, type CategoryId, type Grid,
-  DEFAULT_FPS, FPS_CHOICES, MAX_FRAMES, MAX_STEPS, cleanSequence, playOrder, newFrameId, shiftArt, trackShifts, nextFrameName, pingPong, removeFrame,
+  DEFAULT_FPS, FPS_CHOICES, MAX_SPRITES, MAX_STEPS, MAX_ANIMS, GAME_ANIMS, SHEET_ID, SHEET_NAME, type Animation, cleanAnimations, newAnimId, newSpriteId, nextSpriteName, pingPong, removeSprite,
+  stepsFromText, stepsToText, MAX_SHIFT, defaultGhosts, type Anchor, type Ghost, type Step,
   type Rect, type Shown, CAT_SIZE, isFixed, MAX_SPOTS, SCENE_INKS, clampProp, clampSpot, sceneColors, type Props,
 } from './model.ts';
 
 const toast = (text: string) => showToast($('pixel-toast'), text);
 
-type Tab = 'icons' | 'draw' | 'colours';
-const TABS: [Tab, string][] = [['icons', 'Icons'], ['draw', 'Draw'], ['colours', 'Colours']];
-type Tool = 'pencil' | 'erase' | 'fill' | 'pick' | 'select' | 'pan' | 'track';
+type Tab = 'icons' | 'draw' | 'colours' | 'skins';
+const GALLERY_TABS: [Tab, string][] = [['icons', 'Icons'], ['draw', 'Draw'], ['colours', 'Colours']];
+const WARDROBE_TABS: [Tab, string][] = [['icons', 'Kitty'], ['draw', 'Draw'], ['skins', 'Skins']];
+const tabs = () => (inWardrobe() ? WARDROBE_TABS : GALLERY_TABS);
+type Tool = 'pencil' | 'erase' | 'fill' | 'pick' | 'select' | 'pan';
 const TOOLS: [Tool, string][] = [['pencil', 'Pencil'], ['erase', 'Eraser'], ['fill', 'Fill'], ['pick', 'Pick'], ['select', 'Select']];
 // Every board can be zoomed in (a scene is too big to see whole anyway), so every board has a tool to move around it too.
 const ALL_TOOLS: [Tool, string][] = [...TOOLS, ['pan', 'Move around']];
-const TRACK_TOOL: [Tool, string] = ['track', 'Point of tracking'];
 const ZOOMS = [1, 2, 4, 8];
 // The drawing tools' icons: smooth line drawings (not pixel art, so they don't look like part of the picture), in the text colour.
 const TOOL_ICONS: Record<Tool | 'mirror', string> = {
-  track: '<circle cx="12" cy="12" r="4"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/>',
   pan: '<path d="M12 3v18M3 12h18"/><path d="m9 6 3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/>',
   pencil: '<path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 0 1 3 0l.5.5a2.1 2.1 0 0 1 0 3L8.5 19Z"/><path d="m13.5 7 3.5 3.5"/>',
   erase: '<path d="M3 15.5 13.5 5a2 2 0 0 1 2.8 0l3.7 3.7a2 2 0 0 1 0 2.8L11.5 20h-4Z"/><path d="m8.5 10 5.5 5.5"/><path d="M11.5 20H21"/>',
@@ -65,21 +67,32 @@ let tool: Tool = 'pencil';
 let ink = 's';
 let mirror = false;
 let base: NoteColor = 'pink';          // the colour the base colour is shown in
+const keptFlag = (k: string, dflt: boolean) => { try { const v = localStorage.getItem(k); return v === null ? dflt : v === '1'; } catch { return dflt; } };
+const keepFlag = (k: string, on: boolean) => { try { localStorage.setItem(k, on ? '1' : '0'); } catch { /* private window */ } };
+let kittyHelp = keptFlag('pix-kitty-help', true);       // Kitty tab: the explanation is shown until closed
+let animsOpen = keptFlag('pix-anims-open', true);       // Kitty tab: the animations and the sprites fold away
+let spritesOpen = keptFlag('pix-sprites-open', true);
+let spriteSort = false;                // Kitty tab: sprites listed by name (the numbers stay)
+let zoneMode = false;                  // Draw (the kitty): the board shows and draws the sprites' zones, not their pictures
+let zink = 'H';                        // the part drawn in zone mode
+let clip: { grid: Grid; x: number; y: number; zone: boolean } | null = null;   // copied pixels (kept while you open other sprites), with where they were
+let penOnly = (() => { try { return localStorage.getItem('pix-pen') === '1'; } catch { return false; } })();   // only a pen draws: fingers and palms are ignored
 let organise = false;                  // Icons: tiles are picked to move, not opened
 const picked = new Set<string>();      // the ids picked, in the shown category
 let moveTo: string = USER_GROUP;       // the group they were last moved to
 
 // The icon on the board. id null: a new one, not saved yet. A scene also has its kitty spots and (the room) its props.
-// A kitty can be an animation: frames (each its own named grid; `grid` below is the one being drawn on, the frame at `cur`)
-// and a sequence of frame ids that plays them (see Frame in ./model.ts).
-interface DraftFrame { id: string; name: string; grid: Grid; pin?: [number, number] }
+// The kitty is the sprite sheet: sprites (each its own named grid; `grid` below is the one being drawn on, the sprite at `cur`)
+// and animations that play them (`anim` is the one being edited; see Sprite and Animation in ./model.ts).
+interface DraftSprite { id: string; name: string; grid: Grid; zone: Grid }   // zone: the part of the coat of each pixel (see fixZone)
 interface Draft { cat: CategoryId; id: string | null; name: string; group: string; grid: Grid; saved: string; spots?: Spot[]; props?: Props; food?: boolean;
-  frames?: DraftFrame[]; cur?: number; sequence?: string[]; fps?: number }
+  sprites?: DraftSprite[]; cur?: number; anims?: Animation[]; anim?: number }
 let draft: Draft | null = null;
 let undos: Grid[] = [], redos: Grid[] = [];
 const artKey = (d: Draft) => `${d.name}\n${d.group}\n${toArt(d.grid).join('')}\n${JSON.stringify(d.spots ?? null)}${JSON.stringify(d.props ?? null)}${d.food ? '\nfood' : ''}`
-  + (d.frames ? `\n${JSON.stringify(d.frames.map((f, i) => [f.id, f.name, toArt(i === d.cur ? d.grid : f.grid).join(''), f.pin ?? null]))}${JSON.stringify([d.sequence, d.fps])}` : '');
-let stepSel: number | null = null;   // the step picked in the sequence
+  + (d.sprites ? `\n${JSON.stringify(d.sprites.map((f, i) => [f.id, f.name, toArt(liveGrid(d, i)).join(''), zoneToRows(fixZone(liveGrid(d, i), liveZone(d, i))).join('/')]))}${JSON.stringify(d.anims)}` : '');
+let stepSel: number | null = null;
+let restSel: { anim: string; which: 'before' | 'after' } | null = null;   // the resting pose picked (the ghost before or after the steps), which has the same Forward and Up as a step   // the step picked in the animation
 // A scene: how far it is zoomed in, and whether the board draws or places the kitty spots (and which one is picked).
 let zoom = 1;
 let sceneMode: 'draw' | 'spots' = 'draw';
@@ -112,6 +125,7 @@ function settle() {
     if (before && toArt(before).join() === toArt(draft.grid).join()) undos.pop();
   }
   float = null; sel = null;
+  fixCurZone();
 }
 // Moves the selection, keeping at least one column and row of it on the board.
 function moveSel(x: number, y: number) {
@@ -148,25 +162,31 @@ const inkRows = (c: CategoryId, rows: string[]) => rows.map((r) => [...r].filter
 const emptyInk = () => `<div class="pix-irow"><button type="button" class="pix-ink" role="radio" data-action="pix-ink" data-ink="." aria-checked="${ink === '.' && tool !== 'erase'}" title="Empty"><i class="pix-empty"></i><span>Empty</span></button></div>`;
 function inksHtml(c: CategoryId): string {
   if (c === 'button') return `<div class="pix-inks" role="radiogroup" aria-label="Colour">${inkRows(c, ['o'])}${emptyInk()}</div>`;
-  const last = recentInks()[0];
-  return `<div class="pix-inks" role="radiogroup" aria-label="Colour"><div class="pix-ibase">${inkRows(c, BASE_ROWS)}</div>${emptyInk()}${inkRows(c, INK_ROWS)}
-    <div class="pix-irow">${last ? inkButton(c, last) : ''}<button type="button" class="pix-ink pix-choose" data-action="pix-more" aria-haspopup="dialog">${monoSvg(UI_ICONS.plus)}<span>Choose a colour…</span></button></div></div>`;
+  return `<div class="pix-inks" role="radiogroup" aria-label="Colour"><div class="pix-ibase">${inkRows(c, BASE_ROWS)}</div>${emptyInk()}${inkRows(c, INK_ROWS)}</div>`;
 }
-// The palette colours picked with "Choose a colour", latest first (kept on this device).
+// Pinned above the board: the four colours used last, and Choose a colour (two rows of three), so the colour in hand is never a scroll away.
+function recentBar(c: CategoryId): string {
+  if (c === 'button') return '';
+  const have = categoryOf(c).letters;
+  const recent = recentInks().filter((ch) => have.includes(ch)).slice(0, 4);
+  if (!recent.length && ink.length === 1 && have.includes(ink)) recent.push(ink);
+  return `<div class="pix-irow pix-recent" role="radiogroup" aria-label="Recent colours">${recent.map((ch) => inkButton(c, ch)).join('')}<button type="button" class="pix-ink pix-choose" data-action="pix-more" aria-haspopup="dialog">${monoSvg(UI_ICONS.plus)}<span>Choose a colour…</span></button></div>`;
+}
+// The colours used last, latest first (kept on this device).
 const RECENT_KEY = 'hk-pixel-recent', RECENT_MAX = 9;
 function recentInks(): string[] {
   const v = readJson(RECENT_KEY);
-  return Array.isArray(v) ? v.filter((ch): ch is string => typeof ch === 'string' && ch.length === 1 && ALL_INKS.includes(ch)).slice(0, RECENT_MAX) : [];
+  return Array.isArray(v) ? v.filter((ch): ch is string => typeof ch === 'string' && ch.length === 1 && ch !== '.').slice(0, RECENT_MAX) : [];
 }
 // Draws with a colour from now on (one from "Choose a colour" goes to the top of Previously used).
 function useInk(ch: string) {
   ink = ch;
-  if (ch.length !== 1 || !ALL_INKS.includes(ch)) return;
+  if (ch.length !== 1 || ch === '.') return;
   writeJson(RECENT_KEY, [ch, ...recentInks().filter((r) => r !== ch)].slice(0, RECENT_MAX));   // not kept: fine
 }
 function openInks() {
   if (!draft) return;
-  const c = draft.cat, recent = recentInks();
+  const c = draft.cat, recent = recentInks().filter((ch) => categoryOf(c).letters.includes(ch));
   const grid = (label: string, chs: string[]) => `<h4 class="pix-ihead">${label}</h4>
     <div class="pix-igrid" role="radiogroup" aria-label="${label}">${chs.map((ch) => inkButton(c, ch, 'pix-ink-pick')).join('')}</div>`;
   openLayer(`<h3>Choose a colour</h3>${recent.length ? grid('Previously used', recent) : ''}${grid('All colours', byHue([...ALL_INKS]))}`, 'Choose a colour');
@@ -174,8 +194,9 @@ function openInks() {
 
 // ---------- header ----------
 function renderTop() {
-  $('pixel-top').innerHTML = titleBar('Kitty', 'Gallery', homeButton() + playerButton() + settingsButton())
-    + `<nav class="nav" aria-label="Kitty Gallery"><div class="seg" role="tablist">${TABS.map(([t, label]) =>
+  const w = inWardrobe();
+  $('pixel-top').innerHTML = titleBar(w ? 'Wardrobe' : 'Gallery', '', homeButton() + playerButton() + settingsButton())
+    + `<nav class="nav" aria-label="${w ? 'Kitty Wardrobe' : 'Kitty Gallery'}"><div class="seg" role="tablist">${tabs().map(([t, label]) =>
       `<button type="button" role="tab" data-action="pix-tab" data-tab="${t}" aria-selected="${t === tab}">${label}</button>`).join('')}</div></nav>`;
 }
 
@@ -184,14 +205,14 @@ function render() {
   // Every redraw (choosing a tool or a colour, Undo...) makes a new board box; keep a zoomed-in board where it was scrolled to.
   const old = tab === 'draw' ? document.getElementById('pix-board-wrap') : null;
   const at = old && zoom > 1 ? { left: old.scrollLeft, top: old.scrollTop } : null;
-  $('pixel-body').innerHTML = tab === 'icons' ? iconsHtml() : tab === 'draw' ? drawHtml() : coloursHtml();
+  $('pixel-body').innerHTML = tab === 'icons' ? iconsHtml() : tab === 'draw' ? drawHtml() : tab === 'skins' ? skinsHtml() : coloursHtml();
   if (tab === 'draw') renderBoard();
   const wrap = at && document.getElementById('pix-board-wrap');
   if (wrap && at) { wrap.scrollLeft = at.left; wrap.scrollTop = at.top; }
   restartAnim();
 }
 
-const catSeg = () => `<div class="seg pix-cats" role="tablist" aria-label="Category">${CATEGORIES.map((c) =>
+const catSeg = () => `<div class="seg pix-cats" role="tablist" aria-label="Category">${CATEGORIES.filter((c) => c.id !== 'kitty').map((c) =>
   `<button type="button" role="tab" data-action="pix-cat" data-cat="${c.id}" aria-selected="${c.id === cat}">${esc(c.label)}</button>`).join('')}</div>`;
 
 // A group dropdown: the category's groups, and New group… (value '', which no group can be) which shows a field for its
@@ -219,6 +240,8 @@ function iconsHtml(): string {
   const gone = iconsOf(pixelData(), cat).filter((i) => i.status === 'deleted').sort(byName);
   const mine = pixelData().icons.length;
   const groups = groupsOf(list);
+  if (inWardrobe()) { cat = 'kitty'; return kittyHtml(); }
+  if (cat === 'kitty') cat = 'sticker';   // the kitty is in Kitty Wardrobe
   return `${catSeg()}
     <div class="panel pix-intro">
       <p class="muted">${c.free ? `Kitties can be any size up to ${FREE_MAX} × ${FREE_MAX} pixels: a new one starts at ${c.w} × ${c.h}, and the board can be resized while you draw.`
@@ -232,7 +255,10 @@ function iconsHtml(): string {
     ${groups.map((g) => groupHtml(g, list.filter((i) => i.group === g).sort(byName))).join('')}
     ${gone.length ? goneHtml(gone) : ''}
     ${organise ? organiseBar(groups) : ''}
-    <div class="panel">
+    ${exportHtml(mine)}`;
+}
+function exportHtml(mine: number): string {
+  return `<div class="panel">
       <h3>Export</h3>
       <p class="muted">Your new icons, your changes and the official ones you deleted are in the backup, and in the settings file (Settings → Backup → Settings only),
         which gives someone your icons without your diary. Export puts just your icons in one file to make them official; Import reads one back.</p>
@@ -241,6 +267,118 @@ function iconsHtml(): string {
         <button class="btn" type="button" data-action="pix-import">Import icons</button></div>
       <input type="file" id="pix-file" accept=".json,application/json" hidden>
     </div>`;
+}
+// =================== Skins (Kitty Wardrobe) ===================
+// A kitty's coat is a pattern and a colour, chosen apart; the sprites (the core: outline, ears, nose and the shape) are the same for every
+// coat. The big kitty plays any animation in the pair picked; the tiles show every colour in the pattern, and every pattern in the colour.
+let skinPattern: (typeof SKIN_PATTERNS)[number]['id'] = 'stripes';
+let skinFur = SKIN_COLOURS[0].fur;
+let skinAnim = 'idle';
+const sheetNow = () => iconsOf(pixelData(), 'kitty').find((i) => i.id === SHEET_ID);
+
+// ---- the zones: where the parts of each sprite are ----
+// Zones are drawn in the Draw tab, on the same board as the sprite and with the same tools (Zone button, next to Pen): the board then shows each coat pixel
+// in its part's colour, plays like an animation, and copies and pastes between sprites like a drawing. The outline and the non-coat pixels are locked.
+const ZONE_PARTS: [string, string, string][] = [['H', 'Face', PALETTE.blue300], ['E', 'Ear (left)', PALETTE.sun300], ['F', 'Ear (right)', PALETTE.orange], ['T', 'Tail', PALETTE.red], ['K', 'Patch 1', PALETTE.green500], ['J', 'Patch 2', PALETTE.violet], ['b', 'Body', PALETTE.grey300]];
+const COAT_LETTERS = 'nNwuU';
+const ZONE_LETTERS_OK = 'HEFTKJb';
+const zoneColor = (z: string) => ZONE_PARTS.find((q) => q[0] === z)?.[2] ?? '';
+// A sprite's zones as a grid the size of its art: a part for every coat pixel (Body where none was said), '.' everywhere else.
+const fixZone = (art: Grid, zone?: Grid): Grid => art.map((row, y) => row.map((c, x) => (COAT_LETTERS.includes(c) ? (ZONE_LETTERS_OK.includes(zone?.[y]?.[x] ?? '') ? zone![y][x] : 'b') : '.')));
+const zoneFromRows = (art: Grid, rows?: string[]): Grid => fixZone(art, rows?.map((r) => [...r]));
+const zoneToRows = (g: Grid): string[] => g.map((r) => r.join('').replace(/\.+$/, ''));
+// A sprite's zones as a picture: each coat pixel in its part's colour, the rest as drawn (a private letter stands for each part).
+const ZPRIV: Record<string, string> = { H: '\u0001', E: '\u0002', F: '\u0003', T: '\u0004', K: '\u0005', J: '\u0006', b: '\u0007' };
+const zinkOf = (ch: string): string | undefined => { const z = Object.entries(ZPRIV).find(([, v]) => v === ch); return z ? zoneColor(z[0]) : FINE[ch]; };
+function zoneSvg(art: string[], zone: Grid): string {
+  const zart = art.map((row, y) => [...row].map((c, x) => (COAT_LETTERS.includes(c) ? ZPRIV[zone[y]?.[x]] ?? ZPRIV.b : c)).join(''));
+  const w = Math.max(...zart.map((r) => r.length));
+  const body = Object.entries(runPaths(zart, (ch) => !!zinkOf(ch))).map(([ch, d]) => `<path style="fill:${zinkOf(ch)}" d="${d}"/>`).join('');
+  return `<svg class="pxs fine" style="--w:${w};--h:${zart.length}" viewBox="0 0 ${w} ${zart.length}" aria-hidden="true" shape-rendering="crispEdges">${body}</svg>`;
+}
+// A picture in the layer the board shows: as drawn, or in zone mode its zones.
+const layerSvg = (art: string[], zone: Grid | null) => (zone ? zoneSvg(art, zone) : fineSvg(art));
+
+
+function skinsHtml(): string {
+  const sheet = sheetNow();
+  const anims = (sheet?.animations ?? []).filter((a) => a.steps.length);
+  if (!anims.some((a) => a.id === skinAnim)) skinAnim = anims.find((a) => a.id === 'idle')?.id ?? anims[0]?.id ?? 'idle';
+  const pic = (fur: string, pattern: string, anim: string, still: boolean) => sheetCatSvg(anim, { fur, pattern: pattern as 'plain' }, 'sit', 0, still) ?? '';
+  const tile = (action: string, data: string, on: boolean, fur: string, pattern: string, label: string, note = '') =>
+    `<button class="pix-skin${on ? ' on' : ''}" type="button" data-action="${action}" ${data} aria-pressed="${on}"><span class="pix-skinpic">${pic(fur, pattern, 'idle', true)}</span><b>${esc(label)}</b>${note ? `<span class="muted">${esc(note)}</span>` : ''}</button>`;
+  const cur = SKIN_COLOURS.find((c) => c.fur === skinFur) ?? SKIN_COLOURS[0], pat = SKIN_PATTERNS.find((p) => p.id === skinPattern) ?? SKIN_PATTERNS[0];
+  return `<div class="panel pix-intro"><h3>Skins</h3>
+      <p class="muted">A kitty's coat is a <b>colour</b> and a <b>pattern</b>. Every skin is drawn on the same core sprites (the outline, ears, nose and the shapes of the poses), so a skin only changes the coat colours. Point, patch and calico use the <b>zones</b>: draw them in the Draw tab with the Zone button.</p></div>
+    <div class="panel"><div class="pix-skinbig"><span class="pix-skinpic big">${pic(skinFur, skinPattern, skinAnim, false)}</span></div>
+      <p class="num"><b>${esc(pat.name)} · ${esc(cur.name)}</b></p>
+      <label class="field">Plays <select id="pix-skin-anim">${anims.map((a) => `<option value="${esc(a.id)}" ${a.id === skinAnim ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></label></div>
+    <section class="panel pix-group" aria-label="Colour"><div class="pix-ghead"><h3>Colour</h3></div>
+      <div class="pix-swatches" role="radiogroup" aria-label="Colour">${SKIN_COLOURS.map((c) => `<button class="pix-swatch" type="button" role="radio" data-action="pix-skin-colour" data-fur="${c.fur}" aria-checked="${c.fur === skinFur}"><i style="background: ${c.fur}"></i><span>${esc(c.name)}</span></button>`).join('')}</div></section>
+    <section class="panel pix-group" aria-label="Pattern"><div class="pix-ghead"><h3>Pattern</h3></div>
+      <div class="pix-skins">${SKIN_PATTERNS.map((p) => tile('pix-skin-pattern', `data-id="${p.id}"`, p.id === skinPattern, skinFur, p.id, p.name, p.note)).join('')}</div></section>`;
+}
+
+// The Kitty tab: not a list of icons but the one sprite sheet. Each animation opens to design it (its steps, the sprites they play and
+// where they move them); the sprites are all listed below, each opening to draw on.
+// The sprites that no animation plays (the sheet always keeps at least one sprite).
+const unusedSprites = <T extends { id: string }>(sprites: T[], anims: Animation[]): T[] => {
+  const used = new Set(anims.flatMap((a) => a.steps.map((st) => st.id)));
+  const out = sprites.filter((sp) => !used.has(sp.id));
+  return out.length >= sprites.length ? out.slice(1) : out;
+};
+function askPruneSprites() {
+  const sheet = iconsOf(pixelData(), 'kitty').find((i) => i.id === SHEET_ID), un = unusedSprites(sheet?.sprites ?? [], sheet?.animations ?? []);
+  if (!un.length) return;
+  openLayer(`<h3>Remove ${plural(un.length, 'unused sprite')}?</h3><p class="muted">These sprites are not in any animation, so nothing plays them: ${un.map((sp) => esc(sp.name)).join(', ')}. Their drawings are lost, and the sprites after them get a lower number.</p>
+    <div class="btns"><button class="btn" type="button" data-action="pix-layer-close" data-focus>Cancel</button>
+    <button class="btn danger" type="button" data-action="pix-sprites-prune-confirm">${iconSvg('x')} Remove</button></div>`, 'Remove unused sprites');
+}
+async function pruneSprites() {
+  const sheet = iconsOf(pixelData(), 'kitty').find((i) => i.id === SHEET_ID);
+  if (!sheet?.sprites) return;
+  const gone = new Set(unusedSprites(sheet.sprites, sheet.animations ?? []).map((sp) => sp.id));
+  closeLayer();
+  if (!gone.size) return;
+  const sprites = sheet.sprites.filter((sp) => !gone.has(sp.id));
+  const ok = await setPixelData(putIcon(pixelData(), { category: 'kitty', id: SHEET_ID, name: SHEET_NAME, group: USER_GROUP, art: sprites[0].art, sprites, animations: cleanAnimations(sheet.animations ?? [], sprites), zones: sheet.zones }));
+  toast(ok ? `Removed ${plural(gone.size, 'unused sprite')}.` : "Couldn't save. Try again.");
+  render();
+}
+function kittyHtml(): string {
+  const c = categoryOf('kitty');
+  const sheet = iconsOf(pixelData(), 'kitty').find((i) => i.id === SHEET_ID);
+  const sprites = sheet?.sprites ?? [], anims = sheet?.animations ?? [];
+  const byId = new Map(sprites.map((sp) => [sp.id, sp]));
+  const mine = pixelData().icons.length;
+  const [w, h] = sheet ? [sheet.art[0].length, sheet.art.length] : [c.w, c.h];
+  const unused = unusedSprites(sprites, anims);
+  const have = new Set(anims.map((a) => a.id)), quick = GAME_ANIMS.filter((g) => !have.has(g.id)), full = anims.length >= MAX_ANIMS;
+  return `${kittyHelp ? `<div class="panel pix-intro pix-help">${closeX('pix-help-close', 'Close the explanation')}
+      <p class="muted">${esc(c.where)}.</p>
+      <p class="muted">Tap an <b>animation</b> to design it: its steps are sprites from the list (or new ones you draw), each can be moved forward or up so the file knows when the kitty is in the air or has gone to the side. Every sprite is the same size (${w} × ${h}, up to ${FREE_MAX} × ${FREE_MAX}) and is drawn once, however many animations play it. The <b>base colour</b> is the kitty's fur: each kitty wears its own.</p>
+    </div>` : `<div class="btns"><button class="btn small" type="button" data-action="pix-help-show">About this page</button></div>`}
+    <details class="panel pix-group pix-fold" id="pix-fold-anims" aria-label="Animations" ${animsOpen ? 'open' : ''}>
+      <summary><h3>Animations <span class="num muted">${anims.length}</span></h3></summary>
+      ${anims.length ? `<ul class="pix-anims">${anims.map((a) => {
+        const game = GAME_ANIMS.find((g) => g.id === a.id), first = byId.get(a.steps[0]?.id ?? '');
+        return `<li><button class="pix-arow" type="button" data-action="pix-anim-open" data-id="${esc(a.id)}">
+          <span class="pix-fth" style="${baseStyle('kitty')}">${first ? fineSvg(first.art) : ''}</span>
+          <span class="pix-aname"><b>${esc(a.name)}</b><span class="muted num">${plural(a.steps.length, 'step')} · ${a.fps}/s${a.steps.some((st) => st.dx || st.dy) ? ' · moves' : ''}</span></span>
+          ${game ? `<span class="badge" title="Shown in the game as ${esc(game.where)}">In the game</span>` : ''}</button></li>`;
+      }).join('')}</ul>` : '<p class="muted">None yet.</p>'}
+      <form class="pix-resize" id="pix-anim-new-form" novalidate><label class="field">New animation <input id="pix-anim-new" maxlength="${LIMITS.name}" autocomplete="off" placeholder="Happy dance" ${full ? 'disabled' : ''}></label>
+        <button class="btn small" type="submit" ${full ? 'disabled' : ''}>Add</button></form>
+      ${quick.length ? `<div class="btns flow">${quick.map((g) => `<button class="btn small" type="button" data-action="pix-anim-add" data-id="${g.id}" ${full ? 'disabled' : ''}>Add ${esc(g.name)}</button>`).join('')}</div>` : ''}
+      <p class="muted">The game plays ${GAME_ANIMS.map((g) => `<b>${esc(g.name)}</b> (${esc(g.where)})`).join(' and ')}, and uses the poses Walk, Jump, Front, Back, Three-quarter, Sit side to stand side and Stand to sit where there are some. Where there is none, the room draws its own kitty.</p></details>
+    <details class="panel pix-group pix-fold" id="pix-fold-sprites" aria-label="Sprites" ${spritesOpen ? 'open' : ''}>
+      <summary><h3>Sprites <span class="num muted">${sprites.length}</span></h3></summary>
+      <div class="btns flow"><button class="btn small" type="button" data-action="pix-sprites-sort" aria-pressed="${spriteSort}" title="List the sprites by name instead of by number">Sort by name${spriteSort ? ' ✓' : ''}</button>
+        <button class="btn small" type="button" data-action="pix-sprites-prune" ${unused.length ? '' : 'disabled'} title="Takes out the sprites that no animation plays">Remove unused${unused.length ? ` (${unused.length})` : ''}</button>
+        <button class="btn small" type="button" data-action="pix-sprite-new" ${sprites.length >= MAX_SPRITES ? 'disabled' : ''} aria-label="New sprite">+ New</button></div>
+      <div class="pix-tiles" style="${baseStyle('kitty')}">${sprites.map((sp, n) => ({ sp, n })).sort((a, b) => spriteSort ? a.sp.name.localeCompare(b.sp.name, undefined, { numeric: true, sensitivity: 'base' }) || a.n - b.n : 0).map(({ sp, n }) => `<button class="pix-tile" type="button" data-action="pix-sprite-open" data-i="${n}" title="${esc(sp.name)}"><span class="pix-pic">${pictureSvg('kitty', sp.art)}</span>
+        <span class="pix-tname"><b class="num">${n + 1}</b> ${esc(sp.name)}</span></button>`).join('')}</div></details>
+    ${exportHtml(mine)}`;
 }
 
 function groupHtml(group: string, list: Shown[]): string {
@@ -255,7 +393,6 @@ function groupHtml(group: string, list: Shown[]): string {
       ? `data-action="pix-pick" aria-pressed="${picked.has(i.id)}"` : 'data-action="pix-view"'} data-id="${esc(i.id)}" title="${esc(i.name)}">
       <span class="pix-pic">${pictureSvg(cat, i.art)}</span><span class="pix-tname">${esc(i.name)}</span>
       ${i.status === 'official' ? '' : `<span class="badge ${i.status}">${i.status === 'new' ? 'New' : 'Changed'}</span>`}
-      ${i.frames && i.frames.length > 1 ? `<span class="badge">${i.frames.length} frames</span>` : ''}
       ${organise && i.food ? '<span class="badge">Food</span>' : ''}</button>`).join('')}</div></section>`;
 }
 
@@ -327,20 +464,23 @@ async function movePicked() {
 
 // =================== Draw ===================
 function startDraft(c: CategoryId, id: string | null, asCopy = false) {
+  if (c === 'kitty') id = SHEET_ID;   // the kitty is the one sprite sheet
   const shown = id ? iconsOf(pixelData(), c).find((i) => i.id === id) : undefined;
   const [w, h] = (categoryOf(c).free && shown && freeSize(shown.art)) || sizeOf(c, shown && !asCopy ? shown.id : null);
   const grid = shown ? toGrid(shown.art.map((r) => r.padEnd(w, '.').slice(0, w))) : blankGrid(w, h);
   while (grid.length < h) grid.push(Array<string>(w).fill('.'));
   draft = { cat: c, id: shown ? shown.id : null, name: shown?.name ?? '', group: shown?.group ?? USER_GROUP, grid: grid.slice(0, h), saved: '' };
+  if (c === 'kitty') { draft.id = SHEET_ID; draft.name = SHEET_NAME; draft.group = USER_GROUP; }
   if (c === 'sticker') draft.food = !!shown?.food;
   stepSel = null;
-  if (c === 'kitty' && shown?.frames) {
+  if (c === 'kitty') {
     const gridOf = (art: string[]) => { const g = toGrid(art.map((r) => r.padEnd(w, '.').slice(0, w))); while (g.length < h) g.push(Array<string>(w).fill('.')); return g.slice(0, h); };
-    draft.frames = shown.frames.map((f) => ({ id: f.id, name: f.name, grid: gridOf(f.art), ...(f.pin && { pin: [...f.pin] as [number, number] }) }));
+    zoneMode = false;
+    draft.sprites = shown?.sprites ? shown.sprites.map((f) => { const g = gridOf(f.art); return { id: f.id, name: f.name, grid: g, zone: zoneFromRows(g, shown.zones?.[f.id]) }; }) : [{ id: 's1', name: 'Sprite 1', grid: draft.grid, zone: fixZone(draft.grid) }];
     draft.cur = 0;
-    draft.grid = draft.frames[0].grid;
-    draft.sequence = cleanSequence(shown.sequence, shown.frames);
-    draft.fps = shown.fps ?? DEFAULT_FPS;
+    draft.grid = draft.sprites[0].grid;
+    draft.anims = (shown?.animations ?? []).map((a) => ({ ...a, steps: a.steps.map((st) => ({ ...st })), ...(a.before && { before: { ...a.before } }), ...(a.after && { after: { ...a.after } }) }));
+    draft.anim = -1;   // no animation yet: the sprite on the board is on its own (see openAnim)
   }
   if (c === 'scene') {
     draft.spots = (shown?.spots ?? []).map((p) => [...p] as Spot);
@@ -354,67 +494,95 @@ function startDraft(c: CategoryId, id: string | null, asCopy = false) {
   tool = 'pencil';
 }
 
+// "Additional options", closed until opened: going back to the official one (for the sprite sheet, only the open animation).
+function moreHtml(d: Draft, off: boolean, saved: boolean): string {
+  let body = '';
+  if (d.cat === 'kitty') {
+    const a = curAnim(d), has = !!a && !!officialOf('kitty', SHEET_ID)?.animations?.some((x) => x.id === a.id);
+    body = has ? `<button class="btn" type="button" data-action="pix-anim-revert">Back to the official ${esc(a!.name)}</button>
+      <p class="muted">Only this animation goes back as it was (its steps, speed and moves). Your sprites and the other animations stay as they are.</p>`
+      : '<p class="muted">Open an official animation to bring it back as it was. Only that animation changes, never the sprites.</p>';
+  } else if (off && saved) body = '<button class="btn" type="button" data-action="pix-revert-ask">Back to the official one</button>';
+  else return '';
+  return `<details class="pix-more"><summary>Additional options</summary><div class="btns flow">${body}</div></details>`;
+}
+
+// Zone mode's colours: the parts of the coat (the same buttons as the colours, three to a row).
+function zoneInksHtml(): string {
+  return `<div class="pix-inks" role="radiogroup" aria-label="Part of the coat"><div class="pix-irow pix-zrow3">${ZONE_PARTS.map(([z, label, col]) =>
+    `<button type="button" class="pix-ink" role="radio" data-action="pix-zink" data-z="${z}" aria-checked="${z === zink && tool !== 'erase'}" title="${esc(label)}"><i style="background: ${col}"></i><span>${esc(label)}</span></button>`).join('')}</div>
+    <p class="muted pix-note">Zone: paint where the parts of the coat are, for the Point, Patch and Calico skins. Only the coat pixels can be painted; the rest is locked. The eraser puts a pixel back in Body. Copy and paste, undo and the animation work as they do for the sprites.</p></div>`;
+}
+
 function drawHtml(): string {
-  if (!draft) return `${catSeg()}<div class="panel"><h3>Nothing on the board</h3>
+  if (!draft) return `${inWardrobe() ? '' : catSeg()}<div class="panel"><h3>Nothing on the board</h3>
     <p class="muted">Open an icon from the Icons tab to change it, or start a new one.</p>
     <div class="btns"><button class="btn primary" type="button" data-action="pix-new">${iconSvg('pencil')} New ${esc(categoryOf(cat).label.toLowerCase())}</button></div></div>`;
   const d = draft, c = categoryOf(d.cat);
   const w = d.grid[0].length, h = d.grid.length;
   const off = d.id ? officialOf(d.cat, d.id) : undefined;
   const saved = !!d.id && pixelData().icons.some((i) => i.category === d.cat && i.id === d.id);
-  const title = d.id ? (off ? `Changing ${off.name}` : d.name || 'Untitled') : `New ${c.label.toLowerCase()}`;
+  const sheet = d.cat === 'kitty';
+  const title = sheet ? `Sprite ${(d.cur ?? 0) + 1}: ${d.sprites![d.cur ?? 0].name || 'Sprite'}` : d.id ? (off ? `Changing ${off.name}` : d.name || 'Untitled') : `New ${c.label.toLowerCase()}`;
   const groups = groupsOf(liveIcons(pixelData(), d.cat));
   const group = cleanGroup(d.group, '');
   const scene = d.cat === 'scene', spots = scene && sceneMode === 'spots';
-  return `<div class="panel pix-draw">
-    <div class="pix-dhead"><h3>${esc(title)}</h3><span class="muted num" id="pix-size">${w} × ${h} · ${esc(c.label)}</span></div>
-    ${c.free ? `<form class="pix-resize" id="pix-resize-form" novalidate>
+  const resizeForm = c.free ? `<form class="pix-resize" id="pix-resize-form" novalidate>
       <label class="field">Width <input id="pix-w" type="number" inputmode="numeric" min="1" max="${FREE_MAX}" value="${w}"></label>
       <span aria-hidden="true">×</span>
       <label class="field">Height <input id="pix-h" type="number" inputmode="numeric" min="1" max="${FREE_MAX}" value="${h}"></label>
       <button class="btn small" type="submit">Resize</button>
-      <span class="muted">Keeps the top-left corner; use the arrows below to move the drawing.</span></form>` : ''}
+      <span class="muted">${sheet ? 'Every sprite takes the new size. Keeps the bottom-left corner, where the kitty stands' : 'Keeps the top-left corner'}; use the arrows below to move the drawing.</span></form>` : '';
+  return `<div class="panel pix-draw">
+    <div class="pix-dhead">${sheet ? '<button class="btn small" type="button" data-action="pix-close">&larr; Kitty sprites</button>' : ''}<h3>${esc(title)}</h3><span class="muted num" id="pix-size">${w} × ${h} · ${esc(c.label)}</span></div>
+    ${c.free && !sheet ? resizeForm : ''}
     ${scene ? `<div class="seg pix-modes" role="tablist" aria-label="Board">${([['draw', 'Draw'], ['spots', 'Kitty spots']] as const).map(([m, label]) =>
       `<button type="button" role="tab" data-action="pix-scene-mode" data-mode="${m}" aria-selected="${m === sceneMode}">${label}</button>`).join('')}</div>` : ''}
-    ${d.cat === 'kitty' ? frameBar(d) : ''}
     <div class="pix-tools" ${spots ? 'hidden' : ''}>
-      <div class="seg" role="toolbar" aria-label="Tool">${(d.frames ? [...ALL_TOOLS, TRACK_TOOL] : ALL_TOOLS).map(([t, label]) => `<button type="button" data-action="pix-tool" data-tool="${t}" aria-pressed="${t === tool}" aria-label="${label}" title="${label}">${toolIcon(t)}</button>`).join('')}</div>
+      <div class="seg" role="toolbar" aria-label="Tool">${ALL_TOOLS.map(([t, label]) => `<button type="button" data-action="pix-tool" data-tool="${t}" aria-pressed="${t === tool}" aria-label="${label}" title="${label}">${toolIcon(t)}</button>`).join('')}</div>
       <div class="seg" role="toolbar" aria-label="Board"><button type="button" data-action="pix-mirror" aria-pressed="${mirror}" aria-label="Mirror" title="Mirror: draw on both halves">${toolIcon('mirror')}</button></div>
     </div>
     <div class="seg pix-zooms" role="radiogroup" aria-label="Zoom">${ZOOMS.map((z) =>
       `<button type="button" role="radio" data-action="pix-zoom" data-zoom="${z}" aria-checked="${z === zoom}">${z}×</button>`).join('')}</div>
+    <div class="pix-stage">
+    ${spots || zoneMode ? '' : recentBar(d.cat)}
     <div class="pix-board-wrap${scene ? ' scene' : ''}${zoom > 1 ? ' zoomed' : ''}" id="pix-board-wrap" style="${baseStyle(d.cat)}; --zoom: ${zoom}"><div class="pix-board${scene ? ' scene' : ''}${spots ? ' spots' : ''}" id="pix-board" data-tool="${tool}" style="--bw-cells: ${w}; --bh-cells: ${h}" role="img" aria-label="Drawing board, ${w} by ${h} pixels"></div></div>
+    </div>
     <div class="pix-selbar" id="pix-selbar" aria-live="polite"></div>
     ${scene && !spots ? `<div class="btns flow pix-photo"><button class="btn small" type="button" data-action="pix-photo">Use a photo…</button>
       <span class="muted">It is turned into pixel art in the app's colours, to touch up.</span><input type="file" id="pix-photo" accept="image/*" hidden></div>` : ''}
     <div class="pix-actions" ${spots ? 'hidden' : ''}>
       <button class="btn small" type="button" data-action="pix-undo" ${undos.length ? '' : 'disabled'}>Undo</button>
       <button class="btn small" type="button" data-action="pix-redo" ${redos.length ? '' : 'disabled'}>Redo</button>
-      <button class="btn small" type="button" data-action="pix-flip" title="Flip the drawing, or the selection">Flip</button>
-      <button class="btn small" type="button" data-action="pix-shift" data-dx="-1" data-dy="0" aria-label="Move left">${iconSvg('prev')}</button>
-      <button class="btn small" type="button" data-action="pix-shift" data-dx="1" data-dy="0" aria-label="Move right">${iconSvg('next')}</button>
-      <button class="btn small pix-up" type="button" data-action="pix-shift" data-dx="0" data-dy="-1" aria-label="Move up">${iconSvg('prev')}</button>
-      <button class="btn small pix-down" type="button" data-action="pix-shift" data-dx="0" data-dy="1" aria-label="Move down">${iconSvg('next')}</button>
+      <button class="btn small" type="button" data-action="pix-flip" title="Flip the drawing, or the selection" ${zoneMode ? 'disabled' : ''}>Flip</button>
       <button class="btn small" type="button" data-action="pix-clear">Clear</button>
+      <span class="pix-break"></span>
+      <button class="btn small" type="button" data-action="pix-pen" aria-pressed="${penOnly}" title="Pen: only the pen draws, fingers and the palm are ignored">Pen</button>
+      ${sheet ? `<button class="btn small" type="button" data-action="pix-zone-mode" aria-pressed="${zoneMode}" title="Zone: draw where the parts of the coat are (face, ears, tail, patches) instead of the sprite">Zone</button>` : ''}
+      <button class="btn small" type="button" data-action="pix-shift" data-dx="-1" data-dy="0" aria-label="Move left" ${zoneMode ? 'disabled' : ''}>${iconSvg('prev')}</button>
+      <button class="btn small" type="button" data-action="pix-shift" data-dx="1" data-dy="0" aria-label="Move right" ${zoneMode ? 'disabled' : ''}>${iconSvg('next')}</button>
+      <button class="btn small pix-up" type="button" data-action="pix-shift" data-dx="0" data-dy="-1" aria-label="Move up" ${zoneMode ? 'disabled' : ''}>${iconSvg('prev')}</button>
+      <button class="btn small pix-down" type="button" data-action="pix-shift" data-dx="0" data-dy="1" aria-label="Move down" ${zoneMode ? 'disabled' : ''}>${iconSvg('next')}</button>
     </div>
-    ${spots ? '' : inksHtml(d.cat)}
-    ${!c.base ? '' : `<p class="muted pix-note">${c.outline ? 'The lit and shaded edges of the base colour are added for you where it touches the outside: draw the dark outline yourself. ' : ''}<b>Base colour</b> follows the card or note. Show it in:</p>
+    ${spots ? '' : zoneMode ? zoneInksHtml() : inksHtml(d.cat)}
+    ${sheet ? spriteBar(d) + (zoneMode ? '' : resizeForm) : ''}
+    ${!c.base || zoneMode ? '' : `<p class="muted pix-note">${c.outline ? 'The lit and shaded edges of the base colour are added for you where it touches the outside: draw the dark outline yourself. ' : ''}<b>Base colour</b> follows the card or note. Show it in:</p>
     <div class="seg pix-bases" role="radiogroup" aria-label="Show the base colour in">${NOTE_COLORS.map((n) =>
       `<button type="button" role="radio" data-action="pix-base" data-base="${n}" aria-checked="${n === base}"><i style="background: ${COLOR[n][0]}"></i>${COLOR[n][1]}</button>`).join('')}</div>`}
   </div>
-  ${d.cat === 'kitty' ? animHtml(d) : ''}
-  ${scene ? '' : '<div class="panel"><h3>Preview</h3><div id="pix-preview" class="pix-preview"></div></div>'}
+  ${sheet ? animHtml(d) : ''}
+  ${scene || sheet ? '' : '<div class="panel"><h3>Preview</h3><div id="pix-preview" class="pix-preview"></div></div>'}
   <form class="panel pix-save" id="pix-form" novalidate>
-    <label class="field">Name <input id="pix-name" maxlength="${LIMITS.name}" autocomplete="off" value="${esc(d.name)}" placeholder="${esc(off?.name ?? 'Teapot')}"></label>
-    ${scene ? '' : groupPicker('pix-group', 'Group', groups, group)}
+    ${sheet ? '' : `<label class="field">Name <input id="pix-name" maxlength="${LIMITS.name}" autocomplete="off" value="${esc(d.name)}" placeholder="${esc(off?.name ?? 'Teapot')}"></label>`}
+    ${scene || sheet ? '' : groupPicker('pix-group', 'Group', groups, group)}
     ${d.cat === 'sticker' ? `<label class="check"><input type="checkbox" id="pix-food" ${d.food ? 'checked' : ''}><span><b>Can kitty eat this?</b><br><span class="muted">Then it is cat food too: Habit Kitty's feed button gives each kitty a different one every day.</span></span></label>` : ''}
     <div class="btns flow">
       <button class="btn primary" type="submit">Save</button>
-      ${d.id && !isFixed(d.cat) ? '<button class="btn" type="button" data-action="pix-copy">Save as a new icon</button>' : ''}
-      ${off && saved ? '<button class="btn" type="button" data-action="pix-revert">Back to the official one</button>' : ''}
-      ${(!off && saved) || (off && canDeleteOfficial(d.cat, off.id)) ? `<button class="btn danger" type="button" data-action="pix-delete">${iconSvg('x')} Delete</button>` : ''}
+      ${d.id && !isFixed(d.cat) && !sheet ? '<button class="btn" type="button" data-action="pix-copy">Save as a new icon</button>' : ''}
+      ${(!off && saved) || (off && canDeleteOfficial(d.cat, off.id)) ? `<button class="btn danger" type="button" data-action="pix-delete">${iconSvg('x')} ${sheet ? 'Delete the sprite sheet' : 'Delete'}</button>` : ''}
       <button class="btn" type="button" data-action="pix-close">Close</button>
     </div>
+    ${moreHtml(d, !!off, saved)}
   </form>`;
 }
 
@@ -430,8 +598,7 @@ function renderBoard() {
   if (size) size.textContent = `${w} × ${h} · ${categoryOf(d.cat).label}`;
   for (const [id, v] of [['pix-w', w], ['pix-h', h]] as const) { const f = document.getElementById(id) as HTMLInputElement | null; if (f && document.activeElement !== f) f.value = String(v); }
   b.innerHTML = onionHtml(d) + (d.cat === 'scene' ? `<canvas width="${w}" height="${h}"></canvas><div class="pix-marks" id="pix-marks"></div>`
-    : g.map((row, y) => row.map((ch, x) => `<i data-x="${x}" data-y="${y}" style="background: ${cellColor(d.cat, ch)}"></i>`).join('')).join(''))
-    + pinHtml(d, w, h)
+    : g.map((row, y) => row.map((ch, x) => `<i data-x="${x}" data-y="${y}" style="background: ${boardColor(d, x, y, ch)}"></i>`).join('')).join(''))
     + (sel ? `<b class="pix-sel${float ? ' lifted' : ''}" style="left: ${(sel.x / w) * 100}%; top: ${(sel.y / h) * 100}%; width: ${(sel.w / w) * 100}%; height: ${(sel.h / h) * 100}%"></b>` : '');
   b.dataset.tool = tool;
   if (d.cat === 'scene') { paintCanvas(g); renderMarks(); }
@@ -520,23 +687,34 @@ function renderSelbar() {
   el.innerHTML = sel
     ? `<span class="num"><b>${sel.w} × ${sel.h}</b> selected</span><span class="muted">Drag it or use the arrows to move it.</span>
       <div class="btns flow"><button class="btn small" type="button" data-action="pix-sel-dup">Duplicate</button>
+        <button class="btn small" type="button" data-action="pix-sel-copy">Copy</button>
+        ${clip && clip.zone === zoneMode ? '<button class="btn small" type="button" data-action="pix-sel-paste">Paste</button>' : ''}
         <button class="btn small danger" type="button" data-action="pix-sel-del">${iconSvg('x')} Delete</button>
         <button class="btn small primary" type="button" data-action="pix-sel-done">Done</button></div>`
     : tool === 'select'
       ? `<span class="muted">Drag a box over the drawing to pick it up.</span>
-        <div class="btns flow"><button class="btn small" type="button" data-action="pix-sel-all">Select all</button></div>`
+        <div class="btns flow"><button class="btn small" type="button" data-action="pix-sel-all">Select all</button>
+          ${clip && clip.zone === zoneMode ? '<button class="btn small" type="button" data-action="pix-sel-paste">Paste</button>' : ''}</div>`
       : '';
+}
+// The colour of a board cell: its letter's colour, or in zone mode the colour of its part (a pixel that is not coat is shown as drawn, locked).
+const isCoat = (d: Draft, x: number, y: number) => COAT_LETTERS.includes(d.sprites?.[d.cur ?? 0]?.grid[y]?.[x] ?? '.');
+function boardColor(d: Draft, x: number, y: number, ch: string): string {
+  if (!zoneMode) return cellColor(d.cat, ch);
+  return isCoat(d, x, y) ? zoneColor(ch) || zoneColor('b') : cellColor(d.cat, d.sprites![d.cur ?? 0].grid[y]?.[x] ?? '.');
 }
 function paintCell(x: number, y: number, ch: string) {
   if (!draft) return;
   const g = draft.grid, w = g[0].length;
   const xs = mirror ? [x, w - 1 - x] : [x];
+  if (zoneMode && ch === '.') ch = 'b';   // erasing a zone puts the pixel back in Body
   for (const xx of xs) {
     if (g[y]?.[xx] === undefined || g[y][xx] === ch) continue;
+    if (zoneMode && !isCoat(draft, xx, y)) continue;   // the outline and the rest are locked
     g[y][xx] = ch;
     if (draft.cat === 'scene') { paintPixel(xx, y, ch); continue; }
     const el = document.querySelector<HTMLElement>(`#pix-board > i[data-x="${xx}"][data-y="${y}"]`);
-    if (el) el.style.background = cellColor(draft.cat, ch);
+    if (el) el.style.background = boardColor(draft, xx, y, ch);
   }
 }
 function renderPreview() {
@@ -553,7 +731,7 @@ function renderPreview() {
   const small = c === 'sticker' ? stickerArtSvg(art, 1) : fineSvg(art);
   const row = `<div class="pix-prow" style="${baseStyle(c)}"><span class="pix-pbig">${big}<span>${c === 'sticker' ? 'On a card (zoomed in)' : 'Zoomed in'}</span></span>
       <span class="pix-psmall">${small}<span>Real size</span></span></div>`;
-  if (c === 'deco' || c === 'kitty') { el.innerHTML = row; return; }   // no base colour, and each is drawn in its own place
+  if (c === 'deco') { el.innerHTML = row; return; }   // no base colour, and each is drawn in its own place
   if (c === 'weather') {   // no base colour; on a diary page it is a choice with its name under it
     el.innerHTML = `${row}<p class="muted">On a diary page:</p><div class="moods"><button type="button" aria-pressed="true" tabindex="-1" aria-hidden="true" style="pointer-events: none">${fineSvg(art, 'weather')}<span>${esc(draft.name || 'Untitled')}</span></button></div>`;
     return;
@@ -586,7 +764,7 @@ function step(from: Grid[], to: Grid[]) {
   if (!draft || !from.length) { renderBoard(); return; }
   to.push(draft.grid);
   draft.grid = from.pop()!;
-  fitFrames();
+  fitSprites();
   renderBoard();
 }
 
@@ -650,6 +828,7 @@ function spotDown(ev: PointerEvent, board: HTMLElement) {
 onShown('pixel', 'pointerdown', (ev) => {
   const board = (ev.target as Element).closest?.('#pix-board');
   if (!board || !draft || ev.button > 0 && ev.button !== 2) return;
+  if (penOnly && ev.pointerType === 'touch') { ev.preventDefault(); return; }   // a finger or a palm, with Pen on
   if (isScene() && sceneMode === 'spots') { spotDown(ev, board as HTMLElement); return; }
   if (tool === 'pan') {
     const wrap = document.getElementById('pix-board-wrap');
@@ -664,16 +843,16 @@ onShown('pixel', 'pointerdown', (ev) => {
   ev.preventDefault();
   const [x, y] = at;
   const t: Tool = ev.button === 2 ? 'erase' : tool;
-  if (t === 'track') { setPin(x, y); return; }
   if (t === 'select') { selectDown(ev, board as HTMLElement, at); return; }
   if (sel) { settle(); renderBoard(); }
   if (t === 'pick') {
     const ch = draft.grid[y][x];
-    useInk(ch); tool = 'pencil'; render();   // an empty cell picks Empty
+    if (zoneMode) { if (ch !== '.') zink = ch; } else useInk(ch);
+    tool = 'pencil'; render();   // an empty cell picks Empty
     return;
   }
-  const ch = t === 'erase' ? '.' : ink;
-  if (t === 'fill') { edit((g) => floodFill(g, x, y, ch)); return; }
+  const ch = zoneMode ? (t === 'erase' ? 'b' : zink) : t === 'erase' ? '.' : ink;
+  if (t === 'fill') { if (!zoneMode || isCoat(draft, x, y)) edit((g) => floodFill(g, x, y, ch)); return; }
   pushUndo();
   try { (board as HTMLElement).setPointerCapture(ev.pointerId); } catch { /* a synthetic event */ }
   stroke = { last: at, ch, id: ev.pointerId };
@@ -730,20 +909,19 @@ function readFields() {
   if (g !== null) draft.group = g;
   const f = document.getElementById('pix-food') as HTMLInputElement | null;
   if (f) draft.food = f.checked;
-  const fn = document.getElementById('pix-frame-name') as HTMLInputElement | null;
-  if (fn && draft.frames && draft.cur !== undefined) draft.frames[draft.cur].name = fn.value;
+  const fn = document.getElementById('pix-sprite-name') as HTMLInputElement | null;
+  if (fn && draft.sprites && draft.cur !== undefined) draft.sprites[draft.cur].name = fn.value;
+  const an = document.getElementById('pix-anim-name') as HTMLInputElement | null, a = curAnim(draft);
+  if (an && a) a.name = an.value;
 }
 async function save(asNew: boolean) {
   if (!draft) return;
   readFields();
   settle();
   const d = draft;
-  syncFrame(); fitFrames();
-  const frames = d.frames?.map((f) => ({ id: f.id, name: cleanName(f.name, 'Frame'), art: toArt(f.grid), ...(f.pin && { pin: f.pin }) }));
-  const art = frames ? frames[0].art : toArt(d.grid);
-  if (frames ? frames.every((f) => isBlank(f.art)) : isBlank(art)) { toast('Draw something first.'); return; }
-  const twin = frames?.find((f, i) => frames.findIndex((o) => o.name.toLowerCase() === f.name.toLowerCase()) !== i);
-  if (twin) { toast(`Two frames are called ${twin.name}. Give each frame its own name.`); return; }
+  if (d.cat === 'kitty') { await saveSheet(d); return; }
+  const art = toArt(d.grid);
+  if (isBlank(art)) { toast('Draw something first.'); return; }
   const off = d.id && !asNew ? officialOf(d.cat, d.id) : undefined;
   const name = cleanName(d.name, off?.name ?? 'Untitled');
   let group = cleanGroup(d.group, off?.group ?? USER_GROUP);
@@ -761,206 +939,470 @@ async function save(asNew: boolean) {
   }
   if (d.cat === 'scene' && !d.spots?.length) { toast('Give the kitties at least one spot.'); return; }
   const id = !asNew && d.id ? d.id : newId(name, d.cat, pixelData());
-  const ok = await setPixelData(putIcon(pixelData(), { category: d.cat, id, name, group, art, ...(frames && { frames, sequence: cleanSequence(d.sequence, frames), fps: d.fps ?? DEFAULT_FPS }), ...(d.spots && { spots: d.spots }), ...(d.props && { props: d.props }), ...(d.cat === 'sticker' && { food: !!d.food }) }));
+  const ok = await setPixelData(putIcon(pixelData(), { category: d.cat, id, name, group, art, ...(d.spots && { spots: d.spots }), ...(d.props && { props: d.props }), ...(d.cat === 'sticker' && { food: !!d.food }) }));
   if (!ok) { toast("Couldn't save. Try again."); return; }
   d.id = id; d.name = name; d.group = group; d.saved = artKey(d);
   toast(asNew ? `Saved as ${name}.` : `Saved ${name}.`);
   render();
 }
+// The sprite sheet: all the sprites and all the animations, saved together.
+async function saveSheet(d: Draft) {
+  syncSprite(); fitSprites();
+  const sprites = d.sprites!.map((f) => ({ id: f.id, name: cleanName(f.name, 'Sprite'), art: toArt(f.grid) }));
+  const zones = Object.fromEntries(d.sprites!.map((f) => [f.id, zoneToRows(fixZone(f.grid, f.zone))]));
+  if (sprites.every((f) => isBlank(f.art))) { toast('Draw something first.'); return; }
+  const twin = sprites.find((f, i) => sprites.findIndex((o) => o.name.toLowerCase() === f.name.toLowerCase()) !== i);
+  if (twin) { toast(`Two sprites are called ${twin.name}. Give each sprite its own name.`); return; }
+  const anims = d.anims ?? [];
+  const same = anims.find((a, i) => anims.findIndex((o) => o.name.trim().toLowerCase() === a.name.trim().toLowerCase()) !== i);
+  if (same) { toast(`Two animations are called ${same.name}. Give each animation its own name.`); return; }
+  const ok = await setPixelData(putIcon(pixelData(), { category: 'kitty', id: SHEET_ID, name: SHEET_NAME, group: USER_GROUP, art: sprites[0].art, sprites, animations: cleanAnimations(anims, sprites), zones }));
+  if (!ok) { toast("Couldn't save. Try again."); return; }
+  d.saved = artKey(d);
+  toast('Saved the sprite sheet.');
+  render();
+}
 
-// ---- a kitty animation: frames and a sequence ----
-// The frames are named drawings. The sequence lists them by id, in play order, so a frame can be in it more than once
-// (1 2 3 2 1) and what you draw on a frame shows in every step that plays it.
-const thumb = (grid: Grid) => `<span class="pix-fth">${fineSvg(toArt(grid))}</span>`;
-const liveGrid = (d: Draft, i: number) => (i === d.cur ? d.grid : d.frames![i].grid);
-const fchip = (d: Draft, i: number, action: string, on: boolean, n?: number, ai?: number) =>
-  `<button type="button" class="pix-fchip" data-action="${action}" data-i="${ai ?? i}" aria-pressed="${on}">${n === undefined ? '' : `<b class="num">${n}</b>`}${thumb(liveGrid(d, i))}<span>${esc(d.frames![i].name || 'Frame')}</span></button>`;
-// Onion skin: the frame before the one on the board, faint (50%) behind what you draw, to line the two up. It can be turned off.
+// ---- the kitty: a list of sprites, and animations that play them ----
+// The sprites are named drawings (all one size), numbered by their place in the list. An animation is a list of steps: each plays a sprite
+// and may move it (forward, up, from where it is drawn), so a sprite is drawn once and played by every animation (and at several places),
+// and what you draw on it shows in every step that plays it. Open an animation (from the Kitty tab) to design it: pick its steps from the
+// sprites, or make a new sprite, which goes into the one list of sprites.
+// The pose the kitty rests in before and after an animation (sitting: Idle's first drawing, or standing: the last step of Sit side to stand side),
+// shown faint (a ghost) before the first step and after the last, where the animation says it is (see Ghost in ./model.ts). Idle has none.
+// A number to type. No inputmode: with one the phone's number pad has no minus sign, and without it (a plain number field) the pad has a minus.
+const numField = (id: string, v: number) => `<input id="${id}" type="number" step="1" min="${-MAX_SHIFT}" max="${MAX_SHIFT}" value="${v}">`;
+const REST_NAMES: Record<Anchor, string> = { idle: 'Sitting', stand: 'Standing' };
+const restArt = (d: Draft, pose: Anchor): string[] | null => {
+  const an = d.anims?.find((x) => x.id === (pose === 'idle' ? 'idle' : 'sit2stand')), id = pose === 'idle' ? an?.steps[0]?.id : an?.steps[an.steps.length - 1]?.id;
+  const i = id ? d.sprites!.findIndex((f) => f.id === id) : -1;
+  return i >= 0 ? toArt(liveGrid(d, i)) : null;
+};
+const restZone = (d: Draft, pose: Anchor): Grid | null => {
+  if (!zoneMode) return null;
+  const an = d.anims?.find((x) => x.id === (pose === 'idle' ? 'idle' : 'sit2stand')), id = pose === 'idle' ? an?.steps[0]?.id : an?.steps[an.steps.length - 1]?.id;
+  const i = id ? d.sprites!.findIndex((f) => f.id === id) : -1;
+  return i >= 0 ? liveZone(d, i) : null;
+};
+type Rest = { pose: Anchor; dx: number; dy: number; art: string[]; zone: Grid | null };
+const restOf = (d: Draft, a: Animation, which: 'before' | 'after'): { pose: Anchor; dx: number; dy: number } => {
+  const g = a[which];
+  return { pose: g?.pose ?? defaultGhosts(a.id)[which], dx: g?.dx ?? 0, dy: g?.dy ?? 0 };
+};
+const ghostsOf = (d: Draft, a: Animation): { before: Rest | null; after: Rest | null } => {
+  if (a.id === 'idle') return { before: null, after: null };
+  const mk = (which: 'before' | 'after') => { const r = restOf(d, a, which), art = restArt(d, r.pose); return art ? { ...r, art, zone: restZone(d, r.pose) } : null; };
+  return { before: mk('before'), after: mk('after') };
+};
+const ghostChip = (r: Rest, which: 'before' | 'after', on: boolean) =>
+  `<button type="button" class="pix-fchip pix-ghost" data-action="pix-rest-pick" data-which="${which}" aria-pressed="${on}"><b class="num">&nbsp;</b><span class="pix-fth">${layerSvg(r.art, r.zone)}</span><span>${REST_NAMES[r.pose]} ${which}</span>${moveText(r) ? `<span class="muted pix-fmove">${esc(moveText(r))}</span>` : ''}</button>`;
+const thumb = (d: Draft, i: number) => `<span class="pix-fth">${layerSvg(toArt(liveGrid(d, i)), zoneMode ? liveZone(d, i) : null)}</span>`;
+// The picture and the zones of sprite i: the one on the board is d.grid in whichever layer is showing, the other layer is stored in the sprite.
+const liveGrid = (d: Draft, i: number) => (i === d.cur && !zoneMode ? d.grid : d.sprites![i].grid);
+const liveZone = (d: Draft, i: number) => (i === d.cur && zoneMode ? d.grid : d.sprites![i].zone);
+const loadBoard = (d: Draft) => { const f = d.sprites![d.cur ?? 0]; d.grid = zoneMode ? f.zone : f.grid; };
+const curAnim = (d: Draft): Animation | undefined => (d.anim !== undefined && d.anim >= 0 ? d.anims?.[d.anim] : undefined);
+// "forward 3, up 2": what a step's move says, in words.
+const moveText = (st: { dx?: number; dy?: number }) => [st.dx ? (st.dx > 0 ? `forward ${st.dx}` : `back ${-st.dx}`) : '', st.dy ? (st.dy > 0 ? `up ${st.dy}` : `down ${-st.dy}`) : ''].filter(Boolean).join(', ');
+// n is the sprite's number in the list; ai is what the button hands over (a step's place, say) when that is not the sprite's.
+const fchip = (d: Draft, i: number, action: string, on: boolean, n: number, ai?: number, sub = '') =>
+  `<button type="button" class="pix-fchip" data-action="${action}" data-i="${ai ?? i}" aria-pressed="${on}"><b class="num">${n}</b>${thumb(d, i)}<span>${esc(d.sprites![i].name || 'Sprite')}</span>${sub ? `<span class="muted pix-fmove">${esc(sub)}</span>` : ''}</button>`;
+// Onion skin: the step before the one on the board (or the sprite before it, when it is on its own), faint (50%) behind what you draw, where
+// the move puts it, to line the two up. It can be turned off.
 let onion = true;
+let addOpen = false;   // the Add a step menu is closed until it is opened
 function onionHtml(d: Draft): string {
-  const prev = onion && d.frames && d.cur ? d.frames[d.cur - 1] : undefined;
-  return prev ? `<div class="pix-onion" aria-hidden="true">${fineSvg(toArt(prev.grid))}</div>` : '';
+  if (!onion || !d.sprites) return '';
+  const a = curAnim(d), cur = d.cur ?? 0;
+  let prev: DraftSprite | undefined, ox = 0, oy = 0;
+  if (a && stepSel !== null && stepSel > 0 && a.steps[stepSel - 1]) {
+    const was = a.steps[stepSel - 1], now = a.steps[stepSel];
+    prev = d.sprites.find((f) => f.id === was.id);
+    ox = (now.dx ?? 0) - (was.dx ?? 0); oy = (now.dy ?? 0) - (was.dy ?? 0);   // a step that moved forward 3 is 3 pixels further left
+  } else if (!a && cur) prev = d.sprites[cur - 1];
+  if (!prev) return '';
+  const w = d.grid[0].length, h = d.grid.length;
+  return `<div class="pix-onion" style="transform: translate(${(ox / w) * 100}%, ${(oy / h) * 100}%)" aria-hidden="true">${layerSvg(toArt(prev.grid), zoneMode ? prev.zone : null)}</div>`;
 }
-// The point of tracking of the frame on the board: a ring on its cell. Every frame's point lines up with the first one's as it plays.
-function pinHtml(d: Draft, w: number, h: number): string {
-  const pin = d.frames?.[d.cur ?? 0]?.pin;
-  return pin ? `<b class="pix-pin" aria-hidden="true" style="left: ${(pin[0] / w) * 100}%; top: ${(pin[1] / h) * 100}%; width: ${100 / w}%; height: ${100 / h}%"></b>` : '';
+// The sprite on the board: its name, and to add another, copy it, move or delete it. Under the animation, above the board.
+function spriteBar(d: Draft): string {
+  if (!d.sprites) return '';
+  const sprites = d.sprites, cur = d.cur ?? 0, a = curAnim(d);
+  const prev = a && stepSel !== null && stepSel > 0 ? sprites.find((f) => f.id === a.steps[stepSel - 1]?.id) : !a && cur ? sprites[cur - 1] : undefined;
+  return `<div class="pix-framebar">
+    <label class="field">Sprite ${cur + 1} of ${sprites.length}: name <input id="pix-sprite-name" maxlength="${LIMITS.name}" autocomplete="off" value="${esc(sprites[cur].name)}"></label>
+    <p class="muted">Draw the kitty standing on the bottom edge of the board: the animation moves it from there.</p>
+    <div class="btns flow"><button class="btn small" type="button" data-action="pix-sprite-add" ${sprites.length >= MAX_SPRITES ? 'disabled' : ''}>New sprite</button>
+      <button class="btn small" type="button" data-action="pix-sprite-copy" ${sprites.length >= MAX_SPRITES ? 'disabled' : ''}>Copy this sprite</button>
+      <button class="btn small" type="button" data-action="pix-sprite-left" ${cur === 0 ? 'disabled' : ''} aria-label="Move this sprite earlier in the list">&larr; Earlier</button>
+      <button class="btn small" type="button" data-action="pix-sprite-right" ${cur >= sprites.length - 1 ? 'disabled' : ''} aria-label="Move this sprite later in the list">Later &rarr;</button>
+      <button class="btn small danger" type="button" data-action="pix-sprite-del" ${sprites.length < 2 ? 'disabled' : ''}>${iconSvg('x')} Delete sprite</button></div>
+    <label class="check"><input type="checkbox" id="pix-onion" ${onion ? 'checked' : ''}><span><b>Show the step before</b><br><span class="muted">Faint (50%) behind your drawing, where its move puts it, to line the sprites up. ${prev ? `Now showing ${esc(prev.name || 'Sprite')}.` : 'There is none before this one.'}</span></span></label></div>`;
 }
-// The frames, just above the board: pick the one to draw on, add, copy or delete one.
-function frameBar(d: Draft): string {
-  if (!d.frames) return '';
-  const frames = d.frames, cur = d.cur ?? 0;
-  return `<div class="pix-framebar"><div class="pix-fstrip" role="group" aria-label="Frames">${frames.map((_, i) => fchip(d, i, 'pix-frame-pick', i === cur)).join('')}</div>
-    <div class="btns flow"><button class="btn small" type="button" data-action="pix-frame-add" ${frames.length >= MAX_FRAMES ? 'disabled' : ''}>New frame</button>
-      <button class="btn small" type="button" data-action="pix-frame-copy" ${frames.length >= MAX_FRAMES ? 'disabled' : ''}>Copy this frame</button>
-      <button class="btn small" type="button" data-action="pix-frame-left" ${cur === 0 ? 'disabled' : ''} aria-label="Move this frame earlier">&larr; Earlier</button>
-      <button class="btn small" type="button" data-action="pix-frame-right" ${cur >= frames.length - 1 ? 'disabled' : ''} aria-label="Move this frame later">Later &rarr;</button>
-      <button class="btn small danger" type="button" data-action="pix-frame-del" ${frames.length < 2 ? 'disabled' : ''}>${iconSvg('x')} Delete frame</button></div>
-    <div class="btns flow"><span class="muted">Point of tracking (optional): ${frames[cur].pin ? `cell ${frames[cur].pin![0] + 1}, ${frames[cur].pin![1] + 1}` : 'not set'}.</span>
-      <button class="btn small" type="button" data-action="pix-tool" data-tool="track">Set point</button>
-      <button class="btn small" type="button" data-action="pix-pin-clear" ${frames[cur].pin ? '' : 'disabled'}>Clear point</button></div>
-    <p class="muted">Mark the same part on each frame, such as the front paw, then the back paw. As the animation plays the points line up, so the kitty moves from one to the next.</p>
-    <label class="check"><input type="checkbox" id="pix-onion" ${onion ? 'checked' : ''}><span><b>Show the previous frame</b><br><span class="muted">Faint (50%) behind your drawing, to line the frames up. ${cur ? `Now showing ${esc(frames[cur - 1].name || 'Frame')}.` : 'The first frame has none before it.'}</span></span></label></div>`;
+// The resting pose picked: sitting or standing, and the same Forward and Up as a step: where it is from the first step (before) or the last (after).
+function restPanel(d: Draft, a: Animation, which: 'before' | 'after'): string {
+  const r = restOf(d, a, which);
+  return `<div class="pix-resize"><label class="field">Pose ${which === 'before' ? 'before the first step' : 'after the last step'}
+      <select id="pix-rest-pose">${(['idle', 'stand'] as Anchor[]).map((p) => `<option value="${p}" ${p === r.pose ? 'selected' : ''} ${restArt(d, p) ? '' : 'disabled'}>${REST_NAMES[p]}</option>`).join('')}</select></label>
+    <span class="muted">A walk goes from standing to standing; a jump can start and end either way. Forward and up (above the steps) say where this pose is from the ${which === 'before' ? 'first' : 'last'} step: move it until it lines up with that step.</span></div>`;
 }
+// The animation being designed, above the sprite on the board: its steps, where they move, the sprites to pick from, and a preview.
 function animHtml(d: Draft): string {
-  if (!d.frames) {
-    return `<div class="panel pix-animp"><h3>Animation</h3>
-      <p class="muted">Make this kitty an animation: several named frames, and a sequence that plays them, such as 1 2 3 2 1. Draw a frame once and every step that plays it shows it.</p>
-      <button class="btn" type="button" data-action="pix-anim-start">Make an animation</button></div>`;
+  const sprites = d.sprites!, cur = d.cur ?? 0, anims = d.anims ?? [];
+  const a = curAnim(d);
+  if (!a) {
+    return `<div class="panel pix-animp"><div class="pix-dhead"><h3>${esc(sprites[cur].name || 'Sprite')}</h3></div>
+      <p class="muted">This sprite is on its own. Draw it below, or play it as a step of an animation:</p>
+      ${anims.length ? `<div class="btns flow">${anims.map((x, i) => `<button class="btn small" type="button" data-action="pix-sprite-to-anim" data-i="${i}" ${x.steps.length >= MAX_STEPS ? 'disabled' : ''}>Add to ${esc(x.name)}</button>`).join('')}</div>` : '<p class="muted">There are no animations yet: make one on the Kitty tab.</p>'}</div>`;
   }
-  const frames = d.frames, cur = d.cur ?? 0, seq = d.sequence ?? [];
-  const here = frames[cur];
-  const uses = seq.filter((id) => id === here.id).length;
-  const idx = new Map(frames.map((f, i) => [f.id, i]));
-  const chip = (i: number, action: string, on: boolean, n?: number, ai?: number) => fchip(d, i, action, on, n, ai);
-  return `<div class="panel pix-animp"><h3>Animation</h3>
-    <label class="field">Frame name <input id="pix-frame-name" maxlength="${LIMITS.name}" autocomplete="off" value="${esc(here.name)}"></label>
-    <p class="muted">You are drawing on <b>${esc(here.name || 'Frame')}</b>, which plays in ${plural(uses, 'step')}: changing it changes every one of them.</p>
-    <h3>Sequence <span class="num muted">${seq.length}</span></h3>
-    <div class="pix-fstrip" role="group" aria-label="Sequence">${seq.map((id, n) => chip(idx.get(id) ?? 0, 'pix-step-pick', n === stepSel, n + 1, n)).join('')}</div>
-    <div class="btns flow"><button class="btn small" type="button" data-action="pix-step-add" ${seq.length >= MAX_STEPS ? 'disabled' : ''}>Add ${esc(here.name || 'Frame')} ${stepSel === null ? 'to the end' : `after step ${stepSel + 1}`}</button>
-      <button class="btn small" type="button" data-action="pix-step-left" aria-label="Move step earlier" ${stepSel === null || stepSel < 1 ? 'disabled' : ''}>${iconSvg('prev')}</button>
-      <button class="btn small" type="button" data-action="pix-step-right" aria-label="Move step later" ${stepSel === null || stepSel >= seq.length - 1 ? 'disabled' : ''}>${iconSvg('next')}</button>
-      <button class="btn small" type="button" data-action="pix-step-del" ${stepSel === null || seq.length < 2 ? 'disabled' : ''}>Remove step</button></div>
-    <div class="btns flow"><button class="btn small" type="button" data-action="pix-pingpong" title="Plays the frames forward, then back: 1 2 3 2 1">Ping-pong ${frames.length > 1 ? frames.map((_, i) => i + 1).join(' ') + ' ' + frames.slice(0, -1).map((_, i) => frames.length - 1 - i).join(' ') : ''}</button>
-      <button class="btn small" type="button" data-action="pix-seq-reset">Frames in order</button></div>
-    <div class="pix-animview"><div class="pix-animbox"><div class="pix-anim" id="pix-anim" style="--w:${d.grid[0].length};--h:${d.grid.length}" aria-hidden="true"></div><p class="muted pix-animcap" id="pix-animcap"></p></div>
-      <div class="stack"><label class="field">Speed <select id="pix-fps">${FPS_CHOICES.map((n) => `<option value="${n}" ${n === (d.fps ?? DEFAULT_FPS) ? 'selected' : ''}>${n} steps a second</option>`).join('')}</select></label>
-        <button class="btn small" type="button" data-action="pix-anim-toggle">${animPlaying ? 'Pause' : 'Play'}</button></div></div></div>`;
+  const idx = new Map(sprites.map((f, i) => [f.id, i]));
+  const game = GAME_ANIMS.find((g) => g.id === a.id);
+  const seq = a.steps, st = stepSel !== null ? seq[stepSel] : undefined, ghost = ghostsOf(d, a), rs = restSel && restSel.anim === a.id && ghost[restSel.which] ? restSel.which : null;
+  const picker = `<div class="pix-fstrip" role="group" aria-label="Sprites to add">${sprites.map((f, i) => fchip(d, i, 'pix-step-add', false, i + 1)).join('')}
+    <button type="button" class="pix-fchip pix-fnew" data-action="pix-sprite-add" ${sprites.length >= MAX_SPRITES ? 'disabled' : ''}><b class="num">+</b><span>New sprite</span></button></div>`;
+  return `<div class="panel pix-animp"><div class="pix-dhead"><h3>${esc(a.name)} <span class="num muted">${plural(seq.length, 'step')}</span></h3></div>
+    <p class="muted">${game ? `The game plays this as ${esc(game.where)}.` : `The game plays ${GAME_ANIMS.map((g) => esc(g.name)).join(' and ')}, and the poses Walk, Jump, Front, Back, Three-quarter, Sit side to stand side and Stand to sit; this one is yours to keep.`}</p>
+    <div class="pix-animview"><div class="pix-animbox"><div class="pix-anim" id="pix-anim" style="--w:${d.grid[0].length};--h:${d.grid.length};${baseStyle('kitty')}" aria-hidden="true"></div><p class="muted pix-animcap" id="pix-animcap"></p></div>
+      <div class="stack"><label class="field">Animation name <input id="pix-anim-name" maxlength="${LIMITS.name}" autocomplete="off" value="${esc(a.name)}"></label>
+        <label class="field">Speed <select id="pix-fps">${FPS_CHOICES.map((n) => `<option value="${n}" ${n === a.fps ? 'selected' : ''}>${n} ${n === 1 ? 'step' : 'steps'} a second</option>`).join('')}</select></label>
+        <div class="btns flow"><button class="btn small" type="button" data-action="pix-anim-toggle">${animPlaying ? 'Pause' : 'Play'}</button>
+          <button class="btn small" type="button" data-action="pix-anim-png" ${seq.length ? '' : 'disabled'} title="Every step side by side in one picture, to check the drawing">Save steps as a picture</button></div></div></div>
+    ${st ? `<div class="pix-resize"><label class="field">Forward ${numField('pix-step-dx', st.dx ?? 0)}</label>
+        <label class="field">Up ${numField('pix-step-dy', st.dy ?? 0)}</label>
+        <span class="muted">How far step ${stepSel! + 1} moves its sprite from where it is drawn, in pixels: forward is the way the kitty faces (use a minus to go back), up is off the ground (in the air). Both 0 is where it is drawn.</span></div>`
+      : rs ? `<div class="pix-resize"><label class="field">Forward ${numField('pix-step-dx', restOf(d, a, rs).dx)}</label>
+        <label class="field">Up ${numField('pix-step-dy', restOf(d, a, rs).dy)}</label>
+        <span class="muted">How far the ${REST_NAMES[restOf(d, a, rs).pose].toLowerCase()} pose is from the ${rs === 'before' ? 'first' : 'last'} step, in pixels (forward is the way the kitty faces; use a minus to go back).</span></div>` : ''}
+    <h3>Steps</h3>
+    ${seq.length ? `<div class="pix-fstrip" role="group" aria-label="Steps">${ghost.before ? ghostChip(ghost.before, 'before', rs === 'before') : ''}${seq.map((x, n) => fchip(d, idx.get(x.id) ?? 0, 'pix-step-pick', n === stepSel, (idx.get(x.id) ?? 0) + 1, n, moveText(x))).join('')}${ghost.after ? ghostChip(ghost.after, 'after', rs === 'after') : ''}</div>`
+      : '<p class="muted">No steps yet. Pick a sprite below, or make a new one.</p>'}
+    ${st ? `<div class="btns flow"><button class="btn small" type="button" data-action="pix-step-left" aria-label="Move step earlier" ${stepSel! < 1 ? 'disabled' : ''}>${iconSvg('prev')}</button>
+      <button class="btn small" type="button" data-action="pix-step-right" aria-label="Move step later" ${stepSel! >= seq.length - 1 ? 'disabled' : ''}>${iconSvg('next')}</button>
+      <button class="btn small" type="button" data-action="pix-step-dup" ${seq.length >= MAX_STEPS ? 'disabled' : ''}>Repeat step</button>
+      <button class="btn small" type="button" data-action="pix-step-del">Remove step</button></div>`
+      : rs ? restPanel(d, a, rs)
+      : (seq.length ? `<p class="muted">Tap a step to draw its sprite, and to move it.${ghost.before || ghost.after ? ' Tap a faint kitty (the pose before and after) to line it up.' : ''}</p>` : '')}
+    <details class="pix-add" id="pix-addstep" ${addOpen ? 'open' : ''}><summary><h3>Add a step</h3></summary>
+    <p class="muted">Pick a sprite from the list ${stepSel === null ? 'to add at the end' : `to add after step ${stepSel + 1}`}, or make a new one: it goes into the list too.</p>
+    ${picker}</details>
+    <div class="btns flow"><button class="btn small" type="button" data-action="pix-pingpong" ${seq.length < 2 || seq.length * 2 - 1 > MAX_STEPS ? 'disabled' : ''} title="Plays the steps forward, then back again: 1 2 3 becomes 1 2 3 2 1">Play it back too</button>
+      <button class="btn small danger" type="button" data-action="pix-anim-del">${iconSvg('x')} Delete animation</button></div>
+    <label class="field">Sprite numbers <input id="pix-steps" inputmode="text" autocomplete="off" value="${esc(stepsToText(seq, sprites))}" placeholder="1 2 3 2 1"></label>
+    <p class="muted">The same steps by their sprite numbers (typing them keeps the moves of steps that stay the same). <b>1-4</b> is 1 2 3 4, and <b>4-1</b> plays it backwards.</p></div>`;
 }
 
-// The animation plays on the page while the board is open, at the speed chosen, from what is on the board now.
+// The animation plays on the page while the board is open, at the speed chosen, from what is on the board now, each step where its move puts it.
 let animTimer: ReturnType<typeof setInterval> | undefined;
 let animI = 0;
 let animPlaying = true;
+// A walk that loops ends on its first step again, moved on: that is where the next round starts, so it is not played twice (see loopOf in
+// ../shared/kittysheet.ts).
+const playedSteps = (steps: Step[]) => { const f = steps[0], l = steps[steps.length - 1]; return steps.length >= 3 && l.id === f.id && (l.dx || l.dy) ? steps.slice(0, -1) : steps; };
+// The paths of a picture (the inside of its svg), to draw it moved.
+const inner = (art: string[], zone: Grid | null = null) => layerSvg(art, zone).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
 function drawAnim() {
   const el = document.getElementById('pix-anim');
-  if (!el || !draft?.frames || !draft.sequence?.length) { stopAnim(); return; }
-  const d = draft, byId = new Map(d.frames!.map((f, i) => [f.id, i]));
-  const ids = d.sequence!.filter((id) => byId.has(id));
-  if (!ids.length) return;
-  animI %= ids.length;
-  const i = byId.get(ids[animI])!;
-  const sh = trackShifts(d.frames!.map((f, k) => ({ id: f.id, name: f.name, art: [], pin: f.pin })), d.sequence).get(d.frames![i].id);
-  const art = toArt(liveGrid(d, i));
-  el.innerHTML = fineSvg(sh && (sh[0] || sh[1]) ? shiftArt(art, sh[0], sh[1]) : art);   // only the picture changes: the canvas keeps its size
+  const d = draft, a = d && curAnim(d);
+  if (!el || !d?.sprites || !a) { stopAnim(); return; }
+  const byId = new Map(d.sprites.map((f, i) => [f.id, i]));
+  const steps = playedSteps(a.steps.filter((st) => byId.has(st.id)));
+  if (!steps.length) { el.innerHTML = ''; return; }
+  // the box that holds every step where it is played, so the kitty is not still while the picture moves about
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const st of steps) toArt(liveGrid(d, byId.get(st.id)!)).forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== '.') {
+    x0 = Math.min(x0, x - (st.dx ?? 0)); x1 = Math.max(x1, x - (st.dx ?? 0)); y0 = Math.min(y0, y - (st.dy ?? 0)); y1 = Math.max(y1, y - (st.dy ?? 0)); } });
+  // and the resting poses before and after, where the animation puts them (after: from the last step, which a looping walk's closing step carries)
+  const gh = ghostsOf(d, a), end = a.steps[a.steps.length - 1] ?? {};
+  const ghosts = [gh.before && { art: gh.before.art, zone: gh.before.zone, gx: gh.before.dx, gy: gh.before.dy }, gh.after && { art: gh.after.art, zone: gh.after.zone, gx: (end.dx ?? 0) + gh.after.dx, gy: (end.dy ?? 0) + gh.after.dy }].filter((g): g is { art: string[]; zone: Grid | null; gx: number; gy: number } => !!g);
+  for (const { art, gx, gy } of ghosts) art.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== '.') {
+    x0 = Math.min(x0, x - gx); x1 = Math.max(x1, x - gx); y0 = Math.min(y0, y - gy); y1 = Math.max(y1, y - gy); } });
+  if (x1 < x0) { x0 = 0; y0 = 0; x1 = d.grid[0].length - 1; y1 = d.grid.length - 1; }
+  const w = x1 - x0 + 1, h = y1 - y0 + 1;
+  animI %= steps.length;
+  const st = steps[animI], i = byId.get(st.id)!;
+  el.style.setProperty('--w', String(w)); el.style.setProperty('--h', String(h));
+  el.innerHTML = `<svg class="pxs fine" style="--w:${w};--h:${h}" viewBox="${x0} ${y0} ${w} ${h}" aria-hidden="true" shape-rendering="crispEdges">${ghosts.map(({ art, zone, gx, gy }) => `<g opacity=".35" transform="translate(${-gx} ${-gy})">${inner(art, zone)}</g>`).join('')}<g transform="translate(${-(st.dx ?? 0)} ${-(st.dy ?? 0)})">${inner(toArt(liveGrid(d, i)), zoneMode ? liveZone(d, i) : null)}</g></svg>`;
   const cap = document.getElementById('pix-animcap');
-  if (cap) cap.textContent = `Step ${animI + 1} of ${ids.length}: ${d.frames![i].name || 'Frame'}`;
+  if (cap) cap.textContent = `Step ${animI + 1} of ${steps.length}: sprite ${i + 1}, ${d.sprites[i].name || 'Sprite'}${moveText(st) ? `, ${moveText(st)}` : ''}`;
   animI++;
+}
+// The animation's steps side by side in one PNG, each as drawn (where its move puts it is written under it), to check the drawing.
+async function exportStrip() {
+  const d = draft, a = d && curAnim(d);
+  if (!d?.sprites || !a) return;
+  readFields();
+  const byId = new Map(d.sprites.map((f, i) => [f.id, i]));
+  const steps = playedSteps(a.steps.filter((st) => byId.has(st.id)));
+  if (!steps.length) { toast('This animation has no steps yet.'); return; }
+  type Layer = { art: string[]; ox: number; oy: number; alpha: number };
+  type Cell = { layers: Layer[]; label: string; sub: string };
+  const cells: Cell[] = steps.map((st, n) => ({ layers: [{ art: toArt(liveGrid(d, byId.get(st.id)!)), ox: 0, oy: 0, alpha: 1 }], label: `${n + 1}  sprite ${byId.get(st.id)! + 1}`, sub: moveText(st) }));
+  // the resting poses before the first step and after the last, each over that step where the animation puts it (the steps are drawn where
+  // their moves put them, so the poses are against them as they are in the room)
+  const gh = ghostsOf(d, a), all = a.steps.filter((st) => byId.has(st.id)), f0 = all[0], fl = all[all.length - 1];
+  const artOf = (st: Step) => toArt(liveGrid(d, byId.get(st.id)!));
+  if (gh.before && f0) cells.unshift({ layers: [{ art: artOf(f0), ox: -(f0.dx ?? 0), oy: -(f0.dy ?? 0), alpha: 1 }, { art: gh.before.art, ox: -gh.before.dx, oy: -gh.before.dy, alpha: 0.4 }], label: `${REST_NAMES[gh.before.pose]} before`, sub: moveText(gh.before) });
+  if (gh.after && fl) cells.push({ layers: [{ art: artOf(fl), ox: -(fl.dx ?? 0), oy: -(fl.dy ?? 0), alpha: 1 }, { art: gh.after.art, ox: -((fl.dx ?? 0) + gh.after.dx), oy: -((fl.dy ?? 0) + gh.after.dy), alpha: 0.4 }], label: `${REST_NAMES[gh.after.pose]} after`, sub: moveText(gh.after) });
+  const box = (cs: Cell[]) => {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const c of cs) for (const l of c.layers) l.art.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== '.') { x0 = Math.min(x0, x + l.ox); x1 = Math.max(x1, x + l.ox); y0 = Math.min(y0, y + l.oy); y1 = Math.max(y1, y + l.oy); } });
+    return { x0, y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  };
+  if (!isFinite(box(cells).x0)) { toast('The steps are empty.'); return; }
+  const S = 6, G = 3 * S, head = 20, foot = 22;
+  const fur = getComputedStyle(document.getElementById('pix-anim') ?? document.body).color.match(/\d+/g)?.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, '0')).join('') ?? 'ffb98a';
+  const ink = inkFor(`#${fur}`);
+  const real = box(cells.filter((c) => c.layers.length === 1)), own = cells.map((c) => (c.layers.length === 1 ? (isFinite(real.x0) ? real : box([c])) : box([c])));
+  const cv = document.createElement('canvas');
+  cv.width = G + own.reduce((n, b) => n + b.w * S + G, 0); cv.height = head + Math.max(...own.map((b) => b.h)) * S + foot + G;
+  const g = cv.getContext('2d')!;
+  g.fillStyle = '#fffafd'; g.fillRect(0, 0, cv.width, cv.height);
+  g.font = 'bold 15px monospace'; g.textBaseline = 'middle';
+  let left = G;
+  cells.forEach((c, n) => {
+    const b = own[n], ghosted = c.layers.length > 1, hh = Math.max(...own.map((o) => o.h)) * S;
+    g.strokeStyle = 'rgba(61,44,99,0.25)'; g.setLineDash(ghosted ? [4, 4] : []); g.lineWidth = 1; g.strokeRect(left - 0.5, head - 0.5, b.w * S + 1, hh + 1);
+    for (const l of c.layers) {
+      g.globalAlpha = l.alpha;
+      l.art.forEach((row, y) => { for (let x = 0; x < row.length; x++) { const col = row[x] !== '.' ? ink(row[x]) : undefined; if (col) { g.fillStyle = col; g.fillRect(left + (x + l.ox - b.x0) * S, head + (y + l.oy - b.y0) * S, S, S); } } });
+    }
+    g.globalAlpha = 1;
+    g.fillStyle = '#3d2c63';
+    g.fillText(c.label, left, head / 2);
+    if (c.sub) g.fillText(c.sub, left, head + hh + foot / 2 + 2);
+    left += b.w * S + G;
+  });
+  const blob = await new Promise<Blob | null>((r) => cv.toBlob(r, 'image/png'));
+  if (!blob) { toast("Couldn't make the picture."); return; }
+  const name = `${(a.name || 'animation').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'animation'}-steps-${today()}-${hhmm()}.png`;
+  try {
+    const where = await saveToDevice(name, new Uint8Array(await blob.arrayBuffer()));
+    if (where !== null) toast(where ? `Saved: ${where}` : 'Picture downloaded.');
+  } catch { toast("Couldn't save the picture."); }
 }
 function stopAnim() { if (animTimer !== undefined) clearInterval(animTimer); animTimer = undefined; }
 function restartAnim() {
   stopAnim();
-  if (!draft?.frames || tab !== 'draw') return;
+  const a = draft && curAnim(draft);
+  if (!draft?.sprites || !a || tab !== 'draw') return;
+  if (!animPlaying) animI = Math.max(0, animI - 1);   // paused: the page is drawn again (a tap, a step picked) but the picture holds still
   drawAnim();
-  if (animPlaying) animTimer = setInterval(drawAnim, 1000 / (draft.fps ?? DEFAULT_FPS));
+  if (animPlaying) animTimer = setInterval(drawAnim, 1000 / (a.fps || DEFAULT_FPS));
 }
-// The frame on the board is stored with the others before anything switches, saves or counts them.
-function syncFrame() { if (draft?.frames && draft.cur !== undefined) draft.frames[draft.cur].grid = draft.grid; }
-// Every frame is the board's size (a resize, or an Undo of one, changes the board you are on).
-function fitFrames() {
-  if (!draft?.frames) return;
+// The sprite on the board is stored with the others before anything switches, saves or counts them.
+function syncSprite() {
+  if (!draft?.sprites || draft.cur === undefined) return;
+  if (zoneMode) draft.sprites[draft.cur].zone = draft.grid; else draft.sprites[draft.cur].grid = draft.grid;
+}
+// Zone mode keeps every coat pixel in a part and every other pixel out of one (the picture can have changed since the zones were drawn).
+function fixCurZone() {
+  if (!zoneMode || !draft?.sprites || draft.cur === undefined) return;
+  const fixed = fixZone(draft.sprites[draft.cur].grid, draft.grid);
+  draft.grid.forEach((row, y) => row.forEach((c, x) => { if (c !== fixed[y][x]) row[x] = fixed[y][x]; }));
+}
+// Zone button: the board draws the zones instead of the pictures (and back). The pictures cannot change meanwhile, so the zones are checked against them first.
+function toggleZone() {
+  const d = draft;
+  if (!d?.sprites) return;
+  readFields(); settle(); syncSprite();
+  zoneMode = !zoneMode;
+  d.sprites.forEach((f) => { f.zone = fixZone(f.grid, f.zone); });
+  loadBoard(d);
+  undos = []; redos = []; sel = null; float = null;
+  if (tool === 'erase' || tool === 'pick') tool = 'pencil';
+  render();
+}
+// A sheet's sprites stand on the bottom edge of the board, so a different size keeps the bottom-left corner (other drawings keep the top-left).
+function resizeGridBL(g: Grid, w: number, h: number): Grid {
+  const out = blankGrid(w, h), dy = h - g.length;
+  g.forEach((row, y) => row.forEach((c, x) => { if (x < w && y + dy >= 0) out[y + dy][x] = c; }));
+  return out;
+}
+// Every sprite is the board's size (a resize, or an Undo of one, changes the board you are on).
+function fitSprites() {
+  if (!draft?.sprites) return;
+  if (zoneMode) { syncSprite(); return; }   // (zone mode cannot resize the board)
   const w = draft.grid[0].length, h = draft.grid.length;
-  draft.frames.forEach((f, i) => {
+  draft.sprites.forEach((f, i) => {
     if (i === draft!.cur) f.grid = draft!.grid;
-    else if (f.grid.length !== h || f.grid[0]?.length !== w) f.grid = resizeGrid(f.grid, w, h);
-    if (f.pin && (f.pin[0] >= w || f.pin[1] >= h)) delete f.pin;
+    else if (f.grid.length !== h || f.grid[0]?.length !== w) f.grid = resizeGridBL(f.grid, w, h);
+    if (f.zone.length !== h || f.zone[0]?.length !== w) f.zone = fixZone(f.grid, resizeGridBL(f.zone, w, h));   // the zones stay where the drawing is
   });
 }
-function setPin(x: number, y: number) {
-  const f = draft?.frames?.[draft.cur ?? 0];
-  if (!f) return;
-  f.pin = f.pin && f.pin[0] === x && f.pin[1] === y ? undefined : [x, y];   // tapping the same cell again takes it off
-  if (!f.pin) delete f.pin;
-  readFields(); render();
-}
-// Moves the frame on the board one place along the strip. The sequence names frames by id, so it plays the same; only the
-// order of the strip (and which frame is the kitty's picture in lists: the first) changes.
-function moveFrame(by: -1 | 1) {
+// Moves the sprite on the board one place along the list. Animations name sprites by id, so they play the same; only the numbers
+// (and which sprite is the sheet's picture in lists: the first) change.
+function moveSprite(by: -1 | 1) {
   const d = draft;
-  if (!d?.frames) return;
+  if (!d?.sprites) return;
   const at = d.cur ?? 0, to = at + by;
-  if (to < 0 || to >= d.frames.length) return;
-  readFields(); settle(); syncFrame();
-  [d.frames[at], d.frames[to]] = [d.frames[to], d.frames[at]];
+  if (to < 0 || to >= d.sprites.length) return;
+  readFields(); settle(); syncSprite();
+  [d.sprites[at], d.sprites[to]] = [d.sprites[to], d.sprites[at]];
   d.cur = to;
   render();
 }
-function selectFrame(i: number) {
+function selectSprite(i: number) {
   const d = draft;
-  if (!d?.frames?.[i]) return;
-  readFields(); settle(); syncFrame();
-  d.cur = i; d.grid = d.frames[i].grid;
+  if (!d?.sprites?.[i]) return;
+  readFields(); settle(); syncSprite();
+  d.cur = i; loadBoard(d);
   undos = []; redos = []; sel = null; float = null;
   render();
 }
-function startAnimation() {
-  if (!draft || draft.cat !== 'kitty' || draft.frames) return;
-  readFields(); settle();
-  draft.frames = [{ id: 'f1', name: 'Frame 1', grid: draft.grid }];
-  draft.cur = 0; draft.sequence = ['f1']; draft.fps = DEFAULT_FPS;
-  render();
+// Open the sprite sheet on an animation (or on a sprite on its own: id null), from the Kitty tab.
+function openKitty(animId: string | null, sprite?: number) {
+  startDraft('kitty', SHEET_ID);
+  const d = draft!;
+  const ai = animId === null ? -1 : d.anims!.findIndex((a) => a.id === animId);
+  d.anim = ai; stepSel = null; animI = 0; animPlaying = true;   // an animation opened plays
+  const first = ai >= 0 ? d.sprites!.findIndex((f) => f.id === d.anims![ai].steps[0]?.id) : -1;
+  if (first >= 0) { d.cur = first; loadBoard(d); stepSel = 0; }
+  if (sprite !== undefined && d.sprites![sprite]) { d.cur = sprite; loadBoard(d); }
+  tab = 'draw'; renderTop(); render(); window.scrollTo(0, 0);
 }
-function addFrame(copy: boolean) {
+// A sprite from the list opens in the first animation that plays it (on that step), or on its own.
+function openSprite(i: number) {
+  startDraft('kitty', SHEET_ID);
+  const d = draft!, id = d.sprites![i]?.id;
+  const ai = d.anims!.findIndex((a) => a.steps.some((st) => st.id === id));
+  d.anim = ai; stepSel = ai >= 0 ? d.anims![ai].steps.findIndex((st) => st.id === id) : null; animI = 0;
+  d.cur = i; loadBoard(d);
+  tab = 'draw'; renderTop(); render(); window.scrollTo(0, 0);
+}
+// A new sprite, blank or a copy of the one on the board. In an animation it is also a new step (after the one picked, or at the end), which
+// starts where the picked step is (so a copy carries on from it).
+function addSprite(copy: boolean) {
   const d = draft;
-  if (!d?.frames || d.frames.length >= MAX_FRAMES) return;
-  readFields(); settle(); syncFrame();
-  const here = d.frames[d.cur ?? 0];
-  const f: DraftFrame = { id: newFrameId(d.frames), name: nextFrameName(d.frames),   // a copy is named like a new frame: the next number
+  if (!d?.sprites || d.sprites.length >= MAX_SPRITES) return;
+  readFields(); settle(); syncSprite();
+  const here = d.sprites[d.cur ?? 0], a = curAnim(d);
+  const sp = { id: newSpriteId(d.sprites), name: nextSpriteName(d.sprites),   // a copy is named like a new sprite: the next number
     grid: copy ? here.grid.map((r) => r.slice()) : blankGrid(here.grid[0].length, here.grid.length),
-    ...(copy && here.pin && { pin: [...here.pin] as [number, number] }) };
-  d.frames.push(f);
-  d.sequence = [...(d.sequence ?? []), f.id].slice(0, MAX_STEPS);
-  selectFrame(d.frames.length - 1);
+    zone: copy ? here.zone.map((r) => r.slice()) : blankGrid(here.grid[0].length, here.grid.length) };
+  d.sprites.push(sp);
+  if (a && a.steps.length < MAX_STEPS) {
+    const at = stepSel === null ? a.steps.length : stepSel + 1, from = copy && stepSel !== null ? a.steps[stepSel] : undefined;
+    a.steps.splice(at, 0, { id: sp.id, ...(from?.dx && { dx: from.dx }), ...(from?.dy && { dy: from.dy }) });
+    stepSel = at;
+  }
+  selectSprite(d.sprites.length - 1);
 }
-function askDeleteFrame() {
+function askDeleteSprite() {
   const d = draft;
-  if (!d?.frames || d.frames.length < 2) return;
+  if (!d?.sprites || d.sprites.length < 2) return;
   readFields();
-  const here = d.frames[d.cur ?? 0], uses = (d.sequence ?? []).filter((id) => id === here.id).length;
-  openLayer(`<h3>Delete ${esc(here.name || 'Frame')}?</h3>
-    <p class="muted">The drawing is lost${uses ? `, and ${plural(uses, 'step')} that play${uses === 1 ? 's' : ''} it ${uses === 1 ? 'is' : 'are'} taken out of the sequence` : ''}.</p>
+  const here = d.sprites[d.cur ?? 0];
+  const uses = (d.anims ?? []).reduce((n, a) => n + a.steps.filter((st) => st.id === here.id).length, 0);
+  openLayer(`<h3>Delete ${esc(here.name || 'Sprite')}?</h3>
+    <p class="muted">The drawing is lost${uses ? `, and ${plural(uses, 'step')} that play${uses === 1 ? 's' : ''} it ${uses === 1 ? 'is' : 'are'} taken out of the animations` : ''}. The sprites after it get a number less.</p>
     <div class="btns"><button class="btn" type="button" data-action="pix-layer-close" data-focus>Cancel</button>
-    <button class="btn danger" type="button" data-action="pix-frame-del-confirm">${iconSvg('x')} Delete</button></div>`, 'Delete frame');
+    <button class="btn danger" type="button" data-action="pix-sprite-del-confirm">${iconSvg('x')} Delete</button></div>`, 'Delete sprite');
 }
-function deleteFrame() {
+function deleteSprite() {
   const d = draft;
   closeLayer();
-  if (!d?.frames || d.frames.length < 2) return;
-  syncFrame();
-  const at = d.cur ?? 0, r = removeFrame(d.frames, d.sequence ?? [], d.frames[at].id);
-  d.frames = r.frames; d.sequence = r.sequence; stepSel = null;
-  d.cur = Math.min(at, d.frames.length - 1); d.grid = d.frames[d.cur].grid;
+  if (!d?.sprites || d.sprites.length < 2) return;
+  syncSprite();
+  const at = d.cur ?? 0, r = removeSprite(d.sprites, d.anims ?? [], d.sprites[at].id);
+  d.sprites = r.sprites; d.anims = r.animations; stepSel = null;
+  d.cur = Math.min(at, d.sprites.length - 1); loadBoard(d);
   undos = []; redos = []; sel = null; float = null;
   render();
 }
-// The sequence's own buttons.
-function stepAction(a: 'pick' | 'add' | 'left' | 'right' | 'del' | 'pingpong' | 'reset', i = 0) {
+// A new animation, with no steps yet (id: one the game plays, such as idle), opened to design.
+function addAnim(name: string, id?: string) {
   const d = draft;
-  if (!d?.frames) return;
+  if (!d?.sprites) return;
   readFields();
-  const seq = [...(d.sequence ?? [])];
-  if (a === 'pick') {
+  const anims = d.anims ?? (d.anims = []);
+  const label = cleanName(name, '');
+  if (!label) { toast('Give the animation a name.'); document.getElementById('pix-anim-new')?.focus(); return; }
+  if (anims.length >= MAX_ANIMS) { toast(`There can be ${MAX_ANIMS} animations.`); return; }
+  if (anims.some((a) => a.name.trim().toLowerCase() === label.toLowerCase())) { toast(`There's already an animation called ${label}.`); return; }
+  anims.push({ id: id ?? newAnimId(label, anims), name: label, fps: DEFAULT_FPS, steps: [] });
+  d.anim = anims.length - 1; stepSel = null; animI = 0;
+  render();
+}
+function askDeleteAnim() {
+  const a = draft && curAnim(draft);
+  if (!a) return;
+  readFields();
+  openLayer(`<h3>Delete ${esc(a.name)}?</h3><p class="muted">Only the animation goes: its sprites stay in the list.</p>
+    <div class="btns"><button class="btn" type="button" data-action="pix-layer-close" data-focus>Cancel</button>
+    <button class="btn danger" type="button" data-action="pix-anim-del-confirm">${iconSvg('x')} Delete</button></div>`, 'Delete animation');
+}
+function deleteAnim() {
+  const d = draft;
+  closeLayer();
+  if (!d?.anims?.length || !curAnim(d)) return;
+  d.anims.splice(d.anim ?? 0, 1);
+  d.anim = -1; stepSel = null; animI = 0;   // back to the sprite on its own: Close goes to the Kitty tab
+  render();
+}
+// The sprite numbers typed in become the animation's steps (a step that stays the same keeps its move).
+function applySteps(text: string) {
+  const d = draft, a = d && curAnim(d);
+  if (!d?.sprites || !a) return;
+  const { steps, bad } = stepsFromText(text, d.sprites, a.steps);
+  if (bad.length) toast(`There is no sprite ${bad.slice(0, 3).join(', ')}${bad.length > 3 ? '…' : ''}: the sprites are 1 to ${d.sprites.length}.`);
+  readFields();
+  a.steps = steps; stepSel = null;
+  render();
+}
+// The steps' own buttons. For 'add', i is the number of the sprite in the list (0 is the first).
+function stepAction(act: 'pick' | 'add' | 'left' | 'right' | 'dup' | 'del' | 'pingpong', i = 0) {
+  const d = draft, a = d && curAnim(d);
+  if (!d?.sprites || !a) return;
+  readFields();
+  restSel = null;
+  const seq = a.steps;
+  if (act === 'pick') {
     stepSel = stepSel === i ? null : i;
-    const f = d.frames.findIndex((x) => x.id === seq[i]);
-    if (f >= 0 && f !== d.cur) { selectFrame(f); return; }   // tapping a step opens its frame to draw on
-  } else if (a === 'add') {
-    if (seq.length >= MAX_STEPS) { toast(`A sequence can have ${MAX_STEPS} steps.`); return; }
+    if (stepSel !== null) animI = animPlaying ? stepSel : stepSel + 1;   // the preview goes to the step (and holds there when paused)
+    const f = d.sprites.findIndex((x) => x.id === seq[i]?.id);
+    if (stepSel !== null && f >= 0 && f !== d.cur) { selectSprite(f); return; }   // tapping a step opens its sprite to draw on
+  } else if (act === 'add') {
+    if (seq.length >= MAX_STEPS) { toast(`An animation can have ${MAX_STEPS} steps.`); return; }
+    if (!d.sprites[i]) return;
     const at = stepSel === null ? seq.length : stepSel + 1;
-    seq.splice(at, 0, d.frames[d.cur ?? 0].id);
+    seq.splice(at, 0, { id: d.sprites[i].id });
     stepSel = at;
-  } else if (a === 'left' && stepSel !== null && stepSel > 0) {
+    selectSprite(i); return;   // and it is on the board, to draw on
+  } else if (act === 'left' && stepSel !== null && stepSel > 0) {
     [seq[stepSel - 1], seq[stepSel]] = [seq[stepSel], seq[stepSel - 1]]; stepSel--;
-  } else if (a === 'right' && stepSel !== null && stepSel < seq.length - 1) {
+  } else if (act === 'right' && stepSel !== null && stepSel < seq.length - 1) {
     [seq[stepSel + 1], seq[stepSel]] = [seq[stepSel], seq[stepSel + 1]]; stepSel++;
-  } else if (a === 'del' && stepSel !== null && seq.length > 1) {
+  } else if (act === 'dup' && stepSel !== null) {
+    if (seq.length >= MAX_STEPS) { toast(`An animation can have ${MAX_STEPS} steps.`); return; }
+    seq.splice(stepSel + 1, 0, { ...seq[stepSel] }); stepSel++;
+  } else if (act === 'del' && stepSel !== null) {
     seq.splice(stepSel, 1); stepSel = null;
-  } else if (a === 'pingpong') {
-    seq.splice(0, seq.length, ...pingPong(d.frames.map((f) => f.id)).slice(0, MAX_STEPS)); stepSel = null;
-  } else if (a === 'reset') {
-    seq.splice(0, seq.length, ...d.frames.map((f) => f.id)); stepSel = null;
+  } else if (act === 'pingpong') {
+    seq.push(...seq.slice(0, -1).reverse().map((st) => ({ ...st })));
+    seq.splice(MAX_STEPS); stepSel = null;
   }
-  d.sequence = seq;
+  render();
+}
+// The pose before or after the animation, or how far forward or up it is (whole pixels, a minus goes back or down).
+function setRest(which: 'before' | 'after', field: 'pose' | 'dx' | 'dy', value: string) {
+  const d = draft, a = d && curAnim(d);
+  if (!d || !a) return;
+  const r = restOf(d, a, which);
+  if (field === 'pose') r.pose = value === 'stand' ? 'stand' : 'idle';
+  else r[field] = Math.max(-MAX_SHIFT, Math.min(MAX_SHIFT, Math.round(Number(value)) || 0));
+  a[which] = { pose: r.pose, ...(r.dx && { dx: r.dx }), ...(r.dy && { dy: r.dy }) } as Ghost;
+  readFields();
+  render();
+}
+// The move of the step picked: how far forward and up (whole pixels, a minus goes back or down).
+function setMove(axis: 'dx' | 'dy', value: string) {
+  const d = draft, a = d && curAnim(d);
+  if (a && restSel && restSel.anim === a.id && stepSel === null) { setRest(restSel.which, axis, value); return; }
+  if (!a || stepSel === null || !a.steps[stepSel]) return;
+  const n = Math.max(-MAX_SHIFT, Math.min(MAX_SHIFT, Math.round(Number(value)) || 0));
+  const st = a.steps[stepSel];
+  if (n) st[axis] = n; else delete st[axis];
+  readFields();
   render();
 }
 
@@ -972,8 +1414,8 @@ function resize() {
   if (!(w >= 1 && h >= 1 && w <= FREE_MAX && h <= FREE_MAX)) { toast(`Width and height are 1 to ${FREE_MAX} pixels.`); return; }
   if (w === draft.grid[0].length && h === draft.grid.length) return;
   settle(); sel = null;
-  edit((g) => resizeGrid(g, w, h));
-  fitFrames();   // every frame is the board's size
+  edit((g) => (draft!.cat === 'kitty' ? resizeGridBL(g, w, h) : resizeGrid(g, w, h)));
+  fitSprites();   // every sprite is the board's size
 }
 
 // ---- a photo as a scene ----
@@ -1034,11 +1476,12 @@ function setZoom(z: number) {
 
 // ---- export and import ----
 const today = () => localDateKey();
+const hhmm = () => { const t = new Date(); return `${String(t.getHours()).padStart(2, '0')}${String(t.getMinutes()).padStart(2, '0')}`; };
 async function exportIcons() {
   if (!pixelData().icons.length) { toast('Nothing to export yet.'); return; }
   const day = today();
   try {
-    const where = await saveToDevice(exportName(day), new TextEncoder().encode(exportText(pixelData(), day)));
+    const where = await saveToDevice(exportName(day, hhmm()), new TextEncoder().encode(exportText(pixelData(), day)));
     if (where !== null) toast(where ? `Exported: ${where}` : 'Icons downloaded.');
   } catch { toast("Couldn't export the icons."); }
 }
@@ -1098,24 +1541,10 @@ function openView(id: string) {
   openLayer(`<h3>${esc(i.name)}</h3>
     <p class="muted">${esc(groupLabel(i.group))}${i.status === 'official' ? '' : ` · <span class="badge ${i.status}">${{ new: 'New', changed: 'Changed', deleted: 'Deleted' }[i.status]}</span>`}</p>
     <div class="pix-preview pix-view${gone ? ' pix-gone' : ''}" style="${baseStyle(cat)}"><div class="pix-prow"><span class="pix-pbig" id="pix-view-pic">${pictureSvg(cat, i.art, true)}</span></div></div>
-    ${i.frames ? `<p class="muted">An animation: ${plural(i.frames.length, 'frame')}, ${plural(i.sequence?.length ?? i.frames.length, 'step')}.</p>` : ''}
     ${gone ? '<p class="muted">The app no longer shows or uses it.</p>' : ''}
     <div class="btns flow"><button class="btn" type="button" data-action="pix-layer-close">Close</button>
     ${gone ? `<button class="btn primary" type="button" data-action="pix-restore" data-id="${esc(i.id)}" data-focus>Bring back</button>`
       : `<button class="btn primary" type="button" data-action="pix-open" data-id="${esc(i.id)}" data-focus>${iconSvg('pencil')} Edit</button>`}</div>`, i.name);
-  if (i.frames && i.frames.length > 0) playView(playOrder(i.frames, i.sequence), i.fps ?? DEFAULT_FPS);
-}
-// An animation opened from the list plays, rather than showing its first frame; it stops when the dialog closes.
-let viewTimer: ReturnType<typeof setInterval> | undefined;
-function playView(pics: string[][], fps: number) {
-  if (viewTimer !== undefined) clearInterval(viewTimer);
-  let n = 0;
-  const tick = () => {
-    const el = document.getElementById('pix-view-pic');
-    if (!el) { clearInterval(viewTimer); viewTimer = undefined; return; }
-    el.innerHTML = fineSvg(pics[n++ % pics.length], 'x4');
-  };
-  if (pics.length > 1) viewTimer = setInterval(tick, 1000 / fps);
 }
 async function restore(id: string) {
   closeLayer();
@@ -1180,28 +1609,46 @@ onShown('pixel', 'click', (ev) => {
     case 'pix-shift': if (sel) nudge(Number(b.dataset.dx), Number(b.dataset.dy)); else edit((g) => shiftGrid(g, Number(b.dataset.dx), Number(b.dataset.dy))); break;
     case 'pix-sel-all': if (draft) { settle(); sel = { x: 0, y: 0, w: draft.grid[0].length, h: draft.grid.length }; tool = 'select'; readFields(); render(); } break;
     case 'pix-sel-dup': duplicate(); break;
+    case 'pix-sel-copy': copySel(); break;
+    case 'pix-sel-paste': pasteClip(); break;
+    case 'pix-pen': penOnly = !penOnly; try { localStorage.setItem('pix-pen', penOnly ? '1' : '0'); } catch { /* private window */ } toast(penOnly ? 'Pen on: only the pen draws.' : 'Pen off: fingers draw too.'); readFields(); render(); break;
     case 'pix-sel-del': deleteSel(); break;
     case 'pix-sel-done': settle(); renderBoard(); break;
     case 'pix-clear': edit((g) => (g.every((r) => r.every((c) => c === '.')) ? g : blankGrid(g[0].length, g.length))); break;
     case 'pix-copy': save(true); break;
     case 'pix-scene-mode': settle(); sceneMode = b.dataset.mode as 'draw' | 'spots'; pickedSpot = null; readFields(); render(); break;
     case 'pix-zoom': setZoom(Number(b.dataset.zoom)); break;
-    case 'pix-anim-start': startAnimation(); break;
-    case 'pix-frame-pick': selectFrame(Number(b.dataset.i)); break;
-    case 'pix-pin-clear': { const f = draft?.frames?.[draft.cur ?? 0]; if (f) { delete f.pin; readFields(); render(); } break; }
-    case 'pix-frame-left': moveFrame(-1); break;
-    case 'pix-frame-right': moveFrame(1); break;
-    case 'pix-frame-add': addFrame(false); break;
-    case 'pix-frame-copy': addFrame(true); break;
-    case 'pix-frame-del': askDeleteFrame(); break;
-    case 'pix-frame-del-confirm': deleteFrame(); break;
+    case 'pix-anim-open': { const id = b.dataset.id ?? null; unlessDirty(() => openKitty(id)); break; }
+    case 'pix-sprite-open': { const i = Number(b.dataset.i); unlessDirty(() => openSprite(i)); break; }
+    case 'pix-sprite-new': unlessDirty(() => { openSprite(0); if (draft) { draft.anim = -1; stepSel = null; } addSprite(false); }); break;
+    case 'pix-sprite-to-anim': if (draft?.sprites) { const i = Number(b.dataset.i), a = draft.anims?.[i]; if (a && a.steps.length < MAX_STEPS) { readFields(); a.steps.push({ id: draft.sprites[draft.cur ?? 0].id }); draft.anim = i; stepSel = a.steps.length - 1; animI = 0; render(); } } break;
+    case 'pix-sprite-left': moveSprite(-1); break;
+    case 'pix-sprite-right': moveSprite(1); break;
+    case 'pix-sprite-add': addSprite(false); break;
+    case 'pix-sprite-copy': addSprite(true); break;
+    case 'pix-sprite-del': askDeleteSprite(); break;
+    case 'pix-sprite-del-confirm': deleteSprite(); break;
+    case 'pix-anim-add': { const g = GAME_ANIMS.find((x) => x.id === b.dataset.id); if (g) unlessDirty(() => { openSprite(0); addAnim(g.name, g.id); }); break; }
+    case 'pix-skin-pattern': skinPattern = b.dataset.id as typeof skinPattern; render(); break;
+    case 'pix-zone-mode': toggleZone(); break;
+    case 'pix-help-close': kittyHelp = false; keepFlag('pix-kitty-help', false); render(); break;
+    case 'pix-help-show': kittyHelp = true; keepFlag('pix-kitty-help', true); render(); break;
+    case 'pix-zink': zink = b.dataset.z ?? 'H'; tool = tool === 'erase' || tool === 'pick' ? 'pencil' : tool; readFields(); render(); break;
+    case 'pix-skin-colour': skinFur = b.dataset.fur ?? skinFur; render(); break;
+    case 'pix-sprites-sort': spriteSort = !spriteSort; render(); break;
+    case 'pix-sprites-prune': askPruneSprites(); break;
+    case 'pix-sprites-prune-confirm': void pruneSprites(); break;
+    case 'pix-anim-del': askDeleteAnim(); break;
+    case 'pix-anim-del-confirm': deleteAnim(); break;
     case 'pix-step-pick': stepAction('pick', Number(b.dataset.i)); break;
-    case 'pix-step-add': stepAction('add'); break;
+    case 'pix-step-add': stepAction('add', Number(b.dataset.i)); break;
+    case 'pix-step-dup': stepAction('dup'); break;
     case 'pix-step-left': stepAction('left'); break;
     case 'pix-step-right': stepAction('right'); break;
     case 'pix-step-del': stepAction('del'); break;
     case 'pix-pingpong': stepAction('pingpong'); break;
-    case 'pix-seq-reset': stepAction('reset'); break;
+    case 'pix-rest-pick': { const a = draft && curAnim(draft); if (a) { const w = b.dataset.which as 'before' | 'after'; restSel = restSel?.anim === a.id && restSel.which === w ? null : { anim: a.id, which: w }; stepSel = null; readFields(); render(); } break; }
+    case 'pix-anim-png': void exportStrip(); break;
     case 'pix-anim-toggle': animPlaying = !animPlaying; readFields(); render(); break;
     case 'pix-photo': document.getElementById('pix-photo')?.click(); break;
     case 'pix-spot-del':
@@ -1212,7 +1659,10 @@ onShown('pixel', 'click', (ev) => {
       if (draft && o) { draft.spots = (o.spots ?? []).map((p) => [...p] as Spot); if (o.props) draft.props = { book: [...o.props.book] as Spot, trophy: [...o.props.trophy] as Spot }; pickedSpot = null; renderMarks(); renderSelbar(); }
       break;
     }
-    case 'pix-revert': revert(); break;
+    case 'pix-revert-ask': askRevert(); break;
+    case 'pix-revert': void revert(); break;
+    case 'pix-anim-revert': askAnimRevert(); break;
+    case 'pix-anim-revert-confirm': animRevert(); break;
     case 'pix-delete': remove(); break;
     case 'pix-restore': restore(b.dataset.id!); break;
     case 'pix-export': exportIcons(); break;
@@ -1239,14 +1689,71 @@ function duplicate() {
   moveSel(sel.x + dx, sel.y + dy);
   renderBoard();
 }
+// Copy keeps the picked pixels; Paste puts them down on any sprite, in the same place, picked up to move.
+function copySel() {
+  if (!draft || !sel) return;
+  const g = float ?? draft.grid.slice(sel.y, sel.y + sel.h).map((r) => r.slice(sel!.x, sel!.x + sel!.w));
+  clip = { grid: g.map((r) => r.slice()), x: sel.x, y: sel.y, zone: zoneMode };
+  toast(zoneMode ? 'Zones copied. Open another sprite and tap Paste.' : 'Copied. Open another sprite and tap Paste.');
+  renderSelbar();
+}
+function pasteClip() {
+  if (!draft || !clip) return;
+  if (clip.zone !== zoneMode) { toast(clip.zone ? 'That was copied in zone mode: turn Zone on to paste it.' : 'That is a drawing: turn Zone off to paste it.'); return; }
+  settle();
+  const w = draft.grid[0].length, h = draft.grid.length;
+  pushUndo();
+  float = clip.grid.map((r) => r.slice());
+  sel = { x: clip.x, y: clip.y, w: float[0].length, h: float.length };
+  moveSel(sel.x, sel.y);
+  tool = 'select';
+  if (sel.x >= w || sel.y >= h) { toast("It doesn't fit this sprite."); }
+  readFields(); render();
+}
 function deleteSel() {
   if (!draft || !sel) return;
   lift(); float = null; sel = null;
   renderBoard();
 }
 
+function askRevert() {
+  if (!draft?.id) return;
+  openLayer(`<h3>Back to the official ${esc(officialOf(draft.cat, draft.id)?.name ?? 'one')}?</h3><p class="muted">Your saved changes to it are gone.</p>
+    <div class="btns"><button class="btn" type="button" data-action="pix-layer-close" data-focus>Cancel</button>
+    <button class="btn danger" type="button" data-action="pix-revert">Back to the official one</button></div>`, 'Back to the official one');
+}
+function askAnimRevert() {
+  const a = draft && curAnim(draft);
+  if (!a) return;
+  readFields();
+  openLayer(`<h3>Back to the official ${esc(a.name)}?</h3><p class="muted">Only this animation goes back as it was. Your sprites and the other animations stay. Save to keep it.</p>
+    <div class="btns"><button class="btn" type="button" data-action="pix-layer-close" data-focus>Cancel</button>
+    <button class="btn danger" type="button" data-action="pix-anim-revert-confirm">Back to the official one</button></div>`, 'Back to the official animation');
+}
+function animRevert() {
+  const d = draft, a = d && curAnim(d);
+  closeLayer();
+  const o = a && officialOf('kitty', SHEET_ID);
+  const oa = o?.animations?.find((x) => x.id === a!.id);
+  if (!d?.sprites || !o?.sprites || !oa) return;
+  const w = d.grid[0].length, h = d.grid.length;
+  const have = new Set(d.sprites.map((f) => f.id));
+  for (const st of oa.steps) {   // a sprite it plays that you took out comes back; the ones you have stay as you drew them
+    const sp = o.sprites.find((f) => f.id === st.id);
+    if (!sp || have.has(sp.id)) continue;
+    const g = toGrid(sp.art.map((r) => r.padEnd(w, '.').slice(0, w))); while (g.length < h) g.push(Array<string>(w).fill('.'));
+    const art = g.slice(0, h);
+    d.sprites.push({ id: sp.id, name: sp.name, grid: art, zone: zoneFromRows(art, o.zones?.[sp.id]) }); have.add(sp.id);
+  }
+  d.anims![d.anim ?? 0] = JSON.parse(JSON.stringify(oa)) as Animation;
+  stepSel = null; restSel = null; animI = 0;
+  toast(`${oa.name} is back as it was. Save to keep it.`);
+  render();
+}
+
 async function revert() {
   if (!draft?.id) return;
+  closeLayer();
   const id = draft.id, c = draft.cat;
   if (!await setPixelData(dropIcon(pixelData(), c, id))) { toast("Couldn't change it back."); return; }
   startDraft(c, id);
@@ -1268,6 +1775,7 @@ onShown('pixel', 'submit', async (ev) => {
   const f = ev.target as HTMLFormElement;
   if (f.id === 'pix-form') { ev.preventDefault(); save(false); }
   if (f.id === 'pix-resize-form') { ev.preventDefault(); resize(); }
+  if (f.id === 'pix-anim-new-form') { ev.preventDefault(); const name = (document.getElementById('pix-anim-new') as HTMLInputElement).value; unlessDirty(() => { openSprite(0); addAnim(name); }); }
   if (f.id === 'pix-group-form') {
     ev.preventDefault();
     const from = f.dataset.group!, to = (document.getElementById('pix-group-new') as HTMLInputElement).value;
@@ -1277,13 +1785,20 @@ onShown('pixel', 'submit', async (ev) => {
     render();
   }
 });
+onShown('pixel', 'toggle', (ev) => { const t = ev.target as HTMLElement; if (t.id === 'pix-addstep') addOpen = (t as HTMLDetailsElement).open;
+  if (t.id === 'pix-fold-anims') { animsOpen = (t as HTMLDetailsElement).open; keepFlag('pix-anims-open', animsOpen); }
+  if (t.id === 'pix-fold-sprites') { spritesOpen = (t as HTMLDetailsElement).open; keepFlag('pix-sprites-open', spritesOpen); } }, true);
 onShown('pixel', 'change', (ev) => {
   const t = ev.target as HTMLInputElement;
   if (t.id === 'pix-file') { importFile(t.files?.[0]); t.value = ''; }
   if (t.id === 'pix-photo') { usePhoto(t.files?.[0]); t.value = ''; }
   if (t.id === 'pix-food') { readFields(); renderPreview(); }
   if (t.id === 'pix-onion') { onion = (t as HTMLInputElement).checked; renderBoard(); }
-  if (t.id === 'pix-fps' && draft) { draft.fps = FPS_CHOICES.includes(Number(t.value)) ? Number(t.value) : DEFAULT_FPS; restartAnim(); }
+  if (t.id === 'pix-steps') applySteps(t.value);
+  if (t.id === 'pix-skin-anim') { skinAnim = t.value; render(); }
+  if (t.id === 'pix-rest-pose' && restSel) setRest(restSel.which, 'pose', t.value);
+  if (t.id === 'pix-step-dx' || t.id === 'pix-step-dy') setMove(t.id === 'pix-step-dx' ? 'dx' : 'dy', t.value);
+  if (t.id === 'pix-fps' && draft) { const a = curAnim(draft); if (a) { a.fps = FPS_CHOICES.includes(Number(t.value)) ? Number(t.value) : DEFAULT_FPS; restartAnim(); } }
   if (t.matches('[data-group-select]')) {
     // New group… shows the field for its name
     const name = document.getElementById(`${t.id}-new`) as HTMLInputElement | null, box = name?.closest('label');
@@ -1306,7 +1821,17 @@ onShown('pixel', 'keydown', (ev) => {
   if (ev.shiftKey) step(redos, undos); else step(undos, redos);
 });
 
-onAppShown('pixel', () => { renderTop(); render(); });
+// Kitty Gallery and Kitty Wardrobe are one page in two modes: coming from the other one starts on its first tab.
+let shownMode = '';
+onAppShown('pixel', () => {
+  const mode = inWardrobe() ? 'wardrobe' : 'gallery';
+  if (mode !== shownMode) {
+    shownMode = mode; tab = 'icons'; picked.clear(); organise = false;
+    if (draft && !dirty() && (draft.cat === 'kitty') !== (mode === 'wardrobe')) draft = null;
+    cat = mode === 'wardrobe' ? 'kitty' : cat === 'kitty' ? 'sticker' : cat;
+  }
+  renderTop(); render();
+});
 renderTop();
 render();
 initPixel().then(render);

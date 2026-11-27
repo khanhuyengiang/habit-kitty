@@ -9,6 +9,8 @@
 // settings file carry it to another phone; to make it official, Export writes a file (the format is below) to put in the
 // repo, and its icons are then copied into the code by hand.
 import { OFFICIAL_CARD_FRIENDS, OFFICIAL_PICKER_ICONS, OFFICIAL_UI_ICONS, PALETTE_INKS, bakeSticker } from '../shared/stickers.ts';
+import { OFFICIAL_SHEET } from '../shared/kittysheet-art.ts';
+import { KITTY_ZONES } from '../shared/kittyzones-art.ts';
 import { OFFICIAL_DECOS, OFFICIAL_ICONS, OFFICIAL_WEATHER } from '../shared/art.ts';
 import { PALETTE, type PaletteName } from '../shared/palette.ts';
 import { OFFICIAL_GARDEN_SPOTS, OFFICIAL_PROPS, OFFICIAL_ROOM_SPOTS, ROOM_H, ROOM_W, officialSceneGrid, type SceneId, type Spot } from '../shared/scene.ts';
@@ -33,12 +35,12 @@ export const MORE_INKS = Object.keys(PALETTE_INKS).filter((ch) => !INK_ROWS.join
 const INKS = [...BASE_ROWS, ...INK_ROWS].join('') + MORE_INKS;
 const FULL_INKS = INKS.replace(/[sld]/g, '');   // the same without the base colour
 export const CATEGORIES: Category[] = [
-  { id: 'sticker', label: 'Sticker', where: 'Notes, Kitty Achievement cards and side quests, Kitty Mart categories', w: 18, h: 18, letters: INKS, outline: true, base: 'the card or note it is on' },
-  { id: 'friend', label: 'Mini sticker', where: 'The card friends in the corner of a Kitty Achievement card', w: 9, h: 9, letters: INKS, outline: false, base: 'the card or note it is on' },
+  { id: 'sticker', label: 'Sticker', where: 'Notes, Pawchievement cards and side quests, Kitty Mart categories', w: 18, h: 18, letters: INKS, outline: true, base: 'the card or note it is on' },
+  { id: 'friend', label: 'Mini sticker', where: 'The card friends in the corner of a Pawchievement card', w: 9, h: 9, letters: INKS, outline: false, base: 'the card or note it is on' },
   { id: 'button', label: 'Button', where: 'The small one-colour icons on buttons', w: 7, h: 7, letters: 'o', outline: false, base: '' },
   { id: 'weather', label: 'Weather', where: 'The weather choice on a diary page (with Meteorokinesis on)', w: 13, h: 10, letters: FULL_INKS, outline: false, base: '' },
   { id: 'deco', label: 'Decoration', where: 'Pictures drawn in one place only, such as the wings beside the chosen app on the home screen', w: 12, h: 12, letters: FULL_INKS, outline: false, base: '' },
-  { id: 'kitty', label: 'Kitty', where: 'Kitty poses and designs, drawn at any size. The app does not show them yet', w: 32, h: 24, letters: FULL_INKS, outline: false, base: '', free: true },
+  { id: 'kitty', label: 'Kitty', where: "The kitty sprite sheet: every pose the kitties have, and the animations that play them in Habit Kitty's room", w: 32, h: 24, letters: INKS, outline: false, base: "the kitty's fur", free: true },
   { id: 'scene', label: 'Scene', where: "Habit Kitty's cosy room and garden, where the kitties live", w: ROOM_W, h: ROOM_H, letters: '', outline: false, base: '' },
 ];
 // Decorations and scenes are each drawn in their own place: they can be changed, but there are no new ones.
@@ -120,7 +122,7 @@ export const LIMITS = { name: 30, group: 30, icons: 500 };
 // A scene also has its kitty spots and (the room) where the diary book and the trophy stand.
 export type Props = Record<'book' | 'trophy', Spot>;
 // A sticker can be cat food too (food: true): the kitties are fed it on Habit Kitty's feed button.
-export interface Official { id: string; name: string; group: string; art: string[]; spots?: Spot[]; props?: Props; food?: boolean; frames?: Frame[]; sequence?: string[]; fps?: number }
+export interface Official { id: string; name: string; group: string; art: string[]; spots?: Spot[]; props?: Props; food?: boolean; sprites?: Sprite[]; animations?: Animation[]; zones?: Zones }
 export const SCENES: [SceneId, string][] = [['room', 'Cosy room'], ['garden', 'Garden']];
 export const MAX_SPOTS = 16;
 const sceneArts: Partial<Record<SceneId, string[]>> = {};
@@ -132,10 +134,10 @@ export function officials(cat: CategoryId): Official[] {
   if (cat === 'friend') return Object.entries(OFFICIAL_CARD_FRIENDS).map(([id, v]) => ({ id, name: v.label, group: DEFAULT_GROUP, art: v.art }));
   if (cat === 'weather') return Object.entries(OFFICIAL_WEATHER).map(([id, v]) => ({ id, name: v.label, group: DEFAULT_GROUP, art: v.art }));
   if (cat === 'deco') return Object.entries(OFFICIAL_DECOS).map(([id, v]) => ({ id, name: v.label, group: DEFAULT_GROUP, art: v.art }));
-  if (cat === 'kitty') return [];   // nothing official yet: every kitty is one you drew
+  if (cat === 'kitty') return [{ id: SHEET_ID, name: SHEET_NAME, group: USER_GROUP, art: OFFICIAL_SHEET.sprites[0].art, sprites: OFFICIAL_SHEET.sprites, animations: OFFICIAL_SHEET.animations, zones: KITTY_ZONES }];   // the one sprite sheet
   if (cat === 'scene') return SCENES.map(([id, name]) => ({ id, name, group: DEFAULT_GROUP, art: sceneArt(id), spots: officialSpots(id),
     ...(id === 'room' && { props: { book: [...OFFICIAL_PROPS.book] as Spot, trophy: [...OFFICIAL_PROPS.trophy] as Spot } }) }));
-  // Habit Kitty's button icons, then Kitty Achievement's that Habit Kitty has not got
+  // Habit Kitty's button icons, then Pawchievement's that Habit Kitty has not got
   const all: Record<string, string[]> = { ...OFFICIAL_ICONS };
   for (const [id, art] of Object.entries(OFFICIAL_UI_ICONS)) all[id] ??= art;
   return Object.entries(all).map(([id, art]) => ({ id, name: titleCase(id), group: DEFAULT_GROUP, art }));
@@ -145,13 +147,42 @@ export const officialOf = (cat: CategoryId, id: string) => officials(cat).find((
 // ---- your icons ----
 // A drawing of your own, or a change to an official icon (it has the official one's id). deleted: true marks an official
 // icon you deleted (see canDeleteOfficial); it keeps its picture, name and group, so bringing it back loses nothing.
-// A kitty can be an animation: one drawing made of named frames, and a sequence that plays them. The sequence points at
-// frames by id, so a frame can be in it many times (1 2 3 2 1) and changing the frame changes it everywhere it plays, as in
-// Toon Boom's exposure sheet (a drawing exposed on many cells) and Aseprite's linked cels. `art` stays the first frame's
-// picture, so a kitty still has one picture in every list.
-export interface Frame { id: string; name: string; art: string[]; pin?: [number, number] }   // pin: the point of tracking (a cell)
-export const MAX_FRAMES = 24, MAX_STEPS = 96, DEFAULT_FPS = 4, FPS_CHOICES = [2, 4, 6, 8, 12];
-export interface PixelIcon { category: CategoryId; id: string; name: string; group: string; art: string[]; spots?: Spot[]; props?: Props; food?: boolean; frames?: Frame[]; sequence?: string[]; fps?: number; deleted?: boolean; updated: number }
+// The kitty is one sprite sheet (the only icon of the 'kitty' category, id SHEET_ID): a list of named sprites, all one size, and
+// animations that each pick sprites from the list by id, in play order. A sprite can be in an animation many times (1 2 3 2 1)
+// and in many animations, and changing the sprite changes it everywhere it plays, as in Toon Boom's exposure sheet and
+// Aseprite's linked cels. `art` stays the first sprite's picture, so the sheet still has one picture in every list.
+export interface Sprite { id: string; name: string; art: string[] }
+// A step plays a sprite, and may move it (a displacement, in sprite pixels): `dx` is forward (the way the kitty faces; the sprites are drawn
+// facing left, so forward is left) and `dy` is up, off the ground. So the file knows a kitty is in the air, or has gone to the side, and the
+// same sprite can be drawn once and played at several places (a sitting kitty at rest, and at the start of a jump). No move is 0.
+export interface Step { id: string; dx?: number; dy?: number }
+// Before and after an animation the kitty is in a resting pose: sitting (Idle's first drawing) or standing (the last step of Sit side to
+// stand side). That pose is drawn as a ghost before the first step and after the last, and `dx`/`dy` (forward, up: as for a step) say where
+// it is from the step it is next to, so the whole sequence of poses lines up in the room: sit, stand up, walk, sit down.
+export type Anchor = 'idle' | 'stand';
+export interface Ghost { pose: Anchor; dx?: number; dy?: number }
+export interface Animation { id: string; name: string; fps: number; steps: Step[]; before?: Ghost; after?: Ghost }
+// What an animation starts from and ends in when the sheet does not say: a walk goes from standing to standing, standing up from sitting to
+// standing, sitting down from standing to sitting; anything else from sitting to sitting.
+export function defaultGhosts(id: string): { before: Anchor; after: Anchor } {
+  return id === 'walk' ? { before: 'stand', after: 'stand' } : id === 'sit2stand' ? { before: 'idle', after: 'stand' } : /^standtosit/.test(id) ? { before: 'stand', after: 'idle' } : { before: 'idle', after: 'idle' };
+}
+export function cleanGhost(raw: unknown): Ghost | undefined {
+  const r = raw as Ghost | null;
+  if (!r || (r.pose !== 'idle' && r.pose !== 'stand')) return undefined;
+  const n = (v: unknown) => (Number.isFinite(Number(v)) ? Math.max(-MAX_SHIFT, Math.min(MAX_SHIFT, Math.round(Number(v)))) : 0);
+  const dx = n(r.dx), dy = n(r.dy);
+  return { pose: r.pose, ...(dx && { dx }), ...(dy && { dy }) };
+}
+export const MAX_SHIFT = 96;
+export const SHEET_ID = 'sheet', SHEET_NAME = 'Kitty sprites';
+export const MAX_SPRITES = 48, MAX_STEPS = 96, MAX_ANIMS = 24, DEFAULT_FPS = 4, FPS_CHOICES = [1, 2, 4, 6, 8, 12];
+// The animations the game plays (the others are yours to keep): where Habit Kitty's room shows each one.
+export const GAME_ANIMS: { id: string; name: string; where: string }[] = [
+  { id: 'idle', name: 'Idle', where: 'a kitty sitting in the room' },
+  { id: 'nap', name: 'Nap', where: 'a kitty asleep in the room' },
+];
+export interface PixelIcon { category: CategoryId; id: string; name: string; group: string; art: string[]; spots?: Spot[]; props?: Props; food?: boolean; sprites?: Sprite[]; animations?: Animation[]; zones?: Zones; deleted?: boolean; updated: number }
 export interface PixelData { version: 1; icons: PixelIcon[] }
 export const emptyData = (): PixelData => ({ version: 1, icons: [] });
 
@@ -166,11 +197,11 @@ export function iconsOf(data: PixelData, cat: CategoryId): Shown[] {
   const offs = officials(cat);
   const shown: Shown[] = offs.map((o) => {
     const m = byId.get(o.id);
-    return m ? { ...o, name: m.name, group: m.group, art: m.art, spots: m.spots ?? o.spots, props: m.props ?? o.props, food: m.food ?? o.food, status: m.deleted ? 'deleted' : 'changed' } : { ...o, status: 'official' };
+    return m ? { ...o, name: m.name, group: m.group, art: m.art, spots: m.spots ?? o.spots, props: m.props ?? o.props, food: m.food ?? o.food, sprites: m.sprites ?? o.sprites, animations: m.sprites ? m.animations ?? [] : o.animations, zones: m.zones ?? o.zones, status: m.deleted ? 'deleted' : 'changed' } : { ...o, status: 'official' };
   });
   const offIds = new Set(offs.map((o) => o.id));
   for (const m of mine) if (!offIds.has(m.id)) shown.push({ id: m.id, name: m.name, group: m.group, art: m.art, ...(m.food && { food: true }),
-    ...(m.frames && { frames: m.frames, sequence: m.sequence, fps: m.fps }), status: 'new' });
+    ...(m.sprites && { sprites: m.sprites, animations: m.animations ?? [] }), ...(m.zones && { zones: m.zones }), status: 'new' });
   return shown;
 }
 export const statusOf = (i: { category: CategoryId; id: string; deleted?: boolean }): 'changed' | 'new' | 'deleted' =>
@@ -180,7 +211,7 @@ export const liveIcons = (data: PixelData, cat: CategoryId): Shown[] => iconsOf(
 // What putIcon needs to save a listed icon again as it is (deleted or not).
 const again = (cat: CategoryId, i: Shown): Omit<PixelIcon, 'updated'> =>
   ({ category: cat, id: i.id, name: i.name, group: i.group, art: i.art, spots: i.spots, props: i.props, food: i.food,
-    ...(i.frames && { frames: i.frames, sequence: i.sequence, fps: i.fps }), ...(i.status === 'deleted' && { deleted: true }) });
+    ...(i.sprites && { sprites: i.sprites, animations: i.animations ?? [] }), ...(i.zones && { zones: i.zones }), ...(i.status === 'deleted' && { deleted: true }) });
 
 // The groups in order: default, user, then the rest A to Z.
 export function groupsOf(icons: { group: string }[]): string[] {
@@ -235,10 +266,12 @@ export function putIcon(data: PixelData, icon: Omit<PixelIcon, 'updated'>, now =
   const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
   if (icon.deleted && !(o && canDeleteOfficial(icon.category, icon.id))) return data;   // only an official one can be marked deleted
   if (o && !icon.deleted && o.name === icon.name && o.group === icon.group && o.art.join('\n') === icon.art.join('\n')
-    && same(icon.spots ?? o.spots, o.spots) && same(icon.props ?? o.props, o.props) && !!(icon.food ?? o.food) === !!o.food) return { ...data, icons: rest };
-  const { spots, props, food, deleted, frames, sequence, fps, ...rest2 } = icon;
-  const anim = icon.category === 'kitty' && frames?.length ? { frames, sequence: sequence?.length ? sequence : frames.map((f) => f.id), fps: fps ?? DEFAULT_FPS } : null;
-  return { ...data, icons: [...rest, { ...rest2, ...(anim && { ...anim, art: anim.frames[0].art }), ...(spots && { spots }), ...(props && { props }), ...(icon.category === 'sticker' && food !== undefined && { food }), ...(deleted && { deleted: true }), updated: now }] };
+    && same(icon.spots ?? o.spots, o.spots) && same(icon.props ?? o.props, o.props) && !!(icon.food ?? o.food) === !!o.food
+    && same(icon.sprites, o.sprites) && same(icon.sprites ? icon.animations ?? [] : undefined, o.animations) && same(icon.zones ?? o.zones, o.zones)) return { ...data, icons: rest };
+  if (icon.category === 'kitty' && (icon.id !== SHEET_ID || !icon.sprites?.length)) return data;   // the sheet is the only kitty
+  const { spots, props, food, deleted, sprites, animations, zones, ...rest2 } = icon;
+  const sheet = icon.category === 'kitty' && sprites?.length ? { sprites, animations: cleanAnimations(animations, sprites), art: sprites[0].art, ...(zones && { zones: cleanZones(zones, sprites) }) } : null;
+  return { ...data, icons: [...rest, { ...rest2, ...sheet, ...(spots && { spots }), ...(props && { props }), ...(icon.category === 'sticker' && food !== undefined && { food }), ...(deleted && { deleted: true }), updated: now }] };
 }
 // Deletes your own icon, or puts an official one back as it is in the code (a deleted one too).
 export const dropIcon = (data: PixelData, cat: CategoryId, id: string): PixelData =>
@@ -330,6 +363,7 @@ export function sanitize(raw: unknown): PixelData {
 function checkIcon(i: unknown): Omit<PixelIcon, 'updated'> | null {
   const v = i as Partial<PixelIcon> | null;
   if (!v || !isCategory(v.category) || typeof v.id !== 'string' || !/^[a-z][a-z0-9]{0,31}$/i.test(v.id)) return null;
+  if (v.category === 'kitty' && v.id !== SHEET_ID) return null;   // one sheet: older single kitty drawings are left out
   if (isFixed(v.category) && !officialOf(v.category, v.id)) return null;   // only the official ones
   const size = categoryOf(v.category).free ? freeSize(v.art) : sizeOf(v.category, v.id);
   const art = (size && cleanArt(v.art, v.category, size)) ?? (v.category === 'sticker' ? oldSticker(v.art) : null);
@@ -337,13 +371,12 @@ function checkIcon(i: unknown): Omit<PixelIcon, 'updated'> | null {
   const icon: Omit<PixelIcon, 'updated'> = { category: v.category, id: v.id, name: cleanName(String(v.name ?? ''), v.id), group: cleanGroup(String(v.group ?? '')), art };
   if (v.category === 'sticker' && typeof v.food === 'boolean') icon.food = v.food;
   if (v.category === 'kitty') {
-    const frames = cleanFrames(v.frames, [art[0].length, art.length]);
-    if (frames) {
-      icon.frames = frames;
-      icon.sequence = cleanSequence(v.sequence, frames);
-      icon.fps = FPS_CHOICES.includes(Number(v.fps)) ? Number(v.fps) : DEFAULT_FPS;
-      icon.art = frames[0].art;
-    }
+    const sprites = cleanSprites(v.sprites, [art[0].length, art.length]);
+    if (!sprites) return null;
+    icon.sprites = sprites;
+    icon.animations = cleanAnimations(v.animations, sprites);
+    icon.art = sprites[0].art;
+    if (v.zones !== undefined) icon.zones = cleanZones(v.zones, sprites);
   }
   if (v.deleted === true && officialOf(v.category, v.id) && canDeleteOfficial(v.category, v.id)) icon.deleted = true;
   if (v.category === 'scene') {
@@ -366,83 +399,126 @@ function cleanSpots(raw: unknown): Spot[] | null {
   return spots.length ? spots : null;
 }
 
-// ---- animation frames (a kitty) ----
-// Frames that are the board's size, with ids and names of their own (a name is told apart from the others with a number).
-export function cleanFrames(raw: unknown, size: [number, number]): Frame[] | null {
+// ---- the sprite sheet (the kitty) ----
+// Sprites that are the sheet's size, with ids and names of their own (a name is told apart from the others with a number).
+// Where the parts of each sprite are (for the skins): a picture the size of the sprite, one letter for each coat pixel (see kittyzones-art.ts).
+export type Zones = Record<string, string[]>;
+export const ZONE_LETTERS = 'HEFTKJb';
+export function cleanZones(raw: unknown, sprites: Sprite[]): Zones {
+  const out: Zones = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const sp of sprites) {
+    const rows = (raw as Record<string, unknown>)[sp.id];
+    if (!Array.isArray(rows)) continue;
+    const w = sp.art[0].length;
+    const clean = sp.art.map((row, y) => {
+      const r = typeof rows[y] === 'string' ? (rows[y] as string) : '';
+      return [...row].map((c, x) => ('nNwuU'.includes(c) && ZONE_LETTERS.includes(r[x] ?? '') ? r[x] : '.')).join('').slice(0, w).replace(/\.+$/, '');
+    });
+    while (clean.length && !clean[clean.length - 1]) clean.pop();
+    out[sp.id] = clean;
+  }
+  return out;
+}
+export function cleanSprites(raw: unknown, size: [number, number]): Sprite[] | null {
   if (!Array.isArray(raw)) return null;
-  const out: Frame[] = [];
+  const out: Sprite[] = [];
   const ids = new Set<string>(), names = new Set<string>();
-  for (const f of raw.slice(0, MAX_FRAMES)) {
-    const art = cleanArt((f as Frame)?.art, 'kitty', size);
-    const id = String((f as Frame)?.id ?? '');
+  for (const f of raw.slice(0, MAX_SPRITES)) {
+    const art = cleanArt((f as Sprite)?.art, 'kitty', size);
+    const id = String((f as Sprite)?.id ?? '');
     if (!art || !/^[a-z0-9]{1,12}$/i.test(id) || ids.has(id)) continue;
     ids.add(id);
-    const name = frameName(cleanName(String((f as Frame).name ?? ''), `Frame ${out.length + 1}`), names);
+    const name = freeName(cleanName(String((f as Sprite).name ?? ''), `Sprite ${out.length + 1}`), names);
     names.add(nameKey(name));
-    const pin = cleanPin((f as Frame).pin, [art[0].length, art.length]);
-    out.push({ id, name, art, ...(pin && { pin }) });
+    out.push({ id, name, art });
   }
   return out.length ? out : null;
 }
-// A frame name nobody else has: "Pose" is "Pose 2" if "Pose" is taken (names is a set of nameKey()s).
-export function frameName(name: string, taken: Set<string>): string {
+// A name nobody else has: "Pose" is "Pose 2" if "Pose" is taken (taken is a set of nameKey()s).
+export function freeName(name: string, taken: Set<string>): string {
   if (!taken.has(nameKey(name))) return name;
   for (let n = 2; ; n++) {
     const tail = ` ${n}`, next = name.slice(0, LIMITS.name - tail.length).trimEnd() + tail;
     if (!taken.has(nameKey(next))) return next;
   }
 }
-// The steps of a sequence that are frames; with none left, every frame once, in order.
-export function cleanSequence(raw: unknown, frames: Frame[]): string[] {
-  const ids = new Set(frames.map((f) => f.id));
-  const seq = Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string' && ids.has(x)).slice(0, MAX_STEPS) : [];
-  return seq.length ? seq : frames.map((f) => f.id);
+// A step as it is kept: just the sprite's id, with the move only where it is not 0 (a bare id, the way steps used to be, is a step too).
+export function cleanStep(raw: unknown): Step | null {
+  const r = typeof raw === 'string' ? { id: raw } : (raw as Step | null);
+  if (!r || typeof r.id !== 'string') return null;
+  const n = (v: unknown) => (Number.isFinite(Number(v)) ? Math.max(-MAX_SHIFT, Math.min(MAX_SHIFT, Math.round(Number(v)))) : 0);
+  const dx = n(r.dx), dy = n(r.dy);
+  return { id: r.id, ...(dx && { dx }), ...(dy && { dy }) };
+}
+// The animations that are whole: an id and name each, a speed we offer, and only the steps that are sprites (an animation with
+// none left stays, empty, for you to fill; the game skips it).
+export function cleanAnimations(raw: unknown, sprites: Sprite[]): Animation[] {
+  if (!Array.isArray(raw)) return [];
+  const have = new Set(sprites.map((s) => s.id));
+  const out: Animation[] = [];
+  const ids = new Set<string>(), names = new Set<string>();
+  for (const a of raw.slice(0, MAX_ANIMS)) {
+    const id = String((a as Animation)?.id ?? '');
+    if (!/^[a-z][a-z0-9]{0,15}$/i.test(id) || ids.has(id)) continue;
+    ids.add(id);
+    const name = freeName(cleanName(String((a as Animation).name ?? ''), id), names);
+    names.add(nameKey(name));
+    const steps = Array.isArray((a as Animation).steps) ? (a as Animation).steps.map(cleanStep).filter((x): x is Step => !!x && have.has(x.id)).slice(0, MAX_STEPS) : [];
+    const before = cleanGhost((a as Animation).before), after = cleanGhost((a as Animation).after);
+    out.push({ id, name, fps: FPS_CHOICES.includes(Number((a as Animation).fps)) ? Number((a as Animation).fps) : DEFAULT_FPS, steps, ...(before && { before }), ...(after && { after }) });
+  }
+  return out;
+}
+// An id for a new animation, from its name (lower-case letters and digits, not taken): "Happy dance" is "happydance".
+export function newAnimId(name: string, animations: { id: string }[]): string {
+  const base = (name.normalize('NFKD').toLowerCase().replace(/[^a-z0-9]/g, '').replace(/^[0-9]+/, '') || 'anim').slice(0, 14);
+  const taken = new Set(animations.map((a) => a.id));
+  if (!taken.has(base)) return base;
+  for (let n = 2; ; n++) if (!taken.has(`${base}${n}`)) return `${base}${n}`;
 }
 // 1 2 3 becomes 1 2 3 2 1: forward, then back without repeating the ends.
 export const pingPong = (ids: string[]): string[] => [...ids, ...ids.slice(0, -1).reverse()];
-// A point of tracking: a whole cell on the board.
-export function cleanPin(raw: unknown, [w, h]: [number, number]): [number, number] | null {
-  if (!Array.isArray(raw) || raw.length !== 2) return null;
-  const [x, y] = raw.map(Number);
-  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < w && y < h ? [x, y] : null;
+// Steps from sprite numbers typed in: "1 2 3 2 1", "1-4" (a run, also backwards: "4-1"), commas or spaces. Numbers are places in
+// the sprite list (the first is 1). Anything that isn't a sprite is left out and given back in `bad`.
+export function stepsFromText(text: string, sprites: Sprite[], keep: Step[] = []): { steps: Step[]; bad: string[] } {
+  const ids: string[] = [], bad: string[] = [];
+  const at = (n: number) => (Number.isInteger(n) && n >= 1 && n <= sprites.length ? sprites[n - 1].id : undefined);
+  for (const tok of text.split(/[\s,]+/).filter(Boolean)) {
+    const m = /^(\d+)(?:-(\d+))?$/.exec(tok);
+    const from = m ? Number(m[1]) : NaN, to = m ? Number(m[2] ?? m[1]) : NaN;
+    if (!m || at(from) === undefined || at(to) === undefined) { bad.push(tok); continue; }
+    const dir = to >= from ? 1 : -1;
+    for (let n = from; n !== to + dir; n += dir) ids.push(at(n)!);
+  }
+  // a step that is still the same sprite in the same place keeps its move
+  return { steps: ids.slice(0, MAX_STEPS).map((id, i) => (keep[i]?.id === id ? keep[i] : { id })), bad };
 }
-// The art moved by dx, dy cells; what leaves the board is cut off.
-export function shiftArt(art: string[], dx: number, dy: number): string[] {
-  const w = art[0]?.length ?? 0;
-  return art.map((_, y) => {
-    const src = art[y - dy];
-    return src === undefined ? '.'.repeat(w) : Array.from({ length: w }, (_, x) => src[x - dx] ?? '.').join('');
-  });
+// The numbers of the steps, as stepsFromText reads them back ("1 2 3 2 1").
+export const stepsToText = (steps: Step[], sprites: { id: string }[]): string =>
+  steps.map((st) => sprites.findIndex((s) => s.id === st.id) + 1).filter((n) => n > 0).join(' ');
+// A sprite id nobody has, and the next free "Sprite 3" name.
+export function newSpriteId(sprites: { id: string }[]): string {
+  const ids = new Set(sprites.map((f) => f.id));
+  for (let n = sprites.length + 1; ; n++) if (!ids.has(`s${n}`)) return `s${n}`;
 }
-// Points of tracking line the frames up as they play: the first pin in the sequence is where every pinned frame puts its own,
-// so a pin on the front leg, then on the back leg, makes the body travel while the planted leg stays still.
-export function trackShifts(frames: Frame[], sequence: string[] | undefined): Map<string, [number, number]> {
-  const byId = new Map(frames.map((f) => [f.id, f]));
-  const ref = cleanSequence(sequence, frames).map((id) => byId.get(id)!.pin).find(Boolean);
-  const out = new Map<string, [number, number]>();
-  if (ref) for (const f of frames) if (f.pin) out.set(f.id, [ref[0] - f.pin[0], ref[1] - f.pin[1]]);
-  return out;
+export function nextSpriteName(sprites: { name: string }[]): string {
+  const taken = new Set(sprites.map((f) => nameKey(f.name)));
+  for (let n = sprites.length + 1; ; n++) if (!taken.has(nameKey(`Sprite ${n}`))) return `Sprite ${n}`;
 }
-// The pictures in the order they play, one per step, each moved so its point of tracking (if it has one) lines up.
-export const playOrder = (frames: Frame[], sequence: string[] | undefined): string[][] => {
-  const byId = new Map(frames.map((f) => [f.id, f.art]));
-  const shifts = trackShifts(frames, sequence);
-  return cleanSequence(sequence, frames).map((id) => { const a = byId.get(id)!, s = shifts.get(id); return s && (s[0] || s[1]) ? shiftArt(a, s[0], s[1]) : a; });
-};
-// A frame id nobody has, and the next free "Frame 3" name.
-export function newFrameId(frames: { id: string }[]): string {
-  const ids = new Set(frames.map((f) => f.id));
-  for (let n = frames.length + 1; ; n++) if (!ids.has(`f${n}`)) return `f${n}`;
+// Takes a sprite out of the list and every step that plays it (an animation left with no steps stays, empty).
+export function removeSprite<T extends { id: string }>(sprites: T[], animations: Animation[], id: string): { sprites: T[]; animations: Animation[] } {
+  return { sprites: sprites.filter((f) => f.id !== id), animations: animations.map((a) => ({ ...a, steps: a.steps.filter((x) => x.id !== id) })) };
 }
-export function nextFrameName(frames: { name: string }[]): string {
-  const taken = new Set(frames.map((f) => nameKey(f.name)));
-  for (let n = frames.length + 1; ; n++) if (!taken.has(nameKey(`Frame ${n}`))) return `Frame ${n}`;
-}
-// Takes a frame out of the frames and every step that plays it; a sequence with nothing left plays the frames in order.
-export function removeFrame<T extends { id: string }>(frames: T[], sequence: string[], id: string): { frames: T[]; sequence: string[] } {
-  const rest = frames.filter((f) => f.id !== id);
-  const seq = sequence.filter((x) => x !== id);
-  return { frames: rest, sequence: seq.length ? seq : rest.map((f) => f.id) };
+// The sheet as the game uses it: sprites by id, animations by id (those with steps), and the size every sprite is.
+export interface Sheet { w: number; h: number; sprites: Map<string, string[]>; zones: Map<string, string[]>; animations: Map<string, { fps: number; steps: Required<Step>[]; before?: Required<Ghost>; after?: Required<Ghost> }> }
+export function sheetOf(data: PixelData): Sheet | null {
+  const i = iconsOf(data, 'kitty').find((x) => x.id === SHEET_ID);   // yours, or the one that ships with the app
+  if (!i?.sprites?.length) return null;
+  const sprites = new Map(i.sprites.map((s) => [s.id, s.art]));
+  const whole = (g?: Ghost) => { const c = cleanGhost(g); return c && { pose: c.pose, dx: c.dx ?? 0, dy: c.dy ?? 0 }; };
+  const animations = new Map((i.animations ?? []).filter((a) => a.steps.length).map((a) => [a.id, { fps: a.fps, steps: a.steps.map(cleanStep).filter((st): st is Step => !!st).map((st) => ({ id: st.id, dx: st.dx ?? 0, dy: st.dy ?? 0 })), ...(whole(a.before) && { before: whole(a.before) }), ...(whole(a.after) && { after: whole(a.after) }) }]));
+  return { w: i.sprites[0].art[0].length, h: i.sprites[0].art.length, sprites, zones: new Map(Object.entries(i.zones ?? {})), animations };
 }
 
 // ---- the export file ----
@@ -459,14 +535,15 @@ export function removeFrame<T extends { id: string }>(frames: T[], sequence: str
 // "status" says whether it is a new icon, a change to an official one (of the same id), or an official one you deleted
 // (to take out of the code; its picture is the one it had). Only your icons are in it.
 export const EXPORT_FORMAT = 'itty-bitty-kitty-icons';
-export const exportName = (day: string) => `kitty-icons-${day}.json`;
+// The time is in the name so that saving twice in a day does not make the device add its own " (1)" after the extension.
+export const exportName = (day: string, time = '') => `kitty-icons-${day}${time ? `-${time}` : ''}.json`;
 
 export function exportText(data: PixelData, day: string): string {
   const order = CATEGORIES.map((c) => c.id);
   const icons = [...data.icons].sort((a, b) => order.indexOf(a.category) - order.indexOf(b.category) || a.group.localeCompare(b.group) || a.updated - b.updated)
     .map((i) => ({ category: i.category, id: i.id, status: statusOf(i), ...(i.deleted && { deleted: true }), name: i.name, group: i.group, art: i.art,
       ...(i.spots && { spots: i.spots }), ...(i.props && { props: i.props }), ...(i.food !== undefined && { food: i.food }),
-      ...(i.frames && { frames: i.frames, sequence: i.sequence, fps: i.fps }) }));
+      ...(i.sprites && { sprites: i.sprites, animations: i.animations ?? [] }), ...(i.zones && { zones: i.zones }) }));
   return JSON.stringify({ format: EXPORT_FORMAT, version: 1, exported: day, icons }, null, 2) + '\n';
 }
 
@@ -485,7 +562,7 @@ export function importClashes(data: PixelData, icons: Omit<PixelIcon, 'updated'>
   return icons.filter((i) => {
     const mine = data.icons.find((m) => m.category === i.category && m.id === i.id);
     return !!mine && (mine.name !== i.name || mine.group !== i.group || mine.art.join('\n') !== i.art.join('\n') || !!mine.deleted !== !!i.deleted
-      || JSON.stringify([mine.frames, mine.sequence]) !== JSON.stringify([i.frames, i.sequence]));
+      || JSON.stringify([mine.sprites, mine.animations]) !== JSON.stringify([i.sprites, i.animations]));
   });
 }
 
@@ -496,7 +573,7 @@ export function importIcons(data: PixelData, icons: Omit<PixelIcon, 'updated'>[]
   const clash = new Set(mode === 'keep' ? importClashes(data, icons) : []);
   const next = icons.reduce((d, i) => {
     if (!clash.has(i)) return putIcon(d, i, now);
-    if (i.deleted) return d;   // keep yours: it is there, not deleted
+    if (i.deleted || i.category === 'kitty') return d;   // keep yours: it is there, not deleted (and there is only one sheet)
     const [w, h] = sizeOf(i.category, null);
     if (!categoryOf(i.category).free && (i.art.length !== h || i.art.some((r) => r.length !== w))) return d;
     return putIcon(d, { ...i, id: newId(i.name, i.category, d), group: i.group === DEFAULT_GROUP ? USER_GROUP : i.group }, now);

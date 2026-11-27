@@ -36,7 +36,7 @@ public class RoomWidgetProvider extends AppWidgetProvider {
             RemoteViews rv = new RemoteViews(ctx.getPackageName(), R.layout.widget_room);
             if (bmp != null) rv.setImageViewBitmap(R.id.room_img, bmp);
             rv.setViewVisibility(R.id.room_hint, bmp != null ? View.GONE : View.VISIBLE);
-            rv.setOnClickPendingIntent(R.id.widget_root, tap);
+            rv.setOnClickPendingIntent(android.R.id.background, tap);
             mgr.updateAppWidget(id, rv);
         }
     }

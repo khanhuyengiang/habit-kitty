@@ -1,12 +1,12 @@
 // The Notes screen: the notes as little window cards, two to a row, with a search box. A card opens the note to read;
 // Edit turns it into the form (title, the card's picture, the text), which saves as you type. Notes can be put in notebooks
-// (./books.ts): a notebook is a cover among the cards that opens to its notes, and the Filter (Kitty Achievement's) shows
+// (./books.ts): a notebook is a cover among the cards that opens to its notes, and the Filter (Pawchievement's) shows
 // every note, those in no notebook or one notebook, as covers, under a heading per notebook or all together.
 // The data is in ./data.ts (Habit Kitty starts it), the pure parts in ./model.ts. Drawn with Habit Kitty's stylesheet, in web/notes.html.
 import { iconSvg } from '../shared/art.ts';
 import { PICKER_ICONS, groupedPicks, iconLabel, uiIconSvg, pickable, stickerSvg } from '../shared/stickers.ts';
 import { monoSvg } from '../shared/pixelart.ts';
-import { journalTabs, onAppShown, onShown } from '../shared/apps.ts';
+import { onAppShown, onShown } from '../shared/apps.ts';
 import { $, esc } from '../shared/html.ts';
 import { localDateKey } from '../shared/dates.ts';
 import { makeLayer } from '../shared/layer.ts';
@@ -25,7 +25,7 @@ const toast = (text: string) => showToast($('notes-toast'), text);
 
 // ---- header ----
 function renderTop() {
-  $('notes-top').innerHTML = titleBar('Kitty', 'Journal', homeButton() + playerButton() + settingsButton()) + journalTabs('notes');
+  $('notes-top').innerHTML = titleBar('Library', '', homeButton() + playerButton() + settingsButton());
 }
 
 // ---- state ----
@@ -76,7 +76,7 @@ function openNote(n: Note | null, editing: boolean): Open {
 // A title bar with a cat, the name and three little window keys; under it a dotted screen with the picture and a few words
 // (or, with no picture, the start of the text), sparkles in its corners, the note's doodle in the bottom one and a dotted
 // line with the date. The note's colour (--nc) tints all of it. In the list every card is the same size (.ncard in web/notes.html).
-// The bottom-left picture is one of Kitty Achievement's icons (a sticker at the note's own pixel) and the title bar's cat (./window.ts) is the
+// The bottom-left picture is one of Pawchievement's icons (a sticker at the note's own pixel) and the title bar's cat (./window.ts) is the
 // outline of one of Habit Kitty's mini moods, so everything on the card is drawn on the same grid.
 // An icon that is gone (deleted in Kitty Gallery) is drawn as a heart.
 const doodleSvg = (d: NoteDoodle) => (d === 'none' ? '' : stickerSvg(d, 1));
@@ -123,7 +123,7 @@ function renderList() {
   const all = allNotes(), books = allBooks();
   const open = book ? bookOf(books, book) : undefined;
   if (!open) book = null;
-  const changed = (!book && show !== 'all' ? 1 : 0) + (!book && group !== 'covers' ? 1 : 0);   // an open notebook is a page, not a filter (as a quest is in Kitty Achievement)
+  const changed = (!book && show !== 'all' ? 1 : 0) + (!book && group !== 'covers' ? 1 : 0);   // an open notebook is a page, not a filter (as a quest is in Pawchievement)
   const panel = filterOpen ? `<div class="panel filter-panel" id="filter-panel"><div class="filter-grid">
       ${filterSelect('show', 'Show', [['all', 'All notes'], ['loose', 'Not in a notebook'], ...books.map((b): [string, string] => [`book:${b.name}`, b.name])], open ? `book:${open.name}` : show)}
       ${open ? '' : filterSelect('group', 'Group by', [['covers', 'Notebook covers'], ['book', 'Notebook'], ['none', 'No grouping']], group)}</div>
@@ -281,7 +281,7 @@ function coverFieldHtml(): string {
     <input type="file" id="note-file" accept="image/*" hidden>
     <p class="hint">The picture is scaled down and kept inside the note's file.</p>`;
 }
-// The icon list (Kitty Achievement's), folded to the chosen one; `none` adds a "None" choice.
+// The icon list (Pawchievement's), folded to the chosen one; `none` adds a "None" choice.
 // An icon that is gone (deleted in Kitty Gallery) is a heart, so the heart is the one chosen.
 function iconFold(id: string, name: string, sel: string, open: boolean, none: boolean): string {
   if (!(none && sel === 'none')) sel = pickable(sel);

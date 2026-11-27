@@ -6,7 +6,7 @@ const { fs: files, put } = await import('../test/fsmock.ts');
 const { FileRepo } = await import('./filerepo.ts');
 
 describe('FileRepo', () => {
-  it("keeps Kitty Achievement's files in their own folder, next to Habit Kitty's", async () => {
+  it("keeps Pawchievement's files in their own folder, next to Habit Kitty's", async () => {
     files.clear();
     put('habit-kitty/save.json', 'not ours');
     const repo = new FileRepo();

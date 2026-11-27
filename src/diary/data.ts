@@ -78,6 +78,7 @@ const hasPage = (e?: DiaryEntry) => !!e && (!!e.text.trim() || !!e.photo || !!e.
 export const diaryEntries = () => entries;
 export const entryOf = (day: number): DiaryEntry | undefined => entries[day];
 export const hasPageOn = (day: number) => hasPage(entries[day]);
+export const pageDue = (day: number): number => (ready && !hasPage(entries[day]) ? 1 : 0);   // the number on Kitty Journal's key on the home page
 export const pageCount = () => Object.values(entries).filter(hasPage).length;   // for the accomplishments
 export const dayCount = () => Object.keys(entries).length;                     // days with anything on them: MP
 export const reflectionOf = (key: string): Reflection | undefined => reflections[key];

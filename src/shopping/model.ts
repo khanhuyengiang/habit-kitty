@@ -63,6 +63,9 @@ export const LIMITS = { lists: 30, items: 300, regulars: 1000, recipes: 300, pan
 const BOUGHT_KEPT = 12;
 const DAY = 86_400_000;
 
+// How many lists still have something to buy (the number on Kitty Mart's key on the home page).
+export const listsToShop = (d: Pick<ShopData, 'lists'>): number => d.lists.filter((l) => l.items.some((i) => !i.done)).length;
+
 export const emptyData = (): ShopData => ({
   v: 2, lists: [], regulars: {}, recipes: [], pantry: [], cats: defaultCats(), places: {}, had: {}, dismissed: {}, opts: { ...DEFAULT_OPTS },
 });

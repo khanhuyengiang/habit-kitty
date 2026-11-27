@@ -2,7 +2,7 @@ import { faceSvg } from './pixelcat.ts';
 import { monoSvg, runPaths } from './pixelart.ts';
 import { PALETTE, type PaletteName } from './palette.ts';
 
-// The stickers (the icons on achievements, notes, diary pages, Kitty Mart...), the interface icons and Kitty Achievement's card pictures, drawn on the shared grid (./pixelart.ts). Pure functions that return SVG strings.
+// The stickers (the icons on achievements, notes, diary pages, Kitty Mart...), the interface icons and Pawchievement's card pictures, drawn on the shared grid (./pixelart.ts). Pure functions that return SVG strings.
 
 export { OFFICIAL_PICKER_ICONS, PICKER_ICONS, PICKER_ICON_NAMES, PICKER_ICON_GROUPS, refreshPickerOrder } from './sticker-icons.ts';
 import { PICKER_ICONS, PICKER_ICON_GROUPS } from './sticker-icons.ts';
@@ -79,9 +79,11 @@ function litShaded(pairs: Record<string, string>, base: Record<string, string>):
 }
 
 // Rows of letters to one path per colour (runs merged), so a picture is a handful of elements however dense it is.
-export function fineSvg(art: string[], cls = ''): string {
+// ink: colours for some letters instead of FINE's (the home page's wings take their card's colours)
+export function fineSvg(art: string[], cls = '', ink: Record<string, string> = {}): string {
   const w = Math.max(...art.map((r) => r.length));
-  const body = Object.entries(runPaths(art, (ch) => !!FINE[ch])).map(([ch, d]) => `<path style="fill:${FINE[ch]}" d="${d}"/>`).join('');
+  const col = (ch: string) => ink[ch] ?? FINE[ch];
+  const body = Object.entries(runPaths(art, (ch) => !!col(ch))).map(([ch, d]) => `<path style="fill:${col(ch)}" d="${d}"/>`).join('');
   return `<svg class="pxs fine ${cls}" style="--w:${w};--h:${art.length}" viewBox="0 0 ${w} ${art.length}" aria-hidden="true" shape-rendering="crispEdges">${body}</svg>`;
 }
 

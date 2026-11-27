@@ -9,40 +9,60 @@
 .pstats { display: grid; gap: var(--s4); }
 .title-line { color: var(--accent-text); font-weight: 700; font-size: 18px; }
 
-/* The menu, after inspo/menu.jpg: short, long keys in a column, each with a dark two-pixel outline, a lit top edge and a shaded
-   bottom band. The colours fade from lavender (the first key) to periwinkle; the in-between keys mix their neighbours. The key of the app opened last is the chosen one: a
-   white outline that glows and a wing on each side. A white cat always sleeps on Habit Kitty's key.
-   Each name is written like its app's title bar: the word in the title colour, "Kitty" in pink. */
-.home-menu { --m1: #e6dafc; --m2: #d9ccf7; --m3: color-mix(in srgb, #d9ccf7, #bdb0e6); --m4: #bdb0e6; --m5: color-mix(in srgb, #bdb0e6 70%, #9a8cc8); --m6: color-mix(in srgb, #bdb0e6 40%, #9a8cc8); --menu-dk: #6b4f9e;
-  --wing: calc(12 * 2 * var(--px)); --wing-gap: calc(2 * var(--px));
-  /* every key is as wide as the longest name, and the keys plus both wings always fit the screen */
-  display: grid; gap: var(--s4); justify-items: stretch; width: max-content; margin-inline: auto;
-  max-width: calc(100% - 2 * (var(--wing) + var(--wing-gap))); }
-/* The page fills the screen and the keys sit in its middle, however many there are: the title bar is in the top row and the
-   version in the bottom one, both as tall as each other, so neither pushes the keys off centre. The version sits just under the
-   last key. The cat sleeping on the first key lies in the top row, above the key.
+/* The menu is four cards (Agenda pink, Almanac purple, Archive blue, Atelier orange), each holding 2 or 3 keys. The keys keep the look from
+   inspo/menu.jpg: a dark two-pixel outline, a lit top edge and a shaded bottom band; within a card their colours fade from light to
+   deeper, going down. A key's number (needs you now) sits in its corner and the card's title shows the total. The key of the app
+   opened last is the chosen one: a white outline that glows and a wing on each side. A white cat always sleeps on the Do card.
+   key. Each name is written like its app's title bar: the word in the title colour, "Kitty" in pink. */
+.home-menu { --wing: calc(12 * 2 * var(--px)); --wing-gap: calc(2 * var(--px));
+  display: grid; gap: var(--s5); justify-items: stretch; width: max-content; margin-inline: auto; max-width: 100%; }
+/* every card is a big Kitty Library note window (.nwin.nread, in page.html): its title bar, its screen holding the keys. The screen
+   is wide enough for both wings (the window's edge would cut a wing off outside it). */
+.menu-card { --nc: var(--tint); --edge: var(--menu-dk); }
+.home-menu .nread { min-height: 0; }
+.home-menu .nread .nwin-screen { gap: var(--s3); padding-block: calc(8 * var(--rp)); padding-inline: calc(var(--wing) + var(--wing-gap) + 4 * var(--px)); }
+/* A card has one tint; its three key colours are that tint mixed toward white (light theme) or toward the night colour (dark theme),
+   lightest key first. --menu-dk is the outline. */
+.menu-card { --mix-to: #fff; --p1: 45%; --p2: 70%; --p3: 100%;
+  --c1: color-mix(in srgb, var(--tint) var(--p1), var(--mix-to)); --c2: color-mix(in srgb, var(--tint) var(--p2), var(--mix-to)); --c3: color-mix(in srgb, var(--tint) var(--p3), var(--mix-to));
+  --menu-dk: var(--tint-dk);
+  --wing-line: var(--menu-dk); --wing-lit: color-mix(in srgb, var(--c1) 35%, #fff); --wing-a: var(--c1); --wing-b: var(--c3); }
+.menu-card.pink   { --tint: #ff8fb8; --tint-dk: #c23f7c; }
+.menu-card.purple { --tint: #bdb0e6; --tint-dk: #6b4f9e; }
+.menu-card.blue   { --tint: #8fd0fa; --tint-dk: #5f86b8; }
+.menu-card.orange { --tint: #e8a04c; --tint-dk: #a07250; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .menu-card { --mix-to: #2b2352; --p1: 60%; --p2: 45%; --p3: 32%; --menu-dk: #231d44; } }
+:root[data-theme="dark"] .menu-card { --mix-to: #2b2352; --p1: 60%; --p2: 45%; --p3: 32%; --menu-dk: #231d44; }
+.menu-card-title { display: flex; align-items: center; gap: var(--s3); font: 700 24px/1.1 var(--font); letter-spacing: .04em; min-height: calc(8 * var(--px)); text-shadow: var(--px) var(--px) 0 var(--hilite); }
+/* The page fills the screen and the cards sit in its middle, however many there are: the title bar is in the top row and the
+   version in the bottom one, both as tall as each other, so neither pushes the cards off centre. The version sits just under the
+   last card. The cat sleeping on the first key lies above the key, beside the Agenda card's title.
    In the Android app the page starts below the status bar (web/build.js pads :root by the safe-area inset), so the page is
-   that much shorter than the screen; otherwise it would scroll by the status bar's height and the keys would be off centre. */
+   that much shorter than the screen; otherwise it would scroll by the status bar's height and the cards would be off centre. */
 .wrap.home { overflow-x: clip; min-height: calc(100vh - env(safe-area-inset-top, 0px)); min-height: calc(100dvh - env(safe-area-inset-top, 0px)); grid-template-rows: 1fr auto 1fr; padding-bottom: var(--s6); padding-top: var(--s6); }
 .wrap.home > .top { align-self: start; }
 .wrap.home > .home-foot { align-self: start; margin: 0; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .home-menu { --m1: #6b4f9e; --m2: #4a4084; --m3: color-mix(in srgb, #4a4084, #4a3a78); --m4: #4a3a78; --m5: color-mix(in srgb, #4a3a78 60%, #3d2c63); --m6: color-mix(in srgb, #4a3a78 30%, #3d2c63); --menu-dk: #231d44; } }
-:root[data-theme="dark"] .home-menu { --m1: #6b4f9e; --m2: #4a4084; --m3: color-mix(in srgb, #4a4084, #4a3a78); --m4: #4a3a78; --m5: color-mix(in srgb, #4a3a78 60%, #3d2c63); --m6: color-mix(in srgb, #4a3a78 30%, #3d2c63); --menu-dk: #231d44; }
 .home-menu .menu-btn { padding: var(--s2) var(--s5) calc(var(--s2) + 3 * var(--px)); font-size: 20px; letter-spacing: .06em; white-space: nowrap; min-width: 0;
   background: var(--mb); border-color: var(--menu-dk); text-shadow: var(--px) var(--px) 0 var(--hilite);
   box-shadow: inset 0 var(--px) 0 var(--hilite), inset 0 calc(-3 * var(--px)) 0 color-mix(in srgb, var(--mb) 70%, var(--menu-dk)); }
 .home-menu .menu-btn .kitty { color: var(--accent-text); }
-/* the number of chores due, inside the key (a button's notched edge would cut off anything outside it) */
+/* the number needing you, inside the key (a button's notched edge would cut off anything outside it) */
 .home-menu .menu-btn { position: relative; }
-.menu-badge { position: absolute; right: calc(2 * var(--px)); top: calc(2 * var(--px)); min-width: calc(5 * var(--u)); padding: 0 var(--px); font-size: 12px; font-weight: 700; line-height: 1.3; text-align: center; letter-spacing: 0; text-shadow: none; background: var(--accent); color: var(--accent-ink); border: var(--px) solid var(--menu-dk); }
+.menu-badge, .menu-soon { position: absolute; top: calc(2 * var(--px)); font-size: 12px; line-height: 1.3; letter-spacing: 0; text-shadow: none; }
+.menu-badge { right: calc(2 * var(--px)); min-width: calc(5 * var(--u)); padding: 0 var(--px); font-weight: 700; text-align: center; background: var(--accent); color: var(--accent-ink); border: var(--px) solid var(--menu-dk); }
+.menu-badge.card-badge { position: static; }
+/* a key held for an app that is not made yet */
+.menu-soon { right: calc(3 * var(--px)); color: var(--muted); }
+.home-menu .menu-btn:disabled { opacity: .6; cursor: default; }
 @media (hover: hover) { .home-menu .menu-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--mb) 80%, #fff); } }
 .perch { position: relative; }
 .perch .glow { display: block; filter: drop-shadow(0 0 calc(3 * var(--px)) rgba(255, 255, 255, .9)); }
 /* the chosen key keeps the same dark two-pixel outline as the others, with its white line just inside it */
 .perch .menu-btn { width: 100%;
   box-shadow: inset 0 0 0 var(--bw) #fff, inset 0 calc(-3 * var(--px) - var(--bw)) 0 color-mix(in srgb, var(--mb) 70%, var(--menu-dk)); }
-.seat { position: relative; display: grid; }
-.seat .sitter { position: absolute; right: calc(5 * var(--u)); bottom: calc(100% - var(--px)); pointer-events: none; }
+/* the white cat lies along the Do card's title bar, with a paw hanging 5 pixels over the screen's edge, above Habit Kitty's key */
+.menu-card .nwin-bar { position: relative; }
+.menu-card .sitter { position: absolute; right: calc(31 * var(--px)); bottom: calc(-5 * var(--px)); pointer-events: none; z-index: 1; }
 .perch .wing { position: absolute; top: 50%; transform: translateY(-62%); pointer-events: none; }
 .perch .wing .pxs { width: calc(var(--w) * 2 * var(--px)); height: calc(var(--h) * 2 * var(--px)); }
 .perch .wing.l { right: calc(100% + var(--wing-gap)); }

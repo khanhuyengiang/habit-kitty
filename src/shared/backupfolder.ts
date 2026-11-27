@@ -3,7 +3,7 @@
 //   auto-backup      one folder, picked once; a backup lands there whenever something changed (one file per 3-hour slot;
 //                    older ones are thinned out over 3 months; rules in ./backup-schedule.ts)
 // Android only (the BackupFolder plugin). There is one backup file for both apps: Habit Kitty registers it (registerBackupSource)
-// and builds it, with Kitty Achievement's save inside.
+// and builds it, with Pawchievement's save inside.
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';

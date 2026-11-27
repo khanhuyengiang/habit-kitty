@@ -3,7 +3,7 @@ import { PICKER_ICONS, PICKER_ICON_NAMES } from '../shared/sticker-icons.ts';
 import {
   BASE_ROWS, INK_ROWS, MORE_INKS, byHue, categoryOf, paletteLabel,
   CATEGORIES, DEFAULT_GROUP, EXPORT_FORMAT, LETTERS, USER_GROUP, blankGrid, cleanArt, dropIcon, emptyData, exportText, floodFill,
-  byName, canDeleteOfficial, deleteOfficial, liveIcons, restoreIcon, countMine, dropCount, dropFloat, dropIcons, groupsOf, setFood, resetIcons, iconsOf, importClashes, importIcons, nameTaken, uniqueNames, inRect, liftArea, linePoints, moveIcons, rectOf, newId, officials, putIcon, readExport, renameGroup, sanitize, shiftGrid, sizeOf, toArt, toGrid, FREE_MAX, freeSize, resizeGrid, ALL_INKS, cleanFrames, cleanSequence, cleanPin, shiftArt, trackShifts, pingPong, playOrder, removeFrame, nextFrameName, newFrameId, MAX_FRAMES, DEFAULT_FPS,
+  byName, canDeleteOfficial, deleteOfficial, liveIcons, restoreIcon, countMine, dropCount, dropFloat, dropIcons, groupsOf, setFood, resetIcons, iconsOf, importClashes, importIcons, nameTaken, uniqueNames, inRect, liftArea, linePoints, moveIcons, rectOf, newId, officials, putIcon, readExport, renameGroup, sanitize, shiftGrid, sizeOf, toArt, toGrid, FREE_MAX, freeSize, resizeGrid, ALL_INKS, cleanSprites, cleanAnimations, pingPong, removeSprite, nextSpriteName, newSpriteId, newAnimId, stepsFromText, stepsToText, sheetOf, MAX_SPRITES, MAX_ANIMS, MAX_STEPS, DEFAULT_FPS, SHEET_ID, GAME_ANIMS, MAX_SHIFT,
 } from './model.ts';
 import { PALETTE, type PaletteName } from '../shared/palette.ts';
 import { FINE } from '../shared/stickers.ts';
@@ -387,22 +387,26 @@ describe('scenes', () => {
   });
 });
 
-describe('kitty drawings (any size)', () => {
+describe('the kitty sheet (one size for every sprite, up to FREE_MAX each way)', () => {
   const art = (w: number, h: number) => Array.from({ length: h }, (_, y) => (y === 0 ? 'o' : '.').padEnd(w, '.'));
-  it('keeps each drawing at its own size, up to FREE_MAX each way', () => {
+  const sheet = (id: string, w: number, h: number, extra = {}) => ({ category: 'kitty', id, name: 'Kitty sprites', group: 'user', art: art(w, h), sprites: [{ id: 's1', name: 'Sit', art: art(w, h) }], updated: 1, ...extra });
+  it('is free-size, ships one official sheet, and keeps the sheet\'s own size', () => {
     expect(categoryOf('kitty').free).toBe(true);
-    expect(officials('kitty')).toEqual([]);
+    const off = officials('kitty');
+    expect(off.map((o) => o.id)).toEqual([SHEET_ID]);
+    expect(off[0].sprites!.length).toBeGreaterThan(0);
+    expect(off[0].animations!.map((a) => a.id)).toContain('idle');   // the room plays it
+    for (const a of off[0].animations!) for (const step of a.steps) expect(off[0].sprites!.some((x) => x.id === step.id)).toBe(true);
     expect(freeSize(art(32, 24))).toEqual([32, 24]);
     expect(freeSize(art(FREE_MAX + 1, 4))).toBeNull();
     expect(freeSize([])).toBeNull();
-    const d = sanitize({ version: 1, icons: [
-      { category: 'kitty', id: 'loaf', name: 'Loaf', group: 'user', art: art(40, 18), updated: 1 },
-      { category: 'kitty', id: 'tiny', name: 'Tiny', group: 'user', art: art(3, 2), updated: 1 },
-      { category: 'kitty', id: 'ragged', name: 'Ragged', group: 'user', art: ['oo', 'o'], updated: 1 },
-      { category: 'kitty', id: 'huge', name: 'Huge', group: 'user', art: art(FREE_MAX + 1, 2), updated: 1 },
-    ] });
-    expect(d.icons.map((i) => [i.id, i.art[0].length, i.art.length])).toEqual([['loaf', 40, 18], ['tiny', 3, 2]]);
-    expect(readExport(exportText(d, '2026-11-19')).map((i) => i.id)).toEqual(['loaf', 'tiny']);
+    const d = sanitize({ version: 1, icons: [sheet(SHEET_ID, 40, 18), sheet('huge', 3, 2), sheet('ragged', 3, 2, { art: ['oo', 'o'] })] });
+    expect(d.icons.map((i) => [i.id, i.art[0].length, i.art.length])).toEqual([[SHEET_ID, 40, 18]]);   // there is only one sheet
+    expect(sanitize({ version: 1, icons: [sheet(SHEET_ID, FREE_MAX + 1, 2)] }).icons).toEqual([]);
+  });
+  it('drops an old single-kitty drawing (no sprites, or another id) rather than keep it', () => {
+    const old = { category: 'kitty', id: 'loaf', name: 'Loaf', group: 'user', art: art(40, 18), updated: 1 };
+    expect(sanitize({ version: 1, icons: [old, { ...old, id: SHEET_ID }] }).icons).toEqual([]);
   });
   it('resizes a board from its top-left corner', () => {
     const g = toGrid(['ab', 'cd']);
@@ -419,10 +423,12 @@ describe('choosing any colour', () => {
   });
 });
 
-describe('kitty animations (frames and a sequence)', () => {
+describe('kitty animations (one sprite list, animations that pick from it)', () => {
   const pic = (ch: string) => ['....', `.${ch}${ch}.`, '....'];
-  const frames = () => [{ id: 'f1', name: 'Sit', art: pic('o') }, { id: 'f2', name: 'Stretch', art: pic('w') }, { id: 'f3', name: 'Pounce', art: pic('y') }];
-  const icon = (extra = {}) => ({ category: 'kitty' as const, id: 'loaf', name: 'Loaf', group: 'user', art: pic('o'), frames: frames(), sequence: ['f1', 'f2', 'f3', 'f2', 'f1'], fps: 6, ...extra });
+  const sprites = () => [{ id: 's1', name: 'Sit', art: pic('o') }, { id: 's2', name: 'Stretch', art: pic('w') }, { id: 's3', name: 'Pounce', art: pic('y') }];
+  const st = (...ids: string[]) => ids.map((id) => ({ id }));
+  const anims = () => [{ id: 'idle', name: 'Idle', fps: 6, steps: st('s1', 's2', 's3', 's2', 's1') }, { id: 'nap', name: 'Nap', fps: 2, steps: st('s3') }];
+  const sheet = (extra = {}) => ({ category: 'kitty' as const, id: SHEET_ID, name: 'Kitty sprites', group: 'user', art: pic('K'), sprites: sprites(), animations: anims(), ...extra });
 
   it('ping-pongs 1 2 3 into 1 2 3 2 1', () => {
     expect(pingPong(['a', 'b', 'c'])).toEqual(['a', 'b', 'c', 'b', 'a']);
@@ -430,100 +436,150 @@ describe('kitty animations (frames and a sequence)', () => {
     expect(pingPong(['a'])).toEqual(['a']);
   });
 
-  it('plays one picture per step, so a frame in two steps shows the same picture, and changing it changes both', () => {
-    const f = frames();
-    const play = (fr: typeof f) => playOrder(fr, ['f1', 'f2', 'f3', 'f2', 'f1']);
-    expect(play(f).map((a) => a[1][1])).toEqual(['o', 'w', 'y', 'w', 'o']);
-    const edited = f.map((x) => (x.id === 'f1' ? { ...x, art: pic('R') } : x));
-    expect(play(edited).map((a) => a[1][1])).toEqual(['R', 'w', 'y', 'w', 'R']);
+  it('makes a sequence from the numbers you pick: places in the list, runs, backwards runs', () => {
+    expect(stepsFromText('1 2 3 2 1', sprites())).toEqual({ steps: st('s1', 's2', 's3', 's2', 's1'), bad: [] });
+    expect(stepsFromText('1-3, 2', sprites()).steps).toEqual(st('s1', 's2', 's3', 's2'));
+    expect(stepsFromText('3-1', sprites()).steps).toEqual(st('s3', 's2', 's1'));
+    expect(stepsFromText('2 0 4 x 1-9 3', sprites())).toEqual({ steps: st('s2', 's3'), bad: ['0', '4', 'x', '1-9'] });
+    expect(stepsFromText('', sprites())).toEqual({ steps: [], bad: [] });
+    expect(stepsFromText('1-3 '.repeat(50), sprites()).steps).toHaveLength(MAX_STEPS);
+    expect(stepsToText(st('s1', 's3', 's3', 'gone'), sprites())).toBe('1 3 3');
+    // a step that is still the same sprite in the same place keeps its move
+    const moved = [{ id: 's1', dx: 3 }, { id: 's2', dy: 2 }, { id: 's3' }];
+    expect(stepsFromText('1 2 1', sprites(), moved).steps).toEqual([{ id: 's1', dx: 3 }, { id: 's2', dy: 2 }, { id: 's1' }]);
   });
 
-  it('lines the frames up by their points of tracking', () => {
-    const fr = [
-      { id: 'a', name: 'A', art: ['X..', '...'], pin: [0, 0] as [number, number] },
-      { id: 'b', name: 'B', art: ['...', '.X.'], pin: [1, 1] as [number, number] },
-      { id: 'c', name: 'C', art: ['..X', '...'] },
-    ];
-    expect(trackShifts(fr, ['a', 'b', 'c']).get('b')).toEqual([-1, -1]);
-    expect(trackShifts(fr, ['a', 'b', 'c']).has('c')).toBe(false);
-    expect(playOrder(fr, ['a', 'b', 'c'])).toEqual([['X..', '...'], ['X..', '...'], ['..X', '...']]);
-    expect(trackShifts(fr.map((f) => ({ ...f, pin: undefined })), ['a', 'b']).size).toBe(0);
-  });
-
-  it('shifts art, cuts off what leaves the board, and keeps only pins on the board', () => {
-    expect(shiftArt(['AB.', 'CD.'], 1, 1)).toEqual(['...', '.AB']);
-    expect(shiftArt(['AB.', 'CD.'], -1, 0)).toEqual(['B..', 'D..']);
-    expect(cleanPin([2, 1], [3, 2])).toEqual([2, 1]);
-    expect(cleanPin([3, 1], [3, 2])).toBeNull();
-    expect(cleanPin([1.5, 0], [3, 2])).toBeNull();
-  });
-
-  it('is saved as one icon whose picture is the first frame', () => {
-    const d = putIcon(emptyData(), icon({ art: pic('K') }), 1);
+  it('is saved as one sheet whose picture is the first sprite, with its animations', () => {
+    const d = putIcon(emptyData(), sheet(), 1);
     expect(d.icons).toHaveLength(1);
     expect(d.icons[0].art).toEqual(pic('o'));
-    expect(d.icons[0].frames?.map((f) => f.name)).toEqual(['Sit', 'Stretch', 'Pounce']);
-    expect(d.icons[0].sequence).toEqual(['f1', 'f2', 'f3', 'f2', 'f1']);
-    expect(d.icons[0].fps).toBe(6);
-    const shown = iconsOf(d, 'kitty')[0];
-    expect(shown.frames).toHaveLength(3);
+    expect(d.icons[0].sprites?.map((f) => f.name)).toEqual(['Sit', 'Stretch', 'Pounce']);
+    expect(d.icons[0].animations).toEqual(anims());
+    expect(iconsOf(d, 'kitty')[0].sprites).toHaveLength(3);
     expect(sanitize(JSON.parse(JSON.stringify(d))).icons[0]).toEqual(d.icons[0]);
   });
 
-  it('survives moving the kitty to another group', () => {
-    const d = moveIcons(putIcon(emptyData(), icon(), 1), 'kitty', ['loaf'], 'poses');
-    expect(d.icons[0].group).toBe('poses');
-    expect(d.icons[0].frames).toHaveLength(3);
-    expect(d.icons[0].sequence).toHaveLength(5);
+  it('is only ever the one sheet, and needs a sprite', () => {
+    expect(putIcon(emptyData(), sheet({ id: 'loaf' }), 1).icons).toEqual([]);
+    expect(putIcon(emptyData(), sheet({ sprites: [] }), 1).icons).toEqual([]);
+    expect(putIcon(putIcon(emptyData(), sheet(), 1), sheet({ animations: [] }), 2).icons).toHaveLength(1);
   });
 
-  it('is exported and read back with its frames', () => {
-    const text = exportText(putIcon(emptyData(), icon(), 1), '2026-11-19');
-    const [back] = readExport(text);
-    expect(back.frames?.[1]).toEqual({ id: 'f2', name: 'Stretch', art: pic('w') });
-    expect(back.sequence).toEqual(['f1', 'f2', 'f3', 'f2', 'f1']);
-    expect(back.fps).toBe(6);
+  it('gives the game its sprites and the animations that have steps', () => {
+    const d = putIcon(emptyData(), sheet({ animations: [...anims(), { id: 'blank', name: 'Blank', fps: 4, steps: [] }] }), 1);
+    const s = sheetOf(d)!;
+    expect([s.w, s.h]).toEqual([4, 3]);
+    expect([...s.sprites.keys()]).toEqual(['s1', 's2', 's3']);
+    expect([...s.animations.keys()]).toEqual(['idle', 'nap']);
+    expect(s.animations.get('idle')).toEqual({ fps: 6, steps: ['s1', 's2', 's3', 's2', 's1'].map((id) => ({ id, dx: 0, dy: 0 })) });
+    expect(sheetOf(emptyData())!.animations.has('idle')).toBe(true);   // without yours, the one that ships with the app
+    expect(GAME_ANIMS.map((a) => a.id)).toEqual(['idle', 'nap']);
   });
 
-  it('cleans what is broken: odd sizes, repeated ids, repeated names, steps for frames that are gone', () => {
+  it('is exported and read back whole', () => {
+    const [back] = readExport(exportText(putIcon(emptyData(), sheet(), 1), '2026-11-23'));
+    expect(back.sprites?.[1]).toEqual({ id: 's2', name: 'Stretch', art: pic('w') });
+    expect(back.animations).toEqual(anims());
+  });
+
+  it('cleans what is broken: odd sizes, repeated ids and names, steps for sprites that are gone, speeds we do not offer', () => {
     const raw = [
       { id: 'a', name: 'Pose', art: pic('o') }, { id: 'a', name: 'Dup id', art: pic('o') }, { id: 'b', name: 'pose', art: pic('w') },
       { id: 'c', name: 'Wrong size', art: ['oo'] }, { id: 'bad id!', name: 'x', art: pic('o') },
     ];
-    const fr = cleanFrames(raw, [4, 3])!;
-    expect(fr.map((f) => f.id)).toEqual(['a', 'b']);
-    expect(fr.map((f) => f.name)).toEqual(['Pose', 'pose 2']);
-    expect(cleanSequence(['a', 'zzz', 'b', 'a'], fr)).toEqual(['a', 'b', 'a']);
-    expect(cleanSequence(['zzz'], fr)).toEqual(['a', 'b']);
-    expect(cleanSequence(undefined, fr)).toEqual(['a', 'b']);
-    expect(cleanFrames([], [4, 3])).toBeNull();
-    expect(cleanFrames(Array.from({ length: MAX_FRAMES + 5 }, (_, i) => ({ id: `x${i}`, name: `N${i}`, art: pic('o') })), [4, 3])).toHaveLength(MAX_FRAMES);
+    const sp = cleanSprites(raw, [4, 3])!;
+    expect(sp.map((f) => f.id)).toEqual(['a', 'b']);
+    expect(sp.map((f) => f.name)).toEqual(['Pose', 'pose 2']);
+    const an = cleanAnimations([
+      { id: 'walk', name: 'Walk', fps: 99, steps: ['a', 'zzz', 'b', 'a', 7] }, { id: 'walk', name: 'Dup', fps: 4, steps: ['a'] },
+      { id: 'x y', name: 'Bad id', fps: 4, steps: ['a'] }, { id: 'e', name: 'walk', fps: 8, steps: ['zzz'] },
+    ], sp);
+    expect(an).toEqual([{ id: 'walk', name: 'Walk', fps: DEFAULT_FPS, steps: st('a', 'b', 'a') }, { id: 'e', name: 'walk 2', fps: 8, steps: [] }]);
+    expect(cleanAnimations('nope', sp)).toEqual([]);
+    expect(cleanSprites([], [4, 3])).toBeNull();
+    expect(cleanSprites(Array.from({ length: MAX_SPRITES + 5 }, (_, i) => ({ id: `x${i}`, name: `N${i}`, art: pic('o') })), [4, 3])).toHaveLength(MAX_SPRITES);
+    expect(cleanAnimations(Array.from({ length: MAX_ANIMS + 5 }, (_, i) => ({ id: `a${i}`, name: `N${i}`, steps: [] })), sp)).toHaveLength(MAX_ANIMS);
   });
 
-  it('falls back to every frame in order, at the default speed', () => {
-    const d = putIcon(emptyData(), icon({ sequence: undefined, fps: undefined }), 1);
-    expect(d.icons[0].sequence).toEqual(['f1', 'f2', 'f3']);
-    expect(d.icons[0].fps).toBe(DEFAULT_FPS);
-    expect(sanitize({ version: 1, icons: [{ ...d.icons[0], fps: 99 }] }).icons[0].fps).toBe(DEFAULT_FPS);
+  it('only a kitty has sprites', () => {
+    const d = putIcon(emptyData(), { ...sheet(), category: 'sticker', id: 'star', art: Array.from({ length: 18 }, () => '.'.repeat(18)) } as never, 1);
+    expect(d.icons[0].sprites).toBeUndefined();
   });
 
-  it('only a kitty has frames', () => {
-    const d = putIcon(emptyData(), { ...icon(), category: 'sticker', art: Array.from({ length: 18 }, () => '.'.repeat(18)) } as never, 1);
-    expect(d.icons[0].frames).toBeUndefined();
+  it('removing a sprite takes its steps out of every animation, and keeps the animations', () => {
+    const r = removeSprite(sprites(), anims(), 's2');
+    expect(r.sprites.map((f) => f.id)).toEqual(['s1', 's3']);
+    expect(r.animations[0].steps).toEqual(st('s1', 's3', 's1'));
+    expect(removeSprite(sprites(), anims(), 's3').animations[1].steps).toEqual([]);
   });
 
-  it('removing a frame takes its steps out too, and keeps something to play', () => {
-    const r = removeFrame(frames(), ['f1', 'f2', 'f3', 'f2', 'f1'], 'f2');
-    expect(r.frames.map((f) => f.id)).toEqual(['f1', 'f3']);
-    expect(r.sequence).toEqual(['f1', 'f3', 'f1']);
-    expect(removeFrame(frames().slice(0, 2), ['f2'], 'f2').sequence).toEqual(['f1']);
+  it('names and numbers new sprites and animations', () => {
+    expect(nextSpriteName([{ name: 'Sprite 1' }, { name: 'sit' }])).toBe('Sprite 3');
+    expect(nextSpriteName([{ name: 'Sprite 2' }])).toBe('Sprite 3');
+    expect(newSpriteId([{ id: 's1' }, { id: 's2' }])).toBe('s3');
+    expect(newSpriteId([{ id: 's3' }, { id: 's2' }])).toBe('s4');
+    expect(newAnimId('Happy dance!', [])).toBe('happydance');
+    expect(newAnimId('Idle', [{ id: 'idle' }])).toBe('idle2');
+    expect(newAnimId('123', [])).toBe('anim');
   });
 
-  it('names and numbers new frames', () => {
-    expect(nextFrameName([{ name: 'Frame 1' }, { name: 'sit' }])).toBe('Frame 3');
-    expect(nextFrameName([{ name: 'Frame 2' }])).toBe('Frame 3');
-    expect(nextFrameName([{ name: 'a' }])).toBe('Frame 2');
-    expect(newFrameId([{ id: 'f1' }, { id: 'f2' }])).toBe('f3');
-    expect(newFrameId([{ id: 'f3' }, { id: 'f2' }])).toBe('f4');
+  it('a kept import never makes a second sheet', () => {
+    const mine = putIcon(emptyData(), sheet(), 1);
+    const theirs = readExport(exportText(putIcon(emptyData(), sheet({ animations: [] }), 1), '2026-11-23'));
+    expect(importIcons(mine, theirs, 'keep').icons).toEqual(mine.icons);
+    expect(importIcons(mine, theirs, 'replace').icons[0].animations).toEqual([]);
+  });
+});
+
+describe('the official kitty sheet', () => {
+  it('shows as official, is replaced by yours, and comes back when yours is the same', () => {
+    const o = officials('kitty')[0];
+    expect(iconsOf(emptyData(), 'kitty')[0].status).toBe('official');
+    const mine = { category: 'kitty' as const, id: SHEET_ID, name: o.name, group: o.group, art: o.art, sprites: [o.sprites![0]], animations: [{ id: 'idle', name: 'Idle', fps: 4, steps: [o.sprites![0].id] }] };
+    const d = putIcon(emptyData(), mine, 1);
+    expect(iconsOf(d, 'kitty')[0]).toMatchObject({ status: 'changed' });
+    expect(sheetOf(d)!.sprites.size).toBe(1);
+    expect(putIcon(d, { ...mine, sprites: o.sprites, animations: o.animations }, 2).icons).toEqual([]);   // same as the official one: dropped
+  });
+});
+
+describe('a step can move its sprite (a displacement)', () => {
+  const pic = (ch: string) => ['....', `.${ch}${ch}.`, '....'];
+  const sp = [{ id: 'a', name: 'A', art: pic('o') }, { id: 'b', name: 'B', art: pic('w') }];
+  it('keeps a move only where it is not 0, in whole pixels, and a bare id is a step with no move', () => {
+    const an = cleanAnimations([{ id: 'jump', name: 'Jump', fps: 4, steps: ['a', { id: 'b', dx: 3.6, dy: 0 }, { id: 'a', dx: -2, dy: 5 }, { id: 'a', dx: 'x', dy: 1e9 }, { id: 7 }, null] }], sp);
+    expect(an[0].steps).toEqual([{ id: 'a' }, { id: 'b', dx: 4 }, { id: 'a', dx: -2, dy: 5 }, { id: 'a', dy: MAX_SHIFT }]);
+  });
+  it('is saved, exported and given to the game with its moves', () => {
+    const sheet = { category: 'kitty' as const, id: SHEET_ID, name: 'Kitty sprites', group: 'user', art: pic('o'), sprites: sp, animations: [{ id: 'jump', name: 'Jump', fps: 4, steps: [{ id: 'a' }, { id: 'b', dx: 3, dy: 2 }] }] };
+    const d = putIcon(emptyData(), sheet, 1);
+    expect(d.icons[0].animations![0].steps).toEqual([{ id: 'a' }, { id: 'b', dx: 3, dy: 2 }]);
+    expect(readExport(exportText(d, '2026-11-24'))[0].animations).toEqual(d.icons[0].animations);
+    expect(sheetOf(d)!.animations.get('jump')!.steps).toEqual([{ id: 'a', dx: 0, dy: 0 }, { id: 'b', dx: 3, dy: 2 }]);
+  });
+});
+
+describe('the zones of the sprites (for the skins)', () => {
+  it('ships with zones, and a saved sheet keeps its own', async () => {
+    const { SHEET_ID, cleanZones, putIcon: put, sheetOf } = await import('./model.ts');
+    const sheet = iconsOf(emptyData(), 'kitty')[0];
+    expect(Object.keys(sheet.zones ?? {}).length).toBe(sheet.sprites!.length);
+    const id = sheet.sprites![0].id;
+    const mine = { ...sheet.zones!, [id]: ['H'.repeat(3)] };
+    const saved = put(emptyData(), { category: 'kitty', id: SHEET_ID, name: sheet.name, group: sheet.group, art: sheet.art, sprites: sheet.sprites, animations: sheet.animations, zones: mine });
+    expect(saved.icons[0].zones?.[id]).toEqual([]);   // only coat pixels can be a part: that corner of the sprite is empty
+    expect(sheetOf(saved)!.zones.size).toBeGreaterThan(0);
+    // the same zones as the app's are not saved at all
+    expect(put(emptyData(), { category: 'kitty', id: SHEET_ID, name: sheet.name, group: sheet.group, art: sheet.art, sprites: sheet.sprites, animations: sheet.animations, zones: sheet.zones }).icons).toEqual([]);
+    expect(cleanZones('x', sheet.sprites!)).toEqual({});
+  });
+  it('goes through an export and back', async () => {
+    const { SHEET_ID, putIcon: put, exportText: exp, readExport } = await import('./model.ts');
+    const sheet = iconsOf(emptyData(), 'kitty')[0], id = sheet.sprites![0].id;
+    const row = sheet.zones![id].findIndex((r) => r.includes('H')), col = sheet.zones![id][row].indexOf('H');
+    const zones = { ...sheet.zones!, [id]: sheet.zones![id].map((r, y) => (y === row ? r.slice(0, col) + 'T' + r.slice(col + 1) : r)) };
+    const data = put(emptyData(), { category: 'kitty', id: SHEET_ID, name: sheet.name, group: sheet.group, art: sheet.art, sprites: sheet.sprites, animations: sheet.animations, zones });
+    const back = readExport(exp(data, '2026-11-25')).find((i) => i.category === 'kitty')!;
+    expect(back.zones?.[id][row][col]).toBe('T');
   });
 });

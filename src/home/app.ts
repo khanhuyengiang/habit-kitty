@@ -1,5 +1,5 @@
 // The home page: the menu to everything else, including Player Stat, which opens the player card (name, picture, ID and the three levels).
-// The levels come from the three apps: Level from Kitty Achievement, HP from Habit Kitty's affection, MP from diary days
+// The levels come from the three apps: Level from Pawchievement, HP from Habit Kitty's affection, MP from diary days
 // (see ../shared/stat-lines.ts). Moving between screens is the shell's job (src/web/shell.ts): the menu buttons are data-action="go".
 import { PLAYER_GENDERS, PLAYER_GENDER_LABEL, type Data, type PlayerGender } from '../achievement/model.ts';
 import { LIMITS, ageOf, levelOf, titleFor } from '../achievement/ops.ts';
@@ -8,16 +8,22 @@ import { DECOS, iconSvg } from '../shared/art.ts';
 import { fineSvg } from '../shared/stickers.ts';
 import { hpLine, lvLine, mpLine, shortId } from '../shared/stat-lines.ts';
 import { meterHtml } from '../shared/meter.ts';
-import { lastApp, onAppShown } from '../shared/apps.ts';
+import { lastApp, onAppShown, appShown, shownApp } from '../shared/apps.ts';
 import { compressPhoto } from '../shared/photo.ts';
 import { avatarUrlOf, loadPlayerData, savePlayer } from '../shared/player.ts';
 import { napSvg } from '../shared/pixelcat.ts';
+import { onSheetChange, sheetCatSvg } from '../shared/kittysheet.ts';
 import { $, esc } from '../shared/html.ts';
+import { winBar } from '../notes/window.ts';
 import { appName, closeX, playerButton, settingsButton, showToast, titleBar } from '../shared/ui.ts';
 import { habitStats, onHabitStats } from '../shared/stats.ts';
 import { VERSION } from '../shared/version.ts';
 import { litterData, litterReady, onLitter } from '../litterbox/data.ts';
 import { dueCount, todayNum } from '../litterbox/model.ts';
+import { dayIndex } from '../habit/rules.ts';
+import { onDiary, pageDue } from '../diary/data.ts';
+import { onShop, shopData, shopReady } from '../shopping/data.ts';
+import { listsToShop } from '../shopping/model.ts';
 
 
 let data: Data | null = null;     // the saved player and achievements (null until read)
@@ -63,35 +69,61 @@ function renderStat() {
 // ---------- header and menu ----------
 
 function renderTop() {
-  $('home-top').innerHTML = titleBar('Kitty', 'Home', playerButton() + settingsButton());
+  $('home-top').innerHTML = titleBar('Itty Bitty', 'Kitty', playerButton() + settingsButton());
 }
 
+// The menu is four cards, each a group of keys: Do (pink), Track (purple), Keep (blue) and Studio (orange). A key's number (`due`)
+// says how much needs you now, `what` says what it counts; a card's title shows the total of its keys. A key with `soon` is a place
+// held for an app to come. A new app is one entry here.
 // The wing on each side of the chosen app's key is a Kitty Gallery decoration (DECOS.wing; the right one is mirrored).
-// The menu (after inspo/menu.jpg): short, long keys, one per app, each name written like its title bar. Player Stat is the
-// person in the title bar.
+// Each key's name is written like its title bar. Player Stat is the person in the title bar.
 const SLEEPER = { fur: '#fffafd', pattern: 'plain' as const };
-const MENU: { name: [string, string]; to: string }[] = [
-  { name: ['Habit', 'Kitty'], to: 'habit' },
-  { name: ['Kitty', 'Journal'], to: 'diary' },
-  { name: ['Kitty', 'Achievement'], to: 'achievement' },
-  { name: ['Kitty', 'Mart'], to: 'shopping' },
-  { name: ['Kitty', 'Gallery'], to: 'pixel' },
-  { name: ['Kitty', 'Litterbox'], to: 'litterbox' },
+// the sleeping kitty is the sheet's Nap, on its side (the plain Nap, or the code's own kitty, when the sheet has none)
+const sleeperSvg = () => sheetCatSvg('nap4', SLEEPER, 'nap') ?? sheetCatSvg('nap', SLEEPER, 'nap') ?? napSvg(SLEEPER);
+// the wings wear their card's colours (--wing-* are set in home.html)
+const WING_INK = { H: 'var(--wing-line)', '[': 'var(--wing-lit)', a: 'var(--wing-a)', v: 'var(--wing-b)' };
+const diaryToday = () => dayIndex(new Date(Date.now() + habitStats().offsetHours * 3_600_000));
+
+interface Key { name: [string] | [string, string]; to: string; soon?: boolean; due?: () => number; what?: string }
+interface Card { sleeper?: boolean; title: string; tint: 'pink' | 'purple' | 'blue' | 'orange'; keys: Key[] }
+const CARDS: Card[] = [
+  { sleeper: true, title: 'Do', tint: 'pink', keys: [
+    { name: ['Habit', 'Kitty'], to: 'habit', due: () => habitStats().habitDue ?? 0, what: 'to do' },
+    { name: ['Litterbox'], to: 'litterbox', due: () => (litterReady() ? dueCount(litterData(), todayNum()) : 0), what: 'due' } ] },
+  { title: 'Track', tint: 'purple', keys: [
+    { name: ['Journal'], to: 'diary', due: () => pageDue(diaryToday()), what: 'to write' },
+    { name: ['Clockwork'], to: 'clockwork', soon: true },
+    { name: ['Bank'], to: 'bank', soon: true } ] },
+  { title: 'Keep', tint: 'blue', keys: [
+    { name: ['Mart'], to: 'shopping', due: () => (shopReady() ? listsToShop(shopData()) : 0), what: 'lists to shop' },
+    { name: ['Library'], to: 'notes' },
+    { name: ['Pawchievement'], to: 'achievement' } ] },
+  { title: 'Studio', tint: 'orange', keys: [
+    { name: ['Gallery'], to: 'pixel' },
+    { name: ['Wardrobe'], to: 'wardrobe' } ] },   // each key only while it is on in Settings → Apps to show (Wardrobe is off until then)
 ];
+const badgeText = (n: number) => (n > 99 ? '99+' : String(n));
 
 function renderMenu() {
   const chosen = lastApp();
-  $('home-menu').innerHTML = MENU.map((e, i) => {
-    // Kitty Litterbox's key says how many chores are due now
-    const due = e.to === 'litterbox' && litterReady() ? dueCount(litterData(), todayNum()) : 0;
-    const badge = due ? `<span class="menu-badge" role="img" aria-label="${due} due">${due > 99 ? '99+' : due}</span>` : '';
-    const btn = `<button class="btn menu-btn" type="button" style="--mb: var(--m${i + 1})" data-action="go" data-to="${e.to}">${appName(...e.name)}${badge}</button>`;
-    // the key of the app opened last is the chosen one: a white outline that glows and a wing on each side
-    const key = e.to === chosen
-      ? `<div class="perch"><span class="wing l">${fineSvg(DECOS.wing.art)}</span><span class="glow">${btn}</span><span class="wing r">${fineSvg(DECOS.wing.art)}</span></div>`
-      : btn;
-    // a white cat always sleeps on Habit Kitty's key, whichever key is chosen
-    return e.to === 'habit' ? `<div class="seat">${key}<span class="sitter">${napSvg(SLEEPER)}</span></div>` : key;
+  $('home-menu').innerHTML = CARDS.map((card) => {
+    const keys = card.keys.filter((k) => appShown(k.to));
+    if (!keys.length) return '';   // every app of the card is hidden
+    const total = keys.reduce((sum, k) => sum + (k.due?.() ?? 0), 0);
+    const rows = keys.map((k, i) => {
+      const n = k.due?.() ?? 0, what = k.what ?? '';
+      const badge = k.soon ? '<span class="menu-soon">soon</span>'
+        : n ? `<span class="menu-badge" role="img" aria-label="${n} ${what}">${badgeText(n)}</span>` : '';
+      const btn = `<button class="btn menu-btn" type="button" style="--mb: var(--c${i + 1})" ${k.soon ? 'disabled' : `data-action="go" data-to="${k.to}"`}>${appName(...k.name)}${badge}</button>`;
+      // the key of the app opened last is the chosen one: a white outline that glows and a wing on each side
+      const key = k.to === chosen
+        ? `<div class="perch"><span class="wing l">${fineSvg(DECOS.wing.art, '', WING_INK)}</span><span class="glow">${btn}</span><span class="wing r">${fineSvg(DECOS.wing.art, '', WING_INK)}</span></div>`
+        : btn;
+      return key;
+    }).join('');
+    const count = total ? `<span class="menu-badge card-badge" role="img" aria-label="${total} need you">${badgeText(total)}</span>` : '';
+    const win = `<section class="nwin nread menu-card ${card.tint}" style="--nc: var(--tint)" aria-label="${card.title}">${winBar(card.title, 'happy').replace('<span class="nwin-btns"', `${count}<span class="nwin-btns"`).replace('<span class="nwin-bar">', `<span class="nwin-bar">${card.sleeper ? `<span class="sitter">${sleeperSvg()}</span>` : ''}`)}<div class="nwin-screen">${rows}</div></section>`;
+    return win;
   }).join('');
   $('home-foot').textContent = `v${VERSION}`;
 }
@@ -229,10 +261,12 @@ async function load() {
 
 // The two apps change the player's numbers and may have changed the player itself: read everything again whenever home shows.
 onAppShown('home', () => { renderTop(); renderMenu(); load(); });
-onLitter(renderMenu);   // the chores load after the page starts, and change while it is open
-let menuDay = todayNum();
-setInterval(() => { if (todayNum() !== menuDay) { menuDay = todayNum(); renderMenu(); } }, 60_000);   // the number of chores due changes at midnight
-onHabitStats(() => { if (view === 'stat') renderStat(); });
+onLitter(renderMenu);
+onSheetChange(renderMenu);   // the sleeping kitty is drawn from the kitty sheet, which loads after the page starts
+onDiary(renderMenu);   // the same for the other apps' numbers
+onShop(renderMenu);   // the chores load after the page starts, and change while it is open
+setInterval(() => { if (shownApp() === 'home') renderMenu(); }, 60_000);   // the numbers change with the day (chores due, today's page)
+onHabitStats(() => { if (view === 'stat') renderStat(); if (shownApp() === 'home') renderMenu(); });
 
 renderTop();
 renderMenu();

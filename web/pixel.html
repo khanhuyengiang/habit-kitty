@@ -37,12 +37,44 @@
 
 /* ---- the board ---- */
 .pix-draw { gap: var(--s3); }
+.pix-add > summary { cursor: pointer; display: flex; align-items: center; gap: var(--s2); list-style: none; }
+.pix-add > summary::-webkit-details-marker { display: none; }
+.pix-add > summary::before { content: '+'; font-weight: 700; color: var(--accent-text); }
+.pix-add[open] > summary::before { content: '–'; }
+.pix-add > summary h3 { margin: 0; }
+.pix-more { margin-top: var(--s3); }
+.pix-more > summary { cursor: pointer; font-weight: 600; }
+.pix-more > .btns { margin-top: var(--s2); }
+.pix-more > .btns .muted { margin: 0; }
+.pix-skins { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5em, 1fr)); gap: var(--s2); }
+.pix-skin { display: grid; justify-items: center; gap: var(--s1); padding: var(--s2); text-align: center; cursor: pointer; font: inherit; color: inherit; background: var(--surface); border: var(--bw) solid var(--line); border-radius: var(--r2, 10px); }
+.pix-skin.on, .pix-skin[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent-edge); box-shadow: inset 0 0 0 var(--px) var(--accent-edge); }
+.pix-skin .muted { font-size: 14px; }
+.pix-skinpic { display: block; width: 100%; max-width: 8em; }
+.pix-skinpic svg { display: block; width: 100%; height: auto; }
+.pix-skinpic.big { max-width: min(100%, 22em); }
+.pix-skinbig { display: grid; justify-items: center; padding: var(--s3) 0; }
+.pix-swatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s2); }   /* eight colours: two rows of four */
+.pix-swatch { display: grid; justify-items: center; gap: var(--s1); padding: var(--s2) var(--s1); min-width: 0; cursor: pointer; font: inherit; color: inherit; background: var(--surface); border: var(--bw) solid var(--line); border-radius: var(--r2, 10px); }
+.pix-swatch i { width: calc(14 * var(--u)); height: calc(14 * var(--u)); box-shadow: 0 0 0 var(--px) var(--edge); }
+.pix-swatch span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.pix-swatch[aria-checked="true"] { background: var(--accent-soft); border-color: var(--accent-edge); box-shadow: inset 0 0 0 var(--px) var(--accent-edge); }
+/* the Kitty tab: the explanation closes, the animations and the sprites fold away */
+.pix-help > p:first-of-type { padding-right: calc(12 * var(--u)); }
+.pix-fold > summary { cursor: pointer; display: flex; align-items: center; gap: var(--s2); list-style: none; }
+.pix-fold > summary::-webkit-details-marker { display: none; }
+.pix-fold > summary::before { content: '+'; font-weight: 700; color: var(--accent-text); }
+.pix-fold[open] > summary::before { content: '–'; }
+.pix-fold > summary h3 { margin: 0; text-transform: capitalize; }
+.pix-fold[open] > summary { margin-bottom: var(--s2); }
+.pix-fold > .btns { justify-content: flex-start; margin-bottom: var(--s2); }
 .pix-dhead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; }
 .pix-dhead h3 { margin: 0; }
 .pix-resize { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s2) var(--s3); margin: var(--s3) 0; }
 .pix-resize .field { width: 6.5em; margin: 0; }
 .pix-resize > span[aria-hidden] { padding-bottom: var(--s2); }
 .pix-resize .muted { flex-basis: 100%; font-size: 16px; }
+#pix-anim-new-form .field { width: min(18em, 100%); }
 .pix-tools { display: flex; gap: var(--s2); flex-wrap: wrap; }
 .pix-tools .seg:first-child { flex: 1; }
 /* the tools are icons, so the bar fits a phone without scrolling */
@@ -66,7 +98,6 @@
 .pix-onion .pxs { display: block; width: 100%; height: 100%; }
 .pix-board { position: relative; overflow: hidden; }
 /* the point of tracking: a ring on its cell */
-.pix-pin { position: absolute; box-sizing: border-box; border: 2px solid var(--accent-text); border-radius: 50%; box-shadow: 0 0 0 1px var(--surface), inset 0 0 0 1px var(--surface); pointer-events: none; }
 /* the selection: a dashed box (on a light edge, so it shows on any colour); lifted, it is tinted and can be dragged */
 .pix-sel { position: absolute; box-sizing: border-box; border: 2px dashed var(--accent-text); box-shadow: 0 0 0 1px var(--surface), inset 0 0 0 1px var(--surface); cursor: move; }
 .pix-sel.lifted { background: color-mix(in srgb, var(--accent) 16%, transparent); }
@@ -78,6 +109,17 @@
 .pix-board.spots { cursor: pointer; }
 .pix-zooms, .pix-modes { margin-block: var(--s2); }
 /* a kitty animation: frames and the sequence are strips of small named pictures */
+.pix-anims { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.pix-arow { display: flex; align-items: center; gap: var(--s3); width: 100%; padding: var(--s2) var(--s3); text-align: left; background: var(--surface); border: var(--px) solid var(--line); color: var(--text); font: inherit; cursor: pointer; }
+.pix-arow:hover, .pix-arow:focus-visible { border-color: var(--accent-text); }
+.pix-arow .pix-ghost { border-style: dashed; }
+.pix-ghost .pix-fth { opacity: 0.55; }
+.pix-fth { flex: none; }
+.pix-aname { display: grid; flex: 1; min-width: 0; }
+.pix-aname b { overflow-wrap: anywhere; }
+.pix-fmove { font-size: 14px; line-height: 1.1; }
+.pix-fnew { border-style: dashed; align-content: center; }
+.pix-dhead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); }
 .pix-framebar { display: grid; gap: var(--s2); }
 .pix-fstrip { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .pix-fchip { display: grid; justify-items: center; gap: var(--s1); padding: var(--s2); min-width: 64px; max-width: 110px; background: var(--surface); border: var(--px) solid var(--line); color: var(--ink); font: inherit; cursor: pointer; }
@@ -86,10 +128,10 @@
 .pix-fchip .num { font-size: 14px; color: var(--muted); }
 .pix-fth { display: grid; place-items: center; width: 56px; height: 56px; background: repeating-conic-gradient(var(--surface) 0 25%, var(--surface2) 0 50%) 0 0 / 8px 8px; }
 .pix-fth .pxs { width: 100%; height: 100%; }
-.pix-animview { display: grid; grid-template-columns: auto 1fr; gap: var(--s4); align-items: start; }
-.pix-animbox { display: grid; gap: var(--s2); width: min-content; max-width: 100%; }
+.pix-animview { display: grid; gap: var(--s4); }   /* the picture across the whole box, its name, speed and Pause below it */
+.pix-animbox { display: grid; gap: var(--s2); width: 100%; }
 /* the canvas is the board's size (twice its pixels) and never changes: the picture inside it does */
-.pix-anim { width: calc(var(--w) * var(--px) * 2); max-width: 100%; aspect-ratio: var(--w) / var(--h); background: repeating-conic-gradient(var(--surface) 0 25%, var(--surface2) 0 50%) 0 0 / 12px 12px; }
+.pix-anim { width: 100%; max-height: min(60vh, 26em); aspect-ratio: var(--w) / var(--h); background: repeating-conic-gradient(var(--surface) 0 25%, var(--surface2) 0 50%) 0 0 / 12px 12px; }
 .pix-anim .pxs { width: 100%; height: 100%; }
 .pix-animcap { margin: 0; width: 0; min-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
 /* the kitty spots: a see-through kitty on each, numbered; the picked one outlined */
@@ -107,12 +149,15 @@
 .pix-selbar:empty { display: none; }
 .pix-selbar .btns { justify-content: center; }
 .pix-actions { display: flex; flex-wrap: wrap; gap: var(--s2); justify-content: center; }
+.pix-actions .btn[aria-pressed="true"] { border-color: var(--accent-edge); background: var(--accent); color: var(--accent-ink); }
+.pix-actions .pix-break { flex-basis: 100%; height: 0; }
 .pix-actions .pix-up .pxs, .pix-actions .pix-down .pxs { transform: rotate(90deg); }
 /* the colours: a swatch and its name */
 .pix-inks { display: grid; gap: var(--s1); }
 /* three to a row, a family per row; a short row stays short. The base colour sits on top, a line under it. */
 .pix-irow, .pix-igrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s1); }
 .pix-ibase { display: grid; gap: var(--s1); padding-bottom: var(--s2); margin-bottom: var(--s1); border-bottom: var(--bw) solid var(--line); }
+.pix-recent { position: sticky; top: 0; z-index: 5; padding: var(--s2) 0; background: var(--surface); }
 .pix-choose { grid-column: span 2; justify-content: center; color: var(--muted); }
 .pix-choose:only-child { grid-column: 1 / -1; }
 .pix-choose .pxs { flex: none; fill: currentColor; }

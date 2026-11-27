@@ -18,11 +18,13 @@ export type Spot = [number, number];
 // Where kitties can be: [x, feet-y] in room pixels (the cat's left edge and the row its feet stand on). These are the
 // official ones; the live lists below are what the app uses, and Kitty Gallery can put your own in them (see useScene).
 export const OFFICIAL_ROOM_SPOTS: readonly Spot[] = [
-  [17, 290], [46, 246], [162, 250], [98, 306], [83, 153], [123, 153], [200, 107], [181, 172], [200, 241], [204, 306], [104, 262],
+  [17, 290], [40, 247], [153, 258], [72, 307], [83, 153], [126, 153], [200, 107], [181, 172],
+  [194, 238], [176, 298], [102, 260], [54, 206], [102, 216], [3, 217], [121, 303], [141, 199],
 ];
 // At night they curl up in the soft places first: the cushion bed, the sofa, the cat tree.
 const OFFICIAL_ROOM_NIGHT_SPOTS: readonly Spot[] = [
-  [17, 290], [83, 153], [123, 153], [200, 107], [181, 172], [200, 241], [46, 246], [162, 250], [104, 262], [98, 306], [204, 306],
+  [17, 290], [83, 153], [126, 153], [200, 107], [181, 172], [194, 238], [40, 247], [153, 258], [102, 260], [72, 307], [176, 298],
+  [54, 206], [102, 216], [3, 217], [121, 303], [141, 199],
 ];
 export const OFFICIAL_GARDEN_SPOTS: readonly Spot[] = [[24, 199], [70, 130], [104, 190], [200, 240], [36, 256], [150, 226], [118, 150], [70, 226]];
 // The diary book and the trophy stand on top of the bookcase: [x, y] of their top-left corner, in room pixels.

@@ -17,7 +17,7 @@ import {
 } from './diary/model.ts';
 import { MAX_NOTES, MAX_TEXT, safeName } from './notes/model.ts';
 
-// Format 2 can carry Kitty Achievement's whole save as one more entry (achievement.achkitty, itself a zip, see achievement/backup.ts),
+// Format 2 can carry Pawchievement's whole save as one more entry (achievement.achkitty, itself a zip, see achievement/backup.ts),
 // so one file backs up both apps. Format 1 files (Habit Kitty only) still load. Newer entries (notes, shopping.json,
 // gallery.json, litterbox.json) were added without a new format: an older app skips what it does not know.
 export const BACKUP_FORMAT = 2;
@@ -25,11 +25,11 @@ export const BACKUP_FORMAT = 2;
 export { PHOTO_MAX_BYTES, PHOTO_MAX_SIDE } from './shared/photo.ts';
 
 export interface Backup {
-  game: unknown;                     // null in a file that only holds Kitty Achievement (an old .achkitty save)
+  game: unknown;                     // null in a file that only holds Pawchievement (an old .achkitty save)
   diary: Record<number, DiaryEntry>;
   photos: Record<number, Uint8Array>;
   morePhotos?: Record<number, Uint8Array[]>;   // a page's second, third and fourth photos
-  achievement?: Uint8Array;          // Kitty Achievement's save file, as is
+  achievement?: Uint8Array;          // Pawchievement's save file, as is
   reflections?: Record<string, Reflection>;   // by month, 'YYYY-MM'
   extras?: DiaryExtras;
   notes?: Record<string, string>;     // the notes, by name (notes/<name>.md in the file)
@@ -77,7 +77,7 @@ export function unpackBackup(bytes: Uint8Array): Backup {
   } });
   if (!files['manifest.json']) throw new Error('not a backup');
   const manifest = JSON.parse(strFromU8(files['manifest.json']));
-  // An Kitty Achievement save on its own (the older separate file): there is no game in it.
+  // An Pawchievement save on its own (the older separate file): there is no game in it.
   if (manifest?.app === 'achievement-kitty') return { game: null, diary: {}, photos: {}, achievement: bytes };
   if (!files['game.json'] || manifest?.app !== COMBINED_APP || ![1, BACKUP_FORMAT].includes(manifest.format)) throw new Error('unsupported backup');
   const diary: Record<number, DiaryEntry> = {};

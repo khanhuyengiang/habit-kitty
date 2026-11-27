@@ -49,8 +49,8 @@ export const settingsButton = (attrs = 'data-action="go" data-to="habit" data-ta
 export const backButton = (action: string) => square(`data-action="${action}"`, 'Back', iconSvg('prev'));
 
 // An app's name with "Kitty" in pink and the other word in the title colour: "Habit Kitty", "Kitty Journal".
-export const appName = (first: string, second: string) =>
-  [first, second].map((w) => (w === 'Kitty' ? `<span class="kitty">${w}</span>` : `<span class="name">${w}</span>`)).join(' ');
+export const appName = (first: string, second = '') =>
+  [first, second].filter(Boolean).map((w) => (w === 'Kitty' ? `<span class="kitty">${w}</span>` : `<span class="name">${w}</span>`)).join(' ');
 // The name on the left, the square buttons on the right: the same on every screen, so the buttons never move.
 export const titleBar = (first: string, second: string, buttons: string) =>
   `<div class="brand"><h1>${appName(first, second)}</h1><div class="brand-r">${buttons}</div></div>`;
@@ -66,12 +66,12 @@ export function showToast(el: HTMLElement, text: string) {
 
 // ---- putting things in order ----
 // The two buttons that move one thing up or down a list (data-action, data-id, data-by -1 or 1); the first can't go up, the
-// last can't go down. Kitty Achievement's side quests and Kitty Mart's categories use them.
+// last can't go down. Pawchievement's side quests and Kitty Mart's categories use them.
 export const moveButtons = (action: string, id: string, label: string, first: boolean, last: boolean) =>
   `<button class="btn small" type="button" data-action="${action}" data-id="${esc(id)}" data-by="-1" aria-label="Move ${esc(label)} up" ${first ? 'disabled' : ''}>${monoSvg(UI_ICONS.up)}</button>`
   + `<button class="btn small" type="button" data-action="${action}" data-id="${esc(id)}" data-by="1" aria-label="Move ${esc(label)} down" ${last ? 'disabled' : ''}>${monoSvg(UI_ICONS.down)}</button>`;
 // The Filter button (with how many settings differ from the default) and a choice in its panel, a <select> that carries
-// data-filter="name". Kitty Achievement's collection and the notes use them; the panel is .filter-panel / .filter-grid (page.html).
+// data-filter="name". Pawchievement's collection and the notes use them; the panel is .filter-panel / .filter-grid (page.html).
 export const filterButton = (open: boolean, changed: number, action = 'toggle-filter') =>
   `<button class="btn${changed ? ' on' : ''}" type="button" data-action="${action}" aria-expanded="${open}" aria-controls="filter-panel">${monoSvg(UI_ICONS.filter)} Filter${changed ? ` (${changed})` : ''}</button>`;
 export const filterSelect = (name: string, label: string, opts: [string, string][], cur: string) =>
